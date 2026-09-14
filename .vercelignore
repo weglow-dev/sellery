@@ -1,0 +1,17 @@
+# 배포에 불필요한 파일 — 정적 사이트(index.html · login.html · css/ · js/ · assets/)만 올린다
+.git
+.github
+.claude
+.vscode
+docs
+scripts
+supabase
+assets/_src
+README.md
+CONTRIBUTING.md
+CLAUDE.md
+*.md
+_site
+_preview.html
+.env*
+.vercel

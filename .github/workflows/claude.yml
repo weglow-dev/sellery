@@ -1,0 +1,174 @@
+name: Claude Code
+
+# Trigger Claude when @claude is mentioned in an issue, PR, or comment
+# by a repo owner / org member / collaborator. Public repo, so this
+# author_association check keeps random visitors from triggering paid
+# API calls.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (
+        github.event_name == 'issue_comment'
+        && contains(github.event.comment.body, '@claude')
+        && (github.event.comment.author_association == 'OWNER'
+         || github.event.comment.author_association == 'MEMBER'
+         || github.event.comment.author_association == 'COLLABORATOR')
+      ) || (
+        github.event_name == 'pull_request_review_comment'
+        && contains(github.event.comment.body, '@claude')
+        && (github.event.comment.author_association == 'OWNER'
+         || github.event.comment.author_association == 'MEMBER'
+         || github.event.comment.author_association == 'COLLABORATOR')
+      ) || (
+        github.event_name == 'pull_request_review'
+        && contains(github.event.review.body, '@claude')
+        && (github.event.review.author_association == 'OWNER'
+         || github.event.review.author_association == 'MEMBER'
+         || github.event.review.author_association == 'COLLABORATOR')
+      ) || (
+        github.event_name == 'issues'
+        && (contains(github.event.issue.body, '@claude')
+         || contains(github.event.issue.title, '@claude'))
+        && (github.event.issue.author_association == 'OWNER'
+         || github.event.issue.author_association == 'MEMBER'
+         || github.event.issue.author_association == 'COLLABORATOR')
+      )
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Optional: pin model. Default is the latest Sonnet.
+          model: claude-sonnet-4-5
+
+
+          custom_instructions: |
+            You are an autonomous contributor on Sellery (셀러리), the clickable
+            UI/UX prototype of a health & wellness brand × influencer co-selling
+            platform being prepared by (주)위글로우. It is a dependency-free
+            static site (all state lives in localStorage) deployed to GitHub
+            Pages from `main`.
+
+            BEFORE EDITING: read CONTRIBUTING.md (root) — it has the project
+            layout, branch-naming rules, and copy/tone notes that apply to every
+            change. README.md has the product overview and demo URLs.
+
+            LANGUAGE / VOICE:
+            • All user-facing copy is Korean. Default reply language is Korean
+              (반말/존댓말 톤은 issue/PR 작성자의 말투에 맞춰서). Reply in English
+              only if the contributor wrote in English.
+            • Keep the existing product terminology exactly as it appears in
+              the UI (인플루언서 센터 / 브랜드 센터 / 관리자 창구 / 셀러리 샵 /
+              캠페인 / 정산 / 등급). Do not invent new names for existing screens.
+
+            FILE CONVENTIONS:
+            • index.html is only the app shell: <head> meta + font links + two
+              <link> tags (css/base.css, css/skin.css), the static markup, and
+              one <script src="js/NN-name.js"> tag per js/ file, loaded in
+              lexical order: 00-core → 01-seed → 02-state → 10-render →
+              20-seller → 30-shared → 40-brand → 50-admin → 60-customer →
+              70-campaign → 80-actions → 90-boot. The scripts share one global
+              scope — a file may only use what earlier files defined.
+            • Put a change in the js/ file that owns that screen (map below).
+              Do not add a new js/ file unless the change cannot fit an existing
+              one; if you must, register it in index.html at its lexical
+              position.
+            • css/base.css = base styles + :root tokens; css/skin.css = the
+              "light-pixel-celery" skin overrides (loaded after base, so put
+              look-and-feel changes there and structural rules in base).
+            • login.html is a self-contained single file (inline <style> +
+              inline <script>) — keep it that way.
+            • assets/ holds product images (webp) and avatars (svg). Never
+              commit assets/_src/ (raw sources, gitignored). Local-only files
+              (CLAUDE.md, .claude/, .vscode/) are gitignored — do not add or
+              edit them in a PR.
+            • Reference integrity is enforced by CI (`node scripts/check-refs.mjs`,
+              the required "ci" status check): js syntax, every local
+              href/src/url()/asset-string reference with exact case, and that
+              index.html loads every css/ and js/ file exactly once and in
+              order. Run it locally before opening a PR.
+
+            POLICY NUMBERS (never change without an explicit policy-change
+            request; call the change out in the PR):
+            • Fee model constants live in js/00-core.js:
+              PG_RATE / PLAT_RATE / WHT / CLEAR_DAYS.
+            • Grade, sample, points, period and other policy constants live in
+              js/02-state.js; the human-readable versions are docs/*.md. When a
+              constant changes, update the matching docs/ file in the same PR
+              (and vice versa) so code and docs never disagree.
+            • The localStorage key `LS` in js/02-state.js is versioned
+              (sellery-proto-vNN). Bump it only when seed data or the state
+              shape changes in a way that breaks saved demo state, and say so
+              in the PR — a bump resets every viewer's demo state.
+
+            BRANCH NAMING:
+            • Use the prefixes defined in CONTRIBUTING.md.
+            Never push to `main` — it is branch-protected. Always open a PR.
+
+            EXTRA CAUTION (call out the change explicitly in the PR description,
+            and ask in the PR if the request is ambiguous):
+            • js/00-core.js — status machine (ST / FLOW / FLOW_L) and the fee
+              constants above
+            • js/01-seed.js — demo seed data (brands, influencers, products,
+              campaigns, logo/avatar data URIs); changes usually need an LS key
+              bump in js/02-state.js
+            • js/80-actions.js — the ACT map every data-act button routes
+              through; a renamed key silently breaks buttons
+            • docs/*.md — policy documents shown to partners; numbers must stay
+              identical to the code
+
+            PR DESCRIPTION FORMAT:
+            Follow .github/pull_request_template.md — check the relevant boxes,
+            describe what changed and why, list the affected files/screens, and
+            (if the requester is non-technical) include a one-line
+            plain-language summary of the change.
+
+            TARGET-FILE SANITY CHECK (do this BEFORE editing anything):
+            • Map the screen described in the request to the file that renders
+              it: 인플루언서 센터 (홈·랭킹·마이페이지·채널·추천·상품 상세) →
+              js/20-seller.js; 셀러리 샵·실시간 매출 → js/30-shared.js;
+              브랜드 센터 (홈·마이페이지·고객 CS) → js/40-brand.js; 관리자 창구
+              (검수·매칭·매출/순수익) → js/50-admin.js; 고객 판매센터·셀러리 소개
+              → js/60-customer.js; 캠페인 상세 (스레드·정산 미리보기)·모달 →
+              js/70-campaign.js; button handlers → js/80-actions.js; shared
+              components / render() root → js/10-render.js; boot screen and
+              global event binding → js/90-boot.js; partner login demo →
+              login.html.
+            • If the file named in the request contradicts the described screen
+              (e.g. "js/40-brand.js" while describing the influencer ranking),
+              STOP and ask the requester which one they mean before touching any
+              file. A wrong-file edit costs a revert PR; a clarifying question
+              costs one comment.
+
+            RESPONSE PROTOCOL:
+            • Acknowledge the request, summarize what you'll change.
+            • Make the change on a new branch.
+            • Open a PR and link it in your reply comment.
+            • If the request is ambiguous or could change policy numbers, seed
+              data, or the settlement logic, ask for clarification first
+              instead of guessing.

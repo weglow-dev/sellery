@@ -1,4 +1,38 @@
+# 로컬 개발 노트 — Pages 로 노출하지 않음 (local dev notes, not exposed via Pages)
+CLAUDE.md
+
+# 에디터 / IDE (editor & IDE settings — local only)
 .claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS 메타데이터 (OS metadata)
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 배포용 압축본 — 로컬 보관 (archive zips kept local)
 *.zip
+
+# 로그 / 환경변수 (logs & env)
+*.log
+.env
+.env.*
+
+# 의존성 / 빌드 산출물 — _site/ 는 GitHub Pages 빌드 출력 (dependencies & Pages build output)
+node_modules/
+_site/
+
+# 로컬 미리보기 임시 파일 (local preview scratch file)
 _preview.html
-assets/*.png
+
+# 이미지 (images)
+# 배포용 상품 이미지(webp / svg / png)는 assets/ 에 커밋한다 — 옛 "assets/*.png" 일괄 무시 규칙은 폐기.
+# 원본·누끼 소스(배경 제거 전 png, 포토샵 원본 등)는 assets/_src/ 에 두며 배포에 불필요하므로 무시.
+# (product images live in assets/ and are committed; raw/cutout sources live in assets/_src/ and are ignored)
+assets/_src/
+
+.vercel
+.env*
