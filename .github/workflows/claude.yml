@@ -1,0 +1,30 @@
+name: Claude
+
+# PR이나 이슈에 @claude 라고 멘션하면 Claude가 읽고 답하거나 고쳐서 커밋한다.
+# 동작 조건: 저장소 Settings > Secrets에 ANTHROPIC_API_KEY 가 등록되어 있어야 함.
+# (glo 저장소와 동일한 구성)
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+
+jobs:
+  claude:
+    if: contains(github.event.comment.body || github.event.issue.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
