@@ -1,4 +1,32 @@
+# 로컬 전용 개발 메모 — CLAUDE.md 는 팀 공용이라 커밋하고, 개인 메모는 CLAUDE.local.md 에
+CLAUDE.local.md
+
+# Editor / IDE / 에이전트 설정
 .claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Archive zips · 로컬 미리보기 산출물
 *.zip
 _preview.html
-assets/*.png
+_site/
+
+# Logs / env / 배포 도구 로컬 상태
+*.log
+.env
+.env.*
+.vercel
+
+# Dependencies (도구를 붙이게 되면)
+node_modules/
+
+# 원본·누끼 소스(배경 제거 전 png, 포토샵 원본 등)는 assets/_src/ 에 두며 배포에 불필요하므로 무시.
+# (product images live in assets/ and are committed; raw/cutout sources live in assets/_src/ and are ignored)
+assets/_src/

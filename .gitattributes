@@ -1,0 +1,19 @@
+# 줄바꿈: 모든 텍스트 파일은 저장소·체크아웃 모두 LF 로 통일 (Windows 포함)
+# (normalize every text file to LF, on commit and on checkout)
+* text=auto eol=lf
+
+# 텍스트로 명시 — 자동 감지에 맡기지 않음 (explicitly text)
+*.svg text
+*.mjs text
+
+# 바이너리 — 줄바꿈 변환·텍스트 diff 제외 (binary: no EOL conversion, no text diff)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.pdf binary

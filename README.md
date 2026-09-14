@@ -2,12 +2,13 @@
 
 > 좋은 브랜드를 만나는 공간, 셀러리
 
-브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다.
+브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
 
-**데모** → https://weglow-glo.github.io/sellery/
-**로그인** → https://weglow-glo.github.io/sellery/login.html
+**데모** → https://sellery-swart.vercel.app/ (Vercel · `main` 자동 배포 — 전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 서빙)
+**로그인** → https://sellery-swart.vercel.app/login.html
+**제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
 
-의존성 없는 단일 `index.html`. 상단에서 **인플루언서 센터 / 브랜드 센터 / 관리자 창구 / 고객 화면**을 오가며 전체 흐름을 눌러볼 수 있습니다.
+의존성 없는 정적 사이트. 상단에서 **인플루언서 센터 / 브랜드 센터 / 관리자 창구 / 고객 화면**을 오가며 전체 흐름을 눌러볼 수 있습니다.
 
 ## 구현된 흐름
 
@@ -30,12 +31,59 @@
 같은 상품이라도 기간은 **기본 공유** — 누구나 판매를 열 수 있습니다.
 다만 **플래티넘 이상** 인플루언서가 확정한 기간에는 플래티넘 이상만 함께 진입할 수 있습니다.
 
+## 파일 구조
+
+여러 명이 동시에 고칠 수 있도록 한 파일이던 `index.html`을 화면 단위로 나눴습니다. `index.html`은 껍데기이고, 실제 내용은 `css/`와 `js/`에 있습니다.
+
+```
+index.html          앱 셸 — <head> + css 링크 2개 + <script src> 12개 (순서 고정 00→90, 바꾸지 말 것)
+login.html          로그인 · 가입 · 구글 로그인 (단일 파일)
+css/base.css        기본 스타일 · :root 디자인 토큰                     ← 디자인
+css/skin.css        "light-pixel-celery" 픽셀 스킨 오버라이드              ← 디자인
+js/00-core.js       유틸 · 상태 머신(ST/FLOW) · 수수료 상수 PG_RATE / PLAT_RATE / WHT / CLEAR_DAYS
+js/01-seed.js       시드 데이터 — 데모 브랜드 · 인플루언서 · 상품 · 캠페인     ← 카피 · 데모 데이터
+js/02-state.js      상태 S · localStorage(LS 키) · 해시 라우팅 · 등급/샘플/포인트 상수 · 정산 계산
+js/10-render.js     render() 루트 · 공통 컴포넌트
+js/20-seller.js     인플루언서 센터 (홈 · 랭킹 · 마이페이지 · 채널 · 추천 · 상품 상세)
+js/30-shared.js     셀러리 샵 · 실시간 매출 (인플루언서/브랜드 공용)
+js/40-brand.js      브랜드 센터 (홈 · 마이페이지 · 고객 문의)
+js/50-admin.js      관리자 창구 (검수 · 매칭 · 매출/순수익)
+js/60-customer.js   고객 판매센터 · 셀러리 소개
+js/70-campaign.js   캠페인 상세 (스레드 · 정산 미리보기) · 모달
+js/80-actions.js    ACT 액션 맵 (data-act 버튼 핸들러 전부)
+js/90-boot.js       부트 화면 · 전역 이벤트 · render() 최초 호출
+assets/             아바타 SVG(av-s1~8), 상품 이미지(.webp) — 원본은 assets/_src/ (git 제외)
+docs/               운영 정책 문서 · 수정 가이드 (아래)
+scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
+```
+
+## 센터 바로가기
+
+| 링크 | 화면 |
+|---|---|
+| `/#influencer` | 인플루언서 센터만 |
+| `/#brand` | 브랜드 센터만 |
+| `/#admin` | 관리자 창구만 |
+| `/#customer` | 고객 판매센터만 |
+| `/#s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
+
+## 정책 문서
+
+숫자의 정답은 코드 상수이고, 사람이 읽는 판은 `docs/`에 있습니다. 상수를 바꾸면 같은 PR에서 문서도 고칩니다.
+
+- [docs/settlement-policy.md](docs/settlement-policy.md) — 수수료 · 정산 (PG / 플랫폼 / 등급 추가분 / 원천징수 / D+21)
+- [docs/grade-policy.md](docs/grade-policy.md) — 인플루언서 · 브랜드 등급
+- [docs/period-policy.md](docs/period-policy.md) — 판매 기간 · 링크 유입 보호
+- [docs/sample-policy.md](docs/sample-policy.md) — 샘플 (무상 · 구매 · 환급)
+- [docs/points-policy.md](docs/points-policy.md) — 셀러리(🥬) 포인트 · 추천
+- [docs/editing-guide.md](docs/editing-guide.md) — 데모 데이터 · 화면 · 디자인 수정 가이드 (비개발자용 상세판)
+
 ## 수정하고 올리기
 
-[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` → PR → 병합 → 자동 배포.
+[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` → PR → 병합 → Vercel 자동 배포. `main`에는 직접 올리지 않습니다.
 
 ---
 
 데이터는 브라우저 localStorage에 저장됩니다. 우측 상단 **데이터 초기화**로 시드 상태로 되돌립니다.
 
-> 프로토타입 전용 — 실제 결제·인증·서버는 붙어 있지 않습니다.
+> 프로토타입 전용 — 실제 결제·인증·서버는 붙어 있지 않습니다. 문의: official@weglow.biz

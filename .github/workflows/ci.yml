@@ -1,9 +1,15 @@
 name: CI
 
+# PR 필수 상태 검사. 브랜치 보호 규칙의 required status check 컨텍스트는
+# 아래 job 의 name("프로토타입 점검") 이다 — 이름을 바꾸면 보호 규칙도 같이 바꿀 것.
+
 on:
   pull_request:
   push:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   check:
