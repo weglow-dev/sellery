@@ -87,6 +87,7 @@ gh pr merge --squash --delete-branch
 
 main에 병합되면 Vercel이 자동으로 올립니다 (1분 내).
 → https://sellery-swart.vercel.app/
+(전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 그대로 서빙합니다. 정식 주소는 Vercel 쪽이며, 팀 합의 후 하나로 정리합니다.)
 
 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`).
 

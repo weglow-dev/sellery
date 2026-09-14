@@ -4,7 +4,7 @@
 
 브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
 
-**데모** → https://sellery-swart.vercel.app/
+**데모** → https://sellery-swart.vercel.app/ (Vercel · `main` 자동 배포 — 전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 서빙)
 **로그인** → https://sellery-swart.vercel.app/login.html
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
 

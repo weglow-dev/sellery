@@ -45,7 +45,7 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 
 - 상태 `S` (`view:{role,screen,cid}`, `actingSeller`, `actingBrand`, `data`), 시드 `D_()`, `render()` 전체 재렌더, 액션 디스패처 `ACT` (`data-act` / `data-k`), `openModal/closeModal`, `decorate()`
 - 해시 라우트: `#influencer` `#brand` `#admin` `#customer` `#shop` `#s/<cid>` (`#link/<cid>`)
-- 시드 키 `const LS='sellery-proto-v29'` (`js/02-state.js`) — **데이터 구조를 바꾸면 번호를 올려야** 기존 방문자 화면이 안 깨집니다
+- 시드 키 `const LS='sellery-proto-v30'` (`js/02-state.js`) — **데이터 구조를 바꾸면 번호를 올려야** 기존 방문자 화면이 안 깨집니다
 - 로그인 세션은 `localStorage['sellery-session']`, 링크 유입 컨텍스트는 `localStorage['slry-linkctx']`
 
 ## 핵심 정책 (숫자는 코드 상수가 정답 · 사람용 설명은 docs/)

@@ -1,5 +1,5 @@
 /* ============ state ============ */
-const LS='sellery-proto-v29';
+const LS='sellery-proto-v30';
 const BREF_RATE=0.01, BREF_DISC=0.01, BREF_TIMES=3;
 /* ---- 셀러리(🥬) 포인트 경제 ---- */
 const CELERY_PER=5000000; // 확정 매출 ₩500만당 1🥬

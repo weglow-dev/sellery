@@ -99,7 +99,8 @@ function seedData(){
       {id:'c10',sellerId:'s3',productId:'p2',status:'SAMPLE_APPROVED',createdAt:D(-2)},
       {id:'c11',sellerId:'s7',productId:'p9',status:'SAMPLE_REQUESTED',createdAt:D(0)},
       {id:'c12',sellerId:'s8',productId:'p2',status:'LIVE',start:D(-3),end:D(3),qty:600,createdAt:D(-16)},
-      {id:'c13',sellerId:'s1',productId:'p10',status:'INVITED',createdAt:D(0),invited:true,celUsed:0}
+      {id:'c13',sellerId:'s1',productId:'p10',status:'INVITED',createdAt:D(0),invited:true,celUsed:0},
+      {id:'c14',sellerId:'s1',productId:'p6',status:'SAMPLE_SHIPPED',createdAt:D(-3),tracking:'6812-4471-2039'}
     ],
     orders:[],
     cs:[
