@@ -1,7 +1,7 @@
-name: ci
+name: CI
 
-# PR 필수 상태 검사. 브랜치 보호 규칙의 required status check 컨텍스트는 "ci"
-# (아래 job id) 이므로 job 에 별도 name 을 주지 않는다.
+# PR 필수 상태 검사. 브랜치 보호 규칙의 required status check 컨텍스트는
+# 아래 job 의 name("프로토타입 점검") 이다 — 이름을 바꾸면 보호 규칙도 같이 바꿀 것.
 
 on:
   pull_request:
@@ -12,14 +12,13 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  check:
+    name: 프로토타입 점검
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Reference integrity + JS syntax
-        run: node scripts/check-refs.mjs
+          node-version: '20'
+      - name: node scripts/check.mjs
+        run: node scripts/check.mjs

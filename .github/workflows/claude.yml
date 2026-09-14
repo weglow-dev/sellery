@@ -71,8 +71,8 @@ jobs:
             You are an autonomous contributor on Sellery (셀러리), the clickable
             UI/UX prototype of a health & wellness brand × influencer co-selling
             platform being prepared by (주)위글로우. It is a dependency-free
-            static site (all state lives in localStorage) deployed to GitHub
-            Pages from `main`.
+            static site (all state lives in localStorage) hosted on Vercel —
+            `main` deploys to production and every PR gets a preview URL.
 
             BEFORE EDITING: read CONTRIBUTING.md (root) — it has the project
             layout, branch-naming rules, and copy/tone notes that apply to every
@@ -107,8 +107,8 @@ jobs:
               commit assets/_src/ (raw sources, gitignored). Local-only files
               (CLAUDE.md, .claude/, .vscode/) are gitignored — do not add or
               edit them in a PR.
-            • Reference integrity is enforced by CI (`node scripts/check-refs.mjs`,
-              the required "ci" status check): js syntax, every local
+            • Reference integrity is enforced by CI (`node scripts/check.mjs`,
+              the required "프로토타입 점검" status check): js syntax, every local
               href/src/url()/asset-string reference with exact case, and that
               index.html loads every css/ and js/ file exactly once and in
               order. Run it locally before opening a PR.
