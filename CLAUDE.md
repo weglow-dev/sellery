@@ -8,8 +8,8 @@
 
 ## 저장소 · 배포
 
-- GitHub: `weglow-glo/sellery` (glo와 같은 조직). `main`은 보호됨 — PR 필수, CI `프로토타입 점검` 통과, 리뷰 코멘트 해결, 관리자도 예외 없음.
-- 배포: **Vercel** (team `weglow-team` / project `sellery`) → https://sellery-swart.vercel.app/ . 빌드 없이 루트를 그대로 서빙(`vercel.json` framework null, `.vercelignore`로 docs/scripts/supabase/*.md 제외). GitHub 앱 연동 여부는 저장소만 봐서는 알 수 없습니다(`.vercel/project.json`은 link 정보뿐) — Vercel 대시보드 Settings → Git 에서 확인하세요. 연동돼 있으면 `main` 푸시 = 프로덕션, PR = 미리보기 URL 댓글. 안 돼 있으면 `vercel deploy --prod --scope weglow-team`. 전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 병행 서빙합니다(정식 주소는 Vercel).
+- GitHub: `weglow-dev/sellery` (glo와 같은 조직 · 2026-09-15 에 `weglow-glo` → `weglow-dev` 로 이름 변경, 옛 이름은 리다이렉트되지 않음). `main`은 보호됨 — PR 필수, CI `프로토타입 점검` 통과, 리뷰 코멘트 해결, 관리자도 예외 없음.
+- 배포: **Vercel** (team `weglow-team` / project `sellery`) → https://sellery-swart.vercel.app/ . 빌드 없이 루트를 그대로 서빙(`vercel.json` framework null, `.vercelignore`로 docs/scripts/supabase/*.md 제외). GitHub 앱 연동 여부는 저장소만 봐서는 알 수 없습니다(`.vercel/project.json`은 link 정보뿐) — Vercel 대시보드 Settings → Git 에서 확인하세요. 연동돼 있으면 `main` 푸시 = 프로덕션, PR = 미리보기 URL 댓글. 안 돼 있으면 `vercel deploy --prod --scope weglow-team`. 전환기 동안 GitHub Pages https://weglow-dev.github.io/sellery/ 도 같은 `main`을 병행 서빙합니다(정식 주소는 Vercel).
 - CI: `.github/workflows/ci.yml` → `node scripts/check.mjs` (Node 20+ · js 문법 · css/js 참조와 순서 · 자산 경로 대소문자 · 시드 키 · 주요 화면 함수 · 충돌 흔적). 로컬에서도 같은 명령.
 - Claude 봇: `.github/workflows/claude.yml` (glo와 같은 구성 + 셀러리용 안내문). Secrets `ANTHROPIC_API_KEY` + 조직 Claude GitHub 앱에 저장소 추가 필요.
 - 이 파일(CLAUDE.md)은 **커밋되는 팀 공용 메모**입니다. 개인 메모는 `CLAUDE.local.md`(gitignore). 줄바꿈은 `.gitattributes`가 모든 텍스트 파일을 LF로 강제합니다(Windows 포함).
