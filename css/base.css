@@ -380,3 +380,22 @@ code{font-family:'IBM Plex Mono',monospace;font-size:.9em;background:var(--yello
 .hero-av{position:absolute;top:30px;right:6px;width:88px;height:88px;object-fit:cover;border:2px solid var(--line);box-shadow:4px 4px 0 var(--ink);transform:rotate(2deg);background:var(--surface)}
 @media(max-width:640px){.hero-av{position:static;display:block;width:64px;height:64px;margin:0 0 12px;transform:rotate(-2deg)}}
 .ph.av{background-size:cover;background-position:center;transform:none!important}
+
+/* ---- 고객: 카카오 로그인 · 장바구니 · 내 주문 (2026-09-15) ---- */
+button.kakao{background:#FEE500;color:#191919;border-color:#191919;display:inline-flex;align-items:center;gap:6px;font-weight:700}
+button.kakao:hover{background:#f3da00}
+.kv-av{width:26px;height:26px;border-radius:50%;background:#FEE500;color:#191919;display:inline-grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+.kwin .khd{text-align:center;padding:4px 0 14px;font-size:16px}
+.kwin .khd .kico{width:22px;height:22px;vertical-align:-4px;margin-right:4px}
+.kwin .ksub{font-size:12px;color:var(--mute);margin-top:4px;font-weight:400}
+.klist button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:2px solid var(--soft-line);padding:10px 14px;margin-bottom:8px;font:inherit;font-size:13.5px;box-shadow:none;color:var(--ink)}
+.klist button:hover{border-color:var(--ink);background:var(--yellow-soft)}
+.klist small{display:block;color:var(--mute);font-size:11.5px;font-weight:400}
+.kav{width:34px;height:34px;border-radius:50%;background:#FEE500;color:#191919;display:grid;place-items:center;font-weight:700;flex:none}
+.kft{font-size:11.5px;color:var(--mute);text-align:center;margin-top:6px;line-height:1.5}
+.buyrow{display:flex;gap:8px}.buyrow .buy{flex:1}.buyrow .ghost.buy{flex:0 0 auto;padding-left:18px;padding-right:18px}
+.cartgrid{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start}
+.cart-row{flex-wrap:wrap}.cart-row.off{opacity:.55}.cart-row .picon{flex:none}
+.cart-sum{font-family:'IBM Plex Mono',monospace;font-weight:700;min-width:90px;text-align:right}
+.qty.sm button{width:30px;height:30px;font-size:15px}.qty.sm span{min-width:30px}
+@media(max-width:900px){.cartgrid{grid-template-columns:1fr}.buyrow{flex-direction:column}.buyrow .ghost.buy{flex:1}}

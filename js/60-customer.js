@@ -83,8 +83,10 @@ function vCustHome(){
     <div class="card"><div class="why-i">⏱️</div><b>기간 한정 가격</b><div class="meta">인플루언서 판매 기간에만 열리는 가격입니다. 같은 기간, 다른 곳에서 더 낮은 가격은 없습니다.</div></div>
   </div>
   <div class="card" style="margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px">
-    <div><b>셀러리 회원이 되면</b> <span class="meta">오픈 알림 · 주문·배송·환불 통합 관리 · 인플루언서 팔로우 · 인증 이력</span></div>
-    <div class="btnrow" style="margin:0"><button class="pri sm" data-act="custJoin">카카오로 시작하기</button><button class="sm ghost" data-act="screen" data-k="about">셀러리 소개</button></div>
+    ${S.cust?`<div><b>${esc(S.cust.name)}님</b> <span class="meta">주문·배송·환불은 <b>내 주문</b>에서 한곳에 관리돼요${cartN()?` · 장바구니에 ${cartN()}개`:''}</span></div>
+    <div class="btnrow" style="margin:0"><button class="pri sm" data-act="screen" data-k="orders">내 주문 보기</button>${cartN()?`<button class="sm ghost" data-act="screen" data-k="cart">장바구니 ${cartN()}</button>`:''}</div>`
+    :`<div><b>셀러리 회원이 되면</b> <span class="meta">오픈 알림 · 주문·배송·환불 통합 관리 · 인플루언서 팔로우 · 인증 이력</span></div>
+    <div class="btnrow" style="margin:0"><button class="sm kakao" data-act="custJoin">${KAKAO_ICON} 카카오로 시작하기</button><button class="sm ghost" data-act="screen" data-k="about">셀러리 소개</button></div>`}
   </div>`;
 }
 /* ============ CUSTOMER: 셀러리 소개 ============ */
@@ -265,7 +267,7 @@ function vStore(cid){
           <div class="qty"><button data-act="qtyDelta" data-k="-1">−</button><span>${q}</span><button data-act="qtyDelta" data-k="1">+</button></div>
           <div style="text-align:right"><div style="font-size:11.5px;color:var(--mute)">총 결제 금액</div><div style="font-family:'Archivo',sans-serif;font-size:24px;font-weight:800">₩${fmt(o.price*q)}</div></div>
         </div>
-        ${live?`<button class="pri buy" data-act="buyNow" data-k="${cid}" ${left<=0?'disabled style="opacity:.5"':''}>${left<=0?'품절':'구매하기'}</button>
+        ${live?`<div class="buyrow"><button class="ghost buy" data-act="addCart" data-k="${cid}" ${left<=0?'disabled style="opacity:.5"':''}>🛒 장바구니</button><button class="pri buy" data-act="buyNow" data-k="${cid}" ${left<=0?'disabled style="opacity:.5"':''}>${left<=0?'품절':'구매하기'}</button></div>
           <div class="meta" style="text-align:center;margin-top:8px">${md(P(c.start))}–${md(P(c.end))} 한정 · 잔여 ${fmt(Math.max(0,left))}개 · ${fmt(soldQty(cid))}개 판매됨 · 결제 시 셀러리 안전결제로 이동</div>`
         :c.preview?`<button class="buy" disabled style="opacity:.7">상세페이지 미리보기 — 판매 링크 발급 전</button><div class="meta" style="text-align:center;margin-top:8px">인플루언서 일정이 확정되면 이 레이아웃으로 판매 링크가 생성됩니다 · 재고 ${fmt(p.stock)}개</div>`
         :soon?`<button class="pri buy" data-act="notifyMe" data-k="${cid}">🔔 ${md(P(c.start))} 오픈 알림 받기</button>`
@@ -281,4 +283,38 @@ function vStore(cid){
     ${mine.length?`<div class="sec">${esc(s.name)}님의 다른 판매</div><div class="grid g3">${mine.map(custCard).join('')}</div>`:''}
     <div class="store-foot">${CEL} <b>SELLERY</b> · 셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드(${esc(b.name)})에 있습니다 · #광고 · 인플루언서는 판매 수수료를 받습니다</div>
   </div>`;
+}
+/* ============ CUSTOMER: 장바구니 ============ */
+function vCustCart(){
+  const L=cartLines();const okL=L.filter(x=>x.ok);const total=okL.reduce((a,x)=>a+x.sum,0);
+  if(!L.length)return `<h2 class="pg">장바구니 <small>담아둔 상품이 없어요</small></h2>
+    <div class="card" style="padding:34px;text-align:center"><div style="font-size:34px;margin-bottom:8px">🛒</div>진행 중인 판매 페이지에서 <b>장바구니</b>를 눌러 담아보세요<div class="btnrow" style="justify-content:center;margin-top:14px"><button class="pri sm" data-act="screen" data-k="home">진행 중인 판매 보기</button></div></div>`;
+  return `<h2 class="pg">장바구니 <small>${fmt(cartN())}개 · 기간 한정 가격 — 판매가 끝난 상품은 결제에서 자동으로 빠집니다</small></h2>
+  <div class="cartgrid">
+    <div class="listcard">${L.map(x=>`<div class="rowitem cart-row ${x.ok?'':'off'}">${pIcon(x.p,48)}
+      <div class="grow" style="min-width:160px"><div class="nm" data-act="preview" data-k="${x.c.id}" style="cursor:pointer">${esc(x.p.name)} <span class="sub" style="font-weight:400">· ${esc(x.b.name)}</span></div>
+        <div class="sub">${esc(x.o.n)} · ${platIcon(x.s)} ${esc(x.s.name)} ${x.s.handle}${x.ok?` · ${md(P(x.c.end))} 마감`:x.c.status==='LIVE'?` · <b style="color:var(--danger)">잔여 ${Math.max(0,x.left)}개 — 수량을 줄여주세요</b>`:' · <b style="color:var(--danger)">판매 종료</b>'}</div></div>
+      <div class="qty sm"><button data-act="cartQty" data-k="${x.i}|-1">−</button><span>${x.it.qty}</span><button data-act="cartQty" data-k="${x.i}|1">+</button></div>
+      <div class="cart-sum">₩${fmt(x.sum)}</div>
+      <button class="sm ghost" data-act="cartRemove" data-k="${x.i}" aria-label="삭제" title="삭제">✕</button></div>`).join('')}</div>
+    <div class="card cart-side"><h4 style="margin-top:0">결제 금액</h4>
+      <table class="stmt" style="min-width:0;font-size:13px;width:100%">${okL.map(x=>`<tr><td>${esc(x.p.name)} × ${x.it.qty}</td><td class="num">₩${fmt(x.sum)}</td></tr>`).join('')||'<tr><td colspan="2" style="color:var(--mute)">결제 가능한 상품이 없어요</td></tr>'}<tr><td>배송비</td><td class="num">무료 · 브랜드 직배송</td></tr><tr class="tot"><td>총 결제</td><td class="num">₩${fmt(total)}</td></tr></table>
+      ${L.length>okL.length?`<div class="meta" style="margin:8px 0 0">결제할 수 없는 ${L.length-okL.length}건은 제외됩니다</div>`:''}
+      <button class="pri buy" data-act="cartCheckout" ${okL.length?'':'disabled style="opacity:.5"'} style="width:100%;margin-top:12px;padding:14px">${S.cust?`₩${fmt(total)} 결제하기`:'카카오 로그인 후 결제'}</button>
+      <div class="meta" style="text-align:center;margin-top:8px">결제 대금은 <b>셀러리</b>가 보관 · 판매 종료 후 ${CLEAR_DAYS}일 환불 보호</div></div>
+  </div>`;
+}
+/* ============ CUSTOMER: 내 주문 (카카오 로그인 후) ============ */
+function vCustOrders(){
+  if(!S.cust)return `<h2 class="pg">내 주문</h2><div class="card" style="text-align:center;padding:34px"><b>카카오 로그인</b>하면 주문·배송·환불을 한곳에서 볼 수 있어요<div class="btnrow" style="justify-content:center;margin-top:14px"><button class="sm kakao" data-act="custJoin">${KAKAO_ICON} 카카오 로그인</button></div></div>`;
+  const os=custOrders();
+  const ST_O={PAID:['결제 완료','green'],REFUNDED:['환불 완료','gray']};
+  return `<h2 class="pg">내 주문 <small>${esc(S.cust.name)}님 · ${os.length}건</small></h2>
+  ${os.length?`<div class="listcard">${os.map(o=>{const c=camp(o.campaignId),p=c&&prod(c.productId),b=p&&brand(p.brandId);if(!p)return '';const st=ST_O[o.status]||[o.status,'gray'];
+    const ship=o.status!=='PAID'?'':c.status==='LIVE'?'브랜드 발송 준비 중':c.status==='CLEARING'?`교환·환불 ${md(settleDue(c))}까지`:'배송 완료';
+    return `<div class="rowitem cart-row">${pIcon(p,44)}<div class="grow" style="min-width:160px"><div class="nm">${esc(p.name)} <span class="sub" style="font-weight:400">· ${esc(o.opt||'')} × ${o.qty}</span></div><div class="sub">${o.id.toUpperCase()} · ${md(P(o.at))} 주문 · ${esc(b.name)} 직배송${ship?' · '+ship:''}</div></div>
+      <span class="st ${st[1]}" style="animation:none">${st[0]}</span><div class="cart-sum">₩${fmt(o.unit*o.qty)}</div>
+      <div class="btnrow" style="margin:0"><button class="sm" data-act="openCS" data-k="${c.id}|${o.id}">문의</button>${o.status==='PAID'&&c.status!=='SETTLED'?`<button class="sm ghost" data-act="custRefund" data-k="${o.id}">환불 신청</button>`:''}</div></div>`;}).join('')}</div>`
+  :`<div class="card" style="padding:30px;text-align:center;color:var(--mute)">아직 주문이 없어요 — <button class="sm ghost" data-act="screen" data-k="home">진행 중인 판매 보기</button></div>`}
+  <div class="card" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:10px"><span class="kv-av" style="width:34px;height:34px;font-size:14px">${esc(S.cust.name[0])}</span><div><b>${esc(S.cust.name)}</b><div class="meta">${esc(S.cust.email||'')}${S.cust.email?' · ':''}카카오 계정 · ${md(P(S.cust.at))} 가입</div></div></div><button class="sm ghost" data-act="custLogout">로그아웃</button></div>`;
 }

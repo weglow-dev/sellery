@@ -4,12 +4,12 @@ function transition(cid,st,sysTxt){const c=camp(cid);c.status=st;if(sysTxt)pushS
 const ACT={
   role(k){S.view={role:k,screen:'home',cid:null};render();},
   logout(){try{localStorage.removeItem('sellery-session');}catch(e){}S.session=null;location.href='login.html?role='+(S.view.role==='brand'?'brand':'seller');},
-  screen(k){S.view.screen=k;S.view.cid=null;render();},
+  screen(k){S.view.screen=k;S.view.cid=null;S.view.store=null;render();},
   goHome(){S.view={role:S.view.role,screen:'home',cid:null};render();},
   gotoMy(){
     if(S.view.role==='brand'){S.view={role:'brand',screen:'my',cid:null};render();return;}
     if(S.view.role==='admin'&&S.lockedRole){toast('관리자 설정은 준비 중입니다');return;}
-    if(S.view.role==='customer'){toast('고객 로그인·주문 조회는 실서비스에서 제공됩니다 (카카오 로그인)');return;}
+    if(S.view.role==='customer'){if(S.cust){S.view={role:'customer',screen:'orders',cid:null,store:null};render();}else kakaoStart('');return;}
     S.view={role:'seller',screen:'my',cid:null};render();
   },
   saveBrandInfo(){
@@ -572,20 +572,9 @@ const ACT={
     const opts=optsOf(p),o=opts[Math.min(S.storeOpt||0,opts.length-1)],q=S.storeQty||1;
     const left=(c.qty||0)-soldQty(cid);
     if(left<q){toast(`남은 수량이 부족합니다 (잔여 ${Math.max(0,left)}개)`);return;}
-    const id='o'+(D_().seq++);
-    D_().orders.push({id,campaignId:cid,buyer:'고객(구매 페이지)',qty:q,unit:o.price,opt:o.n,status:'PAID',at:ymd(today())});
-    S.storeQty=1;save();render();
-    openModal(`<h3>주문 완료 ✓</h3>
-    <div class="notice" style="margin:8px 0 12px">결제 금액은 <b>셀러리</b>가 안전하게 보관하고, 판매 종료 후 교환/환불 기간(${CLEAR_DAYS}일)이 지나면 브랜드·인플루언서에게 정산됩니다.</div>
-    <table class="stmt" style="min-width:0;font-size:13px">
-      <tr><td>주문번호</td><td class="num"><b>${id.toUpperCase()}</b></td></tr>
-      <tr><td>상품</td><td class="num">${esc(p.name)} · ${esc(o.n)} × ${q}</td></tr>
-      <tr><td>결제 금액</td><td class="num"><b>₩${fmt(o.price*q)}</b></td></tr>
-      <tr><td>판매 인플루언서</td><td class="num">${esc(seller(c.sellerId).name)} ${seller(c.sellerId).handle}</td></tr>
-      <tr><td>배송</td><td class="num">${esc(brand(p.brandId).name)} 직배송 · 운송장은 셀러리 알림톡으로</td></tr>
-    </table>
-    <p style="font-size:12px;color:var(--mute);margin-top:10px">주문 조회는 셀러리 고객센터(카카오 로그인)에서, 배송·교환·반품 문의는 아래 버튼으로 공급 브랜드에 바로 전달됩니다. 실서비스에서는 이 단계에서 PG 결제창이 열립니다.</p>
-    <div class="foot"><button data-act="openCS" data-k="${cid}|${id}">문의하기</button><button class="pri" data-act="closeModal">확인</button></div>`);
+    if(!S.cust){kakaoStart('buy:'+cid);return;}   // 카카오 로그인 → 바로 이어서 주문
+    const id=placeOrder(c,o,q);
+    S.storeQty=1;save();render();orderDoneModal([id]);
   },
   openCS(k){const [cid,oid]=String(k).split('|');csModal(cid,oid||'');},
   submitCS(cid){
@@ -593,7 +582,7 @@ const ACT={
     if(!msg){toast('문의 내용을 입력해주세요');return;}
     const c=camp(cid),p=prod(c.productId),b=brand(p.brandId);
     const id='cs'+(D_().seq++);
-    csList().push({id,cid,orderId:oid||null,buyer:'고객',type,msg,status:'OPEN',at:ymd(today())});
+    csList().push({id,cid,orderId:oid||null,buyer:S.cust?S.cust.name:'고객',type,msg,status:'OPEN',at:ymd(today())});
     pushSys(cid,`💬 구매 고객이 <b>${esc(type)}</b> 문의를 남겼습니다 — <b>${esc(b.name)}</b> 고객 문의함으로 전달되었습니다`);
     closeModal();save();render();
     toast(`문의가 ${b.name}에 접수되었습니다 — 답변은 알림톡으로 안내됩니다`);
@@ -634,7 +623,44 @@ const ACT={
   custAll(){S.custSel=null;render();},
   custCat(k){S.custCat=k;render();},
   faqToggle(i){S.faqOpen=S.faqOpen===+i?null:+i;render();},
-  custJoin(){toast('카카오 로그인 가입은 실서비스에서 제공됩니다 (시뮬레이션)');},
+  /* ---- 고객 카카오 로그인 · 장바구니 · 내 주문 ---- */
+  custJoin(){kakaoStart('');},
+  kakaoPick(k){ // 데모 계정 선택 → 즉시 로그인 (재확인 없음)
+    let acc=KAKAO_DEMO.find(a=>a.id===k);
+    if(k==='__other'){const nm=prompt('카카오 계정 이름 (데모)');if(!nm||!nm.trim())return;acc={id:'k'+Date.now().toString(36),name:nm.trim(),email:''};}
+    if(acc)kakaoSignIn(acc);
+  },
+  custLogout(){saveCust(null);if(S.view.screen==='orders')S.view.screen='home';render();toast('로그아웃했어요');},
+  custGoOrders(){closeModal();S.view={role:'customer',screen:'orders',cid:null,store:null};render();},
+  addCart(cid){
+    const c=camp(cid);if(!c||c.status!=='LIVE'){toast('현재 판매 중이 아닙니다');return;}
+    const p=prod(c.productId),opts=optsOf(p),oi=Math.min(S.storeOpt||0,opts.length-1),q=S.storeQty||1;
+    const left=(c.qty||0)-soldQty(cid);if(left<q){toast(`남은 수량이 부족합니다 (잔여 ${Math.max(0,left)}개)`);return;}
+    cartAdd(cid,oi,q);S.storeQty=1;render();toast(`장바구니에 담았어요 · ${cartN()}개`);
+  },
+  cartQty(k){const [i,d]=String(k).split('|');const it=(S.cart||[])[+i];if(!it)return;it.qty=Math.max(1,Math.min(10,it.qty+ +d));saveCart();render();},
+  cartRemove(i){(S.cart||[]).splice(+i,1);saveCart();render();},
+  cartCheckout(){
+    if(!S.cust){kakaoStart('checkout');return;}   // 로그인 → 바로 결제 이어서
+    const L=cartLines().filter(x=>x.ok);if(!L.length){toast('결제할 수 있는 상품이 없어요');return;}
+    const ids=L.map(x=>placeOrder(x.c,x.o,x.it.qty));
+    const done=new Set(L.map(x=>x.i));S.cart=(S.cart||[]).filter((_,i)=>!done.has(i));saveCart();
+    save();render();orderDoneModal(ids);
+  },
+  custRefund(oid){
+    const o=D_().orders.find(x=>x.id===oid);if(!o||!S.cust||o.buyerId!==S.cust.id||o.status!=='PAID')return;
+    const c=camp(o.campaignId),p=prod(c.productId);
+    if(c.status==='SETTLED'){toast('정산이 끝난 주문은 브랜드 고객 문의로 접수해주세요');return;}
+    openModal(`<h3>환불 신청</h3>
+    <div style="font-size:13.5px;margin-bottom:10px"><b>${esc(p.name)}</b> · ${esc(o.opt||'')} × ${o.qty} · <b>₩${fmt(o.unit*o.qty)}</b></div>
+    <div class="notice" style="margin:0 0 12px">결제 대금은 <b>셀러리</b>가 보관 중이라 브랜드 확인을 기다리지 않고 바로 환불됩니다. 이미 발송된 상품은 회수 후 처리돼요.</div>
+    <div class="foot"><button data-act="closeModal">취소</button><button class="pri" data-act="custRefundGo" data-k="${oid}">환불 신청</button></div>`);
+  },
+  custRefundGo(oid){
+    const o=D_().orders.find(x=>x.id===oid);if(!o||o.status!=='PAID')return;
+    o.status='REFUNDED';pushSys(o.campaignId,`↩ 고객 환불 신청 · ${esc(o.buyer)} · ₩${fmt(o.unit*o.qty)} (정산액 차감)`);
+    closeModal();save();render();toast('환불 신청 완료 — 결제수단으로 3영업일 내 환급');
+  },
   goCenter(role){S.lockedRole=false;S.view={role,screen:'home',cid:null,store:null};render();},
   notifyMe(){toast('오픈 알림 신청 완료 — 판매 시작 시 카카오 알림톡으로 안내 (시뮬레이션)');},
   /* ---- 관리자: 자동 제안 ---- */
@@ -689,4 +715,52 @@ function simSell(cid,n){
       qty:Math.random()<.25?2:1,unit:p.gp,status:'PAID',at:ymd(today())});
   }
   save();render();toast(`주문 ${n}건 발생 (시뮬레이션)`);
+}
+
+/* ============ 고객 주문 · 카카오 로그인 헬퍼 ============ */
+/* 주문 1건 생성 — 구매하기·장바구니 결제 공통. 로그인 고객이면 buyerId로 '내 주문'에 연결 */
+function placeOrder(c,o,q){
+  const id='o'+(D_().seq++);
+  D_().orders.push({id,campaignId:c.id,buyer:S.cust?S.cust.name:'고객(구매 페이지)',buyerId:S.cust?S.cust.id:null,qty:q,unit:o.price,opt:o.n,status:'PAID',at:ymd(today())});
+  return id;
+}
+function orderDoneModal(ids){
+  const os=ids.map(id=>D_().orders.find(o=>o.id===id)).filter(Boolean);if(!os.length)return;
+  const total=os.reduce((a,o)=>a+o.unit*o.qty,0);
+  openModal(`<h3>주문 완료 ✓</h3>
+  <div class="notice" style="margin:8px 0 12px">결제 금액은 <b>셀러리</b>가 안전하게 보관하고, 판매 종료 후 교환/환불 기간(${CLEAR_DAYS}일)이 지나면 브랜드·인플루언서에게 정산됩니다.</div>
+  <table class="stmt" style="min-width:0;font-size:13px">
+    ${os.map(o=>{const c=camp(o.campaignId),p=prod(c.productId),s=seller(c.sellerId);return `<tr><td>${o.id.toUpperCase()}</td><td class="num">${esc(p.name)} · ${esc(o.opt||'')} × ${o.qty} · <b>₩${fmt(o.unit*o.qty)}</b><div style="font-size:11.5px;color:var(--mute);font-weight:400">${esc(s.name)} ${s.handle} · ${esc(brand(p.brandId).name)} 직배송</div></td></tr>`;}).join('')}
+    ${os.length>1?`<tr class="tot"><td>총 결제</td><td class="num">₩${fmt(total)}</td></tr>`:''}
+  </table>
+  <p style="font-size:12px;color:var(--mute);margin-top:10px">${S.cust?`<b>${esc(S.cust.name)}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요. `:''}운송장은 카카오 알림톡으로 안내됩니다. 실서비스에서는 이 단계에서 PG 결제창이 열립니다.</p>
+  <div class="foot"><button data-act="openCS" data-k="${os[0].campaignId}|${os[0].id}">문의하기</button>${S.cust?`<button data-act="custGoOrders">내 주문</button>`:''}<button class="pri" data-act="closeModal">확인</button></div>`);
+}
+/* 카카오 로그인 — KAKAO_JS_KEY가 있으면 카카오 JS SDK(실계정), 없으면 데모 계정 선택 창.
+   선택/인증 즉시 로그인되고(재확인 없음), 로그인 전에 하려던 동작(after: 'buy:<cid>' | 'checkout')을 이어서 실행한다. */
+function kakaoStart(after){
+  S.kakaoAfter=after||'';
+  if(KAKAO_JS_KEY){kakaoReal();return;}
+  openModal(`<div class="kwin"><div class="khd">${KAKAO_ICON} <b>카카오계정으로 로그인</b><div class="ksub">셀러리 고객 로그인은 카카오만 지원해요</div></div>
+    <div class="klist">${KAKAO_DEMO.map(a=>`<button data-act="kakaoPick" data-k="${a.id}"><span class="kav">${esc(a.name[0])}</span><span><b>${esc(a.name)}</b><small>${esc(a.email)}</small></span></button>`).join('')}
+      <button data-act="kakaoPick" data-k="__other"><span class="kav" style="background:#eee;color:#555">+</span><span><b>다른 카카오계정</b><small>데모 — 이름만 입력</small></span></button></div>
+    <div class="kft">데모 화면 · 실서비스에서는 카카오 로그인 창이 열리고 동의 후 바로 로그인됩니다</div></div>`);
+}
+function kakaoSignIn(acc){
+  saveCust({id:acc.id,name:acc.name,email:acc.email||'',kakao:true,at:ymd(today())});closeModal();
+  const a=S.kakaoAfter||'';S.kakaoAfter='';
+  toast(`${acc.name}님, 카카오로 로그인했어요`);
+  if(a==='checkout'){ACT.cartCheckout();return;}
+  if(a.startsWith('buy:')){ACT.buyNow(a.slice(4));return;}
+  render();
+}
+/* 실서비스 경로 (카카오 JS SDK v2): authorize()는 카카오 로그인 페이지로 리다이렉트하고 ?code= 로 돌아온다.
+   인가 코드 → 토큰 교환은 REST API 키가 필요해 서버(예: /auth/kakao)에서 처리해야 하며, 그 서버가
+   kakaoSignIn({id,name,email})과 같은 모양으로 세션을 내려주면 나머지 흐름은 그대로 동작한다. */
+function kakaoReal(){
+  const go=()=>{try{if(!Kakao.isInitialized())Kakao.init(KAKAO_JS_KEY);
+    Kakao.Auth.authorize({redirectUri:location.origin+location.pathname,state:'cust:'+(S.kakaoAfter||''),scope:'profile_nickname,account_email'});}
+    catch(e){toast('카카오 로그인 초기화 실패 — JavaScript 키와 등록 도메인을 확인해주세요');}};
+  if(window.Kakao){go();return;}
+  const sc=document.createElement('script');sc.src='https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';sc.crossOrigin='anonymous';sc.onload=go;sc.onerror=()=>toast('카카오 SDK를 불러오지 못했어요');document.head.appendChild(sc);
 }

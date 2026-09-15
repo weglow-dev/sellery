@@ -4,7 +4,7 @@ const SCREENS={
   seller:[['home','홈'],['camps','내 캠페인'],['dm','DM'],['explore','상품 갤러리'],['sales','실시간 매출'],['settle','정산'],['rank','랭킹·등급'],['shop','셀러리 샵'],['ref','추천 프로그램']],
   brand:[['home','홈'],['dm','DM'],['camps','내 캠페인'],['orders','주문·발주'],['cs','고객 문의'],['sales','실시간 매출'],['settle','정산'],['products','상품 관리'],['gallery','인플루언서 갤러리'],['shop','셀러리 샵']],
   admin:[['home','대시보드'],['products','상품'],['influencers','인플루언서'],['brands','브랜드'],['orders','주문·CS'],['match','매칭·자동 제안'],['revenue','매출·순수익'],['settle','정산 실행']],
-  customer:[['home','진행 중인 판매'],['influencers','인플루언서'],['about','셀러리 소개']]
+  customer:[['home','진행 중인 판매'],['influencers','인플루언서'],['cart','장바구니'],['orders','내 주문'],['about','셀러리 소개']]   // '내 주문'은 카카오 로그인 후에만 노출
 };
 function render(){
   autoTick();
@@ -12,10 +12,14 @@ function render(){
   const cnt=counts();
   $('#roletabs').innerHTML=S.lockedRole?'':ROLES.map(([k,l])=>
     `<button data-act="role" data-k="${k}" class="${S.view.role===k?'on':''}">${l}${cnt[k]?`<span class="badge">${cnt[k]}</span>`:''}</button>`).join('');
-  const scr=SCREENS[S.view.role];
+  const scr=S.view.role==='customer'?SCREENS.customer.filter(([k])=>k!=='orders'||S.cust):SCREENS[S.view.role];
   const cb=$('#celbal'); if(cb){const who=S.view.role==='brand'?S.actingBrand:S.view.role==='seller'?S.actingSeller:null; cb.innerHTML=who?`${CEL} ${celBal(who)}`:''; cb.style.display=who?'inline-flex':'none';}
   let personaHtml='';
-  if(S.lockedRole){ /* 실서비스: 로그인 계정 고정 — 전환 셀렉트 없음 */
+  if(S.view.role==='customer'){ /* 고객: 카카오 로그인만. 파트너 세션(S.session)과 무관 */
+    personaHtml=S.cust?`<div class="persona"><span class="kv-av">${esc(S.cust.name[0])}</span><span style="color:var(--ink)"><b>${esc(S.cust.name)}</b>님</span><button class="sm ghost" data-act="custLogout">로그아웃</button></div>`
+      :`<div class="persona"><button class="sm kakao" data-act="custJoin">${KAKAO_ICON} 카카오 로그인</button></div>`;
+  }
+  else if(S.lockedRole){ /* 실서비스: 로그인 계정 고정 — 전환 셀렉트 없음 */
     const ss=S.session;
     if(ss&&ss.role===S.view.role&&S.view.role!=='customer'){
       const who=S.view.role==='seller'?(seller(S.actingSeller)||{}):S.view.role==='brand'?(brand(S.actingBrand)||{}):{name:'운영팀'};
@@ -31,7 +35,7 @@ function render(){
   }
   const dmN=(S.view.role==='brand'||S.view.role==='seller')?dmUnreadN()+(S.view.role==='brand'?brandPending().n:sellerPending().n):0;
   $('#subnav').innerHTML=scr.map(([k,l])=>
-    `<button data-act="screen" data-k="${k}" class="${(S.view.screen===k||(k==='dm'&&S.view.screen==='requests'))&&!S.view.cid?'on':''}" style="position:relative">${l}${k==='dm'&&dmN?`<span class="badge">${dmN}</span>`:''}</button>`).join('')+personaHtml;
+    `<button data-act="screen" data-k="${k}" class="${(S.view.screen===k||(k==='dm'&&S.view.screen==='requests'))&&!S.view.cid?'on':''}" style="position:relative">${l}${k==='dm'&&dmN?`<span class="badge">${dmN}</span>`:''}${k==='cart'&&cartN()?`<span class="badge" style="background:var(--ink);color:var(--yellow)">${cartN()}</span>`:''}</button>`).join('')+personaHtml;
   const m=$('#main');
   if(S.view.store){ const y=window.scrollY; m.innerHTML=vStore(S.view.store); decorate(); window.scrollTo(0,S.storeTop?0:y); S.storeTop=false; return; }
   if(S.view.cid){ m.innerHTML=vCampDetail(S.view.cid); decorate(); const box=m.querySelector('.msgs'); if(box) box.scrollTop=box.scrollHeight; return; }
@@ -39,7 +43,7 @@ function render(){
     'seller.home':vSellerHome,'seller.explore':vExplore,'seller.camps':vSellerCamps,'seller.dm':vDM,'brand.dm':vDM,'seller.shop':vShop,'brand.shop':vShop,'seller.sales':vSales,'seller.rank':vRank,'seller.ref':vRef,'seller.settle':vSellerSettle,'seller.my':vMy,
     'brand.home':vBrandHome,'brand.camps':vBrandCamps,'brand.products':vBrandProducts,'brand.gallery':vGallery,'brand.requests':vDM,'brand.sales':vSales,'brand.orders':vBrandOrders,'brand.cs':vBrandCS,'brand.settle':vBrandSettle,'brand.my':vBrandMy,
     'admin.home':vAdminHome,'admin.products':vAdminProducts,'admin.review':vAdminProducts,'admin.influencers':vAdminInfluencers,'admin.brands':vAdminBrands,'admin.orders':vAdminOrders,'admin.match':vAdminMatch,'admin.revenue':vAdminRevenue,'admin.settle':vAdminSettle,
-    'customer.home':vCustHome,'customer.influencers':vCustInfluencers,'customer.about':vCustAbout
+    'customer.home':vCustHome,'customer.influencers':vCustInfluencers,'customer.cart':vCustCart,'customer.orders':vCustOrders,'customer.about':vCustAbout
   }[S.view.role+'.'+S.view.screen]||(S.view.role==='customer'?vCustHome:vSellerHome);
   m.innerHTML=fn();
   decorate();
