@@ -55,7 +55,7 @@ js/80-actions.js    ACT 액션 맵 (data-act 버튼 핸들러 전부)
 js/90-boot.js       부트 화면 · 전역 이벤트 · render() 최초 호출
 assets/             아바타 SVG(av-s1~8), 상품 이미지(.webp) — 원본은 assets/_src/ (git 제외)
 docs/               운영 정책 문서 · 수정 가이드 · 데이터 모델 (아래)
-supabase/           Supabase 스키마 — migrations/0001~0006 + seed.sql (앱 미연동 · 적용 방법은 docs/data-model.md §8)
+supabase/           Supabase 스키마 — migrations/0001~0006 + seed.sql (클라우드 프로젝트 `sellery`에 적용 완료 · 앱 미연동 · 절차는 docs/data-model.md §8)
 scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
 .github/            CI(프로토타입 점검 = node scripts/check.mjs) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
 CONTRIBUTING.md     수정하고 올리는 절차 (브랜치 → 점검 → PR → 병합)
