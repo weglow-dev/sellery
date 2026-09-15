@@ -5,10 +5,11 @@
 브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
 
 **데모** → https://sellery-swart.vercel.app/ (Vercel · `main` 자동 배포 — 전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 서빙)
-**로그인** → https://sellery-swart.vercel.app/login.html
+**로그인** → https://sellery-swart.vercel.app/login.html (데모 계정은 왼쪽 안내 패널 하단 목록(모바일에선 폼 아래)에서 **채우기** · 비밀번호 아무거나 · `login.html?role=brand` 로 브랜드 탭)
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
+**로컬 미리보기** → 저장소 폴더에서 `python -m http.server 8080` → http://localhost:8080 (`index.html` 더블클릭도 되지만, 로그인·링크 흐름까지 보려면 로컬 서버 권장)
 
-의존성 없는 정적 사이트. 상단에서 **인플루언서 센터 / 브랜드 센터 / 관리자 창구 / 고객 화면**을 오가며 전체 흐름을 눌러볼 수 있습니다.
+의존성 없는 정적 사이트 (npm/빌드 없음 · 폰트만 CDN). 상단에서 **인플루언서 센터 / 브랜드 센터 / 관리자 창구 / 고객 화면**을 오가며 전체 흐름을 눌러볼 수 있습니다.
 
 ## 구현된 흐름
 
@@ -20,7 +21,7 @@
 - 인플루언서 갤러리 + 브랜드의 직접 제안(역제안), 수락·거절 처리
 - 익명 셀러 스카우트 — 유료 레퍼런스 열람 → 수락 시 신원 공개 + DM
 - 셀러 등급·랭킹 — 등급별 **수수료율 추가분**, 익명 리더보드
-- 판매센터 — 팔로워가 아닌 고객도 진행 중인 판매를 발견하고 팔로우·구매
+- 판매센터 — 팔로워가 아닌 고객도 진행 중인 판매를 발견하고 오픈 알림 신청·구매
 - 링크 유입 보호 — 인플루언서 링크로 들어온 고객에게 같은 카테고리 상품 미노출 (홈 이동·새로고침에도 유지)
 - 고객 문의(CS) — 관리자를 거치지 않고 브랜드사로 직행
 - 실시간 매출 대시보드, 발주서 CSV·이메일 발주(시뮬)
@@ -36,7 +37,7 @@
 여러 명이 동시에 고칠 수 있도록 한 파일이던 `index.html`을 화면 단위로 나눴습니다. `index.html`은 껍데기이고, 실제 내용은 `css/`와 `js/`에 있습니다.
 
 ```
-index.html          앱 셸 — <head> + css 링크 2개 + <script src> 12개 (순서 고정 00→90, 바꾸지 말 것)
+index.html          앱 셸 — <head> + 로컬 css 링크 2개 (+ 외부 폰트 css 2개: Google Fonts · galmuri) + <script src> 12개 (순서 고정 00→90, 바꾸지 말 것)
 login.html          로그인 · 가입 · 구글 로그인 (단일 파일)
 css/base.css        기본 스타일 · :root 디자인 토큰                     ← 디자인
 css/skin.css        "light-pixel-celery" 픽셀 스킨 오버라이드              ← 디자인
@@ -55,6 +56,12 @@ js/90-boot.js       부트 화면 · 전역 이벤트 · render() 최초 호출
 assets/             아바타 SVG(av-s1~8), 상품 이미지(.webp) — 원본은 assets/_src/ (git 제외)
 docs/               운영 정책 문서 · 수정 가이드 (아래)
 scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
+.github/            CI(프로토타입 점검 = node scripts/check.mjs) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
+CONTRIBUTING.md     수정하고 올리는 절차 (브랜치 → 점검 → PR → 병합)
+CLAUDE.md           팀 공용 에이전트 지침 (CLAUDE.local.md는 개인용 · git 제외)
+.vercelignore       Vercel 배포 제외 목록 — docs/ · scripts/ · *.md 는 배포되지 않음 (문서 링크는 GitHub에서만 열림)
+vercel.json         빌드 없이 루트 그대로 서빙 (framework null)
+.gitattributes      줄바꿈 LF 통일 (Windows 포함)
 ```
 
 ## 센터 바로가기
@@ -63,8 +70,8 @@ scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
 |---|---|
 | `/#influencer` | 인플루언서 센터만 |
 | `/#brand` | 브랜드 센터만 |
-| `/#admin` | 관리자 창구만 |
-| `/#customer` | 고객 판매센터만 |
+| `/#admin` | 관리자 창구(탭 이름: 관리자)만 |
+| `/#customer` | 고객 화면(진행 중인 판매)만 |
 | `/#s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
 
 ## 정책 문서
@@ -80,10 +87,10 @@ scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
 
 ## 수정하고 올리기
 
-[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` → PR → 병합 → Vercel 자동 배포. `main`에는 직접 올리지 않습니다.
+[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` (Node 20+) → PR → 병합 → Vercel 자동 배포. `main`에는 직접 올리지 않습니다.
 
 ---
 
-데이터는 브라우저 localStorage에 저장됩니다. 우측 상단 **데이터 초기화**로 시드 상태로 되돌립니다.
+데이터는 브라우저 localStorage에 저장됩니다. 관리자 창구(#admin) 대시보드 상단의 **데이터 초기화** 버튼으로 시드 상태로 되돌립니다.
 
 > 프로토타입 전용 — 실제 결제·인증·서버는 붙어 있지 않습니다. 문의: official@weglow.biz
