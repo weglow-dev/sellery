@@ -97,5 +97,5 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 
 ## 아직 안 붙은 것
 
-고객 로그인 · 장바구니 · 실결제(PG) · 실인증 · 서버. Supabase 스키마는 설계 중 — `supabase/`는 아직 **로컬에만 있음**(미커밋 · `config.toml`뿐, 마이그레이션 없음, 앱 미연동). 커밋해도 `.vercelignore`에 이미 있어 배포엔 영향 없습니다.
+실결제(PG) · 실인증 · 서버 · 앱↔DB 연동. 고객 카카오 로그인·장바구니·내 주문은 PR #2 로 데모 구현됨(localStorage `sellery-cust`/`sellery-cart`, `KAKAO_JS_KEY` 비어 있으면 데모 계정 선택). Supabase 스키마는 **설계 완료**: `supabase/migrations/0001~0006` + `seed.sql`(glo 관례 · RLS · 파서 검증), 사람용 문서 `docs/data-model.md`, 설계 노트/분석 `docs/data-model-design-notes.md` · `docs/analysis/`. 클라우드 프로젝트는 아직 없음(`npx supabase login` → `link` → `db push`, 시드는 SQL Editor/psql — data-model.md §8).
 외부 판매 예상 매출(`estExternal`)은 가계산입니다. 제안서의 "테스트 기한 14일"은 리터럴 14 두 곳(`addD(today(),14)`)이고 기한 경과 처리는 없습니다.

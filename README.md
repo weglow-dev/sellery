@@ -54,7 +54,8 @@ js/70-campaign.js   캠페인 상세 (스레드 · 정산 미리보기) · 모�
 js/80-actions.js    ACT 액션 맵 (data-act 버튼 핸들러 전부)
 js/90-boot.js       부트 화면 · 전역 이벤트 · render() 최초 호출
 assets/             아바타 SVG(av-s1~8), 상품 이미지(.webp) — 원본은 assets/_src/ (git 제외)
-docs/               운영 정책 문서 · 수정 가이드 (아래)
+docs/               운영 정책 문서 · 수정 가이드 · 데이터 모델 (아래)
+supabase/           Supabase 스키마 — migrations/0001~0006 + seed.sql (앱 미연동 · 적용 방법은 docs/data-model.md §8)
 scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
 .github/            CI(프로토타입 점검 = node scripts/check.mjs) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
 CONTRIBUTING.md     수정하고 올리는 절차 (브랜치 → 점검 → PR → 병합)
@@ -84,6 +85,7 @@ vercel.json         빌드 없이 루트 그대로 서빙 (framework null)
 - [docs/sample-policy.md](docs/sample-policy.md) — 샘플 (무상 · 구매 · 환급)
 - [docs/points-policy.md](docs/points-policy.md) — 셀러리(🥬) 포인트 · 추천
 - [docs/editing-guide.md](docs/editing-guide.md) — 데모 데이터 · 화면 · 디자인 수정 가이드 (비개발자용 상세판)
+- [docs/data-model.md](docs/data-model.md) — Supabase 데이터 모델 (ERD · 테이블 · RLS · 적용 방법) — `supabase/migrations/` + `seed.sql`, 설계 노트·분석은 `docs/data-model-design-notes.md`, `docs/analysis/`
 
 ## 수정하고 올리기
 
