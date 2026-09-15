@@ -7,7 +7,7 @@
 > 셀러리 프로토타입은 **빌드가 없는 정적 사이트**입니다. `index.html` 하나가 `css/` 2개와 `js/` 12개를 불러오고, 데이터는 방문자 **브라우저의 localStorage**에만 저장됩니다(서버 없음). `main`에 머지되면 **Vercel 이 자동 배포**합니다 (1분 내). PR 미리보기 URL 은 Vercel GitHub 앱 연동 여부에 따라 달라집니다 — §5 참고.
 >
 > - 배포 주소: https://sellery-swart.vercel.app/
-> - 저장소: https://github.com/weglow-glo/sellery
+> - 저장소: https://github.com/weglow-dev/sellery
 
 ---
 
@@ -28,7 +28,7 @@
 
 `shinwook-k`에게 GitHub username을 알려주고 collaborator로 추가받으세요.
 
-> 이 저장소는 GitHub 조직 **`weglow-glo`** 안에 있습니다(`glo-us`와 같은 조직). 조직 이름이 바뀌면(예: `weglow-inc`) 저장소 URL이 함께 바뀌고 GitHub는 옛 조직 이름을 리다이렉트하지 않으므로, 로컬에서 `git remote set-url origin https://github.com/<새조직>/sellery.git` 을 한 번 실행해 주세요. 배포 URL(Vercel)은 그대로입니다.
+> 이 저장소는 GitHub 조직 **`weglow-dev`** 안에 있습니다(`glo-us`와 같은 조직). 조직 이름이 바뀌면(예: `weglow-inc`) 저장소 URL이 함께 바뀌고 GitHub는 옛 조직 이름을 리다이렉트하지 않으므로, 로컬에서 `git remote set-url origin https://github.com/<새조직>/sellery.git` 을 한 번 실행해 주세요. 배포 URL(Vercel)은 그대로입니다.
 
 ---
 
@@ -82,7 +82,7 @@ Sellery/
 
 **예시:** 버닝온 상품 설명 `'다이어트 부스터 · 6,000mg × 30포'`를 바꾸고 싶음.
 
-1. https://github.com/weglow-glo/sellery 접속 → `js/` → `01-seed.js` (화면 안내 문구라면 해당 센터 파일, 예: 고객 소개 페이지는 `60-customer.js`)
+1. https://github.com/weglow-dev/sellery 접속 → `js/` → `01-seed.js` (화면 안내 문구라면 해당 센터 파일, 예: 고객 소개 페이지는 `60-customer.js`)
 2. 우상단 **연필(✏️)** 클릭 → `Ctrl+F`로 문구 검색 → 따옴표 **안쪽**만 수정
 3. **Commit changes…** → 메시지(`버닝온 상품 설명 문구 수정`) → **"Create a new branch for this commit and start a pull request"** → 브랜치명 `copy/burningon-desc`
 4. **"Propose changes"** → PR 생성 → CI **프로토타입 점검** 초록 확인 → 리뷰 → 머지 → 1분 내 Vercel 반영

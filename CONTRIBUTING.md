@@ -1,11 +1,11 @@
 # 수정하고 올리는 법
 
-glo(`weglow-glo/glo-us`)와 같은 방식입니다. **main에 직접 올리지 않고, 브랜치 → PR → 병합** 순서로 갑니다. (main은 보호돼 있어 직접 push가 막힙니다.)
+glo(`weglow-dev/glo-us`)와 같은 방식입니다. **main에 직접 올리지 않고, 브랜치 → PR → 병합** 순서로 갑니다. (main은 보호돼 있어 직접 push가 막힙니다.)
 
 ## 0. 처음 한 번만
 
 ```bash
-git clone https://github.com/weglow-glo/sellery.git sellery
+git clone https://github.com/weglow-dev/sellery.git sellery
 cd sellery
 ```
 
@@ -21,7 +21,7 @@ python -m http.server 8080
 로그인 화면(`login.html`)에 데모 계정 목록이 떠 있습니다 — 비밀번호는 8자 이상 아무거나.
 
 > 저장소 권한은 `shinwook-k`에게 GitHub username을 알려주고 collaborator로 추가받으세요.
-> 이 저장소는 GitHub 조직 `weglow-glo` 안에 있습니다. 조직 이름이 바뀌면 저장소 URL도 바뀌고 GitHub는 옛 조직 이름을 리다이렉트하지 않으므로, 그때 `git remote set-url origin https://github.com/<새조직>/sellery.git` 을 한 번 실행해 주세요.
+> 이 저장소는 GitHub 조직 `weglow-dev` 안에 있습니다. 조직 이름이 바뀌면 저장소 URL도 바뀌고 GitHub는 옛 조직 이름을 리다이렉트하지 않으므로, 그때 `git remote set-url origin https://github.com/<새조직>/sellery.git` 을 한 번 실행해 주세요.
 
 ## 1. 수정할 때
 
@@ -90,7 +90,7 @@ gh pr merge --squash --delete-branch
 ## 4. 배포
 
 main에 병합되면 GitHub Pages는 자동으로 갱신됩니다 (1~2분).
-→ https://weglow-glo.github.io/sellery/
+→ https://weglow-dev.github.io/sellery/
 
 정식 주소인 Vercel → https://sellery-swart.vercel.app/ 은 **GitHub 앱 연동 전**이라 병합만으로는 바뀌지 않습니다. 관리자(`shinwook-k`)가 병합 후 직접 올립니다:
 
