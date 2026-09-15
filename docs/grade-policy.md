@@ -1,6 +1,6 @@
 # 셀러리 등급 정책
 
-> 최종 수정: 2026-09-14 · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
+> 최종 수정: 2026-09-15 · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
 
 이 문서는 인플루언서 등급(7단계)과 브랜드 등급(7단계)이 **코드에서 실제로 어떻게 계산되고 어디에 쓰이는지**를 정리한다. 숫자와 규칙은 모두 코드 상수에서 가져왔고, 제안서와 다른 부분은 "제안서 표기", 제안서에는 있지만 코드에 없는 부분은 "미정(코드 미구현)"으로 표시했다. 관련 정책: [settlement-policy.md](./settlement-policy.md) · [period-policy.md](./period-policy.md) · [sample-policy.md](./sample-policy.md) · [points-policy.md](./points-policy.md)
 
@@ -54,11 +54,11 @@
 ## 3. 기준값 — "최근 3개월 확정 매출" `m3Sales`
 
 - **시드값은 고정**이다. 데모 인플루언서의 `m3Sales`는 `seedData()`에 하드코딩되어 있다(아래 표).
-- **갱신 시점은 정산 실행(`ACT.runSettle`) 한 곳뿐**이다. 캠페인이 SETTLED로 바뀔 때 `sl.m3Sales += k.net`(확정 매출 = 결제 − 환불)을 더한다. 단 **시드 이후 생성된 캠페인(id 숫자 ≥ 100)만** 누적하고, 시드 캠페인(c1~c13)은 정산해도 더하지 않는다(시드 지표 중복 방지).
+- **갱신 시점은 정산 실행(`ACT.runSettle`) 한 곳뿐**이다. 캠페인이 SETTLED로 바뀔 때 `sl.m3Sales += k.net`(확정 매출 = 결제 − 환불)을 더한다. 단 **시드 이후 생성된 캠페인(id 숫자 ≥ 100)만** 누적하고, 시드 캠페인(c1~c14)은 정산해도 더하지 않는다(시드 지표 중복 방지).
 - 진행 중(LIVE) 매출은 등급에 반영되지 않는다 — 정산 완료 기준.
 - "최근 3개월" 롤링 차감(3개월 지난 매출 제외)은 **미정(코드 미구현)** — 현재는 누적만 된다. 실서비스에서는 기준 기간·차감 방식 확정 필요.
 - 같은 값이 셀러리(🥬) 획득 기준이기도 하다: `celEarned(seller) = floor(m3Sales / CELERY_PER)` (₩5,000,000당 1🥬) → [points-policy.md](./points-policy.md).
-- **거절·패스는 등급에 영향이 없다.** 브랜드 제안 거절(`ACT.declineInvite` → DECLINED, 제안권 환급만 수행)·테스트 후 패스(`ACT.passCamp` → PASSED, 상태 전환만)·브랜드의 샘플 거절(`ACT.rejectSample` → REJECTED)은 `m3Sales`·등급·갤러리 노출·자동 제안 후보 어디에도 반영되지 않는다 — DECLINED/PASSED/REJECTED 건수를 읽는 곳이 코드에 없다(`vGallery` 필터는 등급·플랫폼만 검사). `autoMatches()`·브랜드 홈 맞춤 추천·상품 카드의 "진행 중" 판정은 REJECTED/PASSED/DECLINED/SETTLED를 **종료**로 보고 그 인플루언서를 다시 후보에 포함한다. 인플루언서 제안서 p.9 "거절해도 등급·노출에 영향이 없어요", p.11 "패스해도 … 등급·노출·다음 제안에 아무 영향이 없어요"와 일치(불이익 로직 부재로 충족). 단 상품당 무상 샘플 1회 판정 `hadFreeSample`은 REJECTED·DECLINED만 제외하고 PASSED는 제외하지 않으므로, 패스한 상품의 무상 샘플은 소진된 것으로 남는다 → [sample-policy.md](./sample-policy.md).
+- **거절·패스는 등급에 영향이 없다.** 브랜드 제안 거절(`ACT.declineInvite` → DECLINED, 제안권 환급만 수행)·테스트 후 패스(`ACT.passCamp` → PASSED, 상태 전환만)·브랜드의 샘플 거절(`ACT.rejectSample` → REJECTED)은 `m3Sales`·등급·갤러리 노출·자동 제안 후보 어디에도 반영되지 않는다 — 등급·갤러리 노출·자동 제안 후보 판정에서 DECLINED/PASSED/REJECTED를 읽는 곳이 없다(`vGallery` 필터는 등급·플랫폼만 검사). 이 상태를 읽는 곳은 표시용 건수 집계(브랜드 내 캠페인 "종료·정산" 묶음·칩 `vBrandCamps`, 관리자 홈 상태별 칩 `vAdminHome`)와 상품 삭제 가드(`ACT.deleteProduct` — 이 세 상태의 캠페인은 "사용 중"으로 세지 않음)뿐이다. `autoMatches()`·브랜드 홈 맞춤 추천·상품 카드의 "진행 중" 판정은 REJECTED/PASSED/DECLINED/SETTLED를 **종료**로 보고 그 인플루언서를 다시 후보에 포함한다. 인플루언서 제안서 p.9 "거절해도 등급·노출에 영향이 없어요", p.11 "패스해도 … 등급·노출·다음 제안에 아무 영향이 없어요"와 일치(불이익 로직 부재로 충족). 단 상품당 무상 샘플 1회 판정 `hadFreeSample`은 REJECTED·DECLINED만 제외하고 PASSED는 제외하지 않으므로, 패스한 상품의 무상 샘플은 소진된 것으로 남는다 → [sample-policy.md](./sample-policy.md).
 
 ### 3.1 시드 인플루언서 (`seedData()` 기준)
 
@@ -73,7 +73,7 @@
 | s7 | 소민 @somin_beauty | ₩6,200,000 | 브론즈 | |
 | s8 | 유나 @yuna_healthy | ₩18,400,000 | 골드 | |
 
-제안서 표기: 브랜드 제안서 p.6 예시 표는 혜린=다이아, 지유=플래티넘, 민지=골드, 유나=골드, 하늘=실버로 적혀 있고 열 이름도 "누적 판매액"이다. 시드 데이터로 계산하면 혜린·지유=골드, 민지=실버이며 화면 열 이름은 "3개월 매출"이다(제안서 스스로 "화면 구성 예시"라고 명시). 시드 기준으로 블랙 등급 인플루언서는 없다.
+제안서 표기: 브랜드 제안서 p.6 예시 표는 혜린=다이아, 지유=플래티넘, 민지=골드, 유나=골드, 하늘=실버로 적혀 있고 열 이름도 "누적 판매액"이다. 시드 데이터로 계산하면 혜린·지유=골드, 민지=실버이며 화면 열 이름은 "3개월 매출"이다(제안서 스스로 "화면 구성 예시"라고 명시). 시드 기준으로 블랙 등급 인플루언서는 없다. 예시 표의 등급 라벨은 제안서 자체의 기준선과도 맞지 않는다 — 인플루언서 제안서 p.6의 기준(300만/800만/1,500만/3,000만/5,000만/1억 = `GRADES`)에 예시 금액을 그대로 대면 혜린 1억 3,240만=블랙, 지유 8,720만=다이아, 민지 5,460만=다이아, 유나 3,900만=플래티넘, 하늘 2,180만=골드가 되어, "누적"으로 읽든 "3개월"로 읽든 인쇄된 라벨(다이아/플래티넘/골드/골드/실버)과 하나도 일치하지 않는다. 두 제안서를 함께 받은 브랜드는 잘못된 기준 모델을 갖게 된다. 프로토타입에는 인플루언서 누적 판매액 지표 자체가 없으므로(`m3Sales`뿐), 브랜드 제안서 예시 표는 실서비스 전에 시드 `m3Sales` 기준으로 다시 만들어야 한다.
 
 ---
 
@@ -109,7 +109,7 @@
 ### 5.1 수수료 할인 적용 방식
 
 - `bDiscOf(b) = BG_DISC[bgname(b)] || 0`. `calc()`에서 `bDisc = net × bDiscOf(b)`를 **브랜드 정산액에 더하고**(`brandPay = net − pg − sf − pfGross + bBoost + bDisc`) 플랫폼 수수료에서 뺀다(`pf = pfGross − costs`). 인플루언서 몫은 변하지 않는다.
-- 정산 미리보기 행: "브랜드 {등급} 등급 수수료 할인 −N.N%p · +₩…". 브랜드 등급 카드 각주: "수수료 할인은 플랫폼 중개 수수료(10%)에서 차감 · 누적 확정 매출(GMV) 기준".
+- 정산 미리보기 행: "브랜드 {등급} 등급 수수료 할인 −N.N%p · +₩…". 브랜드 등급 혜택 표(`brandGradeHtml` — 마이페이지 등급 섹션과 홈 등급 카드 클릭 시 열리는 `brandGradeModal`) 각주: "수수료 할인은 플랫폼 중개 수수료(10%)에서 차감 · 누적 확정 매출(GMV) 기준". 홈 등급 카드 자체에는 이 각주가 없다.
 - 제안서 표기: 브랜드 제안서 p.5 "등급 할인 시 최대 −2%p", p.10 "브랜드 등급 할인(−0.5~2%p)은 상대 몫을 깎지 않고 셀러리가 부담" — 코드와 일치.
 
 ### 5.2 혜택 문구 중 구현 여부
@@ -122,7 +122,7 @@
 | 상위 인플루언서 우선 매칭 (플래티넘) | 미정(코드 미구현) | `autoMatches()`는 브랜드 등급을 보지 않는다 |
 | 카탈로그 상단 노출 (골드) | 미정(코드 미구현) | 상품 갤러리 정렬은 실사진 우선 → 부스트 패스(🥬) 순, 브랜드 등급 무관 |
 | 상품 검수 우선 처리 (실버) | 미정(코드 미구현) | 검수 대기 정렬 규칙 없음 (우선 검수는 🥬 1 "우선 검수권"으로 별도 판매) |
-| 인증 브랜드 뱃지 (브론즈) | 미정(코드 미구현) | 등급 기준 뱃지는 없다. 고객 인증 모달 "공급 브랜드" 행은 브랜드명 + 등급 뱃지 뒤에 사업자번호가 있으면 "· 사업자 {번호}", 없으면 "· 인증 브랜드" **대체 문구**를 붙일 뿐 — "인증 브랜드"는 사업자번호가 없는 브랜드에 나오는 문구이지 인증 뱃지가 아니며 등급과 무관 |
+| 인증 브랜드 뱃지 (브론즈) | 미정(코드 미구현) | 등급 기준 뱃지는 없다. 고객 인증 모달(`ACT.verifyStore`, js/80-actions.js) "공급 브랜드" 행은 브랜드명 + 등급 뱃지 뒤에 사업자번호가 있으면 "· 사업자 {번호}", 없으면 "· 인증 브랜드" **대체 문구**를 붙일 뿐 — "인증 브랜드"는 사업자번호가 없는 브랜드에 나오는 문구이지 인증 뱃지가 아니며 등급과 무관 |
 
 ### 5.3 시드 브랜드
 
@@ -134,8 +134,8 @@
 ### 5.4 인플루언서·고객 화면의 브랜드 등급 노출
 
 - 인플루언서 상품 갤러리 카드(`vExplore` 상품 카드)와 상품 상세 모달(`productDetailModal`) 헤더에 브랜드 칩 옆 **브랜드 등급 뱃지** `gfull(bgname(b))`를 표시한다. 인플루언서가 브랜드 등급을 보고 진행 여부를 판단하는 장치 — 인플루언서 제안서 p.7 "브랜드도 검증합니다 — 정산 이력이 있는 브랜드인지, 등급이 어떤지 확인하고 시작하실 수 있어요".
-- "정산 이력"은 별도 표시가 없고, 상품 상세의 익명 판매 실적 표 상태 칩(정산 완료 등 — 7.2절)으로 간접 확인한다.
-- 관리자 상품 표의 브랜드 열, 고객 판매 인증 모달 "공급 브랜드" 행에도 같은 뱃지가 붙는다.
+- "정산 이력"은 **미정(코드 미구현)** — 브랜드 단위의 정산 이력 표시는 없다("정산 이력"이라는 문구는 DM 화면 부제에만 있다). 상품 상세의 익명 판매 실적 표 상태 칩(정산 완료 등 — 7.2절)으로 간접 확인할 수 있을 뿐이며, 그것도 매출 데이터 확인권(🥬 2) 없이는 첫 행 1건의 상태만 보인다(나머지 행은 블러).
+- 관리자 상품 표의 브랜드 열, 고객 판매 인증 모달(`ACT.verifyStore`, js/80-actions.js) "공급 브랜드" 행에도 같은 뱃지가 붙는다.
 
 ---
 
@@ -175,6 +175,8 @@
 
 제안서 표기: 브랜드 제안서 p.6 "기본 정보는 무료, 판매 실적은 필요할 때만 엽니다. 함께 판매한 적 있는 분의 데이터는 계속 무료예요" — 코드에서 "함께 판매 무료"는 **공개 프로필 카드에만** 적용되고 비공개 프로필(스카우트·TOP5)에는 적용되지 않는다.
 
+제안서 표기: 브랜드 제안서 p.6 카드 예시("지유 플래티넘 · 팔로워 84,300 · 참여율 3.7% · 누적 판매액 · 판매당 평균 · 🥬 3 · 데이터 열람하고 제안하기")는 팔로워·참여율을 무료 기본 정보로, 누적 판매액·판매당 평균만 잠금으로 그리지만, 코드(`sellerCard`)는 **참여율도 게이트 안(유료)** 에 둔다 — 3개월 매출·판매당 평균·좋아요 평균·참여율·이력·외부 판매 예상이 모두 블러 처리되고, 무료로 보이는 것은 등급·이름·핸들·카테고리·팔로워·소개뿐이다. 제안서를 읽은 브랜드는 참여율이 보일 것으로 기대하므로 실서비스 전 정합 필요.
+
 ### 6.1 등급이 붙는 다른 셀러리 항목
 
 - **다이아↑ 인플루언서 제안권 (🥬 10)**: 브랜드가 **다이아·블랙** 등급 인플루언서에게 판매 제안을 보낼 때 자동 차감(`confirmInvite`). 자동 제안(`runAutoPropose`)도 동일하게 차감하며 잔액이 10 미만이면 그 건은 보류. 인플루언서가 거절하면 전액 환급(`declineInvite` → `c.celRefunded`).
@@ -203,9 +205,10 @@
 ### 7.3 비공개 프로필 (`hidden`)
 
 - 관리자만 켜고 끌 수 있다(`admToggleHidden`). 시드에서는 s4 서아·s5 로라(둘 다 다이아).
-- 브랜드 화면에서 "○○○ 인플루언서"로 가려지는 곳은 **네 군데뿐**이다: 홈 "지금 잘 파는 인플루언서 TOP5" · 홈 소식 "스카우트" 항목 · 갤러리 "익명 인플루언서 스카우트" 섹션 · 제안 모달(`inviteModal` 헤더 "○○○ 인플루언서 (익명)"과 발송 토스트). 여기서는 등급 뱃지·3개월 매출·카테고리는 공개, 팔로워·좋아요는 "●●●,●●●"로 가리고, 레퍼런스 열람(6절) 후 팔로워·참여율·매출/팔로워가 열린다.
-- **신원 공개 시점**: 브랜드 제안을 수락할 때(`acceptInvite` — 스레드에 "🔓 익명 인플루언서 신원 공개 — {이름} {핸들}") 또는 독점권을 신청할 때(4절). 갤러리 안내문도 "제안이 수락되는 순간 DM이 열리고 신원이 공개됩니다"라고 적는다.
-- **프로토타입 미차단**: 비공개 인플루언서가 스스로 샘플을 요청(`reqSample`)하거나 샘플을 구매(`confirmSampleBuy`)하면, 브랜드 요청함 행(`vRequests` — "{상품} · {아이콘} {이름} {핸들}")·캠페인 행(`campRow` 브랜드용 — "{이름} {핸들} · 팔로워 N")·스레드 시스템 메시지("인플루언서 {이름}({핸들})가 샘플을 요청/구매했습니다")·캠페인 상세 "샘플 요청 검토" 카드("{이름} {핸들} · 팔로워 N · 등급 …")에 **실명·핸들이 그대로 노출**된다 — 이 경로에는 `hidden` 분기가 없다. 브랜드 홈 "내 상품을 조회한 인플루언서"도 `hidden`을 거르지 않는다(시드 `productViews`에는 비공개 인플루언서가 없어 초기 화면에서는 드러나지 않음). 실서비스에서는 익명 유지 범위 확정 필요.
+- 브랜드 화면에서 "○○○ 인플루언서"로 가려지는 곳은 **네 군데뿐**이다: 홈 "지금 잘 파는 인플루언서 TOP5" · 홈 소식 "스카우트" 항목 · 갤러리 "익명 인플루언서 스카우트" 섹션 · 제안 모달(`inviteModal` 헤더 "○○○ 인플루언서 (익명)"과 발송 토스트). 여기서는 등급 뱃지·3개월 매출·카테고리는 공개, 팔로워·좋아요는 "●●●,●●●"로 가리고, 레퍼런스 열람(6절) 후 팔로워·좋아요 평균·참여율·매출/팔로워가 열린다.
+- **신원 공개 시점(메시지·토스트 기준)**: 브랜드 제안을 수락할 때(`acceptInvite` — 스레드에 "🔓 익명 인플루언서 신원 공개 — {이름} {핸들}") 또는 독점권을 신청할 때(4절). 갤러리 안내문도 "제안이 수락되는 순간 DM이 열리고 신원이 공개됩니다"라고 적는다. 단 이것은 스레드 시스템 메시지와 토스트가 익명을 지킨다는 뜻이고, 화면 헤더·목록 행은 아래처럼 차단하지 않는다.
+- **프로토타입 미차단 — 브랜드 제안 경로**: 브랜드가 비공개 인플루언서에게 제안을 보내면(`confirmInvite` — 토스트는 "○○○ 인플루언서에게 제안 발송") 곧바로 열리는 캠페인 상세 헤더(`vCampDetail`, js/70-campaign.js:14 — "{브랜드} × {아이콘} {이름} {핸들}")·브랜드 DM 목록 행(`vDM`, js/20-seller.js:213)·내 캠페인 "준비 중" 행(`vBrandCamps`, js/40-brand.js:196)에 INVITED 상태에서도 **실명·핸들이 노출**된다 — 이 세 곳에는 `hidden` 분기가 없다. 즉 수락 전 익명은 제안 모달과 발송 토스트에서만 지켜지고, 제안이 발송되는 순간 브랜드 화면에서는 깨진다.
+- **프로토타입 미차단 — 인플루언서 발신 경로**: 비공개 인플루언서가 스스로 샘플을 요청(`reqSample`)하거나 샘플을 구매(`confirmSampleBuy`)하면, 브랜드 요청함 행(`vRequests` — "{상품} · {아이콘} {이름} {핸들}")·캠페인 행(`campRow` 브랜드용 — "{이름} {핸들} · 팔로워 N")·스레드 시스템 메시지("인플루언서 {이름}({핸들})가 샘플을 요청/구매했습니다")·캠페인 상세 "샘플 요청 검토" 카드("{이름} {핸들} · 팔로워 N · 등급 …")에 **실명·핸들이 그대로 노출**된다 — 이 경로에는 `hidden` 분기가 없다. 브랜드 홈 "내 상품을 조회한 인플루언서"도 `hidden`을 거르지 않는다(시드 `productViews`에는 비공개 인플루언서가 없어 초기 화면에서는 드러나지 않음). 실서비스에서는 익명 유지 범위 확정 필요.
 - 관리자 화면은 항상 실명 + "비공개" 태그.
 - 고객 판매센터·인증 모달은 판매 인플루언서 실명 + 등급 뱃지를 표시한다.
 
@@ -249,6 +252,8 @@
 | 샘플 | 월 무상 한도 `sampleQuota` (1 / 2 / 5회) · 상품별 무상 기준 등급 `spOf(p).freeGrade`(기본: 판매가 3만 미만 브론즈, 8만 미만 실버, 그 외 골드) · `freeEligible(p, s)` | [sample-policy.md](./sample-policy.md) |
 | 셀러리 포인트 | 획득 = 등급 기준값 ÷ ₩5,000,000 (`celEarned`) · 등급별 열람 가격 `DATA_PRICE` · 다이아↑ 제안권 🥬 10 · 브랜드 다이아·블랙 월 5회 무료 열람 | [points-policy.md](./points-policy.md) |
 
+제안서 표기: 인플루언서 제안서 p.13 마무리 요약의 "기간 독점과 링크 보호"는 구 정책(하드 독점) 표현이다 — 코드(`periodBlock`: 플래티넘 이상은 언제나 진입, 그 외는 플래티넘 이상 보유자가 있을 때만 차단)와 같은 제안서 본문 p.2("원하는 기간은 누구나 열 수 있고, 플래티넘 이상이 잡은 기간에는 플래티넘 이상만 함께 판매")·p.9는 등급 우선(기간 공유)이다. 주 문서는 [period-policy.md](./period-policy.md)이며, 그 문서의 제안서 표기 항목에서 함께 다룬다.
+
 ---
 
 ## 10. 안내 문구(화면 노출)
@@ -263,7 +268,8 @@
 | 기간 우선권 토스트 | "⚠ 이 기간은 {등급} 등급 인플루언서가 선점했습니다 — 플래티넘 이상만 함께 판매할 수 있어요. 다른 날짜를 선택해주세요" |
 | 브랜드 직접 제안 카드(인플루언서) | "…수수료 N% + 등급 보너스 N.N%p · 수락 시 샘플 발송 단계부터 시작됩니다 (무상 · 이달 한도 미차감)." |
 | 정산 미리보기 | "인플루언서 20% +1.5%p 플래티넘" · "브랜드 {등급} 등급 수수료 할인 −1.0%p" · "플랫폼 10% (보너스·보상·할인 차감 후)" |
-| 브랜드 홈·마이페이지 등급 카드 | "브랜드 등급 — 상위 N%" · "누적 ₩… · {다음}까지 ₩… · 달성 시 …" · "수수료 할인은 플랫폼 중개 수수료(10%)에서 차감 · 누적 확정 매출(GMV) 기준" |
+| 브랜드 홈 등급 카드 | "브랜드 등급 — 상위 N%" · "누적 ₩… · {다음}까지 ₩… · 달성 시 …" · 최고 등급: "최고 등급 · {perk}" (각주 없음, 클릭 시 아래 혜택 표 모달) |
+| 브랜드 등급 혜택 표 (`brandGradeHtml` — 마이페이지 · 홈 등급 카드 클릭 모달 `brandGradeModal`) | "내 브랜드 등급 · ₩… 누적 확정 매출" · "다음 등급 {다음}까지 ₩… · 달성 시 …" · "등급별 혜택 — 브랜드" 7단계 표 · 각주 "수수료 할인은 플랫폼 중개 수수료(10%)에서 차감 · 누적 확정 매출(GMV) 기준" |
 | 브랜드 홈 자산 카드 | "무료 데이터 열람 N회 남음" (다이아·블랙) / "다이아↑ 혜택" (그 외) |
 | 열람 토스트 — 공개 프로필 (`unlockSellerData`) | 무료: "브랜드 {등급} 등급 혜택 — 무료 열람 (이달 N회 남음)" · 유료: "🥬 N 사용 — {이름}님의 성과 데이터가 열렸습니다" |
 | 열람 토스트 — 스카우트 카드 (`unlockRef`) | 무료: "브랜드 등급 혜택 — 무료 열람 (이달 N회 남음)"(등급명 없음) · 유료: "🥬 N 사용 — 레퍼런스 상세 지표가 공개되었습니다" |
@@ -278,58 +284,61 @@
 
 ## 11. 코드 참조
 
-분할 후 파일 기준. 줄 번호는 분할 전 원본 `index.html`에서 읽은 위치.
+분할 후 파일 기준. 줄 번호는 현재 트리(`index.html`은 스크립트 태그만 남은 셸, 로직은 `js/` 12개 파일)에서 읽은 위치이며 2026-09-15 기준이다 — 코드가 바뀌면 줄 번호는 어긋날 수 있으니 식별자로 찾는다.
 
-| 상수 / 함수 | 역할 | 파일 (분할 후) | 원본 위치 |
-|---|---|---|---|
-| `$`, `fmt`, `DAY`, `today`, `addD`, `ymd`, `P` | 유틸 (`freeRefLeft`의 월 키 = `ymd(today()).slice(0,7)`) | js/00-core.js | 원본 index.html L1183–1190 |
-| `ST`, `FLOW`, `FLOW_L` | 상태 머신 (SETTLED 시점에 `m3Sales` 누적) | js/00-core.js | 원본 index.html L1194–1211 |
-| `PG_RATE`(0.019), `PLAT_RATE`(0.10), `WHT`(0.033), `CLEAR_DAYS`(21) | 정산 상수 | js/00-core.js | 원본 index.html L1212 |
-| `seedData()` — brands `gmvBase` / sellers `m3Sales`·`hidden` / `productViews`(비공개 없음) / `brandDataUnlocks`·`unlockedRefs` / `exclusiveReqs` x1 / products `exclusive` | 시드값 | js/01-seed.js | 원본 index.html L1224–1225, L1240–1258, L1261–1268, L1269–1270, L1281–1283, L1288, L1293 |
-| `LS`(`'sellery-proto-v29'`) | localStorage 키 | js/02-state.js | 원본 index.html L1373 |
-| `CELERY_PER`(5,000,000) | 🥬 획득 단위 | js/02-state.js | 원본 index.html L1376 |
-| `DATA_PRICE`, `dataPrice(s)` | 등급별 열람 가격 | js/02-state.js | 원본 index.html L1379–1380 |
-| `BG_DISC`, `gradeBonusOf(s)`, `bDiscOf(b)` | 브랜드 할인율 · 인플루언서 보너스율 | js/02-state.js | 원본 index.html L1382–1384 |
-| `freeRefLeft(b)`, `spendData(bid,s,memo)` | 다이아·블랙 월 5회 무료 · 열람 결제 | js/02-state.js | 원본 index.html L1386–1391 |
-| `growthOf(s)`, `CATMAP`, `catFit(p,s)`, `autoMatches()` | 자동 제안 후보 필터(카테고리 적합 · 진행 중 제외 · 독점 확정 상품 제외)와 점수식 | js/02-state.js | 원본 index.html L1405–1420 |
-| `SHOP` (seller `datapass`·`featured` / brand `diamond`·`ref`·`sdata`·`datapass`), `TOPUP` | 🥬 상품 정의 · 충전 단가 | js/02-state.js | 원본 index.html L1433–1451 |
-| `celEarned(who)`, `celBal(who)` | 🥬 획득(인플루언서 `m3Sales` · 브랜드 `bGmv` ÷ CELERY_PER) | js/02-state.js | 원본 index.html L1452–1456 |
-| `sampleQuota(s)`, `spOf(p)`, `freeEligible(p,s)`, `hadFreeSample(p,s)` | 등급별 샘플 한도 · 무상 기준 등급 · 상품당 1회(PASSED 미제외) | js/02-state.js | 원본 index.html L1458, L1463, L1466–1467 |
-| `passActive(ent,id,days)`, `celSpend(who,n,memo)` | 패스 유효성 · 🥬 차감 | js/02-state.js | 원본 index.html L1481–1485 |
-| `GRADES` | 인플루언서 7단계 | js/02-state.js | 원본 index.html L1488–1496 |
-| `gradeOf(m)`, `gname(s)` | 등급 판정 | js/02-state.js | 원본 index.html L1497–1498 |
-| `GICON`, `gfull(n)`, `tierIdx(g)` | 등급 아이콘·뱃지·순위 | js/02-state.js | 원본 index.html L1506–1516 |
-| `exGradeOf(p)`, `exEligible(p,s)` | 독점권 기준 등급·자격 | js/02-state.js | 원본 index.html L1517–1518 |
-| `BGRADES` | 브랜드 7단계 | js/02-state.js | 원본 index.html L1520–1528 |
-| `bGmv(b)`, `netOf(c)`, `bgradeOf(v)`, `bgname(b)` | 브랜드 GMV·등급 판정 | js/02-state.js | 원본 index.html L1529–1536 |
-| `pyrHtml(tiers,cur)` | 피라미드(고정 "상위 N%") | js/02-state.js | 원본 index.html L1537–1540 |
-| `calc(c)` — `gBonus`, `bDisc`, `sfTotal`, `brandPay`, `pf` | 정산 계산에 등급 반영 | js/02-state.js | 원본 index.html L1634–1655 |
-| `PRIORITY_TIER`, `isPriority(sl)`, `periodBlock(...)` | 기간 우선권 | js/02-state.js | 원본 index.html L1673–1685 |
-| `campRow(c,{who})` — 브랜드용 부제 "{이름} {핸들} · 팔로워 N" (`hidden` 분기 없음) | 캠페인 행 | js/10-render.js | 원본 index.html L1795–1797 |
-| 인플루언서 홈 등급·자산 카드, 독점 오퍼 소식 | 화면 | js/20-seller.js | 원본 index.html L1821–1823, L1860–1877, L1881, L1887 |
-| `vExplore` 등급 이상 베스트셀링 TOP5(실사진 우선 → 매출순) · 상품 카드 브랜드 등급 뱃지 · 수수료 범위 표기 | 화면 | js/20-seller.js | 원본 index.html L1949–1966, L1923, L1927 |
-| `vRank` 랭킹·익명 리더보드 | 화면 | js/20-seller.js | 원본 index.html L2093–2126 |
-| `productDetailModal` 독점권 박스 · 익명 판매 실적(첫 행 무료) · 헤더 브랜드 등급 뱃지 · 수수료 범위 | 상품 상세 | js/20-seller.js | 원본 index.html L2275–2299 (브랜드 등급 뱃지 L2293) |
-| `vShop` (등급 기준값 → 다음 1🥬) | 셀러리 샵 | js/30-shared.js | 원본 index.html L2309–2320 |
-| `vBrandHome` 맞춤 추천·조회한 인플루언서(`hidden` 미필터)·소식 스카우트(첫 `hidden` 1명)·TOP5(`m3Sales` 내림차순)·등급 카드·무료 열람 잔여 | 화면 | js/40-brand.js | 원본 index.html L2446–2493 |
-| `brandGradeHtml(b)` | 브랜드 등급 카드·혜택 표 | js/40-brand.js | 원본 index.html L2515–2534 |
-| `vBrandProducts` 독점권 열 | 화면 | js/40-brand.js | 원본 index.html L2611 |
-| `sellerCard(s,reason)` — `worked`·`unlocked` 게이트 | 갤러리 카드 | js/40-brand.js | 원본 index.html L2617–2666 |
-| `vGallery` 등급 필터·추천 점수·스카우트 | 화면 | js/40-brand.js | 원본 index.html L2667–2706 |
-| `vRequests` 샘플 요청 행(실명·핸들, `hidden` 분기 없음) · 독점권 신청 행(승인/거절, "비공개 프로필 (독점권 신청으로 공개)") | 브랜드 요청함 | js/40-brand.js | 원본 index.html L2755–2764 |
-| 관리자 상품 표 — 브랜드 등급 뱃지 · 독점권 열(등급 뱃지, "이상" 없음 + "확정") | 관리자 | js/50-admin.js | 원본 index.html L2996, L3002 |
-| `vAdminInfluencers`(등급 칩) · `vAdminBrands`(등급·GMV) · `vAdminMatch` | 관리자 | js/50-admin.js | 원본 index.html L3009–3044, L3112–3147 |
-| 고객 판매 카드·인플루언서 칩 등급 뱃지 · `vCustAbout` 7단계 문구 · 인증 모달 | 고객 | js/60-customer.js | 원본 index.html L3269, L3325, L3389, L3398, L4412–4414 |
-| 정산 미리보기(보너스·할인 행) · 샘플 검토/직접 제안 카드 문구 | 캠페인 상세 | js/70-campaign.js | 원본 index.html L3576–3589, L3604, L3610 |
-| `sellerProfileModal`, `inviteModal`("○○○ 인플루언서 (익명)" 헤더 · 제안권 환급 안내), 상품 등록 폼(독점권 셀렉트·무상 기준 등급·수수료 계산) | 모달 | js/70-campaign.js | 원본 index.html L3712–3728, L3758–3760, L3767–3768, L3774–3775 |
-| `ACT.reqSample` 독점 잠김 · 샘플 요청/구매 시스템 메시지(실명) · `unlockSellerData` · `unlockRef` · `topSeller` · `unlockRefGo`(토스트 3종) | 액션 | js/80-actions.js | 원본 index.html L3864, L3872, L3885, L3888–3917 |
-| `ACT.reqExclusive` · `approveExcl` · `rejectExcl` | 독점권 액션 | js/80-actions.js | 원본 index.html L3920–3932 |
-| `ACT.buyDataPass` (인플루언서 🥬 2) | 액션 | js/80-actions.js | 원본 index.html L4044–4048 |
-| `ACT.confirmInvite`(다이아·블랙 🥬 10) · `acceptInvite`(신원 공개) · `declineInvite`(환급만, 등급 무영향) | 액션 | js/80-actions.js | 원본 index.html L4057–4081 |
-| `ACT.rejectSample`(REJECTED) · `passCamp`(PASSED) — 상태 전환만, 등급 무영향 | 액션 | js/80-actions.js | 원본 index.html L4185, L4195 |
-| `ACT.proposeSchedule` · `confirmSchedule` — `periodBlock` 검사 | 액션 | js/80-actions.js | 원본 index.html L4202–4203, L4218–4219 |
-| `ACT.refund` — PAID → REFUNDED(브랜드 GMV 감소 = 유일한 강등 경로) | 액션 | js/80-actions.js | 원본 index.html L4245–4252 |
-| `ACT.runSettle` — `m3Sales` 누적(id ≥ 100, 증가만) · 정산 완료 메시지 | 액션 | js/80-actions.js | 원본 index.html L4253–4256, L4272 |
-| `ACT.saveProduct` — 독점권 셀렉트 저장(확정 후 "사용 안 함"이어도 `exclusive` 유지) | 액션 | js/80-actions.js | 원본 index.html L4279–4290 |
-| `ACT.admToggleHidden` · `brandGradeModal` · `runAutoPropose`(🥬 10 차감·보류) | 액션 | js/80-actions.js | 원본 index.html L4439, L4446, L4448–4461 |
-| `npRate` input 리스너 — "등급 보너스 포함 최대 N% (블랙…)" | 전역 이벤트 | js/90-boot.js | 원본 index.html L4516–4523 |
+| 상수 / 함수 | 역할 | 현재 위치 (파일:줄) |
+|---|---|---|
+| `$`, `fmt`, `DAY`, `today`, `addD`, `ymd`, `P` | 유틸 (`freeRefLeft`의 월 키 = `ymd(today()).slice(0,7)`) | js/00-core.js:2–9 |
+| `ST`, `FLOW`, `FLOW_L` | 상태 머신 (SETTLED 시점에 `m3Sales` 누적) | js/00-core.js:13–30 |
+| `PG_RATE`(0.019), `PLAT_RATE`(0.10), `WHT`(0.033), `CLEAR_DAYS`(21) | 정산 상수 | js/00-core.js:31 |
+| `seedData()` — brands `gmvBase` / sellers `m3Sales`·`hidden` / `productViews`(비공개 없음) / `unlockedRefs`·`brandDataUnlocks` / `exclusiveReqs` x1 / products `exclusive` / campaigns c1~c14 | 시드값 | js/01-seed.js:6 (brands 11–12 · sellers 28–45 · productViews 48 · unlockedRefs·brandDataUnlocks 56–57 · exclusiveReqs 68 · exclusive 75, 80 · campaigns 89–104) |
+| `LS`(`'sellery-proto-v30'`) | localStorage 키 | js/02-state.js:2 |
+| `CELERY_PER`(5,000,000) | 🥬 획득 단위 | js/02-state.js:5 |
+| `DATA_PRICE`, `dataPrice(s)` | 등급별 열람 가격 | js/02-state.js:8–9 |
+| `BG_DISC`, `gradeBonusOf(s)`, `bDiscOf(b)` | 브랜드 할인율 · 인플루언서 보너스율 | js/02-state.js:11–13 |
+| `freeRefLeft(b)`, `spendData(bid,s,memo)` | 다이아·블랙 월 5회 무료 · 열람 결제 | js/02-state.js:15–20 |
+| `growthOf(s)`, `CATMAP`, `catFit(p,s)`, `autoMatches()` | 자동 제안 후보 필터(카테고리 적합 · 진행 중 제외 · 독점 확정 상품 제외)와 점수식 | js/02-state.js:34–49 |
+| `SHOP` (seller `datapass`·`featured` / brand `diamond`·`ref`·`sdata`·`datapass`), `TOPUP` | 🥬 상품 정의 · 충전 단가 | js/02-state.js:62–80 |
+| `celEarned(who)`, `celBal(who)` | 🥬 획득(인플루언서 `m3Sales` · 브랜드 `bGmv` ÷ CELERY_PER) | js/02-state.js:81–85 |
+| `sampleQuota(s)`, `spOf(p)`, `freeEligible(p,s)`, `hadFreeSample(p,s)` | 등급별 샘플 한도 · 무상 기준 등급 · 상품당 1회(PASSED 미제외) | js/02-state.js:87, 92, 95–96 |
+| `passActive(ent,id,days)`, `celSpend(who,n,memo)` | 패스 유효성 · 🥬 차감 | js/02-state.js:110–114 |
+| `GRADES` | 인플루언서 7단계 | js/02-state.js:117–125 |
+| `gradeOf(m)`, `gname(s)` | 등급 판정 | js/02-state.js:126–127 |
+| `GICON`, `gfull(n)`, `tierIdx(g)` | 등급 아이콘·뱃지·순위 | js/02-state.js:135–145 |
+| `exGradeOf(p)`, `exEligible(p,s)` | 독점권 기준 등급·자격 | js/02-state.js:146–147 |
+| `BGRADES` | 브랜드 7단계 | js/02-state.js:149–157 |
+| `bGmv(b)`, `netOf(c)`, `bgradeOf(v)`, `bgname(b)` | 브랜드 GMV·등급 판정 | js/02-state.js:158–165 |
+| `pyrHtml(tiers,cur)` | 피라미드(고정 "상위 N%") | js/02-state.js:166–169 |
+| `calc(c)` — `gBonus`, `bDisc`, `sfTotal`, `brandPay`, `pf` | 정산 계산에 등급 반영 | js/02-state.js:263–284 (`gBonus` 272 · `bDisc` 275 · `brandPay` 282) |
+| `PRIORITY_TIER`, `isPriority(sl)`, `periodBlock(...)` | 기간 우선권 | js/02-state.js:302–314 |
+| `campRow(c,{who})` — 브랜드용 부제 "{이름} {핸들} · 팔로워 N" (`hidden` 분기 없음) | 캠페인 행 | js/10-render.js:89–97 (부제 91) |
+| `vSellerHome` 등급·자산 카드, 독점 오퍼 소식 | 화면 | js/20-seller.js:56–73 (등급 카드 56–62 · 자산 카드 64–73) · 77, 83 (독점 오퍼 소식) |
+| `vExplore` 등급 이상 베스트셀링 TOP5(실사진 우선 → 매출순) · `prodCard` 브랜드 등급 뱃지 · 수수료 범위 표기 | 화면 | js/20-seller.js:143–180 (TOP5 161) · `prodCard` 110–130 (뱃지 119 · 수수료 범위 123) |
+| `vDM` 브랜드용 목록 행 — "{아이콘} {이름} {핸들}" (`hidden` 분기 없음, INVITED 포함) | DM 목록 | js/20-seller.js:188–225 (행 제목 213) |
+| `vRank` 랭킹·익명 리더보드 | 화면 | js/20-seller.js:289–322 (리더보드 311–321) |
+| `productDetailModal` 독점권 박스 · 익명 판매 실적(첫 행 무료) · 헤더 브랜드 등급 뱃지 · 수수료 범위 | 상품 상세 | js/20-seller.js:465–502 (익명 실적 467–473 · 독점권 박스 475–487 · 브랜드 등급 뱃지·수수료 범위 489) |
+| `vShop` (등급 기준값 → 다음 1🥬) | 셀러리 샵 | js/30-shared.js:2–37 (8, 15) |
+| `vBrandHome` 맞춤 추천·조회한 인플루언서(`hidden` 미필터)·소식 스카우트(첫 `hidden` 1명)·TOP5(`m3Sales` 내림차순)·등급 카드·무료 열람 잔여 | 화면 | js/40-brand.js:2–126 (맞춤 추천 65 · 조회한 인플루언서 66 · 소식 스카우트 82 · TOP5 89–92 · 등급 카드 94–97 · 무료 열람 잔여 98–103) |
+| `brandGradeHtml(b)` — 브랜드 등급 카드·혜택 표·각주 | 마이페이지 · 홈 카드 클릭 모달 | js/40-brand.js:128–147 (각주 144) |
+| `vBrandCamps` "준비 중" 행 — "{상품} · {아이콘} {이름} {핸들}" (`hidden` 분기 없음, INVITED 포함) · "종료·정산" 묶음에 REJECTED/PASSED/DECLINED 집계 | 내 캠페인 | js/40-brand.js:175–209 (묶음 179–181 · 행 194–198) |
+| `vBrandProducts` 독점권 열 | 화면 | js/40-brand.js:224 |
+| `sellerCard(s,reason)` — `worked`·`unlocked` 게이트(참여율 포함 유료) | 갤러리 카드 | js/40-brand.js:230–279 (`worked` 239 · `unlocked` 241 · 게이트 251–275) |
+| `vGallery` 등급 필터·추천 점수·스카우트 | 화면 | js/40-brand.js:280–319 (스카우트 카드 289–298) |
+| `vRequests` 샘플 요청 행(실명·핸들, `hidden` 분기 없음) · 독점권 신청 행(승인/거절, "비공개 프로필 (독점권 신청으로 공개)") | 브랜드 요청함 | js/40-brand.js:357–381 (샘플 요청 행 368–372 · 독점권 신청 행 373–376) |
+| `vAdminHome` 상태별 칩(REJECTED/PASSED/DECLINED 포함, 표시용) · 관리자 상품 표 — 브랜드 등급 뱃지 · 독점권 열(등급 뱃지, "이상" 없음 + "확정") | 관리자 | js/50-admin.js:24 · 80, 86 |
+| `vAdminInfluencers`(등급 칩) · `vAdminBrands`(등급·GMV) · `vAdminMatch` | 관리자 | js/50-admin.js:93–115 (등급 칩 101) · 116–131 (123) · 196–232 |
+| 고객 판매 카드·인플루언서 칩 등급 뱃지 · `vCustAbout` 7단계 문구 | 고객 | js/60-customer.js:16, 72, 226, 257 (뱃지) · 136, 145 (7단계 문구) |
+| `ACT.verifyStore` 인증 모달 — 판매 인플루언서 등급 뱃지 · "공급 브랜드" 행 브랜드 등급 뱃지 + 사업자번호 또는 "· 인증 브랜드" 대체 문구 | 고객 액션 | js/80-actions.js:618–632 (625, 627) |
+| `vCampDetail` 헤더 "{브랜드} × {아이콘} {이름} {핸들}" (`hidden` 분기 없음) · 정산 미리보기(보너스·할인 행) · 샘플 검토/직접 제안 카드 문구 | 캠페인 상세 | js/70-campaign.js:14 · 44, 47 · 66, 72 |
+| `sellerProfileModal`, `inviteModal`("○○○ 인플루언서 (익명)" 헤더 · 제안권 환급 안내), `productModal` 상품 등록 폼(독점권 셀렉트·무상 기준 등급·수수료 계산) | 모달 | js/70-campaign.js:174–179 · 180–190 (182, 188) · 204–248 (221–222, 229–230, 236) |
+| `ACT.reqSample` 독점 잠김 · 샘플 요청/구매 시스템 메시지(실명) · `unlockSellerData` · `unlockRef` · `topSeller` · `unlockRefGo`(토스트 3종) | 액션 | js/80-actions.js:75–87 (77, 85) · `confirmSampleBuy` 90–100 (98) · 101 · 108 · 115 · 125 |
+| `ACT.reqExclusive` · `approveExcl` · `rejectExcl` | 독점권 액션 | js/80-actions.js:133, 137, 142 |
+| `ACT.buyDataPass` (인플루언서 🥬 2) | 액션 | js/80-actions.js:257 |
+| `ACT.confirmInvite`(다이아·블랙 🥬 10, 발송 직후 `S.view.cid=id`로 캠페인 상세 열림) · `acceptInvite`(신원 공개 메시지) · `declineInvite`(환급만, 등급 무영향) | 액션 | js/80-actions.js:270–281 (280) · 282–288 (286) · 289–294 |
+| `ACT.rejectSample`(REJECTED) · `passCamp`(PASSED) — 상태 전환만, 등급 무영향 | 액션 | js/80-actions.js:398, 408 |
+| `ACT.proposeSchedule` · `confirmSchedule` — `periodBlock` 검사 | 액션 | js/80-actions.js:410, 429 |
+| `ACT.refund` — PAID → REFUNDED(브랜드 GMV 감소 = 유일한 강등 경로) | 액션 | js/80-actions.js:458–465 |
+| `ACT.runSettle` — `m3Sales` 누적(id ≥ 100, 증가만) · 정산 완료 메시지 | 액션 | js/80-actions.js:466–487 (누적 469 · 정산 완료 메시지 485) |
+| `ACT.saveProduct` — 독점권 셀렉트 저장(확정 후 "사용 안 함"이어도 `exclusive` 유지) · `deleteProduct` — REJECTED/PASSED/DECLINED는 "사용 중" 제외 | 액션 | js/80-actions.js:492–509 (503) · 510 (512) |
+| `ACT.admToggleHidden` · `brandGradeModal` · `runAutoPropose`(🥬 10 차감·보류) | 액션 | js/80-actions.js:652 · 659 · 661–674 |
+| `npRate` input 리스너 — "등급 보너스 포함 최대 N% (블랙…)" | 전역 이벤트 | js/90-boot.js:36–43 |

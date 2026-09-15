@@ -1,6 +1,6 @@
 # 셀러리 수수료·정산 정책
 
-> 최종 수정: 2026-09-14 · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
+> 최종 수정: 2026-09-15 · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
 
 이 문서는 프로토타입 코드가 실제로 계산하는 규칙을 그대로 옮긴 것입니다. 제안서와 코드가 다른 곳은 **코드 값을 기준**으로 쓰고 `제안서 표기:` 로 병기했습니다. 제안서에만 있고 코드에 없는 항목은 `미정(코드 미구현)` 으로 표시합니다.
 
@@ -22,7 +22,7 @@
 
 한 줄 요약: **판매 정산에서 브랜드가 부담하는 것은 "PG 1.9% + 인플루언서 요율 + 플랫폼 10%"** 이고, 등급 보너스·등급 할인·추천 보상은 전부 플랫폼 10% 몫에서 나갑니다. 제안서 표기와 일치합니다("등급 추가분과 등급 할인은 상대 몫을 깎지 않고 셀러리가 부담").
 
-※ 위 요약은 **판매 정산 기준**입니다. 데이터 열람·제안권·부스트 등 선택 유료 항목은 판매 수수료와 별개로 셀러리 포인트(🥬)로 결제하며, 포인트는 판매로 획득하거나 현금으로 충전할 수 있습니다(`TOPUP`: 5🥬 ₩100,000 / 10🥬 ₩190,000 / 30🥬 ₩540,000 · 시뮬 결제 · "충전 셀러리는 환불 불가"). 세부 규칙은 docs/points-policy.md 참조. 제안서 표기: 브랜드 p.6 "기본 정보는 무료, 판매 실적은 필요할 때만 엽니다. 함께 판매한 적 있는 분의 데이터는 계속 무료" — 코드의 등급별 열람가 `DATA_PRICE`(스타터·브론즈 1 / 실버·골드 2 / 플래티넘 3 / 다이아 4 / 블랙 5🥬), 다이아·블랙 브랜드 월 5회 무료 `freeRefLeft`, 샵 항목 안내 "함께 판매한 인플루언서는 무료" 와 일치. 브랜드 p.2 "브랜드 부담 0원 · 입점비·구독료·보증금 없음" 은 판매 수수료 외 고정비가 없다는 뜻이고, 유료 포인트 항목은 선택 사용입니다.
+※ 위 요약은 **판매 정산 기준**입니다. 데이터 열람·제안권·부스트 등 선택 유료 항목은 판매 수수료와 별개로 셀러리 포인트(🥬)로 결제하며, 포인트는 판매로 획득하거나 현금으로 충전할 수 있습니다(`TOPUP`: 5🥬 ₩100,000 / 10🥬 ₩190,000 / 30🥬 ₩540,000 · 시뮬 결제 · "충전 셀러리는 환불 불가"). 세부 규칙은 docs/points-policy.md 참조. 제안서 표기: 브랜드 p.6 "기본 정보는 무료, 판매 실적은 필요할 때만 엽니다. 함께 판매한 적 있는 분의 데이터는 계속 무료" — 코드의 등급별 열람가 `DATA_PRICE`(스타터·브론즈 1 / 실버·골드 2 / 플래티넘 3 / 다이아 4 / 블랙 5🥬), 다이아·블랙 브랜드 월 5회 무료 `freeRefLeft`, 샵 항목 안내 "함께 판매한 인플루언서는 무료" 와 일치. 브랜드 p.2 "브랜드 부담 0원 · 입점비·구독료·보증금 없음" 은 판매 수수료 외 고정비가 없다는 뜻이고, 유료 포인트 항목은 선택 사용입니다(단 **다이아·블랙 인플루언서에게 직접 제안**할 때는 10🥬 가 자동 차감되고 잔액이 없으면 제안 자체가 막혀 현금 충전이 필요합니다 — 거절 시에만 환급, 충전 🥬 는 환불 불가 · `SHOP` `diamond` 항목 js/02-state.js:71, 차감 js/80-actions.js:274 · 브랜드 p.11 STEP 3 "직접 제안하셔도 되고" 는 이 조건을 언급하지 않음 · 세부는 docs/points-policy.md §4.5).
 
 ---
 
@@ -33,14 +33,14 @@
 | 규칙 | 값 | 근거 |
 |---|---|---|
 | 입력 필드 | `#npRate` · 기본값 **30** · `min="11"` · `max="50"` — 이 11~50 범위는 `<input>` HTML 속성(스피너 안내)일 뿐 저장 시 검증하지 않음(예: 80을 입력하면 `rate = 0.70` 으로 그대로 저장) | 상품 등록 모달 |
-| 저장 공식 | `rate = max(5, 입력값 − 10) / 100` | `saveProduct` / `createProduct` |
-| 인플루언서 요율 하한 | **5%** — 입력 11~14는 저장 시 5%로 올려짐(실제 총 요율 15%). 코드가 실제로 강제하는 것은 이 하한뿐이며 상한은 없음 | 위 공식의 `max(5, …)` |
-| 입력값 ≤ 10 | 안내문이 경고로 바뀜: "총 수수료율은 플랫폼 몫(10%)보다 커야 합니다" | `input` 이벤트 핸들러 |
+| 저장 공식 | `rate = max(5, (입력값 \|\| 30) − 10) / 100` — 빈칸·0 은 `\|\|30` 폴백으로 30 취급 | `saveProduct` / `createProduct` (js/80-actions.js:504, :528) |
+| 인플루언서 요율 하한 | **5%** — 입력 11~14는 저장 시 5%로 올려짐(실제 총 요율 15%). 입력 1~10 도 그대로 5% 로 저장됨(아래 경고문은 표시만 하고 저장을 막지 않음). 빈칸·0 은 `\|\|30` 폴백으로 총 30%(인플 20%) 로 저장. 코드가 실제로 강제하는 것은 이 하한뿐이며 상한은 없음 | 위 공식의 `max(5, …)` |
+| 입력값 ≤ 10 | 안내문이 경고로 바뀜: "총 수수료율은 플랫폼 몫(10%)보다 커야 합니다" — `#npRateCalc` 문구만 바꾸고 검증 플래그는 없으므로 이 경고가 저장을 차단하지는 않음(위 하한 행) | `input` 이벤트 핸들러 (js/90-boot.js:36–43) |
 | 실시간 안내 | "→ 플랫폼 10%p + 제안 수수료 N% · 등급 보너스 포함 최대 N+3% (블랙, 보너스는 플랫폼 부담)" | 같은 핸들러 |
 | 잠금 | 캠페인이 `SCHEDULE_CONFIRMED / LIVE / CLEARING` 인 상품은 판매가·소비자가·수수료율 입력이 `disabled` 이고 저장 시에도 `cp`·`gp`·`rate` 는 건너뜀. **예외 — 구매 옵션 `p.options[].price` 는 잠금 중에도 수정·저장됨**(`saveProduct` 는 옵션을 잠금과 무관하게 항상 덮어씀 · 모달 안내 "재고·샘플 정책·옵션·이미지·독점권은 수정 가능합니다"). 고객 결제 단가는 `p.gp` 가 아니라 옵션가(`buyNow` 의 `unit = o.price`)이므로, 확정·LIVE 중에도 고객이 실제로 내는 가격(= 정산 `net` 의 기준)을 바꿀 수 있음 | `productModal` `locked`, `saveProduct`, `buyNow` |
 | 재검수 | 노출 중(`listed`) 상품의 판매가 또는 요율을 바꾸면 `pending`(재검수 대기)으로 전환 | `saveProduct` |
 
-화면 표기: 브랜드 상품 목록은 "20% (+플랫폼 10)", 관리자 상품 목록은 "30% (인플 20 + 플랫폼 10)". 저장되는 값은 인플루언서 요율(`p.rate`)뿐이고 총 요율은 `p.rate + PLAT_RATE` 로 다시 계산합니다. 인플루언서 화면(홈 진행 카드·NEW 소식·캠페인 카드·브랜드 요청 목록·캠페인 스레드 헤더·관리자 검수 목록)은 기본 요율만 "수수료 N%" 로 표시하고, 상품 카드만 "수수료 N~N+3%" 범위(`GRADES[0].bonus` = 블랙 3)로 표시합니다. 등급 보너스 %p 가 실제 값으로 보이는 곳은 정산 미리보기(11.1절, "인플루언서 20% +1.5%p 플래티넘")와 브랜드 직접 제안 메시지("수수료 20% + 등급 보너스 1.5%p")뿐입니다. 제안서 표기(인플루언서 p.6 "내 수수료 = 브랜드 제안 수수료율 + 등급 추가분", p.4 "총 요율 공개 · 내 몫이 먼저 보임")와 달리 대부분의 인플루언서 화면은 제안 요율만 보여줍니다.
+화면 표기: 브랜드 상품 목록은 "20% (+플랫폼 10)", 관리자 상품 목록은 "30% (인플 20 + 플랫폼 10)". 저장되는 값은 인플루언서 요율(`p.rate`)뿐이고 총 요율은 `p.rate + PLAT_RATE` 로 다시 계산합니다. 인플루언서 화면(홈 진행 카드·NEW 소식·캠페인 카드·브랜드 요청 목록·캠페인 스레드 헤더·관리자 검수 목록)은 기본 요율만 "수수료 N%" 로 표시하고, 상품 카드(js/20-seller.js:123)와 상품 상세 모달(js/20-seller.js:489)은 "수수료 N~N+3%" 범위(`GRADES[0].bonus` = 블랙 3)로 표시합니다. 등급 보너스 %p 가 실제 값으로 보이는 곳은 정산 미리보기(11.1절, "인플루언서 20% +1.5%p 플래티넘")·브랜드 직접 제안 메시지("수수료 20% + 등급 보너스 1.5%p")뿐 아니라 홈 "내 자산" 카드(`+N%p`, js/20-seller.js:70)와 랭킹 "등급별 혜택" 표(`t.perk`, js/20-seller.js:308)에도 있고, 정산 완료 스레드 메시지(js/80-actions.js:485)는 %p 없이 등급명만("(플래티넘 보너스 포함)") 병기합니다. 상품 카드에는 별도로 "건당 예상 수수료"(js/20-seller.js:124)가 있는데 기본 요율만 곱한 값(`p.gp × p.rate`)이라 등급 보너스가 빠져 있고, 인플루언서 제안서 p.7 "내 수수료로 환산한 예상 수령액"에 해당하는 표시는 코드에 없습니다(미정(코드 미구현) — 14절). 제안서 표기(인플루언서 p.6 "내 수수료 = 브랜드 제안 수수료율 + 등급 추가분", p.4 "총 요율 공개 · 내 몫이 먼저 보임")와 달리 대부분의 인플루언서 화면은 제안 요율만 보여줍니다.
 
 제안서 표기: "총 요율 공개 + 플랫폼 10%p 고정", 예시 총 30% = 플랫폼 10%p + 인플루언서 20%p — 일치. 입력 범위(11~50)는 제안서에 없음. 하한 5%는 제안서 "브랜드가 정한 총 수수료율에서 플랫폼 몫 10%p를 뺀 나머지가 전부 인플루언서 몫"(인플루언서 p.5)·"총 수수료율을 직접 정하면 플랫폼 10%p가 자동 분리됩니다"(브랜드 p.5)와 **다름** — 11~14 를 입력하면 브랜드 부담 총 요율이 입력값이 아닌 15% 가 됩니다(코드 기준, 제안서 표기와 불일치). 가격 잠금의 제안서 표기(브랜드 p.8 "진행 중인 상품은 판매가·수수료율을 바꿀 수 없습니다", 인플루언서 p.9 "확정된 뒤에는 브랜드가 판매가·수수료율을 바꿀 수 없어요")는 `gp`·`rate` 에는 맞지만 구매 옵션가에는 적용되지 않습니다(위 잠금 행, 코드 불일치).
 
@@ -84,7 +84,7 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 - **브랜드 정산액**에는 `pf`(보너스 차감 후)가 아니라 `pfGross`(10% 전액)가 들어갑니다. 즉 브랜드는 인플루언서 등급 보너스·추천 보상과 무관하게 항상 10%를 내고, 자기 몫의 할인(`bBoost`, `bDisc`)만 돌려받습니다.
 - **인플루언서**는 기본 요율 `sf` 에 등급 보너스 `gBonus` 와 추천 부스트 `boost` 를 더해 받습니다. 추천인 보상(`refReward`, `bReward`)은 당사자가 아닌 추천인에게 별도 지급됩니다.
 - 플랫폼이 실제로 남기는 돈은 `pf = 10% − (보너스 + 보상 + 할인)` 이고, 여기서 부가세를 뺀 `pfNet` 이 순수익입니다.
-- `gross` 는 `CANCELED` 만 제외하므로 결제 건수 표시는 `PAID + REFUNDED` 입니다(환불 건도 결제로 세고 환불 행에서 뺌).
+- `gross` 는 `CANCELED` 만 제외하므로 결제 건수 표시는 `PAID + REFUNDED` 입니다(환불 건도 결제로 세고 환불 행에서 뺌). 코드에 `CANCELED` 를 실제로 생성하는 경로는 없음 — 방어적 조건일 뿐, 프로토타입에서는 발생하지 않는 상태입니다.
 
 ---
 
@@ -139,7 +139,7 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 
 ## 6. 확정 매출과 환불
 
-- 확정 매출 `net` = 결제(`PAID` + `REFUNDED`) − 환불(`REFUNDED`). 주문 상태 `CANCELED` 는 처음부터 제외.
+- 확정 매출 `net` = 결제(`PAID` + `REFUNDED`) − 환불(`REFUNDED`). 주문 상태 `CANCELED` 는 처음부터 제외(단 코드에 `CANCELED` 를 실제로 생성하는 경로는 없음 — 방어적 조건).
 - 환불 처리(`refund` 액션)는 `PAID` 주문만 가능하며 두 가지 예외가 있습니다.
   - 캠페인이 `SETTLED` 이면 불가 — 토스트 "정산이 완료된 판매의 주문은 환불 처리할 수 없습니다 — 별도 CS 정산 조정 필요".
   - 인플루언서 샘플 구매 주문(`o.sample`)은 불가 — "캠페인 스레드에서 협의".
@@ -154,15 +154,15 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 구분 | 규칙 | 코드 |
 |---|---|---|
 | 개인 인플루언서 | 수수료 합계(`sfTotal`)의 **3.3%** 원천징수 후 지급 | `sellerWht(s) = WHT` |
-| 사업자 인플루언서 | 원천징수 없음 · 세금계산서 발행 · 사업자등록번호 필수(없으면 저장 거부) | `sellerWht(s) = 0`, `saveSettleInfo` |
-| 브랜드 | 사업자등록번호·정산 계좌 등록 후 D+21 지급과 세금계산서 발행. 마이페이지 정산 정보 필드 = 은행·계좌번호·예금주·사업자등록번호(저장 필수 — 하나라도 없으면 "은행·계좌·예금주·사업자등록번호를 입력해주세요" 로 저장 거부) + 사업자등록증 파일(`brandDocPick`, 파일명만 `settleInfo.bizDoc` 에 저장) + 통신판매업 신고번호(선택, `settleInfo.mailOrder`, 저장·지급 보류 조건 아님) | `vBrandSettle` 경고, `saveBrandInfo`, `brandDocPick` |
+| 사업자 인플루언서 | 원천징수 없음 · 세금계산서 발행(문구만 · 발행 로직 미정(코드 미구현)) · 사업자등록번호 필수(없으면 저장 거부) | `sellerWht(s) = 0`, `saveSettleInfo` |
+| 브랜드 | 사업자등록번호·정산 계좌 등록 후 D+21 지급과 세금계산서 발행(문구만 · 발행 로직 미정(코드 미구현)). 마이페이지 정산 정보 필드 = 은행·계좌번호·예금주·사업자등록번호(저장 필수 — 하나라도 없으면 "은행·계좌·예금주·사업자등록번호를 입력해주세요" 로 저장 거부) + 사업자등록증 파일(`brandDocPick`, 파일명만 `settleInfo.bizDoc` 에 저장) + 통신판매업 신고번호(선택, `settleInfo.mailOrder`, 저장·지급 보류 조건 아님) | `vBrandSettle` 경고, `saveBrandInfo`, `brandDocPick` |
 | 플랫폼 부가세 | 수수료 `pf` 에 부가세 내포 → `vat = pf − pf/1.1`, 순수익 `pfNet = pf − vat` | `calc()` |
 
 정산 유형은 인플루언서 마이페이지 `정산 유형` 셀렉트(개인 — 사업소득 원천징수 3.3% 공제 / 사업자 — 세금계산서 발행)에서 고릅니다. 사업자 등록증은 파일명만 저장(프로토타입).
 
 주의(코드 불일치): 인플루언서 **정산 화면의 "실수령(예정)" 열**과 **실시간 매출의 "내 수수료 (실시간)" KPI**는 `sfTotal × (1 − WHT)` 로 정산 유형과 무관하게 항상 3.3%를 뺍니다. 홈 장부·관리자 정산·정산 실행·캠페인 상세 완료 카드는 `sellerWht()` 를 써서 사업자는 0으로 처리합니다. 사업자 인플루언서(시드 `s2` 혜린)는 두 화면의 금액이 서로 다르게 보입니다.
 
-제안서 표기: "개인 3.3% 원천징수 / 사업자 세금계산서" — 일치. 부가세 처리는 제안서에 없음. 브랜드 p.11 STEP 1 "브랜드 정보·사업자등록증·정산 계좌를 등록", 준비물 "사업자등록증 · 통신판매업 신고번호 · 정산 계좌" — 코드에서 통신판매업 신고번호는 **선택 입력**이며 저장·지급 보류 조건이 아니고, 사업자등록증도 파일명만 저장될 뿐 보류 조건이 아닙니다(보류는 계좌 유무만 판정 — 8.3절).
+제안서 표기: "개인 3.3% 원천징수 / 사업자 세금계산서" — 일치. 부가세 처리는 제안서에 없음. 브랜드 p.11 STEP 1 "브랜드 정보·사업자등록증·정산 계좌를 등록", 준비물 "사업자등록증 · 통신판매업 신고번호 · 정산 계좌" — 코드에서 통신판매업 신고번호는 **선택 입력**이며 저장·지급 보류 조건이 아니고, 사업자등록증도 파일명만 저장될 뿐 보류 조건이 아닙니다(보류는 계좌 유무만 판정 — 8.3절). 인플루언서 p.10 "계좌만 등록하면 끝 — 개인은 3.3% 원천징수 후 입금, 사업자는 세금계산서로 선택하시면 됩니다" 와 달리, 코드는 정산 유형을 사업자로 고르고 사업자등록번호가 없으면 저장 자체를 거부합니다(`saveSettleInfo`, js/80-actions.js:191) — 사업자는 "계좌만"으로 끝나지 않습니다.
 
 ---
 
@@ -188,7 +188,7 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 
 1. `c.status = 'SETTLED'`, `c.settledAt = 오늘`.
 2. 시드 이후 생성된 캠페인(`c.id` 번호 ≥ 100)만 인플루언서 `m3Sales` 에 확정 매출을 누적(등급·셀러리 획득 기준).
-3. 샘플 구매 환급(9절) — 조건 충족 시 셀러리는 원장에 되돌리고 현금은 `refundCash` 로 인플루언서 지급액에 가산.
+3. 샘플 구매 환급(9절) — 조건 충족 시 셀러리는 원장에 되돌리고 현금은 `refundCash` 로 인플루언서 지급액에 가산. 부담 주체는 미정(코드 미구현) — 9절 참고.
 4. `settlements` 에 기록: `{at, cid, title, net, brandPay, sellerPay: sfTotal×(1−wht)+refundCash, platFee: pf, pfNet, holdS, holdB}`.
 5. 추천 보상이 있으면 `refEarnings` / `brandRefEarnings` 에 기록하고 스레드에 시스템 메시지.
 6. 스레드에 "정산 완료 · 브랜드 ₩… · 인플루언서 ₩… → 원천징수 3.3% 공제 후 ₩… / 사업자 정산(세금계산서) ₩… · 명세 발행".
@@ -198,9 +198,9 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 대상 | 보류 판정 | 화면 경고 조건 |
 |---|---|---|
 | 인플루언서 | `!(settleInfo && settleInfo.account)` → `holdS` | 정산 화면: 은행·계좌 없음 / 마이페이지: 은행·계좌·예금주·(사업자면 사업자번호) / 관리자 정산 실행 대기 목록: `settleInfo` 객체 자체가 없을 때만 |
-| 브랜드 | `!(settleInfo && settleInfo.account)` → `holdB` | 정산 화면: 은행·계좌·사업자등록번호 중 하나라도 없음 / 관리자 정산 실행 대기 목록: `settleInfo` 객체 자체가 없을 때만 |
+| 브랜드 | `!(settleInfo && settleInfo.account)` → `holdB` | 정산 화면: 은행·계좌·사업자등록번호 중 하나라도 없음 / 마이페이지: 은행·계좌·예금주·사업자등록번호(`ok = bank && account && holder && bizNo`, js/40-brand.js:436) / 관리자 정산 실행 대기 목록: `settleInfo` 객체 자체가 없을 때만 |
 
-관리자 정산 실행 대기 목록의 "정산 정보 미등록 → 지급 보류" 경고는 인플루언서·브랜드의 `settleInfo` 객체 존재 여부만 보고, 실제 보류 판정 `holdS/holdB` 는 `settleInfo.account` 유무를 봅니다. 그래서 계좌 없이 사업자등록증만 먼저 올린 경우(`bizDocPick`/`brandDocPick` 이 `settleInfo = {bizDoc}` 만 만듦)는 대기 목록에 경고 없이 정산 실행 시 보류됩니다(코드 불일치 — 경고 조건과 보류 조건이 다름).
+관리자 정산 실행 대기 목록의 "정산 정보 미등록 → 지급 보류" 경고는 인플루언서·브랜드의 `settleInfo` 객체 존재 여부만 보고, 실제 보류 판정 `holdS/holdB` 는 `settleInfo.account` 유무를 봅니다. 그래서 계좌 없이 사업자등록증만 먼저 올린 경우(`bizDocPick`/`brandDocPick` 이 `settleInfo = {bizDoc}` 만 만듦)는 대기 목록에 경고 없이 정산 실행 시 보류됩니다(코드 불일치 — 경고 조건과 보류 조건이 다름). 반면 관리자 대시보드의 "정산정보 미등록 계정" 카운트(js/50-admin.js:13)와 브랜드 목록의 등록/미등록 배지(js/50-admin.js:126)는 `settleInfo.account` 기준이라 `holdS/holdB` 판정과 일치합니다 — 경고·보류 불일치는 정산 실행 대기 목록(js/50-admin.js:184)에 한정됩니다.
 
 보류여도 정산 자체는 실행·기록되며(`SETTLED`), 기록에 `holdS/holdB` 플래그가 붙고 스레드에 "⏸ 지급 보류 — … 정산 계좌 미등록. 마이페이지에서 정산 정보를 등록하면 다음 지급 배치에 포함됩니다." 가 남습니다. 관리자 "정산 완료" 표에는 "지급 보류 · 인플/브랜드 계좌 미등록" 배지로 표시됩니다. 실제 "다음 배치 재지급" 로직은 `미정(코드 미구현)`.
 
@@ -222,7 +222,7 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 브랜드 정산 | 일반 판매와 동일하게 `brandPay` 에 포함 | 모달 안내문 |
 | 셀러리로 낸 금액 | 브랜드에는 원화로 정산 → 그 차액은 플랫폼 부담(관리자 손익의 "샘플 셀러리 결제 보전" `celCover`) | `vAdminRevenue` |
 | 환불 | 샘플 주문은 `refund` 액션으로 환불 불가(스레드에서 협의) | `refund` |
-| 구매액 환급 옵션 | 브랜드가 상품에 `refund` 를 켜면 정산 실행 시 1회 환급: 🥬는 원장에 복원, 현금은 인플루언서 지급액에 가산(원천징수 대상 아님) | `runSettle` |
+| 구매액 환급 옵션 | 브랜드가 상품에 `refund` 를 켜면 정산 실행 시 1회 환급: 🥬는 원장에 복원, 현금은 인플루언서 지급액에 가산(원천징수 대상 아님). **부담 주체 미정(코드 미구현)** — `brandPay`·플랫폼 수수료(`pf`/`pfNet`)·관리자 손익(`vAdminRevenue`) 어디서도 차감되지 않아 환급 재원이 어느 정산에도 잡히지 않음(🥬 환급분은 `celCover` 로 이미 브랜드에 원화 보전된 것과 별개로 인플루언서에게 복원됨) | `runSettle` |
 
 예시: 판매가 ₩29,900 · 인플루언서 20% → 샘플 구매가 ₩23,920 = 🥬 1 + ₩3,920.
 
@@ -259,11 +259,13 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 추천인 보상 2% | `−refReward` | 인플루언서 추천 부스트 중 |
 | 브랜드 추천인 보상 1% / 신규 브랜드 수수료 할인 −1%p | `−bReward` / `+bBoost` | 브랜드 추천 부스트 중 |
 | 브랜드 {등급} 등급 수수료 할인 −x%p | `+bDisc` | 브랜드 골드 이상 |
-| 플랫폼 10% (보너스·보상·할인 차감 후) | `−pf` | 항상 |
+| 플랫폼 10% [+ "(보너스·보상·할인 차감 후)" — `k.costs` 가 0보다 클 때만] | `−pf` | 항상 |
 | **브랜드 정산액** | `brandPay` | 항상 |
 | 정산 기준일(D+21) | `settleDue(c)` | `c.end` 있을 때 |
 
 주의(표시 불일치): 행을 위에서부터 더하면 `net − pg − sf − pfGross + 2·(bBoost + bDisc)` 가 되어, 브랜드 할인(`bBoost`/`bDisc`)이 있는 캠페인에서는 마지막 행 `brandPay` 와 `bBoost + bDisc` 만큼 어긋납니다(`pf` 가 이미 할인을 뺀 값인데 `+` 행이 또 있음). 등급 보너스만 있는 경우(제안서 예시)는 정확히 맞습니다.
+
+제안서 표기(인플루언서 p.10): 인플루언서용 미리보기는 "내 수수료 20% ₩525,860 / 등급 추가분 +1.5%p(플래티넘) ₩39,440 / 원천징수 3.3%(개인) −₩18,655 / 내 실수령액 ₩546,645" 처럼 인플루언서 본인 관점(내 수수료·등급 추가분·원천징수·실수령액)으로 그려져 있습니다. 코드의 정산 미리보기는 역할 구분 없이 브랜드 관점 표 1종만 렌더합니다(js/70-campaign.js:36-52) — 인플루언서 행에는 등급 보너스 %p 가 함께 표시되지만("+1.5%p 플래티넘"), 원천징수·실수령액 행은 없고 마지막 행은 "브랜드 정산액"입니다. `gBonus`(등급 추가분 금액)와 원천징수 금액은 이 표에서 단독으로 표시되지 않습니다(정산 완료 후 인플루언서 정산 화면·스레드 메시지에서만 확인 가능 — 11.2절, 코드 불일치).
 
 ### 11.2 인플루언서 · 정산
 
@@ -288,6 +290,8 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 
 같은 화면의 4번째 KPI 카드는 **셀러리 충전 매출**입니다: `celWon` = 셀러리 원장(`celeryLedger`) 중 `won` 이 있는 충전 항목의 합계, 공급가 `celNet = round(celWon / 1.1)`, 충전 건수, 소진 🥬. 손익 요약 옆에는 **셀러리 포인트 손익** 표가 따로 있습니다: 충전 결제액(VAT 포함) → − 부가세 → **충전 순매출** · 무상 발행(가입·이벤트, `granted`) · 매출 달성 획득(₩500만당 1, `earned`) · 소진(`spent`) · 미사용 잔액(부채, `bal`, 충전가 ₩20,000 환산). 안내: "셀러리 1개 = 충전가 ₩20,000 기준. 무상 발행·획득분은 매출이 아닌 마케팅 비용(잔액은 부채)으로 잡습니다." 충전은 셀러리 샵의 `topup` 액션(`TOPUP` 5🥬 ₩100,000 / 10🥬 ₩190,000 / 30🥬 ₩540,000, 시뮬 결제, "충전 셀러리는 환불 불가")으로 원장에 `{delta, won}` 을 기록합니다. 판매 수수료 정산과는 별개 흐름이며 포인트 규칙은 docs/points-policy.md 참조.
 
+주의(표시 불일치): 대시보드(vAdminHome) KPI "누적 GMV (확정)"·"플랫폼 순수익"은 `LIVE / CLEARING / SETTLED` 캠페인만 합산합니다(js/50-admin.js:4-6). 반면 위 손익 요약과 이 절의 표는 `samplePaid` 가 있는 캠페인(`SAMPLE_PURCHASED` 포함)도 더합니다(js/50-admin.js:234). 그래서 샘플 구매만 있고 아직 정산 상태가 아닌 캠페인(시드 c2)은 손익 요약·브랜드 정산 표(js/40-brand.js:416)에는 잡히지만 대시보드 KPI에는 잡히지 않아, 관리자 센터 안에서 플랫폼 순수익 수치가 화면마다 다르게 보일 수 있습니다.
+
 그 아래 "운영 비용 · 최종 순이익"은 `OPEX_DEF`(서버·DB·CS·도메인·기타 월 고정비, PG 고정비, 알림톡 건당, Claude API 건당)를 기본값으로 하는 **관리자 순수익 시뮬레이션**입니다. 정산 규칙과는 무관하며 관리자가 값을 바꿔 저장(`saveOpex`)할 수 있습니다.
 
 ---
@@ -303,12 +307,12 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 확정 매출 | ₩2,629,300 | `net` = 2,629,300 | ₩2,629,300 | ✓ |
 | PG 1.9% | −₩49,957 | 2,629,300 × 0.019 = 49,956.7 | −₩49,957 | ✓ |
 | 인플루언서 20% | ₩525,860 | `sf` = 525,860 | ₩525,860 | ✓ |
-| 등급 추가분 +1.5%p (플래티넘) | ₩39,440 | `gBonus` = 39,439.5 | ₩39,440 | ✓ |
+| 등급 추가분 +1.5%p (플래티넘) | ₩39,440 | `gBonus` = 39,439.5 | 화면 미표시(계산값) | △ 표시 위치 다름 |
 | 인플루언서 20% +1.5%p 합계 | −₩565,300 | `sfTotal` = 565,299.5 | −₩565,300 | ✓ |
 | 플랫폼 10% (보너스 차감 후) | −₩223,490 | `pf` = 262,930 − 39,439.5 = 223,490.5 | −₩223,491 | △ ₩1 (반올림) |
 | **브랜드 정산액** | ₩1,790,553 | `brandPay` = 2,629,300 − 49,956.7 − 525,860 − 262,930 = 1,790,553.3 | ₩1,790,553 | ✓ |
-| 원천징수 3.3% (개인) | −₩18,655 | 565,299.5 × 0.033 = 18,654.88 | −₩18,655 | ✓ |
-| **인플루언서 실수령액** | ₩546,645 | 565,299.5 × 0.967 = 546,644.62 | ₩546,645 | ✓ |
+| 원천징수 3.3% (개인) | −₩18,655 | 565,299.5 × 0.033 = 18,654.88 | 화면 미표시(계산값) | △ 표시 위치 다름 |
+| **인플루언서 실수령액** | ₩546,645 | 565,299.5 × 0.967 = 546,644.62 | SETTLED 카드·정산 표·스레드 메시지에서만 표시 | △ 표시 위치 다름 |
 
 - 플랫폼 행만 ₩1 차이: 코드는 `Math.round(223,490.5)` = 223,491 로 표시하고 제안서는 223,490 으로 인쇄됨. 브랜드 정산액은 반올림 전 값으로 계산하므로 영향 없음.
 - 제안서 p.10 상단 "확정 매출 100만원" 분배(브랜드 ₩681,000 / 인플루언서 ₩200,000 / 셀러리 ₩100,000 / PG ₩19,000)도 같은 공식(등급 보너스 0)으로 정확히 재현됩니다. 브랜드 p.9의 "셀러리 = 확정 매출의 30% + PG 1.9%" 역시 브랜드 잔여 68.1%와 일치.
@@ -356,68 +360,72 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 | 샘플 셀러리 결제 환산 | "현금 또는 셀러리" | 1🥬 = ₩20,000, 플랫폼이 원화 보전 | 코드 기준 |
 | 환불 기간 구분 | 없음 | 문구만 "단순 변심 7일 · 하자 21일", 로직은 21일 단일 | 문구 기준 |
 | 자동 발주 09:00 발송 | 없음 | 문구만, 실제 발송 없음 | 미정(코드 미구현) |
+| 세금계산서·정산 명세 발행 | "세금계산서 발행" · "명세 발행"(사업자 인플루언서·브랜드, 7절·8.2절 6단계) | 문구만 — 실제 발행 로직 없음, 기록은 `settlements` 배열(js/80-actions.js:473)뿐 | 미정(코드 미구현) |
+| 정산 미리보기 역할별 구분 | 인플루언서용 표: 내 수수료·등급 추가분·원천징수·내 실수령액(인플 p.10) | 역할 공통 브랜드 관점 표 1종 — 원천징수·실수령 행 없음(js/70-campaign.js:36-52) | 코드 불일치 |
+| 샘플 구매액 환급 재원 | 브랜드가 켠 옵션(브랜드 부담으로 읽힘, 인플 p.11) | `sellerPay` 가산만 — `brandPay`·플랫폼 수수료·관리자 손익 어디서도 차감 없음 | 미정(코드 미구현) |
+| 예상 수령액 표시 | 판매당 평균 × 내 수수료(인플 p.7) | 상품 카드 "건당 예상 수수료" = `p.gp × p.rate`(등급 보너스 미반영, js/20-seller.js:124) | 미정(코드 미구현) |
 
 ---
 
 ## 15. 코드 참조
 
-| 상수 / 함수 | 분할 후 파일 | 원본 위치 | 비고 |
+| 상수 / 함수 | 분할 후 파일 | 분할 후 위치 | 비고 |
 |---|---|---|---|
-| `fmt` | js/00-core.js | (원본 index.html L1184) | `Math.round` 후 천 단위 |
-| `ST` (CLEARING / SETTLED) · `FLOW` · `FLOW_L` | js/00-core.js | (원본 index.html L1194–L1211) | 상태 머신 |
-| `PG_RATE` `PLAT_RATE` `WHT` `CLEAR_DAYS` | js/00-core.js | (원본 index.html L1212) | 0.019 / 0.10 / 0.033 / 21 |
-| `seedData` (settleInfo 시드) | js/01-seed.js | (원본 index.html L1219, L1224–L1248) | s2 = 사업자 |
-| `LS` | js/02-state.js | (원본 index.html L1373) | `'sellery-proto-v29'` |
-| `BREF_RATE` `BREF_DISC` `BREF_TIMES` | js/02-state.js | (원본 index.html L1374) | 0.01 / 0.01 / 3 |
-| `CELERY_PER` · `OPEX_DEF` · `DATA_PRICE` · `dataPrice` | js/02-state.js | (원본 index.html L1376–L1380) | OPEX_DEF = 순수익 시뮬 기본값 · DATA_PRICE = 등급별 열람가 1~5🥬 |
-| `BG_DISC` · `gradeBonusOf` · `bDiscOf` | js/02-state.js | (원본 index.html L1382–L1384) | 등급 반영 |
-| `freeRefLeft` · `spendData` · `CATMAP` | js/02-state.js | (원본 index.html L1386–L1391, L1406) | 다이아·블랙 브랜드 월 5회 무료 열람 |
-| `autoTick` | js/02-state.js | (원본 index.html L1421–L1429) | 스케줄러: 시작일 → LIVE · 종료일 경과 → CLEARING (`render()` 첫 줄에서 호출, L1716) |
-| `SHOP` 항목 설명 · `TOPUP` | js/02-state.js | (원본 index.html L1433–L1451) | sdata "함께 판매한 인플루언서는 무료" L1444 · TOPUP 5/10/30🥬 L1451 |
-| `celEarned` · `celBal` | js/02-state.js | (원본 index.html L1452–L1456) | — |
-| `sampleQuota` · `sampleUsed` · `sampleLeft` | js/02-state.js | (원본 index.html L1458–L1460) | — |
-| `SAMPLE_CEL_WON` · `spOf` · `samplePrice` · `sampleSplit` · `freeEligible` · `hadFreeSample` | js/02-state.js | (원본 index.html L1462–L1467) | 샘플 구매가 |
-| `GRADES` · `gradeOf` · `gname` · `tierIdx` | js/02-state.js | (원본 index.html L1488–L1498, L1516) | 인플루언서 등급·보너스 |
-| `BGRADES` · `bGmv` · `netOf` · `bgradeOf` · `bgname` | js/02-state.js | (원본 index.html L1520–L1536) | 브랜드 등급 |
-| `REF_RATE` `REF_BOOST` `REF_TIMES` | js/02-state.js | (원본 index.html L1541) | 0.02 / 0.01 / 5 |
-| `dlCSV` | js/02-state.js | (원본 index.html L1603–L1608) | CSV 다운로드(BOM) |
-| `isRefBoost` · `isBrandRefBoost` | js/02-state.js | (원본 index.html L1617–L1633) | 첫 N회 판정 |
-| `calc` | js/02-state.js | (원본 index.html L1634–L1655) | **정산 계산식** |
-| `sellerWht` · `settleDue` | js/02-state.js | (원본 index.html L1656–L1657) | 원천징수 · 기준일 |
-| `periodBlock` 등 기간 정책 | js/02-state.js | (원본 index.html L1670–L1685) | 정산과 무관 |
-| `vSellerHome` 장부 (`pendPay`, `monthPay`) | js/20-seller.js | (원본 index.html L1813–L1814, L1854) | `sellerWht` 사용 |
-| `vSellerSettle` | js/20-seller.js | (원본 index.html L2074–L2090) | 실수령 = `sfTotal×(1−WHT)` · 요율 열 = `p.rate` [+1%p] (등급 보너스 미표시, L2086) |
-| 인플루언서 화면 요율 표시 | js/20-seller.js · js/40-brand.js · js/50-admin.js · js/70-campaign.js | (원본 index.html L1797, L1835, L1888, L1927, L2584, L2731, L3086, L3553) | "수수료 N%" 기본 요율만 · 상품 카드 L1927 은 "N~N+3%" |
-| `vMy` 정산 정보 폼 | js/20-seller.js | (원본 index.html L2171–L2182) | 정산 유형 셀렉트 |
-| `vRank` 제목 문구 | js/20-seller.js | (원본 index.html L2099) | — |
-| 셀러리 샵 충전 UI | js/30-shared.js | (원본 index.html L2323–L2325) | "충전 (시뮬 결제)" · "충전 셀러리는 환불 불가" |
-| 실시간 매출 KPI · 주문 피드 | js/30-shared.js | (원본 index.html L2373, L2381) | `sfTotal×(1−WHT)` / `brandPay` · 피드 주문별 "환불" 배지 |
-| 브랜드 등급 카드 문구 | js/40-brand.js | (원본 index.html L2528–L2531) | — |
-| 브랜드 상품 목록 요율 표시 | js/40-brand.js | (원본 index.html L2609–L2610) | — |
-| `vBrandOrders` (발주·송장·자동 발주) | js/40-brand.js | (원본 index.html L2770–L2799) | 주문 표 상태 열(결제완료/배송중/환불) L2797 |
-| `vBrandSettle` | js/40-brand.js | (원본 index.html L2801–L2817) | 브랜드 정산 표 · 경고 조건 `bank && account && bizNo` L2805 |
-| `vBrandMy` 정산 정보 | js/40-brand.js | (원본 index.html L2855–L2869) | 은행·계좌·예금주·사업자등록번호 + 사업자등록증 파일(`bizDoc`) + 통신판매업 신고번호(선택 `mailOrder`) |
-| 관리자 상품 목록 `totalRate` | js/50-admin.js | (원본 index.html L2981, L2999) | 총 요율 = rate + 10 |
-| 관리자 주문·CS 목록 | js/50-admin.js | (원본 index.html L3063–L3064) | 주문별 결제완료/환불 상태 · 환불 처리 버튼 |
-| `vAdminSettle` | js/50-admin.js | (원본 index.html L3091–L3109) | 정산 실행 화면 · 대기 목록 경고는 `settleInfo` 객체 유무만 검사 L3100 |
-| `vAdminRevenue` (손익 요약 · OPEX) | js/50-admin.js | (원본 index.html L3149–L3252) | `celCover` L3162, 안내 L3244 · 셀러리 충전 매출 `celWon/celNet` L3154·KPI L3182 · 셀러리 포인트 손익 표 L3203–L3213 |
-| 고객 판매센터 · 소개 문구 | js/60-customer.js | (원본 index.html L3300, L3334, L3356, L3431–L3439, L3446, L3525, L3533) | 21일 보호 문구 |
-| 정산 미리보기 표 | js/70-campaign.js | (원본 index.html L3574–L3590) | 11.1절 · 등급 보너스 %p 표시 L3582 |
-| `detActions` LIVE 시뮬 카드(`endCamp` 버튼) · CLEARING / SETTLED 카드 · INVITED 제안 메시지 | js/70-campaign.js | (원본 index.html L3659–L3662, L3664–L3674, L3610) | 판매 종료 처리는 관리자 전용 · 제안 메시지에 등급 보너스 %p 표시 |
-| `sampleBuyModal` | js/70-campaign.js | (원본 index.html L3695–L3710) | 샘플 구매가·결제 수단 · "− 내 수수료 N%" = `p.rate` L3702 · 지정가 라벨 "(1회 한정)" L3701 |
-| `productModal` `locked` · `#npRate` · `#npBuyMode` · `#npOpts` | js/70-campaign.js | (원본 index.html L3745–L3748, L3765–L3768, L3776, L3782–L3783) | 잠금 안내 · min 11 · max 50 · 기본 30 · 지정가 옵션 라벨 "(1회 한정)" · 구매 옵션 textarea |
-| `saveBrandInfo` | js/80-actions.js | (원본 index.html L3802–L3808) | 은행·계좌·예금주·사업자번호 저장 필수 · `mailOrder` 선택 저장 |
-| `brandDocPick` · `bizDocPick` | js/80-actions.js | (원본 index.html L3834–L3848, L3982–L3996) | 사업자등록증 파일명만 `settleInfo.bizDoc` 에 저장(계좌 없이도 `settleInfo` 객체 생성) |
-| `confirmSampleBuy` | js/80-actions.js | (원본 index.html L3877–L3887) | 샘플 주문 생성 |
-| `saveSettleInfo` | js/80-actions.js | (원본 index.html L3974–L3981) | 사업자는 bizNo 필수 |
-| `topup` | js/80-actions.js | (원본 index.html L4037–L4043) | 셀러리 충전 — 원장에 `{delta:n, won}` 기록(시뮬 결제) |
-| `poCSV` · `poEmail` · `saveAutoPO` | js/80-actions.js | (원본 index.html L4145–L4165) | 발주서 |
-| `settleCSV` | js/80-actions.js | (원본 index.html L4174–L4183) | 정산 명세 · 대상 LIVE/CLEARING/SETTLED · 원천징수·실수령 열 없음 |
-| `endCamp` · `ffwd` · `refund` | js/80-actions.js | (원본 index.html L4233–L4252) | 수동 종료(`c.end = 오늘`)·시뮬·환불(스레드 "환불 처리 · 구매자 · ₩금액 (정산액 차감)" L4250) |
-| `runSettle` | js/80-actions.js | (원본 index.html L4253–L4274) | 정산 실행·보류(`holdS/holdB` = `settleInfo.account` 유무, L4259)·환급·추천 |
-| `saveProduct` · `createProduct` (rate·옵션 저장) | js/80-actions.js | (원본 index.html L4282, L4288, L4291, L4314–L4315) | `max(5, 입력−10)/100` (상한 검사 없음) · `p.options` 는 잠금과 무관하게 항상 저장 L4288 |
-| `buyNow` (고객 결제 단가) | js/80-actions.js | (원본 index.html L4359–L4363) | `unit = o.price` (옵션가, `p.gp` 아님) |
-| 고객 주문 완료 안내 | js/80-actions.js | (원본 index.html L4366) | — |
-| `saveOpex` · `runSettleAll` | js/80-actions.js | (원본 index.html L4428, L4441) | — |
-| `simSell` | js/90-boot.js | (원본 index.html L4471–L4479) | 주문 시뮬(unit = 판매가) |
-| `#npRate` input 핸들러 | js/90-boot.js | (원본 index.html L4516–L4523) | 총 요율 안내·경고 |
+| `fmt` | js/00-core.js | js/00-core.js:3 | `Math.round` 후 천 단위 |
+| `ST` (CLEARING / SETTLED) · `FLOW` · `FLOW_L` | js/00-core.js | js/00-core.js:13-30 | 상태 머신 |
+| `PG_RATE` `PLAT_RATE` `WHT` `CLEAR_DAYS` | js/00-core.js | js/00-core.js:31 | 0.019 / 0.10 / 0.033 / 21 |
+| `seedData` (settleInfo 시드) | js/01-seed.js | js/01-seed.js:11-12,28,33,35 | s2 = 사업자 |
+| `LS` | js/02-state.js | js/02-state.js:2 | `'sellery-proto-v30'` |
+| `BREF_RATE` `BREF_DISC` `BREF_TIMES` | js/02-state.js | js/02-state.js:3 | 0.01 / 0.01 / 3 |
+| `CELERY_PER` · `OPEX_DEF` · `DATA_PRICE` · `dataPrice` | js/02-state.js | js/02-state.js:5-9 | OPEX_DEF = 순수익 시뮬 기본값 · DATA_PRICE = 등급별 열람가 1~5🥬 |
+| `BG_DISC` · `gradeBonusOf` · `bDiscOf` | js/02-state.js | js/02-state.js:11-13 | 등급 반영 |
+| `freeRefLeft` · `spendData` · `CATMAP` | js/02-state.js | js/02-state.js:15-20,35 | 다이아·블랙 브랜드 월 5회 무료 열람 |
+| `autoTick` | js/02-state.js | js/02-state.js:51-58 | 스케줄러: 시작일 → LIVE · 종료일 경과 → CLEARING (`render()` 첫 줄에서 호출, js/10-render.js:10) |
+| `SHOP` 항목 설명 · `TOPUP` | js/02-state.js | js/02-state.js:62-80 | sdata "함께 판매한 인플루언서는 무료" js/02-state.js:73 · TOPUP 5/10/30🥬 js/02-state.js:80 |
+| `celEarned` · `celBal` | js/02-state.js | js/02-state.js:81-85 | — |
+| `sampleQuota` · `sampleUsed` · `sampleLeft` | js/02-state.js | js/02-state.js:87-89 | — |
+| `SAMPLE_CEL_WON` · `spOf` · `samplePrice` · `sampleSplit` · `freeEligible` · `hadFreeSample` | js/02-state.js | js/02-state.js:91-96 | 샘플 구매가 |
+| `GRADES` · `gradeOf` · `gname` · `tierIdx` | js/02-state.js | js/02-state.js:117-127,145 | 인플루언서 등급·보너스 |
+| `BGRADES` · `bGmv` · `netOf` · `bgradeOf` · `bgname` | js/02-state.js | js/02-state.js:149-165 | 브랜드 등급 |
+| `REF_RATE` `REF_BOOST` `REF_TIMES` | js/02-state.js | js/02-state.js:170 | 0.02 / 0.01 / 5 |
+| `dlCSV` | js/02-state.js | js/02-state.js:232-237 | CSV 다운로드(BOM) |
+| `isRefBoost` · `isBrandRefBoost` | js/02-state.js | js/02-state.js:246-262 | 첫 N회 판정 |
+| `calc` | js/02-state.js | js/02-state.js:263-284 | **정산 계산식** |
+| `sellerWht` · `settleDue` | js/02-state.js | js/02-state.js:285-286 | 원천징수 · 기준일 |
+| `periodBlock` 등 기간 정책 | js/02-state.js | js/02-state.js:299-314 | 정산과 무관 |
+| `vSellerHome` 장부 (`pendPay`, `monthPay`) | js/20-seller.js | js/20-seller.js:9-10 | `sellerWht` 사용 |
+| `vSellerSettle` | js/20-seller.js | js/20-seller.js:270-286 | 실수령 = `sfTotal×(1−WHT)` · 요율 열 = `p.rate` [+1%p] (등급 보너스 미표시, js/20-seller.js:282) |
+| 인플루언서 화면 요율 표시 | js/10-render.js · js/20-seller.js · js/40-brand.js · js/50-admin.js · js/70-campaign.js | 각 화면 렌더 함수 내부 — 예: 캠페인 카드(js/10-render.js:91 `campRow`) · 상품 카드(js/20-seller.js:123) · 상품 상세 모달(js/20-seller.js:489) | "수수료 N%" 기본 요율만 · 상품 카드·상세 모달은 "N~N+3%"(js/20-seller.js:123, :489) |
+| `vMy` 정산 정보 폼 | js/20-seller.js | js/20-seller.js:367-386 | 정산 유형 셀렉트 |
+| `vRank` 제목 문구 | js/20-seller.js | js/20-seller.js:295 | — |
+| 셀러리 샵 충전 UI | js/30-shared.js | js/30-shared.js:16-18 | "충전 (시뮬 결제)" · "충전 셀러리는 환불 불가" |
+| 실시간 매출 KPI · 주문 피드 | js/30-shared.js | js/30-shared.js:66,74 | `sfTotal×(1−WHT)` / `brandPay` · 피드 주문별 "환불" 배지 |
+| 브랜드 등급 카드 문구 | js/40-brand.js | js/40-brand.js:144 | — |
+| 브랜드 상품 목록 요율 표시 | js/40-brand.js | js/40-brand.js:222 | — |
+| `vBrandOrders` (발주·송장·자동 발주) | js/40-brand.js | js/40-brand.js:382-413 | 주문 표 상태 열(결제완료/배송중/환불) js/40-brand.js:410 |
+| `vBrandSettle` | js/40-brand.js | js/40-brand.js:414-430 | 브랜드 정산 표 · 경고 조건 `bank && account && bizNo` js/40-brand.js:418 |
+| `vBrandMy` 정산 정보 | js/40-brand.js | js/40-brand.js:468-482 | 은행·계좌·예금주·사업자등록번호 + 사업자등록증 파일(`bizDoc`) + 통신판매업 신고번호(선택 `mailOrder`) |
+| 관리자 상품 목록 `totalRate` | js/50-admin.js | js/50-admin.js:65,83 | 총 요율 = rate + 10 |
+| 관리자 주문·CS 목록 | js/50-admin.js | js/50-admin.js:147-148 | 주문별 결제완료/환불 상태 · 환불 처리 버튼 |
+| `vAdminSettle` | js/50-admin.js | js/50-admin.js:175-193 | 정산 실행 화면 · 대기 목록 경고는 `settleInfo` 객체 유무만 검사 js/50-admin.js:184 |
+| `vAdminRevenue` (손익 요약 · OPEX) | js/50-admin.js | js/50-admin.js:233-336 | `celCover` js/50-admin.js:246, 안내 js/50-admin.js:328 · 셀러리 충전 매출 `celWon/celNet` js/50-admin.js:238·KPI js/50-admin.js:266 · 셀러리 포인트 손익 표 js/50-admin.js:287-297 |
+| 고객 판매센터 · 소개 문구 | js/60-customer.js | js/60-customer.js:47,81,103,178-186,251,272,280 | 21일 보호 문구 |
+| 정산 미리보기 표 | js/70-campaign.js | js/70-campaign.js:36-52 | 11.1절 · 등급 보너스 %p 표시 js/70-campaign.js:44 |
+| `detActions` LIVE 시뮬 카드(`endCamp` 버튼) · CLEARING / SETTLED 카드 · INVITED 제안 메시지 | js/70-campaign.js | js/70-campaign.js:70-76,113-135 | 판매 종료 처리는 관리자 전용 · 제안 메시지에 등급 보너스 %p 표시(js/70-campaign.js:72) |
+| `sampleBuyModal` | js/70-campaign.js | js/70-campaign.js:157-172 | 샘플 구매가·결제 수단 · "− 내 수수료 N%" = `p.rate` js/70-campaign.js:164 · 지정가 라벨 "(1회 한정)" js/70-campaign.js:163 |
+| `productModal` `locked` · `#npRate` · `#npBuyMode` · `#npOpts` | js/70-campaign.js | js/70-campaign.js:207-210,227-230,238,244-245 | 잠금 안내 · min 11 · max 50 · 기본 30 · 지정가 옵션 라벨 "(1회 한정)" · 구매 옵션 textarea |
+| `saveBrandInfo` | js/80-actions.js | js/80-actions.js:15-23 | 은행·계좌·예금주·사업자번호 저장 필수 · `mailOrder` 선택 저장 |
+| `brandDocPick` · `bizDocPick` | js/80-actions.js | js/80-actions.js:47-61,195-209 | 사업자등록증 파일명만 `settleInfo.bizDoc` 에 저장(계좌 없이도 `settleInfo` 객체 생성) |
+| `confirmSampleBuy` | js/80-actions.js | js/80-actions.js:90-100 | 샘플 주문 생성 |
+| `saveSettleInfo` | js/80-actions.js | js/80-actions.js:187-194 | 사업자는 bizNo 필수 |
+| `topup` | js/80-actions.js | js/80-actions.js:250-256 | 셀러리 충전 — 원장에 `{delta:n, won}` 기록(시뮬 결제) |
+| `poCSV` · `poEmail` · `saveAutoPO` | js/80-actions.js | js/80-actions.js:358-378 | 발주서 |
+| `settleCSV` | js/80-actions.js | js/80-actions.js:387-396 | 정산 명세 · 대상 LIVE/CLEARING/SETTLED · 원천징수·실수령 열 없음 |
+| `endCamp` · `ffwd` · `refund` | js/80-actions.js | js/80-actions.js:446-465 | 수동 종료(`c.end = 오늘`)·시뮬·환불(스레드 "환불 처리 · 구매자 · ₩금액 (정산액 차감)" js/80-actions.js:463) |
+| `runSettle` | js/80-actions.js | js/80-actions.js:466-487 | 정산 실행·보류(`holdS/holdB` = `settleInfo.account` 유무, js/80-actions.js:472)·환급·추천 |
+| `saveProduct` · `createProduct` (rate·옵션 저장) | js/80-actions.js | js/80-actions.js:492-532 | `max(5, 입력−10)/100`(js/80-actions.js:504,528) · 상한 검사 없음 · `p.options` 는 잠금과 무관하게 항상 저장 js/80-actions.js:501 |
+| `buyNow` (고객 결제 단가) | js/80-actions.js | js/80-actions.js:568-576 | `unit = o.price` (옵션가, `p.gp` 아님) |
+| 고객 주문 완료 안내 | js/80-actions.js | js/80-actions.js:579 | — |
+| `saveOpex` · `runSettleAll` | js/80-actions.js | js/80-actions.js:641,654 | — |
+| `simSell` | js/80-actions.js | js/80-actions.js:684-692 | 주문 시뮬(unit = 판매가) |
+| `#npRate` input 핸들러 | js/90-boot.js | js/90-boot.js:36-43 | 총 요율 안내·경고 |

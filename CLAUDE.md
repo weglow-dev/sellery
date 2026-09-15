@@ -9,10 +9,17 @@
 ## 저장소 · 배포
 
 - GitHub: `weglow-glo/sellery` (glo와 같은 조직). `main`은 보호됨 — PR 필수, CI `프로토타입 점검` 통과, 리뷰 코멘트 해결, 관리자도 예외 없음.
-- 배포: **Vercel** (team `weglow-team` / project `sellery`) → https://sellery-swart.vercel.app/ . 빌드 없이 루트를 그대로 서빙(`vercel.json` framework null, `.vercelignore`로 docs/scripts/supabase/*.md 제외). GitHub 앱 연동 후 `main` 푸시 = 프로덕션, PR = 미리보기 URL. 연동 전엔 `vercel deploy --prod --scope weglow-team`.
-- CI: `.github/workflows/ci.yml` → `node scripts/check.mjs` (js 문법 · css/js 참조와 순서 · 자산 경로 대소문자 · 시드 키 · 주요 화면 함수 · 충돌 흔적). 로컬에서도 같은 명령.
+- 배포: **Vercel** (team `weglow-team` / project `sellery`) → https://sellery-swart.vercel.app/ . 빌드 없이 루트를 그대로 서빙(`vercel.json` framework null, `.vercelignore`로 docs/scripts/supabase/*.md 제외). GitHub 앱 연동 여부는 저장소만 봐서는 알 수 없습니다(`.vercel/project.json`은 link 정보뿐) — Vercel 대시보드 Settings → Git 에서 확인하세요. 연동돼 있으면 `main` 푸시 = 프로덕션, PR = 미리보기 URL 댓글. 안 돼 있으면 `vercel deploy --prod --scope weglow-team`. 전환기 동안 GitHub Pages https://weglow-glo.github.io/sellery/ 도 같은 `main`을 병행 서빙합니다(정식 주소는 Vercel).
+- CI: `.github/workflows/ci.yml` → `node scripts/check.mjs` (Node 20+ · js 문법 · css/js 참조와 순서 · 자산 경로 대소문자 · 시드 키 · 주요 화면 함수 · 충돌 흔적). 로컬에서도 같은 명령.
 - Claude 봇: `.github/workflows/claude.yml` (glo와 같은 구성 + 셀러리용 안내문). Secrets `ANTHROPIC_API_KEY` + 조직 Claude GitHub 앱에 저장소 추가 필요.
-- 로컬 미리보기: `python -m http.server 8080` (또는 `.claude/launch.json`의 `sellery-static`).
+- 이 파일(CLAUDE.md)은 **커밋되는 팀 공용 메모**입니다. 개인 메모는 `CLAUDE.local.md`(gitignore). 줄바꿈은 `.gitattributes`가 모든 텍스트 파일을 LF로 강제합니다(Windows 포함).
+- 로컬 미리보기: `python -m http.server 8080`. (`.claude/launch.json`의 `sellery-static`은 같은 명령의 로컬 전용 설정 — `.claude/`가 gitignore라 클론에는 없습니다.)
+
+## 기여
+
+브랜치 → `node scripts/check.mjs` → PR(템플릿 체크리스트: check.mjs · 브라우저 확인 · LS 버전 · docs 동기화 · script 순서) → CI 초록 + 리뷰 코멘트 해결 → squash 병합(`gh pr merge --squash --delete-branch`).
+브랜치 접두사 `fix/` `feat/` `copy/` `design/` `docs/` `policy/`. 커밋 메시지는 한글 한 줄, 파일명이 아니라 화면·기능 이름으로.
+이슈 템플릿 5종 bug · copy-change · design-change · policy-change · task (`.github/ISSUE_TEMPLATE/`) — 수수료·등급 등 정책 숫자 변경은 policy-change. 상세는 CONTRIBUTING.md · docs/editing-guide.md(비개발자용).
 
 ## 파일
 
@@ -43,10 +50,11 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 
 ## 구조
 
-- 상태 `S` (`view:{role,screen,cid}`, `actingSeller`, `actingBrand`, `data`), 시드 `D_()`, `render()` 전체 재렌더, 액션 디스패처 `ACT` (`data-act` / `data-k`), `openModal/closeModal`, `decorate()`
-- 해시 라우트: `#influencer` `#brand` `#admin` `#customer` `#shop` `#s/<cid>` (`#link/<cid>`)
+- 상태 `S` (`view:{role,screen,cid}`, `actingSeller`, `actingBrand`, `data`), 데이터 접근자 `D_()`(=`S.data`), 시드 `seedData()`(`js/01-seed.js`), `render()` 전체 재렌더, 액션 디스패처 `ACT` (`data-act` / `data-k`), `openModal/closeModal`, `decorate()`
+- 해시 라우트: `#influencer`(=`#seller`) `#brand` `#admin` `#customer`(=`#shop`, 고객 판매센터) `#s/<cid>` (`#link/<cid>`). 셀러리 샵은 해시가 아니라 화면 키 `shop`입니다(`data-act="screen" data-k="shop"`).
 - 시드 키 `const LS='sellery-proto-v30'` (`js/02-state.js`) — **데이터 구조를 바꾸면 번호를 올려야** 기존 방문자 화면이 안 깨집니다
 - 로그인 세션은 `localStorage['sellery-session']`, 링크 유입 컨텍스트는 `localStorage['slry-linkctx']`
+- 초기화: `#admin` 대시보드의 [데이터 초기화] 버튼(`ACT.reset` — LS 삭제 + `clearLinkCtx()` + `seedData()`). 앱바에는 없습니다.
 
 ## 핵심 정책 (숫자는 코드 상수가 정답 · 사람용 설명은 docs/)
 
@@ -57,10 +65,10 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 (제안 20% → 골드 21%, 블랙 23%) "3%를 받는다"가 아니라 "수수료율 +3%p". → docs/grade-policy.md
 
 **판매 기간** 같은 상품이라도 기간은 기본 공유 — 누구나 오픈 가능.
-단 **플래티넘 이상**이 확정한 기간에는 플래티넘 이상만 진입할 수 있습니다 (`periodBlock()`).
-과거의 "기간 완전 독점"은 폐기됐습니다. 상품 독점권(다이아 이상)은 별개 기능. → docs/period-policy.md
+단 **플래티넘 이상**(`PRIORITY_TIER`)이 확정한 기간에는 플래티넘 이상만 진입할 수 있습니다 (`periodBlock()`).
+과거의 "기간 완전 독점"은 폐기됐습니다. 상품 독점권은 별개 기능 — 상품별 기준 등급(`exGradeOf`, 브랜드가 등록 폼에서 골드~블랙 중 선택, 자격 판정은 `exEligible`). 다이아 전용이 아니며 시드에도 플래티넘 기준 상품(p4)이 있습니다. → docs/period-policy.md
 
-**샘플** 상품별 무상 기준 등급 + 월 한도(등급별 1/2/5회), 미달 시 유상 구매(현금 또는 🥬, 1🥬=₩20,000 `SAMPLE_CEL_WON`), 브랜드 직접 제안은 한도 미차감. → docs/sample-policy.md
+**샘플** 상품별 무상 기준 등급 이상 · 상품당 무상 1회(`hadFreeSample`) · 월 한도 등급별 1/2/5회(`sampleQuota`). 셋 중 하나라도 미달이면 유상 구매 — 현금, 또는 🥬 우선 + 잔액 현금(`sampleSplit`, 1🥬=₩20,000 `SAMPLE_CEL_WON`; 현금/🥬 택일이 아님). 브랜드 직접 제안은 한도 미차감. → docs/sample-policy.md
 
 **셀러리 포인트** 확정 매출 ₩500만당 1🥬 (`CELERY_PER`), 1🥬 ≈ ₩20,000 상당. 데이터 열람 가격은 `DATA_PRICE`. → docs/points-policy.md
 
@@ -72,7 +80,8 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 ## 타이포그래피 — 건드릴 때 주의
 
 - 본문 `IBM Plex Sans KR`은 **700이 최대**. `font-weight:800`을 쓰면 가짜 굵기가 적용돼 글자가 뭉갭니다.
-- `font-synthesis:none` 유지 (합성 굵기 차단)
+- `font-synthesis:none` 유지 (합성 굵기 차단 · `css/base.css`)
+- **login.html은 css 파일을 안 쓰므로** 위 규칙이 자동 적용되지 않습니다 — 인라인 `<style>`에서 font-synthesis:none · keep-all · 본문 800 금지를 따로 지켜야 합니다(현재 login.html에는 font-synthesis · keep-all 둘 다 없음. 제목의 Archivo 800/900은 실제 웨이트가 로드되므로 괜찮음).
 - `-webkit-font-smoothing:antialiased` **넣지 마세요** — 윈도우 서브픽셀 렌더링이 꺼져서 흐려집니다
 - 한글은 `word-break:keep-all` — 없으면 표에서 "바인허/브"처럼 어절 중간에서 잘립니다
 
@@ -81,11 +90,12 @@ scripts/check.mjs   배포 전 자가 점검 (CI 동일)
 셀러리 마크는 **위치 로고일 때만 왼쪽으로 -14° 기울입니다** (앱바, 부트 화면, 로그인 워드마크).
 본문 안에 포인트로 들어가는 마크는 똑바로 세웁니다.
 
-## 데모 계정 (login.html · 비밀번호 아무거나)
+## 데모 계정 (login.html)
 
-지유 jiyu@ · 혜린 hyerin@ · 민지 minji@ · 서아 seoa@ · 로라 lola@ · 하늘 haneul@ · 소민 somin@ · 유나 yuna@ (`@sellery.demo`) · 관리자 `admin@sellery.co.kr`. 구글 로그인은 데모 계정 선택 팝업(`GOOGLE_CLIENT_ID` 자리표시자).
+인플루언서 8명: 지유 jiyu@ · 혜린 hyerin@ · 민지 minji@ · 서아 seoa@ · 로라 lola@ · 하늘 haneul@ · 소민 somin@ · 유나 yuna@ (`@sellery.demo`) · 브랜드: 바인허브 `partner@vyneherb.co` · 글로헬스 `official@weglow.biz` · 관리자 `admin@sellery.co.kr`.
+비밀번호는 **8자 이상이면 아무거나**(데모 버튼은 `sellery2026` 자동 입력). 로그인 탭(인플루언서/브랜드)과 계정 역할이 맞아야 하고, 관리자는 어느 탭에서든 됩니다. 구글 로그인은 데모 계정 선택 팝업(`GOOGLE_CLIENT_ID` 자리표시자).
 
 ## 아직 안 붙은 것
 
-고객 로그인 · 장바구니 · 실결제(PG) · 실인증 · 서버. Supabase 스키마는 설계 중(`supabase/` 마이그레이션 예정, 앱 미연동).
+고객 로그인 · 장바구니 · 실결제(PG) · 실인증 · 서버. Supabase 스키마는 설계 중 — `supabase/`는 아직 **로컬에만 있음**(미커밋 · `config.toml`뿐, 마이그레이션 없음, 앱 미연동). 커밋해도 `.vercelignore`에 이미 있어 배포엔 영향 없습니다.
 외부 판매 예상 매출(`estExternal`)은 가계산입니다. 제안서의 "테스트 기한 14일"은 리터럴 14 두 곳(`addD(today(),14)`)이고 기한 경과 처리는 없습니다.
