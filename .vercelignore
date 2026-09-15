@@ -15,3 +15,6 @@ _site
 _preview.html
 .env*
 .vercel
+
+# Next.js 앱 소스는 별도 Vercel 프로젝트(sellery-app, Root Directory web)에서 배포 — 프로토타입 프로젝트에는 올리지 않는다
+web

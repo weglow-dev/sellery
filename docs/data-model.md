@@ -5,9 +5,9 @@
 | 대상 | (주)위글로우 셀러리 — 건강·웰니스 브랜드 × 인플루언서 협업판매 플랫폼 |
 | 원본 | 프로토타입 코드 — 분리 전 단일 파일 `index.html`(git `978ea1e:index.html`, 이하 OLD/index.html)과 현재의 `js/*.js`(같은 내용을 화면 단위로 나눈 것). `S.data.*` 컬렉션 19개 + 정책 상수 |
 | 목표 인프라 | glo 프로젝트와 동일: Next.js + Vercel + Supabase(Postgres, Auth, RLS) |
-| 현재 상태 | **클라우드 적용 완료(2026-09-15) · 앱 미연동**. Supabase 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul, Postgres 17)에 0001~0006 `db push` + `seed.sql` 투입 완료. 실 DB 검증: 24개 테이블 RLS on · 정책은 공개 카탈로그 테이블에만 · anon `select *`/정산 조회 권한 거부 · 비공개 인플루언서(s4·s5)와 SETTLED 캠페인 anon 미노출 · `campaign_card()` 동작 · 버킷 2개 |
-| 산출물 | `supabase/migrations/0001_init.sql` … `0006_storage.sql`, `supabase/seed.sql`, 설계 노트 `docs/data-model-design-notes.md`, 분석 노트 `docs/analysis/*.md` |
-| 최종 수정 | 2026-09-15 (1차 리뷰 34건 반영 — design-notes.md §6; 2차 리뷰 high 2건 반영 — design-notes.md §7) |
+| 현재 상태 | **클라우드 적용 완료(2026-09-15) · 앱 슬라이스 1 연동 중**. Supabase 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul, Postgres 17)에 0001~**0008** `db push` + `seed.sql`(§7 15절 포함) 투입 완료. 실 DB 검증: 26개 테이블 RLS on · 정책은 공개 카탈로그 테이블에만 · anon `select *`/정산 조회 권한 거부 · 비공개 인플루언서(s4·s5)와 SETTLED 캠페인 anon 미노출 · `campaign_card()` 동작 · 버킷 2개 · 0008 스모크(§10.4) 통과 |
+| 산출물 | `supabase/migrations/0001_init.sql` … `0008_app_checkout.sql`, `supabase/seed.sql`, 앱 타입 `web/src/lib/database.types.ts`(`npm run gen:types` 산출), 설계 노트 `docs/data-model-design-notes.md`, 분석 노트 `docs/analysis/*.md`, 앱 계획 `docs/app-plan.md` |
+| 최종 수정 | 2026-09-15 (1차 리뷰 34건 반영 — design-notes.md §6; 2차 리뷰 high 2건 반영 — design-notes.md §7; 0007·0008 적용 반영 — §10) |
 
 표기: 코드에서 확인한 사실은 `L####`(분리 전 단일 파일 OLD/index.html = `git show 978ea1e:index.html` 의 줄 번호)로 인용한다. 현재 트리에서는 같은 코드가 `js/00-core.js`(L1182~) · `js/01-seed.js`(L1214~) · `js/02-state.js`(L1372~) 등으로 나뉘어 있다(파일별 원본 범위는 CLAUDE.md 참고).
 
@@ -17,7 +17,7 @@
 
 ## 0. 한눈에 보기
 
-- **테이블 24개 + 뷰 1개**, 마이그레이션 6개 파일(+ `0006_storage.sql` Storage 버킷). 프로토타입 `S.data` 의 19개 컬렉션과 정책 상수를 전부 이관한다(§2 표).
+- **테이블 26개 + 뷰 1개**, 마이그레이션 8개 파일(+ `0006_storage.sql` Storage 버킷, `0007` service_role 권한, `0008` 앱 체크아웃 — §10). 프로토타입 `S.data` 의 19개 컬렉션과 정책 상수를 전부 이관한다(§2 표).
 - **프로토타입 id 보존**: 모든 핵심 테이블은 `id uuid` PK 와 별도로 `code text unique`(`'s1'`, `'b1'`, `'p1'`, `'c1'`, `'o101'` …)를 가진다. 시드가 1:1 로 매핑되고, 기존 판매 링크 형식 `/s/{handle}/{code}` 도 유지된다.
 - **모든 쓰기는 서버(service role)**. 클라이언트(anon/authenticated 키)가 직접 읽는 것은 공개 카탈로그(브랜드·인플루언서·상품·공개 캠페인)와 본인 profile / 본인 orders 뿐. insert/update 정책은 어디에도 없다.
 - **DB 가 강제하는 것**: 열거값(check), 참조 무결성(FK), 유니크(활성 캠페인 쌍, 정산 1회, primary 채널 1개 …), 캐시 동기화 트리거(등급·판매수량·brand_id). **앱이 강제하는 것**: 상태 전이 표, 등급 우선 기간제, 재고 배정, 가격 잠금, 샘플 한도, 🥬 잔액, 정산 수식, 링크 진입 보호, 마스킹(§5).
@@ -32,7 +32,9 @@
 | `0004_orders_settlements.sql` | `customers`, `order_code_seq`, `orders`(+`orders_sync_sold_qty` 트리거, `recalc_campaign_sold_qty()`), `brand_gmv()`, `settlements`(요율 스냅샷 전부 + bigint), `payouts` |
 | `0005_points_referral_cs.sql` | `celery_ledger`, `celery_balances`(뷰), `celery_purchases`, `data_views`, `referral_earnings`, `seller_external_sales`, `cs_code_seq`, `cs_conversations`, `cs_messages`(+ `actor_role`/`actor_user_id`) |
 | `0006_storage.sql` | Storage 버킷 `public-assets`(공개) · `partner-docs`(비공개) |
-| `seed.sql` | 정책 상수 · 등급 · 카테고리 · 브랜드 2 · 인플루언서 8 · 채널 9 · 상품 10 · 캠페인 13 · 주문 1,052 · 스레드 23 · 원장 · 열람/독점/조회/외부판매 · 추천 보상 · CS |
+| `0007_service_role_grants.sql` | `service_role` 에 `public` 스키마 전체 테이블·시퀀스·함수 권한 + `alter default privileges`(§8 주의 박스) |
+| `0008_app_checkout.sql` | `checkout_sessions`(승인 전 주문), `payment_events`(토스 원문 로그), `orders` 결제/환불 컬럼 추가, `resolve_product_options()`, `campaign_card()` v2, 서버 전용 RPC `app_claim_checkout / app_confirm_checkout / app_refund_precheck / app_refund_record / app_checkout_reserved / expire_checkout_sessions / stale_checkout_sessions / purge_checkout_pii`, 공개 RPC `public_stats()` — §10 |
+| `seed.sql` | 정책 상수 · 등급 · 카테고리 · 브랜드 2 · 인플루언서 8 · 채널 9 · 상품 10 · 캠페인 13(+ 앱 검증용 LIVE 2, 15절) · 주문 1,052 · 스레드 23(+4) · 원장 · 열람/독점/조회/외부판매 · 추천 보상 · CS |
 
 ### 0.2 공통 관례 (glo 마이그레이션과 동일)
 
@@ -450,7 +452,9 @@ erDiagram
 | `campaigns` | **협업판매 1건**(인플루언서 × 상품). 상태 머신·생성 경로 플래그·샘플 구매·일정 제안/확정·배정 재고·판매수량 캐시·정산 시각. `brand_id` 는 트리거가 product 에서 채우는 비정규화. | `code`, `seller_id`, `product_id`, `brand_id`, `status`, `invited`, `auto_proposed`, `regongu`, `cel_used/cel_refunded`, `purchased`, `sample_*`, `tracking_no`, `received_at`, `test_due`, `proposed_*`, `start_date`, `end_date`, `qty`, `price_locked/rate_locked`(**추정**), `sold_qty`(캐시), `home_featured_at`, `settled_at` | `S.data.campaigns[]` (L1302) |
 | `campaign_events` | 캠페인 스레드 = 시스템 이벤트(상태 전이 이력 겸용) + 채팅. 시스템 행은 `event_type + payload` 로 정규화, 연락처 유출 감지는 `leak_flag`. `sender`(표시 역할)와 `actor_role`/`actor_user_id`(실제 발신자, 감사)를 분리 — 관리자 대행 발신은 `sender='brand', actor_role='admin'`. | `campaign_id`, `kind`, `sender`, `actor_role`, `actor_user_id`, `body`, `event_type`, `payload`, `leak_flag`, `created_at` | `S.data.messages{cid:[]}` (L1343) |
 | `customers` | 구매 고객(카카오 로그인 → `user_id`, 비회원은 null). 프로토타입에 계정 모델 없음. | `user_id`, `name`, `phone`, `email`, `address` | (없음 — **추정**) |
-| `orders` | 판매 링크 주문. 인플루언서 샘플 구매도 주문 1건(`is_sample`). 배송 완료 판정은 `status='PAID' and tracking_no is not null`. | `code`, `campaign_id`, `customer_id`, `user_id`, `status`, `buyer_name`, `qty`, `unit_price`, `amount`(generated), `option_name`, `is_sample`, `shipping`, `courier`, `tracking_no`, `shipped_at`, `payment_*`, `paid_at`, `refunded_at` | `S.data.orders[]` (L1327 `mkOrders`, L4355 `buyNow`) |
+| `orders` | **결제된** 주문(승인 전 시도는 `checkout_sessions`). 인플루언서 샘플 구매도 주문 1건(`is_sample`). 배송 완료 판정은 `status='PAID' and tracking_no is not null`. 0008 이 결제/환불 컬럼을 추가(§10.2). | `code`, `campaign_id`, `customer_id`, `user_id`, `status`, `buyer_name`, `buyer_phone`, `buyer_email`, `qty`, `unit_price`, `amount`(generated), `option_name`, `order_name`, `is_sample`, `shipping`, `courier`, `tracking_no`, `shipped_at`, `payment_*`, `paid_at`, `refunded_at`, `refund_reason`, `refund_amount`, `refund_actor`, `raw_payment`, `raw_cancel`, `checkout_session_id` | `S.data.orders[]` (L1327 `mkOrders`, L4355 `buyNow`) |
+| `checkout_sessions` (0008) | **토스 결제 1건 = 세션 1건(승인 전 주문)**. `/api/checkout` 이 만들고 `/api/payments/confirm` 이 선점·확정한다. 상태 `PENDING → CONFIRMING → CONFIRMED | FAILED | EXPIRED`. 서버 전용 — 정책 없음. | `toss_order_id`(unique, 토스 orderId), `user_id`, `customer_id`, `campaign_id`, `option_index/option_name`, `qty`(1..10), `unit_price`, `amount`(generated), `order_name`, `buyer_*`, `shipping`, `status`, `payment_key`(부분 unique), `payment_method`, `approved_at`, `raw_payment`, `fail_code/fail_message`, `link_code`, `expires_at`(+30분) | (없음 — app-plan §5, glo `orders.pending` 의 대체) |
+| `payment_events` (0008) | 토스 웹훅·승인·취소 원문 로그(감사·재처리). `handled=false` 행은 운영 큐(`needs_manual_adjust`, `partial_cancel_manual`, `error: …`). 서버 전용. | `source`(webhook/deposit_callback/confirm/cancel), `event_type`, `toss_order_id`, `payment_key`, `payload`, `handled`, `result`, `received_at` | (없음 — app-plan §5) |
 | `settlements` | **정산 실행 스냅샷**(캠페인당 1행). 요율(추천 4요율 포함)·등급·모든 금액 라인을 `bigint`(KRW 정수, 라인별 독립 반올림)로 보관. `platform_fee/platform_net` 는 관리자 전용. | `campaign_id`(unique), `gross/refunds/net/sample_net`, `pg_rate/platform_rate/seller_rate/wht_rate/ref_boost_rate/ref_reward_rate/brand_ref_disc_rate/brand_ref_reward_rate`, `seller_grade/brand_grade`, 금액 라인 15개, `seller_payout`, `brand_payout`, `hold_seller/hold_brand`, `status`, `due_on`, `settled_at` | `S.data.settlements[]` (L4260) + `calc()`(L1634) 라인 전체 |
 | `payouts` | 정산 1건당 인플루언서/브랜드 지급 2행. 보류 사유·계좌 스냅샷·지급 시각. | `settlement_id`, `payee_type`, `seller_id`/`brand_id`, `amount`, `wht`, `status`, `hold_reason`, `bank_snapshot`, `paid_at` | `settlements[].holdS/holdB` 의 확장 (**추정**) |
 | `celery_ledger` | 🥬 포인트 원장(+지급/−차감). 획득분도 `reason='earned'` 행으로 적재(프로토타입은 파생 계산). 소유자는 seller/brand 중 정확히 하나. | `owner_type`, `seller_id`/`brand_id`, `delta`, `reason`, `memo`, `won`, `ref_type/ref_id` | `S.data.celeryLedger[]` (L1230) |
@@ -476,6 +480,9 @@ erDiagram
 | `campaigns_fill_brand` (트리거) | `campaigns.product_id` 로 `brand_id` 를 채움(불일치 방지) | — |
 | `recalc_campaign_sold_qty(uuid)` / `orders_sync_sold_qty` (트리거) | 주문 insert/update/delete 시 `campaigns.sold_qty = Σ qty(PAID)` | service role 전용 |
 | `brand_gmv(uuid)` | 브랜드 누적 GMV = `gmv_base` + Σ PAID 주문금액(샘플 포함) — `bGmv` L1529 | service role 전용 |
+| `resolve_product_options(jsonb, int)` (0008) | `products.options` 가 비면 `platform_settings.option_bundle_defaults` 로 1/2/3개 세트 확정(`optsOf` L1398 의 SQL 판, 라벨·100원 반올림 동일). `campaign_card()` 안에서만 호출 | service role 전용 |
+| `app_claim_checkout / app_confirm_checkout / app_refund_precheck / app_refund_record / app_checkout_reserved / expire_checkout_sessions / stale_checkout_sessions / purge_checkout_pii` (0008) | 체크아웃·환불·정리 서버 RPC — §10.3 | service role 전용 |
+| `public_stats()` (0008) | 홈 상단 집계(오늘 판매 수량·누적 GMV·공개 인플루언서 수·브랜드 수·서버 기준일) — 플랫폼 합계만 | anon/authenticated execute |
 
 ---
 
@@ -514,7 +521,7 @@ erDiagram
 |---|---|---|
 | `profiles.role` | `customer, seller, brand, admin` | login.html 역할 3개 + 고객(무계정) |
 | `products.status` | `pending, listed, paused, rejected` | 동일 (`PSTATS` L2968). `rejected ⇒ reject_reason` |
-| `orders.status` | `PAID, REFUNDED, CANCELED` | `PAID/REFUNDED` 쓰기 + `CANCELED` 읽기(calc L1636) |
+| `orders.status` | `PAID, REFUNDED, CANCELED` | `PAID/REFUNDED` 쓰기 + `CANCELED` 읽기(calc L1636). **슬라이스 1 부터 `CANCELED` = 조정 큐**(돈은 토스에서 돌아갔으나 SETTLED 캠페인·샘플 주문이라 REFUNDED 로 둘 수 없는 건 — §10.2) |
 | `exclusive_requests.status` | `PENDING, APPROVED, REJECTED` | 동일 |
 | `cs_conversations.status` / `type` | `OPEN, ANSWERED, CLOSED` / `배송 문의, 교환·반품, 상품 문의, 기타` | 동일 (`CS_TYPES` L1690, 한글 값 그대로) |
 | `cs_messages.sender` | `customer, brand, admin` | msg / reply |
@@ -615,11 +622,11 @@ due_on              = campaigns.end_date + clear_days(21)
 | `seller_channels` | `id, seller_id, platform, handle, url, followers, verified, is_primary` | `verified and seller_is_public(seller_id)` | `vcode` 차단. 부모 판정은 `security definer` 헬퍼 `seller_is_public()` 으로 명시(정책이 `sellers.hidden` 을 grant 없이 참조하기 위함) — sellers 정책이 바뀌어도 hidden 채널(핸들·URL=신원)이 새지 않도록 sellers 와 같은 술어를 한 곳에서 유지 |
 | `products` | `id, code, brand_id, name, description, emoji, thumb_url, image_urls, category, consumer_price, sale_price, options, status, deleted_at` | `deleted_at is null and exists(공개 캠페인: SCHEDULE_CONFIRMED/LIVE/CLEARING)` | **`status in ('listed','paused')` 단독 브랜치 없음**(1차 리뷰 medium — 고객 화면엔 상품 카탈로그가 없다 L3285-3286; 미판매 상품의 가격·옵션·브랜드는 비공개). `paused` 중에도 진행 중 판매는 캠페인 상태로 열린다(L2615). `deleted_at` 은 `sellers.hidden` 과 달리 grant 목록에 포함한다 — 정책 자신이 이 컬럼을 USING 절에서 읽고, 값 자체는 비식별화 문제가 없기 때문(2차 리뷰 high). 수수료율·재고·샘플 정책·독점·반려 사유·부스트는 여전히 차단 |
 | `campaigns` | `id, code, seller_id, product_id, brand_id, status, start_date, end_date, qty, sold_qty, home_featured_at` | `status in ('SCHEDULE_CONFIRMED','LIVE','CLEARING')` | **SETTLED 제외**(1차 리뷰 high — 열면 모든 인플루언서·브랜드의 판매 실적이 익명 없이 열거된다). **`created_at` 도 grant 대상 아님**(협상 시작 시각 비공개). 협상 필드(제안 일정·샘플 결제·초대·🥬) 차단. `sold_qty` 캐시 덕분에 `orders` 를 열 필요 없음 |
-| `customers` | authenticated: `id, user_id, name, phone, email, address` | `auth.uid() = user_id` | |
-| `orders` | authenticated: `id, code, campaign_id, user_id, status, qty, unit_price, amount, option_name, courier, tracking_no, shipped_at, paid_at, refunded_at` | `auth.uid() = user_id` | 구매자 본인만. `user_id` 는 정책이 참조하는 자기 컬럼이라 grant 없이도 동작하지만(추정) 본인 행이라 새는 것이 없어 포함. 결제 원문·배송지 원문은 서버 응답으로만 |
-| **service role 전용** — `platform_settings`, `exclusive_requests`, `product_views`, `campaign_events`, `settlements`, `payouts`, `celery_ledger`, `celery_balances`(뷰), `celery_purchases`, `data_views`, `referral_earnings`, `seller_external_sales`, `cs_conversations`, `cs_messages` | 없음(revoke all) | 없음 | 파트너 센터·관리자 화면은 전부 서버 액션 경유 |
+| `customers` | authenticated: `id, user_id, name, phone, email, address, created_at`(0008) | `auth.uid() = user_id` | |
+| `orders` | authenticated: `id, code, campaign_id, user_id, status, qty, unit_price, amount, option_name, courier, tracking_no, shipped_at, paid_at, refunded_at` + 0008 `order_name, refund_amount, refund_reason` | `auth.uid() = user_id` | 구매자 본인만. `user_id` 는 정책이 참조하는 자기 컬럼이라 grant 없이도 동작하지만(추정) 본인 행이라 새는 것이 없어 포함. **`shipping`·`buyer_phone/email`·`raw_*`·`payment_key` 는 계속 차단** — 배송지 원문·결제 원문은 서버 응답(service role 조인)으로만. 0008 적용 후 스모크 §10.4 |
+| **service role 전용** — `platform_settings`, `exclusive_requests`, `product_views`, `campaign_events`, `settlements`, `payouts`, `celery_ledger`, `celery_balances`(뷰), `celery_purchases`, `data_views`, `referral_earnings`, `seller_external_sales`, `cs_conversations`, `cs_messages`, **`checkout_sessions`, `payment_events`**(0008) | 없음(revoke all) | 없음 | 파트너 센터·관리자 화면은 전부 서버 액션 경유. 체크아웃 세션은 `/api/payments/confirm` 이 `auth.getUser()` 로 요청자를 확인한 뒤 service role 로 읽는다(app-plan §7.1) |
 
-RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) — 판매 링크 페이지·판매 카드·인증 모달용으로 캠페인 코드 1건에 대한 캠페인·상품·인플루언서 카드(hidden 이어도 이름/핸들/아바타/등급 — 팔로워·소개는 제외)·브랜드(사업자번호·통신판매업번호 포함)·인증 채널을 한 번에 반환. SETTLED 캠페인도 응답하지만(종료 안내 렌더링) `qty`/`sold_qty` 는 `null`(실적 비공개). 열거 불가(코드 1건 단위)이므로 hidden 인플루언서 신원이 목록 조회로 새지 않는다. `seller_is_public(uuid)` 는 `seller_channels` 정책 헬퍼.
+RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) — 판매 링크 페이지·판매 카드·인증 모달용으로 캠페인 코드 1건에 대한 캠페인·상품·인플루언서 카드(hidden 이어도 이름/핸들/아바타/등급 — 팔로워·소개는 제외)·브랜드(사업자번호·통신판매업번호 포함)·인증 채널을 한 번에 반환. SETTLED 캠페인도 응답하지만(종료 안내 렌더링) `qty`/`sold_qty` 는 `null`(실적 비공개). 열거 불가(코드 1건 단위)이므로 hidden 인플루언서 신원이 목록 조회로 새지 않는다. **0008 v2**: `product.options` 는 항상 확정 배열(`resolve_product_options`), `product.options_raw`, `campaign.today`(KST 기준일), `settings{clear_days, link_protect_days, home_feature_days}` 추가, **`channels` 는 `seller_is_public(seller)` 일 때만**(hidden 인플루언서의 공개 캠페인은 채널 목록이 `[]` — 0001 `seller_channels` 정책과 같은 범위, 채널 핸들·URL = 신원). `seller_is_public(uuid)` 는 `seller_channels` 정책 헬퍼. **`public_stats()`**(0008, security definer, anon execute) — 홈 상단 집계(플랫폼 합계만); 앱은 60초 캐시로 감싼다.
 
 함수 권한: `app_role()` 은 authenticated 만, `recalc_campaign_sold_qty()`·`orders_sync_sold_qty()`·`brand_gmv()`·`grade_for_sales()`·`brand_grade_for_gmv()`·트리거 함수는 전부 public/anon/authenticated 에서 execute 회수(서버 전용, Supabase 기본 부여를 명시적으로 되돌림 — 1차 리뷰 low). `security definer` 함수는 모두 `set search_path = public`.
 
@@ -647,6 +654,7 @@ RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) —
 | 12 | `referral_earnings` — s1←s3 186,400 · b1←b2 318,000 (`'(지난 판매)'` → `campaign_id null` + memo) | 2 |
 | 13 | `cs_conversations` cs1(OPEN, 배송 문의) · cs2(ANSWERED, 교환·반품) + `cs_messages` 3 | 2 + 3 |
 | 14 | `brands.grade` 재계산 update (인플루언서 등급·`sold_qty` 는 트리거가 이미 채움) | — |
+| 15 | **앱 검증용 LIVE 캠페인** c14(혜린 s2 × 데일리 플랜트 프로틴 p5) · c15(소민 s7 × 수분광 앰플 마스크 p10) — 투입일(**KST**)부터 30일, 재고 500, 주문 없음. 두 상품 모두 `options='[]'` 라 `campaign_card` 의 기본 옵션 확정 경로를 검증 + 스레드 2행씩. 7) 의 c1/c12 는 최초 투입일 ±2~3일이라 곧 만료되므로 이 절이 "오늘 기준 LIVE 1건 이상"(app-plan §10.1 G) 을 보장한다. 이미 있으면 날짜를 바꾸지 않는다(30일 뒤 되살리려면 c14/c15 행 삭제 후 재투입) | 2 + 4 |
 
 규칙:
 
@@ -661,7 +669,9 @@ RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) —
 
 ## 8. 적용 방법 (새 Supabase 프로젝트)
 
-**2026-09-15 적용 완료** — 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul). 이후 스키마 변경은 이미 적용된 파일을 고치지 말고 **새 번호(0007_…)** 마이그레이션을 추가해 PR → 병합 후 로그인·링크된 PC에서 `npx supabase db push --linked`. 시드 재투입은 `--include-seed`(멱등: `on conflict do nothing`). 아래는 새 환경에서 처음 적용할 때의 절차.
+**2026-09-15 적용 완료** — 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul), 0001~0008 + seed. 이후 스키마 변경은 이미 적용된 파일을 고치지 말고 **새 번호(0009_…)** 마이그레이션을 추가해 PR → 병합 후 로그인·링크된 PC에서 `npx supabase db push --linked`. 시드 재투입(멱등: `on conflict do nothing`)은 `npx supabase db query --linked --file supabase/seed.sql` — `db push --include-seed` 는 CLI 2.x 에서 이미 등록된 seed 파일의 **해시(`supabase_migrations.seed_files`)만 갱신하고 SQL 을 실행하지 않는 것을 2026-09-15 에 확인**했다(15절 추가 후 push 는 "Finished" 였으나 c14/c15 가 없었고, `--file` 투입으로 생성됨). 아래는 새 환경에서 처음 적용할 때의 절차.
+
+> **service_role 권한 주의(0007_service_role_grants.sql)**: 프로젝트를 만들 때 대시보드의 "Automatically expose new tables" 를 껐기 때문에 새 테이블에는 anon/authenticated 뿐 아니라 **service_role 에도 기본 권한이 붙지 않는다**. service_role 은 RLS 만 우회할 뿐 GRANT 는 필요하므로, 0007 이 `public` 스키마의 모든 테이블·시퀀스·함수에 대해 service_role 에 전체 권한을 주고 `alter default privileges` 로 이후 객체에도 자동 적용한다. 새 프로젝트에 다시 적용할 때도 이 파일이 포함돼야 앱 서버(sb_secret_/service_role 키)가 읽고 쓸 수 있다. 증상: 서버 키로 조회 시 `42501 permission denied for table …` + "GRANT … TO service_role" 힌트.
 
 전제: Supabase 대시보드에서 새 프로젝트 생성 완료(project ref · DB 비밀번호 확보). CLI 는 `npx supabase`(글로벌 설치 불필요). 아래는 Windows PowerShell 기준.
 
@@ -797,3 +807,70 @@ DB 는 "저장·제약·공개 읽기" 까지만 담당하므로, 아래는 Next
 - `sellers.hidden`, `campaigns.created_at`, `brands.biz_no`/`mail_order_no` 는 **anon/authenticated 에 grant 하지 않는다**(1차 리뷰 high/medium) — 실행 후 `set role anon; select hidden from public.sellers;` 이 `permission denied` 를 내야 정상이다.
 - **컬럼 미부여 컬럼을 자기 테이블 정책이 참조할 때**(2차 리뷰 high, 0001 L19-22 의 추정 항목): `sellers_select_public` 은 `active and not hidden` 을 직접 쓰지 않고 `seller_is_public(id)`(security definer, 이미 `seller_channels` 정책이 쓰던 헬퍼)를 재사용해 `hidden` 컬럼 grant 필요 자체를 없앴다. 반대로 `products_select_public` 이 참조하는 `deleted_at` 은 비식별화 위험이 없으므로 grant 목록에 추가해 같은 문제를 해소했다(재이용 가능한 함수가 없고, 값 자체가 민감하지 않은 경우의 반대 처방). 이 두 처방의 실제 필요 여부(컬럼 단위 권한이 정책이 읽는 자기 테이블 컬럼에도 적용되는지)는 여전히 **추정** — §8.4 스모크 테스트로 확정한다. `review/semantic.js` 의 policy-vs-grant 교차검증을 재실행해 두 정책 모두 더 이상 걸리지 않음을 확인했다(2026-09-15).
 - 시간대: `paid_at/created_at` 은 timestamptz. "오늘 주문", "이달 샘플 한도" 는 서버가 `(ts at time zone 'Asia/Seoul')::date` 로 비교.
+
+---
+
+## 10. 앱 슬라이스 1 반영 — 0007 · 0008 (2026-09-15 클라우드 적용)
+
+`docs/app-plan.md §5`(데이터 계약 확정)·§7(결제 시퀀스) 의 DB 측 구현. 0001~0006 파일은 손대지 않았고, `orders` 는 컬럼·인덱스·grant 를 **추가만** 했다. 0007 은 service_role 권한(§8 주의 박스). 이 절은 0008 을 요약하고 적용 후 스모크 결과를 기록한다 — 함수 본문·반환 형태의 원문은 `supabase/migrations/0008_app_checkout.sql` 헤더 주석이 단일 소스다.
+
+### 10.1 결정 요약
+
+| 결정 | 내용 |
+|---|---|
+| 승인 전 주문은 `orders` 가 아니다 | `orders` 를 읽는 모든 코드(정산 `calc()`·발주 CSV·`sold_qty` 트리거·주문번호 시퀀스·시드)가 "결제된 주문" 을 가정한다. 토스 결제 시도는 `checkout_sessions` 1행이고, 승인 DONE 이 확인된 뒤 `app_confirm_checkout()` 이 `orders` 1행을 만든다(glo 의 `orders.pending` 모델을 채택하지 않음 — app-plan §0-4). |
+| 모든 쓰기는 service role + DB 함수 | 세션 선점·승인 확정·환불 가드·환불 기록·만료·PII 파기는 전부 `security definer` 함수로, `revoke … from public, anon, authenticated`. 라우트·웹훅·reconcile 잡은 검증을 반복하지 않는다. |
+| 돈이 움직인 뒤의 기록은 현실을 거부하지 않는다 | `app_confirm_checkout` 은 토스 응답을 세션과 대조해 불일치를 `PAYMENT_MISMATCH` 로 돌려주고(라우트가 전액 취소), `app_refund_record` 는 `NOT_FOUND`/already 외 가드 없이 기록한다(가드는 `app_refund_precheck` 가 토스 호출 **전** 에). |
+| **`orders.status='CANCELED'` = 조정 큐** | 0004 열거의 미사용값을 슬라이스 1 부터 "토스에서는 환불됐지만 REFUNDED 로 둘 수 없는 주문"(SETTLED 캠페인 — 정산 스냅샷 확정 / `is_sample` — `orders_sample_not_refunded`) 에 쓴다. `campaign_events 'refund_needs_adjust'` + `payment_events(handled=false, result='needs_manual_adjust')` 가 같이 남는다. 정산 calc 이관 슬라이스에서 `CANCELED` 와 `PAID & refund_amount>0`(콘솔 부분취소) 을 조정 항목으로 처리한다. 고객 화면은 `CANCELED` 도 "환불 완료" 로 보인다. |
+| 가상계좌·계좌이체 미지원 | 세션 상태에 `WAITING_FOR_DEPOSIT` 류를 두지 않는다. `app_confirm_checkout` 은 `method='가상계좌'` 또는 `virtualAccount` 키가 있으면 `VIRTUAL_ACCOUNT_NOT_SUPPORTED`. |
+| hidden 인플루언서 채널 비노출 | `campaign_card().channels` 는 `seller_is_public(seller)` 일 때만 채운다(0001 `seller_channels` 정책과 같은 범위). hidden 인플루언서의 공개 캠페인은 이름·핸들·아바타·등급만 나오고 인증 모달의 채널 목록은 빈다. |
+
+### 10.2 스키마 변경
+
+| 객체 | 내용 |
+|---|---|
+| `checkout_sessions` (신규) | §2 표. 제약: `toss_order_id ~ '^[A-Za-z0-9_-]{6,64}$'`, `qty 1..10`, `amount = qty×unit_price`(generated), `status` 5종, `CONFIRMED ⇒ payment_key & approved_at`. 인덱스: `user`, `customer`, `(campaign, status)`(소프트 예약 합), `expires_at where PENDING/CONFIRMING`(만료·reconcile), `payment_key` **부분 unique**(웹훅 역조회 + 선점 시 타 세션 충돌 검출 `PAYMENT_KEY_CONFLICT`). `set_updated_at` 트리거. |
+| `payment_events` (신규) | §2 표. 인덱스 `toss_order_id`, `payment_key`, `received_at desc`. 웹훅은 서명이 없으므로 라우트가 본문 크기(64KB)·형식·세션/주문 매칭을 통과한 뒤에만 남긴다(모르는 주문은 payload 를 잘라 `result='ignored'`). |
+| `orders` (추가만) | 컬럼 `checkout_session_id`(FK set null), `order_name`, `buyer_phone`, `buyer_email`, `refund_amount`(≥0), `refund_actor`(customer/brand/admin/system), `raw_cancel`. 인덱스 `orders_checkout_session_uidx`(부분 unique — 세션 1:1, 장바구니 확장 시 해제), `orders_payment_key_idx`(부분, 비유니크), `orders_user_paid_idx(user_id, paid_at desc)`. `paid_at not null`·열거·트리거·`orders_sample_not_refunded` 불변. `orders_refunded_has_amount` 제약은 두지 않았다(시드 REFUNDED 행이 `refund_amount null`). |
+| grant | `orders` authenticated select + `order_name, refund_amount, refund_reason`(정책 `orders_select_own` 그대로 — `auth.uid() = user_id`). `customers` + `created_at`. 새 테이블·새 함수는 anon/authenticated 전부 revoke. service_role 은 0007 의 default privileges 로 자동 부여(스모크로 확인). |
+| `campaign_card(text)` v2 | 시그니처 동일(인자명 `p_code`). 추가: `product.options`(항상 확정 배열), `product.options_raw`, `campaign.today`(KST), `settings{clear_days, link_protect_days, home_feature_days}`, `channels` 범위 축소(hidden 비노출). 기존 필드는 그대로. |
+
+### 10.3 함수 (전부 `security definer set search_path = public`, service role 전용 — `public_stats` 만 anon)
+
+| 함수 | 역할 · 반환 |
+|---|---|
+| `app_claim_checkout(toss_order_id, payment_key, stale=20s)` | confirm **선점**: PENDING(미만료) → CONFIRMING + `payment_key` 저장. `{ok:true, claimed, session(PII 없음)}` / `{ok:false, code: NOT_FOUND | CONFIRMING(신선한 진행 중 → 409) | EXPIRED | <fail_code>(종결 세션은 원래 실패 사유 보존) | PAYMENT_KEY_CONFLICT}`. `updated_at` 이 `stale` 보다 오래된 CONFIRMING 은 같은 paymentKey(또는 없음)면 **재선점**(라우트가 죽은 경우의 복구 — 고객 새로고침). 만료 PENDING 은 여기서 EXPIRED 로 전이. |
+| `app_confirm_checkout(session_id, payment_key, payment, recover=false)` | **승인 확정(한 트랜잭션)**: 세션 `for update` → CONFIRMED 면 멱등 `{ok, already:true, order_id, order_code}` → `payment` 대조(`status='DONE'`, `orderId`, `totalAmount`, `paymentKey` — `PAYMENT_MISMATCH`) → 가상계좌 거부 → 캠페인 `for update` + `LIVE` & `start_date ≤ today(KST) ≤ end_date`(`NOT_LIVE`) + `qty − sold_qty ≥ 세션 qty`(`SOLD_OUT`, `left`) → `orders` insert(PAID, `paid_at = approvedAt`) → 세션 CONFIRMED. `recover=true`(웹훅·reconcile) 는 FAILED/EXPIRED 무주문 세션도 복구(단 `fail_code='CANCEL_PENDING'` 제외). `ok:false` 인 `PAYMENT_MISMATCH/VIRTUAL_ACCOUNT_NOT_SUPPORTED/NOT_LIVE/SOLD_OUT` 은 돈이 잡힌 뒤이므로 호출자가 반드시 토스 전액 취소. |
+| `app_checkout_reserved(campaign_id)` | 소프트 예약 합 — PENDING/CONFIRMING·미만료 세션 `qty` 합. `/api/checkout` 은 `qty − sold_qty − reserved ≥ 요청 qty` 아니면 결제창을 열지 않는다(하드 예약 없음 — 최종 방어선은 위 함수의 잠금 재검사). |
+| `app_refund_precheck(order_id, actor)` | 가드만(상태 변경 없음): PAID · 비샘플 · 캠페인 비SETTLED · `actor='customer'` 는 `tracking_no is null`. `{ok, order_code, amount, payment_key, campaign_status}` / `{ok:false, code: BAD_ACTOR | NOT_FOUND | REFUNDED | CANCELED | SAMPLE | SETTLED | SHIPPED}`. |
+| `app_refund_record(order_id, actor, reason, amount, raw, partial=false)` | 토스가 취소를 확정한 **뒤** 의 기록(가드 없음). 전액: 일반 → REFUNDED + `refund_*` + `raw_cancel` + `campaign_events 'refunded'`(sold_qty 는 트리거) / SETTLED·샘플 → **CANCELED + `refund_needs_adjust`**(`adjust:true`) / customer 인데 기록 시점에 송장이 생겼으면 REFUNDED + `refund_after_ship`(`after_ship:true`, 회수 필요). 부분(`partial=true`, 콘솔 PARTIAL_CANCELED): PAID 유지 + `refund_amount`·`raw_cancel` + `partial_refund`. 이미 REFUNDED/CANCELED 면 `already:true`. 스레드 본문의 구매자명은 `김*호` 마스킹. |
+| `expire_checkout_sessions(grace=1h)` | `PENDING` 과 **payment_key 없는** CONFIRMING 만 `EXPIRED`(`fail_code` 보존). payment_key 가 있는 CONFIRMING 은 승인이 처리됐을 수 있어 건드리지 않는다 → reconcile. |
+| `stale_checkout_sessions(age=2m, limit=100)` | reconcile 입력: payment_key 있는 CONFIRMING(고착) + `FAILED(CANCEL_PENDING)`. `checkout_session_brief` 로 PII 없이 반환. |
+| `purge_checkout_pii(older_than=30d)` | FAILED/EXPIRED 세션의 `buyer_name='(삭제)'`, `buyer_phone/email=null`, `shipping='{}'`, `raw_payment=null`(행은 남김). app-plan §5.1 보존·파기표. |
+| `public_stats()` | `{today_qty, gmv, sellers, brands, today}` — anon execute, 개별 판매 실적 없음. |
+| `resolve_product_options(options, sale_price)` · `checkout_session_brief(row)` | 내부 헬퍼(execute 회수). |
+
+### 10.4 적용 후 스모크 (2026-09-15, `npx supabase db query --linked`)
+
+`db query --linked` 는 Management API 로 **한 요청 = 한 트랜잭션** 이며 **마지막 문장의 결과만** 돌려주고, 어느 문장이든 실패하면 배치 전체가 그 오류로 끝난다. 그래서 "허용돼야 하는 검사" 와 "거부돼야 하는 검사" 를 한 배치에 넣으면 거부 검사의 `permission denied` 가 배치 전체의 결과로 보여 허용 검사까지 실패한 것처럼 보인다 — 아래 항목은 **문장별로 따로** 실행했다. (같은 이유로 초기 스모크에서 "`authenticated` 가 `orders.order_name` 을 못 읽는다" 로 보고됐으나, `pg_policy` 의 `orders_select_own` 은 `(auth.uid() = user_id)` 뿐이고 `user_id` 는 grant 목록에 있으며 단독 실행은 통과한다 → 0009 는 만들지 않았다.) 쓰기 함수 검증은 `do $$ … raise exception 'RESULT …' $$` 블록 안에서 실행해 결과를 오류 메시지로 읽고 전부 롤백했다(잔여 세션 0, `sold_qty` 불변 확인).
+
+| 역할 | 검사 | 결과 |
+|---|---|---|
+| anon | `campaign_card('c1')->'product'->'options'` 길이 / `campaign.today` / `settings` / `channels` | 3 / `2026-09-15` / `{21,7,7}` / 1 ✓ |
+| anon | `campaign_card('c14')` (options='[]' 상품) | `[{1개 31900},{2개 세트 · 5% 추가 할인 60600},{3개 세트 · 10% 추가 할인 86100}]` ✓ |
+| anon | `select … from checkout_sessions` / `orders` | permission denied ✓ |
+| anon/authenticated | `has_function_privilege` — `app_*`, `expire/stale/purge`, `resolve_product_options`, `checkout_session_brief` | 전부 false ✓ (`campaign_card`, `public_stats`, `seller_is_public` 만 true; `app_role` 은 authenticated 만) |
+| service_role | 위 함수 execute · `checkout_sessions`/`payment_events` select/insert/update · `order_code_seq` usage | 전부 true ✓ (0007 default privileges) |
+| authenticated | `select order_name from orders limit 1` | 통과(0행 — JWT 없음) ✓ · `set_config('request.jwt.claims', …sub…)` 후 `auth.uid()` 일치 ✓ |
+| authenticated | `select shipping from orders limit 1` / `select *` | permission denied ✓ |
+| service | `app_claim_checkout` → `{ok, claimed:true, status CONFIRMING, payment_key 저장}` · 재호출 → `CONFIRMING` | ✓ |
+| service | `app_confirm_checkout` — `totalAmount` 다름 → `PAYMENT_MISMATCH` · `method='가상계좌'` → `VIRTUAL_ACCOUNT_NOT_SUPPORTED` · 정상 → `{ok, already:false, order o2000}` + `orders PAID` + `sold_qty 44→46` · 재호출 → `already:true` | ✓ |
+| service | `app_refund_precheck(customer)` → ok · `app_refund_record` → `REFUNDED`, `sold_qty 46→44`, `campaign_events 'refunded'` 1행 · 재호출 → `already:true` | ✓ |
+| service | LIVE 인데 `end_date = 어제` 로 바꾼 캠페인 세션 confirm → `NOT_LIVE` | ✓ |
+| service | 만료 PENDING 선점 → `EXPIRED`(전이) · 재선점 → `code='EXPIRED'`(fail_code 보존) | ✓ |
+| service | `expire_checkout_sessions(1h)`: payment_key **있는** CONFIRMING 유지(`CONFIRMING/pk`), payment_key 없는 CONFIRMING → EXPIRED | 1건만 만료 ✓ |
+| service | `updated_at` 3시간 전 CONFIRMING(같은 paymentKey) 재선점 → `claimed:true` · `app_checkout_reserved` = 진행 중 세션 qty 합 | ✓ |
+
+### 10.5 앱 타입
+
+`web/src/lib/database.types.ts` 는 `cd web && npm run gen:types`(`scripts/gen-types.mjs` — 루트에서 `supabase gen types typescript --linked`, UTF-8·LF 로 저장, CLI 실패 시 파일 보존) 산출. `campaign_card` 의 인자명은 `p_code`, jsonb 반환은 `Json` 이라 앱은 `lib/campaign.ts` 의 `parseCampaignCard` 런타임 가드로 좁힌다. 0008 적용 후 재생성해 `npx tsc --noEmit` 통과(2026-09-15).

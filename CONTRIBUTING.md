@@ -103,6 +103,30 @@ vercel deploy --prod --scope weglow-team
 
 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`). Vercel 쪽은 관리자가 아직 안 올렸을 수 있으니 Pages 주소로 먼저 확인하세요.
 
+## 앱(`web/`)을 고칠 때
+
+`web/` 은 프로토타입과 별개인 Next.js 16 앱입니다(설계서 [docs/app-plan.md](docs/app-plan.md) · 실행법 [web/README.md](web/README.md) · 배포 [web/DEPLOY.md](web/DEPLOY.md)). 프로토타입 `css/`·`js/` 를 import 하지 않고, 프로토타입도 앱 때문에 고치지 않습니다.
+
+```bash
+cd web
+npm install
+cp .env.example .env.local      # 값은 docs/app-plan.md §3 표에서 — 커밋 금지
+npm run dev                     # http://localhost:3000
+```
+
+올리기 전에 `web/` 에서:
+
+```bash
+npm run typecheck && npm run lint && npm run build
+```
+
+CI 의 **web-ci**(`.github/workflows/web-ci.yml`)가 같은 순서를 Node 20 · 더미 env 로 돌립니다. `프로토타입 점검`과 함께 초록불이어야 병합할 수 있습니다.
+
+- 파일은 **파티션(A~H) 소유**가 정해져 있습니다 — [docs/app-plan.md §10.1](docs/app-plan.md) 표 · [web/README.md](web/README.md) "구조 · 파티션". 자기 파티션 밖 파일은 만들지도 고치지도 않고, 다른 파티션 모듈은 §10.0 계약 시그니처대로 import 만 합니다.
+- 스키마 변경은 `supabase/migrations/` 에 새 번호로 추가하고(적용된 파일 수정 금지) 병합 후 `npx supabase db push --linked` → `cd web && npm run gen:types` — [docs/data-model.md §8](docs/data-model.md).
+- 비밀키는 `.env.local` 과 Vercel 환경변수에만. 코드·문서·PR 본문에 값을 쓰지 않습니다.
+- Next 16 은 학습 데이터와 다릅니다 — `web/AGENTS.md` 대로 `web/node_modules/next/dist/docs/` 를 먼저 읽습니다.
+
 ## Claude에게 시키기
 
 이슈 본문, 또는 PR·이슈의 댓글/리뷰 코멘트에 `@claude` 를 쓰면 Claude가 읽고 답하거나 직접 고쳐서 PR을 올립니다. (PR 본문에는 반응하지 않음 · collaborator 로 추가된 계정만 트리거됨)

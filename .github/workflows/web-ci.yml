@@ -1,0 +1,64 @@
+name: Web CI
+
+# 앱(web/) PR 필수 상태 검사 — docs/app-plan.md §10.1 H · §11.1.
+# 브랜치 보호 규칙의 required status check 컨텍스트는 아래 job 의 name("web-ci") 이다 —
+# 이름을 바꾸면 보호 규칙도 같이 바꿀 것(§13). 프로토타입 점검(ci.yml)과는 별개 워크플로.
+#
+# paths 필터를 두지 않는다: required check 는 모든 PR 에서 결과를 보고해야 한다 —
+# 필터로 건너뛴 PR 은 "Expected — Waiting for status" 상태로 영원히 병합이 막힌다.
+# (web/ 이 안 바뀐 PR 도 캐시 덕에 2~3분이면 끝난다.)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-ci:
+    name: web-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # 빌드용 더미 env (§10.1 H). force-dynamic 페이지는 프리렌더되지 않고 admin.ts / toss.ts 는
+      # 호출 시점에만 throw 하므로 실제 키 없이 typecheck·lint·build 가 통과해야 한다.
+      # 비밀키(SUPABASE_SERVICE_ROLE_KEY, TOSS_SECRET_KEY, CRON_SECRET)는 CI 에 넣지 않는다.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci
+      NEXT_PUBLIC_TOSS_CLIENT_KEY: test_gck_ci
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      # next-env.d.ts 와 .next/types/routes.d.ts(PageProps·LayoutProps·RouteContext 헬퍼)는 gitignore 된 생성물이라
+      # 빌드 없이 typecheck 하려면 먼저 만들어야 한다 (node_modules/next/dist/docs/01-app/03-api-reference/06-cli/next.md "next typegen").
+      - name: next typegen
+        run: npx next typegen
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: lint
+        run: npm run lint
+
+      - name: build
+        run: npm run build
