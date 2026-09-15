@@ -5,7 +5,7 @@
 | 대상 | (주)위글로우 셀러리 — 건강·웰니스 브랜드 × 인플루언서 협업판매 플랫폼 |
 | 원본 | 프로토타입 코드 — 분리 전 단일 파일 `index.html`(git `978ea1e:index.html`, 이하 OLD/index.html)과 현재의 `js/*.js`(같은 내용을 화면 단위로 나눈 것). `S.data.*` 컬렉션 19개 + 정책 상수 |
 | 목표 인프라 | glo 프로젝트와 동일: Next.js + Vercel + Supabase(Postgres, Auth, RLS) |
-| 현재 상태 | **설계 완료 · 앱 미연동 · 실제 DB 실행 미검증** (로컬 DB/Docker 없음 — libpg_query 문법 파싱과 AST 검사만 통과) |
+| 현재 상태 | **클라우드 적용 완료(2026-09-15) · 앱 미연동**. Supabase 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul, Postgres 17)에 0001~0006 `db push` + `seed.sql` 투입 완료. 실 DB 검증: 24개 테이블 RLS on · 정책은 공개 카탈로그 테이블에만 · anon `select *`/정산 조회 권한 거부 · 비공개 인플루언서(s4·s5)와 SETTLED 캠페인 anon 미노출 · `campaign_card()` 동작 · 버킷 2개 |
 | 산출물 | `supabase/migrations/0001_init.sql` … `0006_storage.sql`, `supabase/seed.sql`, 설계 노트 `docs/data-model-design-notes.md`, 분석 노트 `docs/analysis/*.md` |
 | 최종 수정 | 2026-09-15 (1차 리뷰 34건 반영 — design-notes.md §6; 2차 리뷰 high 2건 반영 — design-notes.md §7) |
 
@@ -660,6 +660,8 @@ RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) —
 ---
 
 ## 8. 적용 방법 (새 Supabase 프로젝트)
+
+**2026-09-15 적용 완료** — 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul). 이후 스키마 변경은 이미 적용된 파일을 고치지 말고 **새 번호(0007_…)** 마이그레이션을 추가해 PR → 병합 후 로그인·링크된 PC에서 `npx supabase db push --linked`. 시드 재투입은 `--include-seed`(멱등: `on conflict do nothing`). 아래는 새 환경에서 처음 적용할 때의 절차.
 
 전제: Supabase 대시보드에서 새 프로젝트 생성 완료(project ref · DB 비밀번호 확보). CLI 는 `npx supabase`(글로벌 설치 불필요). 아래는 Windows PowerShell 기준.
 
