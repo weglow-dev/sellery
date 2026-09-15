@@ -80,6 +80,7 @@ button,button.pri,button.ghost,button.danger,button.sm,.master button{border:non
 button:hover,button.pri:hover,button.ghost:hover,button.danger:hover,button.sm:hover{transform:translate(-1px,-1px);box-shadow:var(--pxb2),3px 5px 0 0 var(--ink),5px 3px 0 0 var(--ink),5px 5px 0 0 var(--ink),var(--bevel2)}
 button:active,button.pri:active,button.ghost:active,button.danger:active,button.sm:active{transform:translate(2px,2px);box-shadow:var(--pxb2),inset 2px 2px 0 rgba(28,42,20,.2)}
 button.pri{background:var(--yellow);color:var(--ink)}
+button.kakao{border:none;box-shadow:var(--pxb2);background:#FEE500}
 button.ghost{background:var(--surface)}
 button.danger{background:var(--danger);color:#fff}
 button[disabled]{box-shadow:var(--pxb2)!important;opacity:.45;transform:none!important}

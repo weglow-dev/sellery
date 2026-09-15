@@ -205,6 +205,27 @@ function loadLinkCtx(){
     return {cid:v.cid};
   }catch(e){return null;}
 }
+/* ---- 고객 계정 · 장바구니 (고객 화면 전용) ----
+   고객 로그인은 카카오만 지원. 파트너 세션('sellery-session')과는 별개이고,
+   시드 데이터(LS)와도 분리된 키에 저장하므로 "데이터 초기화"를 해도 남는다. */
+const CUST_KEY='sellery-cust', CART_KEY='sellery-cart';
+const KAKAO_JS_KEY='';   // 실서비스: 카카오 개발자 콘솔 JavaScript 키. 비어 있으면 데모 계정 선택 창이 뜬다.
+const KAKAO_DEMO=[{id:'k1',name:'김서연',email:'seoyeon@kakao.demo'},{id:'k2',name:'박지훈',email:'jihoon@kakao.demo'},{id:'k3',name:'이하은',email:'haeun@kakao.demo'}];
+const KAKAO_ICON=`<svg class="kico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="#191919" d="M12 3C6.5 3 2 6.4 2 10.6c0 2.7 1.8 5 4.5 6.4l-1 3.6c-.1.3.3.6.5.4l4.3-2.9c.6.1 1.1.1 1.7.1 5.5 0 10-3.4 10-7.6S17.5 3 12 3z"/></svg>`;
+function loadCust(){try{const v=JSON.parse(localStorage.getItem(CUST_KEY)||'null');return v&&v.id?v:null;}catch(e){return null;}}
+function saveCust(c){try{if(c)localStorage.setItem(CUST_KEY,JSON.stringify(c));else localStorage.removeItem(CUST_KEY);}catch(e){}S.cust=c||null;}
+function loadCart(){try{const v=JSON.parse(localStorage.getItem(CART_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}}
+function saveCart(){try{localStorage.setItem(CART_KEY,JSON.stringify(S.cart||[]));}catch(e){}}
+/* 장바구니 항목 {cid, oi(옵션 index), qty} — 같은 판매·옵션은 수량 합산(최대 10) */
+function cartAdd(cid,oi,qty){S.cart=S.cart||[];const it=S.cart.find(x=>x.cid===cid&&x.oi===oi);if(it)it.qty=Math.min(10,it.qty+qty);else S.cart.push({cid,oi,qty});saveCart();}
+const cartN=()=>(S.cart||[]).reduce((a,x)=>a+x.qty,0);
+/* 화면용 해석: 캠페인·상품·옵션·판매자 + 지금 결제 가능한지(LIVE·재고). 판매가 끝난 항목은 결제에서 자동 제외 */
+function cartLines(){
+  return (S.cart||[]).map((it,i)=>{const c=camp(it.cid);if(!c)return null;const p=prod(c.productId),opts=optsOf(p),o=opts[Math.min(it.oi,opts.length-1)];
+    const left=(c.qty||0)-soldQty(c.id);const ok=c.status==='LIVE'&&left>=it.qty;
+    return {i,it,c,p,o,s:seller(c.sellerId),b:brand(p.brandId),left,ok,sum:o.price*it.qty};}).filter(Boolean);
+}
+const custOrders=()=>S.cust?D_().orders.filter(o=>o.buyerId===S.cust.id&&!o.sample).sort((a,b)=>b.id.localeCompare(a.id,undefined,{numeric:true})):[];
 /* center-specific links: index.html#influencer / #brand / #admin lock the UI to one center */
 (function(){
   const h=(location.hash||'').replace('#','').toLowerCase();
@@ -217,6 +238,7 @@ function loadLinkCtx(){
       if(ss.role==='brand'&&S.data.brands.some(x=>x.id===ss.id))S.actingBrand=ss.id;
       if(!h||h===ss.role||(h==='influencer'&&ss.role==='seller')){S.view.role=ss.role;S.lockedRole=true;}}}catch(e){}
   S.linkCtx=loadLinkCtx();   // 이전 방문에서 링크로 들어왔다면 보호 유지
+  S.cust=loadCust();S.cart=loadCart();   // 고객 카카오 세션 · 장바구니 (새로고침에도 유지)
   const lm=h.match(/^(?:s|link)\/(c\d+)$/); if(lm&&S.data.campaigns.some(c=>c.id===lm[1])){S.view={role:'customer',screen:'home',cid:null,store:lm[1]};S.lockedRole=true;S.linkCtx={cid:lm[1]};saveLinkCtx(lm[1]);}  // 판매 링크 진입: index.html#s/c1 (helpers는 아래에서 정의되므로 S.data 직접 접근)
 })();
 window.addEventListener('hashchange',()=>{
