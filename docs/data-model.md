@@ -671,6 +671,8 @@ RPC(anon/authenticated execute): **`campaign_card(text)`**(security definer) —
 
 **2026-09-15 적용 완료** — 프로젝트 `sellery`(ref `ocxppeuoiysnkwwujvko`, Seoul), 0001~0008 + seed. 이후 스키마 변경은 이미 적용된 파일을 고치지 말고 **새 번호(0009_…)** 마이그레이션을 추가해 PR → 병합 후 로그인·링크된 PC에서 `npx supabase db push --linked`. 시드 재투입(멱등: `on conflict do nothing`)은 `npx supabase db query --linked --file supabase/seed.sql` — `db push --include-seed` 는 CLI 2.x 에서 이미 등록된 seed 파일의 **해시(`supabase_migrations.seed_files`)만 갱신하고 SQL 을 실행하지 않는 것을 2026-09-15 에 확인**했다(15절 추가 후 push 는 "Finished" 였으나 c14/c15 가 없었고, `--file` 투입으로 생성됨). 아래는 새 환경에서 처음 적용할 때의 절차.
 
+> **0009(2026-09-15)**: `app_confirm_checkout` 의 가상계좌 판정 버그 수정 — 토스 Payment 객체는 카드 결제여도 `virtualAccount: null` 키를 항상 포함하므로 키 존재(`?`) 대신 값이 null 이 아닐 때만 가상계좌로 본다(0008 판정으로는 모든 카드 승인이 자동 취소됐음). 클라우드 적용 완료.
+
 > **service_role 권한 주의(0007_service_role_grants.sql)**: 프로젝트를 만들 때 대시보드의 "Automatically expose new tables" 를 껐기 때문에 새 테이블에는 anon/authenticated 뿐 아니라 **service_role 에도 기본 권한이 붙지 않는다**. service_role 은 RLS 만 우회할 뿐 GRANT 는 필요하므로, 0007 이 `public` 스키마의 모든 테이블·시퀀스·함수에 대해 service_role 에 전체 권한을 주고 `alter default privileges` 로 이후 객체에도 자동 적용한다. 새 프로젝트에 다시 적용할 때도 이 파일이 포함돼야 앱 서버(sb_secret_/service_role 키)가 읽고 쓸 수 있다. 증상: 서버 키로 조회 시 `42501 permission denied for table …` + "GRANT … TO service_role" 힌트.
 
 전제: Supabase 대시보드에서 새 프로젝트 생성 완료(project ref · DB 비밀번호 확보). CLI 는 `npx supabase`(글로벌 설치 불필요). 아래는 Windows PowerShell 기준.
