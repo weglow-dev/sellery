@@ -167,6 +167,7 @@ cd web && npm run gen:types                                 # src/lib/database.t
 
 ## 8. 배포 후 확인 (Production · Preview 공통)
 
+0. `/api/health` → 200 `{"ok":true,"checks":{"supabaseAdmin":"ok","toss":"ok"}}` — 로그인 없이 서버 비밀키 2개(`SUPABASE_SERVICE_ROLE_KEY` · `TOSS_SECRET_KEY`)가 맞는 값인지 확인한다(DB HEAD 조회 1회 + 토스 존재하지 않는 결제 조회 1회). 503 이면 Vercel → Logs 의 `[health]` 줄에 원인.
 1. `/` 200 — 헤더 · 푸터 · 사업자 정보 · 배경 `#eef3dc`.
 2. `/s/<handle>/<code>` 200 + 응답에 `set-cookie: slry_linkctx=<code>; HttpOnly; SameSite=Lax; Secure`. `/c/<code>` → 308 정식 URL. 없는 코드 → 404.
 3. `/login` → 카카오 → `/auth/callback` → `next` 복귀. `/checkout` 미로그인 → `/login?next=`.
