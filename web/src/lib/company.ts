@@ -12,14 +12,11 @@ export const PENDING = "확인 중";
 
 export const COMPANY = {
   name: "(주)위글로우",
-  /** TODO(§13): 대표자명 */
-  ceo: PENDING,
-  /** TODO(§13): 사업자등록번호 (000-00-00000) */
-  bizNo: PENDING,
+  ceo: "강신욱",
+  bizNo: "517-86-00666",
   /** TODO(§13): 통신판매업신고번호 (제0000-서울○○-0000호) */
   mailOrderNo: PENDING,
-  /** TODO(§13): 사업장 주소 */
-  address: PENDING,
+  address: "서울시 성동구 왕십리로 38(홍성빌딩), 3층",
   email: "official@weglow.biz",
   /** TODO(§13): 고객센터 채널(채널톡) 링크 — 확정 전에는 메일 링크 */
   csUrl: "mailto:official@weglow.biz",
