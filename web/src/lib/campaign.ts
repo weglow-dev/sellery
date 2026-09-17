@@ -269,8 +269,8 @@ export function storeUrl(handle: string, code: string): string {
   return `/s/${normalizeHandle(handle)}/${encodeURIComponent(code)}`;
 }
 
-/** 화면 표시용 주소 (프로토타입 원문 `sellery.co.kr/s/{handle}/{code}`) */
-export function displayStoreUrl(card: CampaignCard, host = "sellery.co.kr"): string {
+/** 화면 표시용 주소 (프로토타입 원문 `sellery.life/s/{handle}/{code}`) */
+export function displayStoreUrl(card: CampaignCard, host = "sellery.life"): string {
   return `${host}${canonicalStoreUrl(card)}`;
 }
 

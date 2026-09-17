@@ -260,11 +260,11 @@ const ACT={
     save();productDetailModal(pid);toast('✓ 매출 데이터 확인권 적용 — 전체 실적이 열렸습니다 (−2 🥬)');
   },
   copyBrandRef(code){
-    try{navigator.clipboard.writeText(`셀러리에 브랜드 입점하세요! 가입 시 추천 코드 ${code} 입력하면 첫 ${BREF_TIMES}회 판매 플랫폼 수수료 −1%p → sellery.co.kr/brand`);toast('브랜드 추천 메시지 복사됨');}
+    try{navigator.clipboard.writeText(`셀러리에 브랜드 입점하세요! 가입 시 추천 코드 ${code} 입력하면 첫 ${BREF_TIMES}회 판매 플랫폼 수수료 −1%p → sellery.life/brand`);toast('브랜드 추천 메시지 복사됨');}
     catch(e){toast('복사 실패 — 코드: '+code);}
   },
   copyRef(code){
-    try{navigator.clipboard.writeText(`셀러리에서 같이 판매해요! 가입할 때 추천 코드 ${code} 입력하면 첫 5회 판매 수수료 +1% → sellery.co.kr`);toast('추천 메시지 복사됨 — DM으로 공유하세요');}
+    try{navigator.clipboard.writeText(`셀러리에서 같이 판매해요! 가입할 때 추천 코드 ${code} 입력하면 첫 5회 판매 수수료 +1% → sellery.life`);toast('추천 메시지 복사됨 — DM으로 공유하세요');}
     catch(e){toast('복사 실패 — 코드: '+code);}
   },
   confirmInvite(sid){
@@ -610,7 +610,7 @@ const ACT={
     openModal(`<h3>${CEL} 셀러리 판매 인증</h3>
     <div class="notice" style="margin:8px 0 12px">이 판매 페이지는 셀러리가 발급한 정식 링크입니다. 사칭 링크는 이 인증 정보를 표시할 수 없습니다.</div>
     <table class="stmt" style="min-width:0;font-size:13px">
-      <tr><td>인증 링크</td><td class="num">sellery.co.kr/s/${s.handle.slice(1)}/${cid} <span class="st green" style="animation:none">유효</span></td></tr>
+      <tr><td>인증 링크</td><td class="num">sellery.life/s/${s.handle.slice(1)}/${cid} <span class="st green" style="animation:none">유효</span></td></tr>
       <tr><td>판매 인플루언서</td><td class="num">${platIcon(s)} ${esc(s.name)} ${s.handle} · <span class="gradebox sm">${gfull(gname(s))}</span></td></tr>
       <tr><td>인증 채널</td><td class="num">${ch.map(x=>`${PLAT_ICONS[x.platform]||''} ${esc(x.handle)} ✓`).join('<br>')||'—'}</td></tr>
       <tr><td>공급 브랜드</td><td class="num">${esc(b.name)} · <span class="gradebox sm">${gfull(bgname(b))}</span>${b.settleInfo&&b.settleInfo.bizNo?` · 사업자 ${esc(b.settleInfo.bizNo)}`:' · 인증 브랜드'}</td></tr>

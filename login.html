@@ -176,7 +176,7 @@ const SESSION_KEY='sellery-session';
    실서비스: GOOGLE_CLIENT_ID를 채우면 Google Identity Services 버튼이 렌더되고 시뮬 버튼은 숨겨집니다.
    흐름: GIS credential(ID 토큰 JWT) → 서버 POST /auth/google 에서 토큰 검증(aud=client_id, iss=accounts.google.com, exp)
         → email_verified 이메일로 계정 조회: 있으면 로그인, 없으면 가입 폼(이메일 고정·비밀번호 생략) → 세션 쿠키 발급.
-   Google Cloud Console: OAuth 클라이언트(웹) · 승인된 JavaScript 원본에 sellery.co.kr 추가 · 동의 화면 게시. */
+   Google Cloud Console: OAuth 클라이언트(웹) · 승인된 JavaScript 원본에 sellery.life 추가 · 동의 화면 게시. */
 const GOOGLE_CLIENT_ID='';
 const GOOGLE_DEMO=[
   {email:'jiyu@sellery.demo',name:'김지유'},{email:'haneul@sellery.demo',name:'하늘'},{email:'partner@vyneherb.co',name:'김바인 · 바인허브'},{email:'official@weglow.biz',name:'박글로 · 글로헬스'},{email:'new.partner@gmail.com',name:'신규 파트너 (미가입)'}
@@ -227,7 +227,7 @@ if(GOOGLE_CLIENT_ID){
 /* 시뮬: accounts.google.com 계정 선택 창 → 선택 즉시 로그인. 팝업이 차단되면 같은 창을 페이지 안에 띄움 */
 let gWin=null;
 const gRows=()=>GOOGLE_DEMO.map(g=>`<button data-e="${g.email}" data-n="${g.name}"><span class="av">${g.name[0]}</span><span><b>${g.name}</b><br><small>${g.email}</small></span></button>`).join('')+`<button data-e="__other"><span class="av" style="background:#e8eaed;color:#444">＋</span><span><b>다른 계정 사용</b></span></button>`;
-const gHead=`<div class="hd"><div class="glogo"><span>G</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span></div><h3>계정 선택</h3><p><b>sellery.co.kr</b>(으)로 이동</p></div>`;
+const gHead=`<div class="hd"><div class="glogo"><span>G</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span></div><h3>계정 선택</h3><p><b>sellery.life</b>(으)로 이동</p></div>`;
 const gFoot=`계속 진행하면 Google에서 내 이름, 이메일 주소, 프로필 사진을 셀러리와 공유합니다. (프로토타입 시뮬레이션)`;
 function gPickEmail(b){let em=b.dataset.e,nm=b.dataset.n;if(em==='__other'){em=prompt('Google 이메일');if(!em)return null;nm=em.split('@')[0];}return {email:em,name:nm};}
 function gOverlay(){

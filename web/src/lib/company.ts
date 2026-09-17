@@ -20,8 +20,8 @@ export const COMPANY = {
   /** 고객센터 = 이메일 (사용자 결정 2026-09-17 — 채널톡 등 별도 채널은 두지 않는다) */
   csUrl: "mailto:official@weglow.biz",
   csLabel: "고객센터",
-  /** 표시용 도메인 (프로토타입 원문 "sellery.co.kr") */
-  siteHost: "sellery.co.kr",
+  /** 표시용 도메인 (프로토타입 원문 "sellery.life") */
+  siteHost: "sellery.life",
   /** 이용약관 페이지 (src/app/terms · 본문 src/content/legal/terms.ts) — 비우면 푸터가 링크 대신 텍스트로 렌더 */
   termsUrl: "/terms",
   /** 개인정보처리방침 페이지 (src/app/privacy · 본문 src/content/legal/privacy.ts) */

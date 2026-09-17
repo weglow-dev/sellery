@@ -1,4 +1,4 @@
-/* ============ CUSTOMER (sellery.co.kr 고객 화면 · 구매 페이지) ============ */
+/* ============ CUSTOMER (sellery.life 고객 화면 · 구매 페이지) ============ */
 function custVisible(c){ // 링크 진입 방문: 같은 상품·카테고리의 타 인플루언서 판매 비노출 (인플루언서 판매 보호)
   if(!S.linkCtx)return true;const lc=camp(S.linkCtx.cid);if(!lc)return true;
   if(c.sellerId===lc.sellerId)return true;
@@ -137,7 +137,7 @@ function vCustAbout(){
         <div class="box b2"><b>PRODUCT</b><div><span>표시광고 기준 · 기능성 인정 범위 · 성분</span><em>상품 검수</em></div></div>
         <div class="box b3"><b>SELLER</b><div><span>채널 소유 인증 · 판매 실적 · 7단계 등급</span><em>인플루언서 인증</em></div></div>
         <div class="arrow">↓</div>
-        <div class="box all"><b>ALL THREE</b><div><span>판매 페이지의 셀러리 인증 마크</span><em>sellery.co.kr/s/…</em></div></div>
+        <div class="box all"><b>ALL THREE</b><div><span>판매 페이지의 셀러리 인증 마크</span><em>sellery.life/s/…</em></div></div>
       </div>
       <div class="cap">the Sellery trust blueprint</div>
     </div>
@@ -193,7 +193,7 @@ function vCustAbout(){
     <div class="sp-l">
       <div class="hand">look for the mark.</div>
       <div class="store-trust" style="margin:0">${CEL} <b>셀러리 인증 판매</b> · 결제 보관 · ${CLEAR_DAYS}일 환불 보호 · 인플루언서 채널 인증 ✓ <span style="text-decoration:underline;margin-left:auto">인증 확인</span></div>
-      <div class="cap" style="text-align:left;margin-top:10px">정식 판매 페이지 상단에 항상 표시 · 주소는 <b>sellery.co.kr/s/…</b></div>
+      <div class="cap" style="text-align:left;margin-top:10px">정식 판매 페이지 상단에 항상 표시 · 주소는 <b>sellery.life/s/…</b></div>
     </div>
     <div class="sp-r">
       <span class="tag">TRUST MARK</span>
@@ -215,7 +215,7 @@ function vCustAbout(){
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><b>브랜드이신가요?</b><div class="meta">건강·웰니스 브랜드라면 상품을 등록하고 인증 인플루언서의 제안을 받아 보세요. 입점비는 없고, 성과 수수료만 있습니다.</div></div><button class="sm pri" data-act="goCenter" data-k="brand">브랜드 센터</button></div>
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><b>인플루언서이신가요?</b><div class="meta">건강·웰니스 판매 레퍼런스가 있다면 채널 인증 후 샘플 요청부터 시작하세요. 수수료율은 상품마다 공개되어 있습니다.</div></div><button class="sm pri" data-act="goCenter" data-k="seller">인플루언서 센터</button></div>
   </div>
-  <div class="store-foot">${CEL} <b>SELLERY</b> · 셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드에 있습니다 · 고객센터 채널톡 · sellery.co.kr</div>
+  <div class="store-foot">${CEL} <b>SELLERY</b> · 셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드에 있습니다 · 고객센터 채널톡 · sellery.life</div>
   </div>`;
 }
 
@@ -248,7 +248,7 @@ function vStore(cid){
   return `<div class="store">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <button class="ghost sm" data-act="storeBack">${S.view.role==='customer'?'← 셀러리 홈':'← 돌아가기'}</button>
-      <span style="font-size:11.5px;color:var(--mute)">${S.view.role!=='customer'?'구매자에게 보이는 화면 · ':''}${c.preview?'sellery.co.kr/p/'+p.id+' (상세페이지 미리보기)':'sellery.co.kr/s/'+s.handle.slice(1)+'/'+cid}</span>
+      <span style="font-size:11.5px;color:var(--mute)">${S.view.role!=='customer'?'구매자에게 보이는 화면 · ':''}${c.preview?'sellery.life/p/'+p.id+' (상세페이지 미리보기)':'sellery.life/s/'+s.handle.slice(1)+'/'+cid}</span>
     </div>
     <div class="store-trust" ${c.preview?'':`data-act="verifyStore" data-k="${cid}"`}>${CEL} <b>셀러리 인증 판매</b> · 결제 보관 · ${CLEAR_DAYS}일 환불 보호 · 인플루언서 채널 인증 ✓ <span style="text-decoration:underline;margin-left:auto">${c.preview?'미리보기':'인증 확인'}</span></div>
     <div class="card" style="padding:0;overflow:hidden">

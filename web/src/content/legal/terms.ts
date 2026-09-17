@@ -15,7 +15,7 @@ export const TERMS: LegalDoc = {
   version: "1.0",
   effectiveDate: "2026-09-17",
   intro:
-    "이 약관은 (주)위글로우가 운영하는 셀러리(sellery.co.kr)에서 고객이 상품을 구매할 때 적용된다. 브랜드사·인플루언서 등 파트너에게는 별도 약관·계약이 적용된다.",
+    "이 약관은 (주)위글로우가 운영하는 셀러리(sellery.life)에서 고객이 상품을 구매할 때 적용된다. 브랜드사·인플루언서 등 파트너에게는 별도 약관·계약이 적용된다.",
   sections: [
     {
       id: "purpose",

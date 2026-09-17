@@ -35,7 +35,7 @@ function vSellerHome(){
         <div><span class="ms-l">주문</span><span class="ms-v">${k.paidCnt}건</span></div>
         <div><span class="ms-l">마감 · 잔여</span><span class="ms-v">D-${dd} · ${fmt(Math.max(0,left))}개</span></div>
       </div>
-      <div class="btnrow one"><button class="sm ghost" data-act="open" data-k="${c.id}">스레드</button><button class="sm ghost" data-act="preview" data-k="${c.id}">구매 페이지</button><button class="sm ghost" data-act="copyLink" data-k="sellery.co.kr/s/${sl.handle.slice(1)}/${c.id}">링크 복사</button><button class="sm ghost" data-act="screen" data-k="sales">실시간 매출</button></div>
+      <div class="btnrow one"><button class="sm ghost" data-act="open" data-k="${c.id}">스레드</button><button class="sm ghost" data-act="preview" data-k="${c.id}">구매 페이지</button><button class="sm ghost" data-act="copyLink" data-k="sellery.life/s/${sl.handle.slice(1)}/${c.id}">링크 복사</button><button class="sm ghost" data-act="screen" data-k="sales">실시간 매출</button></div>
     </div>`;};
   const soonRow=c=>{const p=prod(c.productId);const dd=Math.ceil((P(c.start)-today())/DAY);return `<div class="rowitem" data-act="open" data-k="${c.id}">${pIcon(p,38)}<div class="grow"><div class="nm">${esc(p.name)}</div><div class="sub">${brand(p.brandId).name} · ${md(P(c.start))}–${md(P(c.end))} · 재고 ${fmt(c.qty||0)}</div></div><span class="st blue" style="animation:none">오픈 D-${dd}</span></div>`;};
   const salesHtml=`<div class="sec">진행 중 · 예정 판매</div>

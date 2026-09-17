@@ -5,7 +5,7 @@ function vCampDetail(cid){
   const k=calc(c);
   const msgs=(D_().messages[cid]||[]);
   const role=S.view.role==='brand'?'brand':S.view.role==='admin'?'admin':'seller';
-  const linkUrl=`sellery.co.kr/s/${s.handle.slice(1)}/${cid}`;
+  const linkUrl=`sellery.life/s/${s.handle.slice(1)}/${cid}`;
   return `<button class="ghost sm" data-act="back">← 목록으로</button>
   <div class="det-head" style="margin-top:12px">
     ${pIcon(p,52)}
