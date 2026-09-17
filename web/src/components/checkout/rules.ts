@@ -90,6 +90,17 @@ export function mediatorText(brandName: string): string {
   return `셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드(${brandName})에 있음을 확인합니다`;
 }
 
+/** 개인정보처리방침의 제3자 제공 조항 앵커 — 체크아웃 확인 문구의 [자세히] 링크 (content/legal/privacy.ts 섹션 id 계약) */
+export const PRIVACY_THIRD_PARTY_HREF = "/privacy#third-party";
+
+/**
+ * 개인정보 제3자 제공 고지 — 통신판매중개자 확인 체크박스 문구 끝에 붙는다.
+ * 배송지 필드(recipient·phone·address·memo)는 브랜드 발주 CSV·택배사로 흘러가므로 제공 상대(판매 브랜드)를 결제 전에 알린다.
+ */
+export function thirdPartyText(brandName: string): string {
+  return `주문·배송을 위해 수령인 정보(이름·연락처·주소·배송 메모)가 판매 브랜드 ${brandName} 에 제공되는 데 동의합니다`;
+}
+
 /* ---------------- /checkout/success?paymentKey&orderId&amount ---------------- */
 
 /** 토스 paymentKey / orderId 형식 (app-plan §6.2 와 동일) */

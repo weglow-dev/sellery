@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -92,6 +93,17 @@ export function LoginClient({ next, authError }: { next: string; authError: bool
 
         <p className="mt-1.5 text-center text-[11.5px] leading-normal text-mute">
           로그인하면 오픈 알림 · 주문·배송·환불 통합 관리 · 인플루언서 팔로우 · 인증 이력을 쓸 수 있어요
+        </p>
+        <p className="mt-2 text-center text-[11.5px] leading-normal text-mute">
+          로그인하면{" "}
+          <Link href="/terms" className="underline underline-offset-2">
+            이용약관
+          </Link>
+          과{" "}
+          <Link href="/privacy" className="underline underline-offset-2">
+            개인정보처리방침
+          </Link>
+          에 동의한 것으로 봅니다
         </p>
       </section>
 

@@ -24,10 +24,10 @@ export const COMPANY = {
   csLabel: "고객센터 채널톡",
   /** 표시용 도메인 (프로토타입 원문 "sellery.co.kr") */
   siteHost: "sellery.co.kr",
-  /** TODO(§13): 이용약관 URL — 문서가 없으면 빈 문자열 (푸터는 링크 대신 텍스트로 렌더) */
-  termsUrl: "",
-  /** TODO(§13): 개인정보처리방침 URL — 문서가 없으면 빈 문자열 */
-  privacyUrl: "",
+  /** 이용약관 페이지 (src/app/terms · 본문 src/content/legal/terms.ts) — 비우면 푸터가 링크 대신 텍스트로 렌더 */
+  termsUrl: "/terms",
+  /** 개인정보처리방침 페이지 (src/app/privacy · 본문 src/content/legal/privacy.ts) */
+  privacyUrl: "/privacy",
 } as const;
 
 export type Company = typeof COMPANY;

@@ -21,7 +21,9 @@ import { OrderSummary, PayBar } from "@/components/checkout/order-summary";
 import {
   checkoutHref,
   mediatorText,
+  PRIVACY_THIRD_PARTY_HREF,
   RETURN_KEY,
+  thirdPartyText,
   validateShipping,
   type ShippingDraft,
   type ShippingField,
@@ -237,7 +239,13 @@ export function CheckoutClient({ card, optionIndex, qty, customerKey, email, def
                     disabled={submitting}
                     style={{ marginTop: 3 }}
                   />
-                  <span>{mediatorText(brand.name)}</span>
+                  <span>
+                    {mediatorText(brand.name)}. {thirdPartyText(brand.name)} (
+                    <Link href={PRIVACY_THIRD_PARTY_HREF} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                      자세히
+                    </Link>
+                    )
+                  </span>
                 </label>
               }
             />
