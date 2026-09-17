@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { KAKAO_ICON } from "@/components/icons";
 import { OrderRow } from "@/components/orders/order-row";
-import { SignOutButton } from "@/app/account/sign-out-button";
+import { SignOutButton } from "@/app/(customer)/account/sign-out-button";
 import { displayName, getSessionUser } from "@/lib/auth";
 import { md } from "@/lib/dates";
 import { fetchMyAccount, fetchMyOrders, fetchOrderSettings } from "@/lib/orders-server";

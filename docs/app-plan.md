@@ -11,7 +11,7 @@
 | # | 결정 | 이유 |
 |---|---|---|
 | 1 | **앱은 `web/` 하위에 둔다(저장소 루트는 프로토타입 그대로)** | 루트 `index.html + css/ + js/` 는 이해관계자 데모·설계 원본으로 계속 쓰인다. glo 도 같은 구조(저장소 루트 정적 + `web/` Next)라 팀 관례와 일치. `.vercelignore` 가 이미 `web` 을 프로토타입 배포에서 제외한다. |
-| 2 | **Vercel 프로젝트를 분리한다: `sellery`(프로토타입) + `sellery-app`(Next, Root Directory `web`)** | 서버 기능(토스 승인·Supabase SSR)은 정적 호스팅 불가. 프로토타입 URL 을 깨지 않고 앱을 독립 배포·롤백. 도메인 `sellery.co.kr` 은 앱이 준비되면 `sellery-app` 으로 이전(§13). |
+| 2 | **Vercel 프로젝트를 분리한다: `sellery`(프로토타입) + `sellery-app`(Next, Root Directory `web`)** | 서버 기능(토스 승인·Supabase SSR)은 정적 호스팅 불가. 프로토타입 URL 을 깨지 않고 앱을 독립 배포·롤백. 도메인 `sellery.life` 은 앱이 준비되면 `sellery-app` 으로 이전(§13). |
 | 3 | **프로토타입은 유지·수정하지 않는다** | 앱은 프로토타입의 문자열·토큰·규칙을 옮겨 오되, 프로토타입 js/css 를 import 하지 않는다(localStorage 모델과 결합). |
 | 4 | **승인 전 주문은 `orders` 가 아니라 `checkout_sessions`(0008)** | `orders` 를 읽는 모든 코드(정산 `calc()`·발주 CSV·관리자 목록·`sold_qty` 트리거·주문번호 시퀀스·시드 1,052건)가 "결제된 주문" 을 가정한다. glo 방식(pending 상태 추가)은 이 가정을 전부 깨고 유령 주문 문제를 가져온다. |
 | 5 | **모든 쓰기는 service role, 승인 확정은 DB 함수 1회 호출** | access-model §0-4. `app_confirm_checkout()` 이 세션·캠페인 행 잠금 + 토스 응답 대조 + 기간·재고 재검사 + `orders` insert 를 한 트랜잭션으로 묶어 초과 판매를 막는다. 선점(`app_claim_checkout`)·환불 가드/기록(`app_refund_precheck`/`app_refund_record`)도 함수다 — 호출자(라우트·웹훅·reconcile)가 검증을 반복하지 않는다. |
@@ -150,7 +150,7 @@ web/
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 공개 | 토스페이먼츠 개발자센터 → 내 개발정보 → 상점 `NHN_shingoonk` → **결제위젯 연동 키** → 클라이언트 키 (`test_gck_…` / `live_gck_…`) | 위젯 `loadTossPayments` |
 | `TOSS_SECRET_KEY` | **비밀(서버)** | 같은 화면 → 시크릿 키 (`test_gsk_…` / `live_gsk_…`). **반드시 위젯 키 짝** — API 개별연동 키(`test_ck_/sk_`)를 섞으면 위젯이 뜨지 않거나 승인 실패 | confirm / cancel / 조회 (Basic `base64(secret + ":")`) |
 | `NEXT_PUBLIC_TOSS_WIDGET_VARIANT` | 공개 | 토스 상점관리자 → 결제위젯 → UI 변형 이름(결제수단). glo 는 `DEFAULT-2`(약관은 `AGREEMENT`) | `renderPaymentMethods({ variantKey })`. 기본값 `DEFAULT-2` — 코드 수정 없이 바꿀 수 있게 환경변수로 뺀다(§13) |
-| `NEXT_PUBLIC_SITE_URL` | 공개 | `https://sellery.co.kr`(프로덕션) / `http://localhost:3000` | `metadataBase`, 절대 URL 이 필요한 곳. OAuth `redirectTo`·토스 `successUrl` 은 `window.location.origin` 을 쓴다(프리뷰 배포 호환) |
+| `NEXT_PUBLIC_SITE_URL` | 공개 | `https://sellery.life`(프로덕션) / `http://localhost:3000` | `metadataBase`, 절대 URL 이 필요한 곳. OAuth `redirectTo`·토스 `successUrl` 은 `window.location.origin` 을 쓴다(프리뷰 배포 호환) |
 | `CRON_SECRET` | 비밀 | 임의 생성 | 다음 슬라이스 — `expire_checkout_sessions()`·reconcile(§7.5)·`purge_checkout_pii()` 크론·캠페인 스케줄러 |
 | `ADMIN_PASSWORD` | 비밀 | 임의 생성 | 다음 슬라이스(선택) — 관리자 부트스트랩 Basic Auth 이중 잠금. **단독 인증이 아니다**: `app_role()='admin'` 세션 게이트 위에 얹는 이중 잠금일 뿐이며, 구현 시 `updateSession` 을 먼저 호출한 뒤 검사(glo `proxy.ts` 는 `/admin` 에서 세션 갱신을 건너뛴다 — 복사 금지)·`crypto.timingSafeEqual` 비교·실패 로깅·Preview 는 별도 값 또는 비활성. |
 
@@ -199,6 +199,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 - 파트너 계정은 이메일/비밀번호(Supabase email provider) + `profiles.role in ('seller','brand','admin')`. 승격은 관리자 서버 액션(0001 헤더).
 - 슬라이스 1 에서는 `lib/auth.ts` 에 `getRole(user)`(`app_role()` RPC 호출) 만 두고 화면·게이트는 없다. `/brand`, `/influencer`, `/admin` 경로 예약(404).
 - 고객 경로는 `profiles.role` 을 보지 않는다 — 파트너 계정도 구매 가능.
+- `profiles.role` 은 파트너 판정에만 쓴다 — 고객 집계(주문 · 고객 수)는 `customers` 행 기준이고, 파트너 계정은 `customers` 행을 만들지 않는다(`docs/inf-console-plan.md §4.2`).
 
 ---
 
@@ -535,6 +536,8 @@ Shipping 타입(`{ recipient, phone, postcode, address1, address2?, memo? }`)은
 | **F 내 주문·계정** | `src/app/account/{layout.tsx}`, `src/app/account/orders/**`, `src/lib/{orders-server,order-status,carriers}.ts`, `src/components/orders/*`, `src/components/cs-modal.tsx` | 로그인 고객의 주문 목록에 상품명(`order_name`)·옵션·브랜드·상태 칩·파생 배송 문구, SETTLED 캠페인 주문도 이름이 비지 않음(service 조인). `CANCELED` 주문(조정 큐)도 고객에게는 `환불 완료` 칩. 환불 버튼 조건(PAID·비SETTLED·미발송)만 노출, 클릭 → 사유 선택(단순 변심/상품 하자/오배송/기타 + 200자) → `/api/payments/cancel` → 새로고침 후 `환불 완료`. 타인 주문 코드 URL → 404. 미로그인 → 로그인 카드. |
 | **G DB 적용·타입·시드 보강** | `supabase/migrations/0008_app_checkout.sql`(적용·필요 시 수정), `supabase/seed.sql`(보강 절 추가만), `web/src/lib/database.types.ts`, `docs/data-model.md`(0008 반영 절) | 사전: `supabase login` + `supabase link --project-ref ocxppeuoiysnkwwujvko`(§13). `supabase db push` 성공(클라우드 `sellery`). `set role anon` 스모크: `select campaign_card('c1')->'product'->'options'` 가 비어 있지 않음, `select * from checkout_sessions` permission denied, `select app_confirm_checkout(...)`·`app_claim_checkout(...)`·`app_refund_record(...)` permission denied, `public_stats()` 반환. `authenticated` 로 `orders.order_name` select 가능, `orders.shipping` 은 permission denied. service role 로 `app_confirm_checkout` 에 `totalAmount` 가 다른 payment 를 넣으면 `PAYMENT_MISMATCH`, `end_date` 지난 LIVE 캠페인 세션이면 `NOT_LIVE`. `expire_checkout_sessions()` 가 payment_key 있는 CONFIRMING 을 건드리지 않음. 시드에 **오늘 기준 LIVE 캠페인 1건 이상**(start ≤ today ≤ end, 재고 여유)이 있도록 보강 절 추가(날짜 상대식 `current_date`). 스텁 커밋 0 의 `Database = any` 를 `npm run gen:types` 산출로 교체해 커밋하고 **전체 `typecheck` 를 다시 통과**. |
 | **H CI · Vercel · 문서** | `.github/workflows/web-ci.yml`, `web/DEPLOY.md`, `web/README.md`, `web/AGENTS.md`(확인), 루트 `README.md`(web 링크 한 줄), `CONTRIBUTING.md`(web 절) | PR 에서 CI 가 `web/` 기준 `npm ci → typecheck → lint → build` 를 돌리고(빌드용 더미 env: `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=ci`, `NEXT_PUBLIC_TOSS_CLIENT_KEY=test_gck_ci`, `NEXT_PUBLIC_SITE_URL=http://localhost:3000`), 통과. 브랜치 보호 required check 에 `web-ci` job 이름을 추가(기존 `ci.yml` 은 job 이름을 보호 규칙에 묶어 둠 — §13). `web/DEPLOY.md` 에 §13 체크리스트·Vercel 설정(Root Directory `web`, "Include files outside root" off, Deployment Protection, env 표)·도메인 이전 절차 기재. |
+| **I 인플루언서 콘솔** (`docs/inf-console-plan.md`) | `src/app/(partner)/influencer/**`, `src/lib/partner/seller.ts`, `src/lib/partner/sample.ts`, `src/lib/partner-payment-sync.ts`, `src/app/api/partner/**`, `web/scripts/{approve-partner,dev-seller}.mjs` | 단계별 완료 기준은 `docs/inf-console-plan.md §7` (1단계: `inf.sellery.life` 셸 · 308 루프 없음 · 회전 쿠키 · `/auth/*` 리라이트 제외 · 고객 회귀 없음). 공유 파일(`proxy.ts`, `lib/hosts.ts`, `(customer)/` 이동, `(partner)/layout.tsx`, `partner-shell.tsx`, `money.ts`, 0010/0011)은 1단계 PR 에서 먼저 병합하고 이후 변경은 공동 리뷰 |
+| **J 브랜드 콘솔** (다음) | `src/app/(partner)/brand/**`, `src/lib/partner/brand.ts` | `docs/inf-console-plan.md §9` — 같은 `(partner)/layout.tsx` 셸 · `hosts.ts` 표에 `NEXT_PUBLIC_BRAND_HOST` 한 줄 |
 
 공통 규칙: 자기 파티션 밖 파일은 만들지도 고치지도 않는다. 공유 계약(§10.0) 변경은 소유자가 하고 PR 설명에 적는다. `web/src/lib/database.types.ts` 는 G 만 만진다(다른 파티션은 G 가 올릴 때까지 `Database = any` 임시 타입 파일을 **자기 디렉터리에 두지 말고** 스텁 커밋 0 의 G 스텁(`export type Database = any`)을 쓴다).
 
@@ -606,11 +609,11 @@ Shipping 타입(`{ recipient, phone, postcode, address1, address2?, memo? }`)은
 
 - [ ] **토스페이먼츠**: 개발자센터에서 상점 `NHN_shingoonk` 의 **결제위젯 연동 키** 테스트 짝(`test_gck_…`/`test_gsk_…`)을 `web/.env.local` 과 Vercel(Preview) 에, 라이브 짝(`live_gck_…`/`live_gsk_…`)은 실판매 직전 Vercel(Production) 에 입력. 코드에 넣지 않는다.
 - [ ] **토스 위젯 설정**: 상점 관리자 → 결제위젯 → 결제수단에서 **가상계좌·계좌이체 비활성화**(카드·간편결제만). **위젯 UI 변형 이름 2개(결제수단·약관)를 확인해 알려주기** — glo 는 `DEFAULT-2` / `AGREEMENT`(`DEFAULT` 로는 위젯이 뜨지 않거나 다른 UI). 결제수단 값은 `NEXT_PUBLIC_TOSS_WIDGET_VARIANT` 에 입력.
-- [ ] **토스 웹훅 URL 등록**: 테스트 상점·라이브 상점 각각 `https://sellery.co.kr/api/payments/webhook`(도메인 이전 전에는 `https://sellery-app.vercel.app/api/payments/webhook`) — 이벤트 `PAYMENT_STATUS_CHANGED`(+ `DEPOSIT_CALLBACK` 는 무관하나 켜 두어도 무해). 웹훅은 서명이 없는 공개 엔드포인트다 — Vercel WAF(또는 upstash ratelimit)로 `/api/payments/webhook` 에 IP 기준 레이트리밋(예: 분당 60) 을 건다.
+- [ ] **토스 웹훅 URL 등록**: 테스트 상점·라이브 상점 각각 `https://sellery.life/api/payments/webhook`(도메인 이전 전에는 `https://sellery-app.vercel.app/api/payments/webhook`) — 이벤트 `PAYMENT_STATUS_CHANGED`(+ `DEPOSIT_CALLBACK` 는 무관하나 켜 두어도 무해). 웹훅은 서명이 없는 공개 엔드포인트다 — Vercel WAF(또는 upstash ratelimit)로 `/api/payments/webhook` 에 IP 기준 레이트리밋(예: 분당 60) 을 건다.
 - [ ] **토스 운영 규칙**: 콘솔에서 **부분취소를 하지 않는다**(슬라이스 1 은 전액 취소만 정식 지원 — 부분취소는 `payment_events handled=false` 큐로 남아 수동 정산 조정). 정산 완료 캠페인·샘플 주문의 콘솔 취소도 같은 큐로 간다.
 - [ ] **Supabase CLI 링크**: 개발 PC 에서 `supabase login`(access token) 후 저장소 루트에서 `supabase link --project-ref ocxppeuoiysnkwwujvko`(DB 비밀번호 필요) — G 가 `db push`/`gen:types --linked` 전에 완료돼야 한다.
 - [ ] **카카오 개발자 앱**: 카카오 로그인 활성화, Redirect URI 에 `https://ocxppeuoiysnkwwujvko.supabase.co/auth/v1/callback` 등록, 동의 항목(닉네임·이메일) 설정, REST API 키·Client Secret 발급. **이메일을 필수 동의로 받으려면 비즈 앱 전환이 필요** — 전환 여부 결정(미전환이면 선택 동의 → `user.email` null 허용, 앱은 이미 optional 로 다룬다 §4.1).
-- [ ] **Supabase Auth**: Authentication → Providers → Kakao 에 위 키 입력. URL Configuration → Site URL `https://sellery.co.kr`, Redirect URLs 에 `https://sellery.co.kr/**`, `https://sellery-app.vercel.app/**`, `https://*-<vercel-team>.vercel.app/**`, `http://localhost:3000/**`.
+- [ ] **Supabase Auth**: Authentication → Providers → Kakao 에 위 키 입력. URL Configuration → Site URL `https://sellery.life`, Redirect URLs 에 `https://sellery.life/**`, `https://sellery-app.vercel.app/**`, `https://*-<vercel-team>.vercel.app/**`, `http://localhost:3000/**`.
 - [ ] **Supabase 키**: Project Settings → API 의 URL·anon·service_role 을 `.env.local` 과 Vercel 에 입력(service_role 은 서버 전용 표시).
 - [ ] **Vercel 프로젝트 `sellery-app` 생성**: 같은 GitHub 저장소 연결, **Root Directory `web`**, Framework Next.js, "Include source files outside of the Root Directory" **off**, 환경변수 표(§3) Production + Preview 모두 입력, 리전은 `vercel.json`(icn1). **Deployment Protection**: Preview 는 Off 또는 "Protection Bypass for Automation" 토큰 — 기본값(켜짐)이면 토스 `successUrl` 복귀·웹훅·카카오 콜백이 인증 페이지에 막혀 Preview 결제 테스트가 안 된다.
 - [ ] **브랜치 보호**: `main` 의 required status check 에 새 `web-ci` job 이름 추가(기존 `ci.yml` 은 job 이름이 보호 규칙에 묶여 있다).
@@ -618,5 +621,5 @@ Shipping 타입(`{ recipient, phone, postcode, address1, address2?, memo? }`)은
 - [x] **사업자 정보 확정** — 2026-09-17 반영(`web/src/lib/company.ts`): 대표 강신욱 · 사업자등록번호 517-86-00666 · 통신판매업신고번호 제2022-서울강남-00726호 · 주소 서울시 성동구 왕십리로 38(홍성빌딩), 3층 · 고객센터 = 이메일 `official@weglow.biz`(채널톡 등 별도 채널은 두지 않기로 — 사용자 결정). 전자상거래법상 모든 페이지 푸터에 필요.
 - [x] **이용약관·개인정보처리방침** — 2026-09-17 `/terms` · `/privacy` 게시(본문 `web/src/content/legal/{terms,privacy}.ts`, 렌더 `components/legal-doc.tsx`). §5.1 표 반영. 푸터·로그인 안내·체크아웃 확인 체크박스(제3자 제공 동의 → `/privacy#third-party`)가 링크한다. 사업자 확정값 반영(통신판매업신고번호 제2022-서울강남-00726호 · 보호책임자 이준호 · 고객센터 = 이메일). 사용자 결정(2026-09-17)으로 국외 이전 상대 연락처·로그 보존일, 결제대금예치·피해보상보험 언급, 관할법원 지정은 넣지 않았다. 오픈 전 법률 검토.
 - [ ] **다음 우편번호 API** 사용 승인(외부 스크립트 `t1.daumcdn.net`) — CSP 를 두면 허용 목록에 추가.
-- [ ] **도메인 이전 시점 결정**: `sellery.co.kr` 을 프로토타입(`sellery`)에서 앱(`sellery-app`)으로 옮길 때 프로토타입은 `demo.sellery.co.kr` 같은 서브도메인으로 유지할지.
+- [ ] **도메인 이전 시점 결정**: `sellery.life` 을 프로토타입(`sellery`)에서 앱(`sellery-app`)으로 옮길 때 프로토타입은 `demo.sellery.life` 같은 서브도메인으로 유지할지.
 - [ ] **열린 결정 확인**(기본값으로 진행 중): 발송 후 고객 셀프 환불 불가(§0-8) · 홈 "보는 중" 의사난수 유지 · 홈 `최저가` 문구 유지(브랜드 약정은 파트너 슬라이스) · 환불 사유 선택 입력 추가(단순 변심/상품 하자/오배송/기타).

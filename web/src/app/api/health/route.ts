@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isTossError, tossGetPayment } from "@/lib/toss";
+import { consoleHostOf, hostsMode } from "@/lib/hosts";
 
 /**
  * GET /api/health — 배포 뒤 서버 설정 점검 (web/DEPLOY.md §8). 소유: E.
@@ -10,6 +11,7 @@ import { isTossError, tossGetPayment } from "@/lib/toss";
  *   - toss: 시크릿 키로 존재하지 않는 결제 1건 조회 → 맞는 키면 404 NOT_FOUND_PAYMENT → ok,
  *           틀린 키면 401 UNAUTHORIZED_KEY · 미설정이면 CONFIG_ERROR → fail
  * 전부 ok 면 200, 하나라도 fail 이면 503. 원인은 Vercel Logs 에만 남긴다(공개 엔드포인트).
+ * `hosts` 는 콘솔 호스트 설정 상태(docs/inf-console-plan.md §3.1-4): `{ inf, brand, mode: 'host'|'path' }` — 비밀 없음.
  */
 export const dynamic = "force-dynamic";
 
@@ -37,5 +39,6 @@ export async function GET() {
   }
 
   const ok = checks.supabaseAdmin === "ok" && checks.toss === "ok";
-  return NextResponse.json({ ok, checks }, { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } });
+  const hosts = { inf: consoleHostOf("seller"), brand: consoleHostOf("brand"), mode: hostsMode() };
+  return NextResponse.json({ ok, checks, hosts }, { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } });
 }

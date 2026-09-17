@@ -4,8 +4,8 @@
 
 | Vercel 프로젝트 | 내용 | Root Directory | 주소 |
 |---|---|---|---|
-| `sellery` (기존) | 프로토타입 — 저장소 루트를 빌드 없이 서빙(`vercel.json` framework null, `.vercelignore` 가 `web` 제외) | `/` | https://sellery-swart.vercel.app/ → 도메인 이전 후 `demo.sellery.co.kr`(§6) |
-| `sellery-app` (신규) | 이 앱 | `web` | `https://sellery-app.vercel.app` → 준비되면 `https://sellery.co.kr`(§6) |
+| `sellery` (기존) | 프로토타입 — 저장소 루트를 빌드 없이 서빙(`vercel.json` framework null, `.vercelignore` 가 `web` 제외) | `/` | https://sellery-swart.vercel.app/ → 도메인 이전 후 `demo.sellery.life`(§6) |
+| `sellery-app` (신규) | 이 앱 | `web` | `https://sellery-app.vercel.app` → 준비되면 `https://sellery.life`(§6) |
 
 같은 GitHub 저장소(`weglow-dev/sellery`)에 두 프로젝트를 연결한다. `main` 병합 = 두 프로젝트 모두 Production 배포, PR = Preview. 값(키)은 이 문서·코드·PR 어디에도 쓰지 않는다 — `web/.env.local`(gitignored) 과 Vercel 환경변수에만.
 
@@ -27,6 +27,7 @@ Vercel → team `weglow-team` → Add New Project → 저장소 `weglow-dev/sell
 | Cron Jobs | 없음 | 슬라이스 1 은 크론 없음. reconcile · 만료 · PII 파기는 수동 호출(§4.3). 슬라이스 4 에서 `vercel.json` `crons` 로 |
 | **Deployment Protection** | Preview: **Off** 또는 "Protection Bypass for Automation" 토큰 발급 | 기본값(Vercel Authentication 켜짐)이면 토스 `successUrl` 복귀 · 웹훅 · 카카오 콜백이 인증 페이지에 막혀 **Preview 에서 결제 테스트가 안 된다**. Production 은 켜지 않는다(공개 서비스) |
 | Git → Production Branch | `main` | |
+| **Domains** | `sellery.life` — 고객(apex 이전 §6) · `inf.sellery.life` — 인플루언서 콘솔(`docs/inf-console-plan.md §3.1`) · 프로토타입은 `sellery` 프로젝트의 `demo.sellery.life` 예정(§6) | 콘솔은 같은 프로젝트의 두 번째 도메인 — `src/proxy.ts` 가 Host 를 보고 `/influencer/*` 로 리라이트(`NEXT_PUBLIC_INF_HOST` 필요, §2). 브랜드 콘솔은 나중에 `brand.sellery.life` |
 
 Preview 의 결제 테스트는 브랜치 고정 도메인(`sellery-app-git-<branch>-<team>.vercel.app`) 을 쓰면 Supabase Redirect URL(§3.1)·토스 웹훅 URL 을 매번 바꾸지 않아도 된다.
 
@@ -42,9 +43,11 @@ Preview 의 결제 테스트는 브랜치 고정 도메인(`sellery-app-git-<bra
 | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 공개 | `live_gck_…` (실판매 직전) | `test_gck_…` | 토스 개발자센터 → 내 개발정보 → 상점 → **결제위젯 연동 키** → 클라이언트 키 |
 | `TOSS_SECRET_KEY` | **비밀(서버)** | `live_gsk_…` | `test_gsk_…` | 같은 화면 → 시크릿 키. **반드시 위 클라이언트 키와 짝**(gck ↔ gsk). API 개별연동 키(`ck_/sk_`)를 섞으면 위젯이 안 뜨거나 승인 실패 |
 | `NEXT_PUBLIC_TOSS_WIDGET_VARIANT` | 공개 | 상점관리자에서 확인한 결제수단 UI 변형 이름 | 같음 | 비우면 `DEFAULT-2`. 약관은 코드에서 `AGREEMENT` 고정(§3.3) |
-| `NEXT_PUBLIC_SITE_URL` | 공개 | `https://sellery.co.kr` (이전 전에는 `https://sellery-app.vercel.app`) | `https://sellery-app.vercel.app` | `metadataBase` · 절대 URL. OAuth `redirectTo`·토스 `successUrl` 은 `window.location.origin` 을 써서 Preview 마다 바꿀 필요 없다 |
+| `NEXT_PUBLIC_SITE_URL` | 공개 | `https://sellery.life` (이전 전에는 `https://sellery-app.vercel.app`) | `https://sellery-app.vercel.app` | `metadataBase` · 절대 URL. OAuth `redirectTo`·토스 `successUrl` 은 `window.location.origin` 을 써서 Preview 마다 바꿀 필요 없다 |
 | `CRON_SECRET` | 비밀 | 임의 생성 (`openssl rand -hex 32`) | 별도 값 | `/api/cron/reconcile` 수동 호출용 `Authorization: Bearer …`. 슬라이스 1 은 크론 없음(§4.3) |
 | `ADMIN_PASSWORD` | 비밀 | (다음 슬라이스) | — | 관리자 Basic Auth 이중 잠금 — 단독 인증이 아니다(§3 표 주석). 지금은 넣지 않는다 |
+| `NEXT_PUBLIC_INF_HOST` | 공개 | `inf.sellery.life` | **넣지 않음** (경로 모드 — Preview 는 `/influencer/...` 로 직접 연다) | 콘솔 호스트 리라이트 표(`src/lib/hosts.ts`, `docs/inf-console-plan.md §2.3`). 값은 host 만(스킴 없이). 비우면 경로 모드. 로컬 호스트 모드는 `.env.local` `inf.localhost:3000`. **Production 에 넣은 뒤 Redeploy**(`NEXT_PUBLIC_*` 는 빌드 시 인라인 — Redeploy 전에는 proxy·layout 이 경로 모드로 남아 확인이 실패한다, `docs/inf-console-plan.md §3.1` 4행) → `/api/health` 의 `hosts.mode` 가 `host` 인지 확인 |
+| `NEXT_PUBLIC_BRAND_HOST` | 공개 | (브랜드 콘솔 때) `brand.sellery.life` | 넣지 않음 | 같은 표의 두 번째 행 — 지금은 넣지 않는다 |
 
 앱 환경변수가 **아닌** 것(대시보드에만 입력): 카카오 REST API 키 · Client Secret → Supabase Authentication → Providers → Kakao (§3.2).
 
@@ -56,8 +59,8 @@ CI 는 이 값들 없이 더미(`.github/workflows/web-ci.yml` 의 `env`)로 빌
 
 - **Authentication → Providers → Kakao**: Enabled, Client ID = 카카오 REST API 키, Client Secret = 카카오 Client Secret(§3.2). 콜백 URL 은 Supabase 가 보여 주는 `https://ocxppeuoiysnkwwujvko.supabase.co/auth/v1/callback`.
 - **Authentication → URL Configuration**:
-  - Site URL: `https://sellery.co.kr` (이전 전에는 `https://sellery-app.vercel.app`)
-  - Redirect URLs (전부 추가): `https://sellery.co.kr/**` · `https://sellery-app.vercel.app/**` · `https://*-<vercel-team>.vercel.app/**`(Preview) · `http://localhost:3000/**`
+  - Site URL: `https://sellery.life` (이전 전에는 `https://sellery-app.vercel.app`)
+  - Redirect URLs (전부 추가): `https://sellery.life/**` · `https://sellery-app.vercel.app/**` · `https://*-<vercel-team>.vercel.app/**`(Preview) · `http://localhost:3000/**`
   - 여기 없는 `redirectTo` 는 Site URL 로 떨어져 `next` 를 잃는다 — Preview 브랜치 도메인도 와일드카드로 포함시킬 것.
 - **키**: Settings → API 의 URL · anon · service_role 을 §2 표대로. service_role 은 서버 전용.
 - 스키마·권한: §4.
@@ -77,7 +80,7 @@ CI 는 이 값들 없이 더미(`.github/workflows/web-ci.yml` 의 `env`)로 빌
   | 시점 | 웹훅 URL |
   |---|---|
   | 도메인 이전 전 | `https://sellery-app.vercel.app/api/payments/webhook` |
-  | 도메인 이전 후 | `https://sellery.co.kr/api/payments/webhook` |
+  | 도메인 이전 후 | `https://sellery.life/api/payments/webhook` |
   | 로컬 테스트 | 터널 URL + `/api/payments/webhook` (`docs/app-plan.md §11.4`) |
 
   이벤트 `PAYMENT_STATUS_CHANGED` (+ `DEPOSIT_CALLBACK` 은 무관하나 켜 두어도 무해). 웹훅은 **서명이 없는 공개 엔드포인트**다 — 앱은 본문을 믿지 않고 `paymentKey` 재조회로만 상태를 바꾸며(§7.3), 그 위에 **Vercel Firewall(Custom Rules → Rate Limit) 로 `/api/payments/webhook` 에 IP 기준 레이트리밋(예: 분당 60)** 을 건다(플랜에 없으면 upstash ratelimit 을 라우트 앞에 — 다음 슬라이스). 콘솔의 "웹훅 테스트 전송" 으로 등록을 확인한다.
@@ -127,23 +130,23 @@ cd web && npm run gen:types                                 # src/lib/database.t
 - **브랜치 보호(`main`) → Require status checks** 에 `web-ci` 를 **추가**한다(`프로토타입 점검` 과 둘 다). job `name` 을 바꾸면 보호 규칙도 같이 바꿀 것.
 - Vercel GitHub 연동이 되면 PR 마다 `sellery`(프로토타입) · `sellery-app`(앱) Preview 댓글이 각각 달린다.
 
-## 6. 도메인 이전 절차 (`sellery.co.kr`: 프로토타입 → 앱)
+## 6. 도메인 이전 절차 (`sellery.life`: 프로토타입 → 앱)
 
 앱이 준비되면(§7 체크리스트 완료 + Preview 에서 §11.2/§11.3 시나리오 통과) 정식 도메인을 `sellery` 프로젝트에서 `sellery-app` 으로 옮긴다. 프로토타입은 지우지 않고 서브도메인으로 유지한다(제안서 데모 · 이해관계자 시연용).
 
-1. **결정**: 프로토타입 주소를 `demo.sellery.co.kr` 로 할지 확정(§13 열린 결정). 이전 시각은 트래픽이 적은 시간으로.
+1. **결정**: 프로토타입 주소를 `demo.sellery.life` 로 할지 확정(§13 열린 결정). 이전 시각은 트래픽이 적은 시간으로.
 2. **사전 준비 (이전 전날까지)**
-   - Vercel `sellery-app` Production 환경변수에 **라이브 토스 키 짝** · `NEXT_PUBLIC_SITE_URL=https://sellery.co.kr` 입력 → 재배포.
-   - Supabase URL Configuration: Site URL 을 `https://sellery.co.kr` 로, Redirect URLs 에 `https://sellery.co.kr/**` 가 있는지(§3.1). 카카오 Redirect URI 는 Supabase 콜백이라 변경 없음.
-   - 토스 라이브 상점 웹훅 URL 을 `https://sellery.co.kr/api/payments/webhook` 으로 **미리 추가**(테스트 상점은 그대로 둔다).
+   - Vercel `sellery-app` Production 환경변수에 **라이브 토스 키 짝** · `NEXT_PUBLIC_SITE_URL=https://sellery.life` 입력 → 재배포.
+   - Supabase URL Configuration: Site URL 을 `https://sellery.life` 로, Redirect URLs 에 `https://sellery.life/**` 가 있는지(§3.1). 카카오 Redirect URI 는 Supabase 콜백이라 변경 없음.
+   - 토스 라이브 상점 웹훅 URL 을 `https://sellery.life/api/payments/webhook` 으로 **미리 추가**(테스트 상점은 그대로 둔다).
    - `web/next.config.ts` 의 `redirects()` 에 프로토타입 경로 리다이렉트 추가(A 파티션 파일): `/index.html` → `/`, `/login.html` → `/login`. 해시 라우트(`/#s/c1`, `/#customer`)는 서버가 볼 수 없어 리다이렉트 불가 — 제안서 · SNS 에 뿌린 `/#s/{code}` 링크가 있으면 홈에서 안내(다음 슬라이스).
-   - 프로토타입 저장소 안내 링크(루트 `README.md` · `CONTRIBUTING.md` 의 데모 주소)를 `demo.sellery.co.kr` 기준으로 바꿀 PR 준비.
+   - 프로토타입 저장소 안내 링크(루트 `README.md` · `CONTRIBUTING.md` 의 데모 주소)를 `demo.sellery.life` 기준으로 바꿀 PR 준비.
 3. **이전 (Vercel 대시보드)**
-   - `sellery` 프로젝트 → Settings → Domains 에서 `sellery.co.kr`(과 `www`) **제거** → `sellery-app` → Domains 에 **추가**. 같은 팀 안에서는 Vercel 이 DNS 검증 없이 넘겨 준다. DNS 가 Vercel 네임서버가 아니면(등록기관 관리) Vercel 이 안내하는 A/CNAME 레코드가 그대로인지 확인 — 보통 레코드는 바뀌지 않는다.
-   - `sellery` 프로젝트에 `demo.sellery.co.kr` 추가 → DNS 에 CNAME `cname.vercel-dns.com` 추가.
-   - `www.sellery.co.kr` → `sellery.co.kr` 리다이렉트는 Vercel Domains 설정에서.
-4. **확인 (5분 안에)**: `curl -sI https://sellery.co.kr/` 200 · `https://sellery.co.kr/s/<handle>/<code>` 200 · `https://sellery.co.kr/c/<code>` 308 · `/login` 에서 카카오 로그인 왕복 · 토스 라이브 키로 **소액 실결제 1건 후 즉시 취소**(내 주문에서 환불 → 카드사 취소 확인) · 토스 콘솔 "웹훅 테스트 전송" 200 · `robots.txt` 에 `/api` `/checkout` `/account` disallow.
-5. **사후**: 준비한 README/CONTRIBUTING PR 병합 · 제안서 · 카카오 채널 · 인플루언서에게 알린 링크 형식은 `https://sellery.co.kr/s/{handle}/{code}`(`@` 없는 핸들) · 토스 테스트 상점 웹훅은 그대로 Preview/로컬용.
+   - `sellery` 프로젝트 → Settings → Domains 에서 `sellery.life`(과 `www`) **제거** → `sellery-app` → Domains 에 **추가**. 같은 팀 안에서는 Vercel 이 DNS 검증 없이 넘겨 준다. DNS 가 Vercel 네임서버가 아니면(등록기관 관리) Vercel 이 안내하는 A/CNAME 레코드가 그대로인지 확인 — 보통 레코드는 바뀌지 않는다.
+   - `sellery` 프로젝트에 `demo.sellery.life` 추가 → DNS 에 CNAME `cname.vercel-dns.com` 추가.
+   - `www.sellery.life` → `sellery.life` 리다이렉트는 Vercel Domains 설정에서.
+4. **확인 (5분 안에)**: `curl -sI https://sellery.life/` 200 · `https://sellery.life/s/<handle>/<code>` 200 · `https://sellery.life/c/<code>` 308 · `/login` 에서 카카오 로그인 왕복 · 토스 라이브 키로 **소액 실결제 1건 후 즉시 취소**(내 주문에서 환불 → 카드사 취소 확인) · 토스 콘솔 "웹훅 테스트 전송" 200 · `robots.txt` 에 `/api` `/checkout` `/account` disallow.
+5. **사후**: 준비한 README/CONTRIBUTING PR 병합 · 제안서 · 카카오 채널 · 인플루언서에게 알린 링크 형식은 `https://sellery.life/s/{handle}/{code}`(`@` 없는 핸들) · 토스 테스트 상점 웹훅은 그대로 Preview/로컬용.
 6. **롤백**: 도메인을 다시 `sellery` 프로젝트로 옮기면 즉시 프로토타입으로 돌아간다(두 프로젝트 모두 살아 있다). 앱 자체 문제는 Vercel Deployments → 이전 배포 "Promote to Production"(Instant Rollback). DB 마이그레이션은 forward-only — 되돌리려면 새 마이그레이션.
 
 ## 7. 배포 전 체크리스트 (`docs/app-plan.md §13` — 사용자가 해야 할 것)
@@ -162,7 +165,7 @@ cd web && npm run gen:types                                 # src/lib/database.t
 - [x] **사업자 정보 확정** — 2026-09-17 반영(`web/src/lib/company.ts`): 대표 강신욱 · 사업자등록번호 517-86-00666 · 통신판매업신고번호 제2022-서울강남-00726호 · 주소 서울시 성동구 왕십리로 38(홍성빌딩), 3층 · 고객센터 = 이메일 `official@weglow.biz`(채널톡 등 별도 채널은 두지 않기로 — 사용자 결정). 전자상거래법상 모든 페이지 푸터에 필요.
 - [ ] **이용약관 · 개인정보처리방침** 문서 유무 결정 — 없으면 체크아웃은 토스 위젯 내장 약관 + 통신판매중개자 확인 체크만. 개인정보처리방침에 `docs/app-plan.md §5.1` 보존 · 파기표(미결제 세션 30일 · 거래기록 5년 · 결제 이벤트 로그 1년) 반영.
 - [ ] **다음 우편번호 API** 외부 스크립트 승인(CSP 허용 목록).
-- [ ] **도메인 이전 시점 결정** + 프로토타입 서브도메인(`demo.sellery.co.kr`) 여부 → §6.
+- [ ] **도메인 이전 시점 결정** + 프로토타입 서브도메인(`demo.sellery.life`) 여부 → §6.
 - [ ] **열린 결정 확인**(기본값으로 진행 중): 발송 후 고객 셀프 환불 불가 · 홈 "보는 중" 의사난수 유지 · 홈 `최저가` 문구 유지 · 환불 사유 선택(단순 변심/상품 하자/오배송/기타).
 
 ## 8. 배포 후 확인 (Production · Preview 공통)

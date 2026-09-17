@@ -8,7 +8,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { StatusChip } from "@/components/status-chip";
 import { CsModalButton } from "@/components/cs-modal";
-import { RefundButton } from "@/app/account/orders/[code]/refund-button";
+import { RefundButton } from "@/app/(customer)/account/orders/[code]/refund-button";
 import { md } from "@/lib/dates";
 import { isRefundable, orderStatusLabel, shipLabel, won } from "@/lib/order-status";
 import type { MyOrder } from "@/lib/orders-server";

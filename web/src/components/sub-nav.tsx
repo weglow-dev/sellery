@@ -8,7 +8,7 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignOutButton } from "@/app/account/sign-out-button";
+import { SignOutButton } from "@/app/(customer)/account/sign-out-button";
 import { KAKAO_ICON } from "@/components/icons";
 
 export type NavUser = { name: string } | null;

@@ -60,16 +60,19 @@ web/
 ├─ public/favicon.svg                                                                                     A
 ├─ scripts/gen-types.mjs (`npm run gen:types` — G 의 타입 산출용) · scripts/dev-user.mjs (B, 개발용 계정)
 └─ src/
-   ├─ proxy.ts                         updateSession + 링크 유입 쿠키 slry_linkctx (§8)                  B
-   ├─ app/
-   │  ├─ layout.tsx · globals.css · not-found.tsx · robots.ts                                             A
-   │  ├─ page.tsx · s/[handle]/[code]/ · c/[code]/                                                        C
-   │  ├─ login/ · auth/callback/ · auth/signout/ · api/me/ · account/sign-out-button.tsx                  B
-   │  ├─ checkout/ (page · checkout-client · success · fail)                                              D
-   │  ├─ account/layout.tsx · account/orders/                                                             F
+   ├─ proxy.ts                         updateSession + 링크 유입 쿠키 slry_linkctx (§8) + 콘솔 호스트 리라이트·세션 게이트 (inf-console-plan §3.2)   B
+   ├─ app/                             root layout 둘 — (customer)/layout.tsx 고객 · (partner)/layout.tsx 콘솔. 최상위 layout.tsx 없음
+   │  ├─ globals.css · fonts.ts · global-not-found.tsx · robots.ts                                        A
+   │  ├─ (customer)/  layout.tsx · not-found.tsx · [...rest]/ — 고객 라우트는 전부 이 그룹 안 (URL 불변)      A
+   │  │  ├─ (customer)/page.tsx · (customer)/s/[handle]/[code]/ · (customer)/c/[code]/                   C
+   │  │  ├─ (customer)/login/ · (customer)/account/sign-out-button.tsx                                   B
+   │  │  ├─ (customer)/checkout/ (page · checkout-client · success · fail)                               D
+   │  │  └─ (customer)/account/layout.tsx · (customer)/account/orders/                                   F
+   │  ├─ (partner)/   layout.tsx · partner-shell.tsx · console-tabs.tsx · influencer/** (inf.sellery.life 리라이트 착지 · docs/inf-console-plan.md)   I
+   │  ├─ auth/callback/ · auth/signout/ · api/me/  (app/ 직속 — 어느 호스트에서도 같은 경로, 리라이트 제외)      B
    │  └─ api/checkout/ · api/payments/{confirm,cancel,webhook}/ · api/cron/reconcile/                    E
    ├─ lib/
-   │  ├─ supabase/{client,server,middleware,admin}.ts · auth.ts · customers.ts · linkctx.ts               B
+   │  ├─ supabase/{client,server,middleware,admin}.ts · auth.ts · customers.ts · linkctx.ts · hosts.ts    B
    │  ├─ campaign.ts · campaign-server.ts · dates.ts · types.ts                                           C
    │  ├─ toss.ts · money.ts · text.ts                                                                     E
    │  ├─ orders-server.ts · order-status.ts · carriers.ts                                                 F
