@@ -77,7 +77,7 @@ export function CsModal({ open, onClose, productName, thumbUrl, emoji, brandName
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}
           >
-            💬 고객센터 채널톡
+            ✉️ {COMPANY.csLabel}
           </a>
         </>
       }
@@ -103,7 +103,7 @@ export function CsModal({ open, onClose, productName, thumbUrl, emoji, brandName
         <div style={{ fontSize: 13 }}>{CS_TYPES.join(" / ")}</div>
       </div>
       <p style={{ fontSize: 12.5 }}>
-        문의 접수는 셀러리 고객센터(채널톡)에서 받고 있어요 — 인플루언서 DM이 아닌 셀러리로 접수해주세요. 메일:{" "}
+        문의 접수는 셀러리 고객센터(이메일)에서 받고 있어요 — 인플루언서 DM이 아닌 셀러리로 접수해주세요. 메일:{" "}
         <a href={`mailto:${COMPANY.email}`} style={{ textDecoration: "underline" }}>
           {COMPANY.email}
         </a>

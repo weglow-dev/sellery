@@ -3,7 +3,7 @@ import { COMPANY, warnIfCompanyPending } from "@/lib/company";
 
 /**
  * 전역 푸터 (ux-spec §2.3 — 프로토타입에는 없고 `.store-foot` 한 줄만 있었다):
- *   1행 [원문] 통신판매중개자 고지 · 고객센터 채널톡 · sellery.co.kr
+ *   1행 [원문] 통신판매중개자 고지 · 고객센터(이메일 — 채널톡 없음, 사용자 결정 2026-09-17) · sellery.co.kr
  *   2행 (주)위글로우 사업자 정보 — lib/company.ts (플레이스홀더는 "확인 중" 으로 노출)
  *   3행 이용약관 · 개인정보처리방침 — 문서 URL 이 비어 있으면 링크 대신 텍스트
  * 링크 페이지는 이 위에 페이지 전용 `.store-foot`(브랜드명 · #광고) 가 한 번 더 온다 (C).

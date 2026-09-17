@@ -14,14 +14,12 @@ export const COMPANY = {
   name: "(주)위글로우",
   ceo: "강신욱",
   bizNo: "517-86-00666",
-  /** TODO(§13): 통신판매업신고번호 (제0000-서울○○-0000호) */
-  mailOrderNo: PENDING,
+  mailOrderNo: "제2022-서울강남-00726호",
   address: "서울시 성동구 왕십리로 38(홍성빌딩), 3층",
   email: "official@weglow.biz",
-  /** TODO(§13): 고객센터 채널(채널톡) 링크 — 확정 전에는 메일 링크 */
+  /** 고객센터 = 이메일 (사용자 결정 2026-09-17 — 채널톡 등 별도 채널은 두지 않는다) */
   csUrl: "mailto:official@weglow.biz",
-  /** 고객센터 채널 표시명 (프로토타입 원문 "고객센터 채널톡") */
-  csLabel: "고객센터 채널톡",
+  csLabel: "고객센터",
   /** 표시용 도메인 (프로토타입 원문 "sellery.co.kr") */
   siteHost: "sellery.co.kr",
   /** 이용약관 페이지 (src/app/terms · 본문 src/content/legal/terms.ts) — 비우면 푸터가 링크 대신 텍스트로 렌더 */
@@ -36,9 +34,8 @@ export type Company = typeof COMPANY;
 export function companyPendingFields(): string[] {
   const pending: string[] = [];
   for (const k of ["ceo", "bizNo", "mailOrderNo", "address"] as const) {
-    if (COMPANY[k] === PENDING) pending.push(k);
+    if ((COMPANY[k] as string) === PENDING) pending.push(k); // 확정값이 들어오면 리터럴 타입이 겹치지 않아 string 으로 넓혀 비교
   }
-  if (COMPANY.csUrl.startsWith("mailto:")) pending.push("csUrl");
   if (!COMPANY.termsUrl) pending.push("termsUrl");
   if (!COMPANY.privacyUrl) pending.push("privacyUrl");
   return pending;

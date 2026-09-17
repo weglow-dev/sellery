@@ -5,7 +5,7 @@ import type { LegalDoc } from "@/lib/legal";
  * 사실 근거: docs/app-plan.md §5.1(보존·파기)·§8(링크 유입) · web/DEPLOY.md §3(외부 서비스)·§4.3(수동 파기 잡) ·
  *   web/src/lib/company.ts · web/src/lib/linkctx.ts(쿠키 수명 90일) · web/src/app/api/checkout/route.ts(주문 저장 항목) ·
  *   web/src/app/checkout/checkout-client.tsx(토스 전달 항목) · supabase/migrations/0008_app_checkout.sql(purge_checkout_pii).
- * "[확인 필요]" 표시는 사용자가 확정해야 하는 값이다.
+ * 사업자 확정값(2026-09-17): 통신판매업신고번호 제2022-서울강남-00726호 · 보호책임자 이준호. 국외 이전 상대의 연락처·로그 보존일은 사용자 결정으로 넣지 않는다.
  */
 export const PRIVACY: LegalDoc = {
   slug: "privacy",
@@ -225,7 +225,7 @@ export const PRIVACY: LegalDoc = {
           caption: "국외 이전",
           head: ["항목", "Vercel Inc.", "Supabase, Inc."],
           rows: [
-            ["이전받는 자", "Vercel Inc.(미국) — 연락처 [확인 필요]", "Supabase, Inc.(미국) — 연락처 [확인 필요]"],
+            ["이전받는 자", "Vercel Inc.(미국)", "Supabase, Inc.(미국)"],
             ["이전 국가", "미국", "미국"],
             [
               "이전 항목",
@@ -235,12 +235,12 @@ export const PRIVACY: LegalDoc = {
             [
               "이전 일시·방법",
               "서비스 이용 시 네트워크를 통해 전송",
-              "국내(AWS 서울 리전) 저장, 장애 대응·기술 지원 시 국외에서 조회 가능 [확인 필요]",
+              "국내(AWS 서울 리전) 저장, 장애 대응·기술 지원 시 국외에서 조회 가능",
             ],
             ["이용 목적", "웹 호스팅, 서버 실행, 접속 로그 관리", "데이터베이스·로그인 인증 호스팅"],
             [
               "보유·이용기간",
-              "회사와의 위탁 계약 종료 시까지(접속 로그는 Vercel 로그 보존 기간인 [확인 필요]일 후 자동 삭제)",
+              "회사와의 위탁 계약 종료 시까지",
               "회사와의 위탁 계약 종료 시까지",
             ],
           ],
@@ -341,8 +341,7 @@ export const PRIVACY: LegalDoc = {
         {
           type: "ul",
           items: [
-            "개인정보 보호책임자: 강신욱(대표이사) [확인 필요]",
-            "담당 부서: 셀러리 운영팀 [확인 필요]",
+            "개인정보 보호책임자: 이준호",
             "이메일: [official@weglow.biz](mailto:official@weglow.biz)",
           ],
         },
@@ -389,7 +388,7 @@ export const PRIVACY: LegalDoc = {
     { type: "p", text: "이 방침은 2026년 9월 17일부터 시행한다. (버전 1.0)" },
     {
       type: "p",
-      text: "(주)위글로우 · 대표이사 강신욱 · 사업자등록번호 517-86-00666 · 통신판매업신고번호 확인 중 · 서울시 성동구 왕십리로 38(홍성빌딩), 3층 · [official@weglow.biz](mailto:official@weglow.biz)",
+      text: "(주)위글로우 · 대표이사 강신욱 · 사업자등록번호 517-86-00666 · 통신판매업신고번호 제2022-서울강남-00726호 · 서울시 성동구 왕십리로 38(홍성빌딩), 3층 · [official@weglow.biz](mailto:official@weglow.biz)",
     },
   ],
 };

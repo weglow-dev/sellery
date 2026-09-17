@@ -159,7 +159,7 @@ cd web && npm run gen:types                                 # src/lib/database.t
 - [ ] **Vercel `sellery-app` 생성**: Root Directory `web` · outside-root off · 환경변수 표 · Deployment Protection(Preview off 또는 bypass 토큰) · `icn1`(vercel.json).
 - [ ] **브랜치 보호**: `main` required status check 에 `web-ci` 추가(`프로토타입 점검` 유지).
 - [ ] **0008 적용 확인**: 클라우드에 0001~0008 적용됨(2026-09-15). `docs/data-model.md §10` 검토 — `orders.status='CANCELED'` 를 조정 큐로 쓰는 결정 · hidden 인플루언서 채널 비노출.
-- [ ] **사업자 정보 확정**(`web/src/lib/company.ts` 플레이스홀더 교체): (주)위글로우 대표자 · 사업자등록번호 · 통신판매업신고번호 · 주소 · 고객센터 채널(채널톡) · 이메일(`official@weglow.biz`). 전자상거래법상 모든 페이지 푸터에 필요.
+- [x] **사업자 정보 확정** — 2026-09-17 반영(`web/src/lib/company.ts`): 대표 강신욱 · 사업자등록번호 517-86-00666 · 통신판매업신고번호 제2022-서울강남-00726호 · 주소 서울시 성동구 왕십리로 38(홍성빌딩), 3층 · 고객센터 = 이메일 `official@weglow.biz`(채널톡 등 별도 채널은 두지 않기로 — 사용자 결정). 전자상거래법상 모든 페이지 푸터에 필요.
 - [ ] **이용약관 · 개인정보처리방침** 문서 유무 결정 — 없으면 체크아웃은 토스 위젯 내장 약관 + 통신판매중개자 확인 체크만. 개인정보처리방침에 `docs/app-plan.md §5.1` 보존 · 파기표(미결제 세션 30일 · 거래기록 5년 · 결제 이벤트 로그 1년) 반영.
 - [ ] **다음 우편번호 API** 외부 스크립트 승인(CSP 허용 목록).
 - [ ] **도메인 이전 시점 결정** + 프로토타입 서브도메인(`demo.sellery.co.kr`) 여부 → §6.
