@@ -17,7 +17,7 @@ Vercel → team `weglow-team` → Add New Project → 저장소 `weglow-dev/sell
 | 항목 | 값 | 이유 |
 |---|---|---|
 | Project Name | `sellery-app` | |
-| **Root Directory** | `web` | 모노레포 형태 — 루트에는 `vercel.json` 이 없다(CLI 배포는 `--cwd web`) |
+| **Root Directory** | `web` | 설정 완료(2026-09-18, API). 루트에 `vercel.json` 없음. CLI 배포는 **저장소 루트**에서 `vercel deploy --prod --scope weglow-team`(루트가 `sellery-app` 에 링크됨 — `--cwd web` 로 올리면 `web/web` 을 찾아 실패) |
 | **Include source files outside of the Root Directory** | **off** | 앱은 루트 파일(`js/`, `css/`, `supabase/`)을 import 하지 않는다. 켜면 업로드 범위만 커진다 |
 | Framework Preset | Next.js (자동 감지) | |
 | Build / Install Command | 기본값 (`next build` / `npm install`) | `web/package.json` 에 `prebuild` 훅 없음 |
@@ -172,7 +172,7 @@ cd web && npm run gen:types                                 # src/lib/database.t
 - `.github/workflows/web-ci.yml` — job `web-ci`: `web/` 에서 `npm ci → next typegen → typecheck → lint → build`(Node 20, 더미 env). 모든 PR 과 `main` push 에서 돈다(paths 필터 없음 — required check 는 항상 결과를 보고해야 한다).
 - 기존 `.github/workflows/ci.yml`(job `프로토타입 점검` = `node scripts/check.mjs`)은 그대로.
 - **브랜치 보호(`main`) → Require status checks** 에 `web-ci` 를 **추가**한다(`프로토타입 점검` 과 둘 다). job `name` 을 바꾸면 보호 규칙도 같이 바꿀 것.
-- Vercel GitHub 연동이 되면 PR 마다 `sellery-app` Preview 댓글이 달린다(프로토타입은 GitHub Pages 라 미리보기 없음).
+- Vercel GitHub 연동 완료(2026-09-18, `vercel git connect`): `main` 푸시 = 프로덕션, PR = `sellery-app` Preview 댓글(프로토타입은 GitHub Pages 라 미리보기 없음). Preview 는 경로 모드(`/influencer/...`)로 열린다.
 
 ## 6. 도메인 (`sellery.life` — 2026-09-18 상태)
 
