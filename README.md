@@ -4,7 +4,7 @@
 
 브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼. (주)위글로우 · 오픈 준비 중. 저장소 루트는 클릭 가능한 UI/UX 프로토타입(화면 설계 원본), `web/`은 실제 서비스 앱(Next.js)입니다.
 
-**앱(정식 서비스)** → https://sellery.life (고객 구매 페이지) · https://inf.sellery.life (인플루언서 콘솔, 구축 중) — `web/` Next.js 앱 · Vercel 프로젝트 `sellery-app` 하나 (실행 web/README.md · 배포·도메인 web/DEPLOY.md)
+**앱(정식 서비스)** → https://sellery.life (고객 구매 페이지) · https://sellery.life/influencer (인플루언서 콘솔, 구축 중) — `web/` Next.js 앱 · Vercel 프로젝트 `sellery-app` 하나 (실행 web/README.md · 배포·도메인 web/DEPLOY.md)
 **프로토타입(클릭 데모)** → https://weglow-dev.github.io/sellery/ (GitHub Pages · `main` 자동 · 화면 참고용, 정식 주소 아님)
 **프로토타입 로그인 데모** → https://weglow-dev.github.io/sellery/login.html (데모 계정은 왼쪽 안내 패널 하단 목록(모바일에선 폼 아래)에서 **채우기** · 비밀번호 아무거나 · `login.html?role=brand` 로 브랜드 탭)
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)

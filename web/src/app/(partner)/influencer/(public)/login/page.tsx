@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isPartnerUser } from "@/lib/auth";
+import { linkSellerIdOf } from "@/lib/partner/signup";
 import { consolePath } from "@/lib/hosts";
 import { consoleNextOf } from "@/lib/partner/seller";
 import { LoginForm } from "./login-form";
@@ -36,7 +37,11 @@ export default async function InfluencerLoginPage({ searchParams }: { searchPara
   const next = consoleNextOf(sp.next, host);
 
   const user = await getSessionUser();
-  if (user) redirect(next);
+  // 파트너 세션이면 복귀 지점으로. 파트너가 아닌 세션(경로 모드에서 고객 카카오 로그인 상태)은 redirect 하지 않고
+  // "다른 계정으로 로그인" 안내를 그린다 — /home 이 foreign 을 여기로 보내므로 redirect 하면 루프가 된다.
+  const foreign = user !== null && !isPartnerUser(user) && linkSellerIdOf(user) === null;
+  if (user && !foreign) redirect(next);
+  const loginPath = consolePath("seller", "/login", host);
 
   const err = first(sp.error);
   const initialError = err ? (ERROR_TEXT[err] ?? ERROR_TEXT.auth) : null;
@@ -47,6 +52,17 @@ export default async function InfluencerLoginPage({ searchParams }: { searchPara
         <div className="lbl-sm">인플루언서 콘솔</div>
         <h2 className="console-title">로그인</h2>
         <p className="meta">등록한 이메일과 비밀번호로 로그인합니다. 인플루언서 계정은 고객 카카오 계정과 별개의 이메일 계정이에요.</p>
+        {foreign ? (
+          <div className="notice" role="status" style={{ margin: "0 0 14px" }}>
+            지금 <b>{user?.email ?? "고객(카카오)"}</b> 계정으로 로그인돼 있어요. 인플루언서 콘솔은 별도의 이메일 계정으로 들어갑니다 — 먼저
+            로그아웃한 뒤 인플루언서 계정으로 로그인해주세요.
+            <form method="post" action={`/auth/signout?next=${encodeURIComponent(loginPath)}`} style={{ marginTop: 10 }}>
+              <button type="submit" className="sm">
+                로그아웃하고 인플루언서 계정으로
+              </button>
+            </form>
+          </div>
+        ) : null}
         <LoginForm next={next} initialError={initialError} passwordHref={consolePath("seller", "/password", host)} />
         <div className="foot">
           <span>아직 계정이 없나요?</span>

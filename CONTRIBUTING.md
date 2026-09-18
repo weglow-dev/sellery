@@ -90,7 +90,7 @@ gh pr merge --squash --delete-branch
 ## 4. 배포
 
 - **프로토타입(저장소 루트)**: `main`에 병합되면 GitHub Pages가 자동 갱신됩니다 (1~2분) → https://weglow-dev.github.io/sellery/ . 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`). Vercel의 프로토타입 배포는 2026-09-18에 없앴습니다 — 프로토타입은 화면 참고용 데모이지 정식 주소가 아닙니다.
-- **앱(`web/`)**: Vercel 프로젝트는 `sellery-app` 하나 → https://sellery.life (고객) · https://inf.sellery.life (인플루언서 콘솔). GitHub 연동 전이라 병합만으로는 바뀌지 않고 관리자(`shinwook-k`)가 올립니다:
+- **앱(`web/`)**: Vercel 프로젝트는 `sellery-app` 하나 → https://sellery.life (고객) · https://sellery.life/influencer (인플루언서 콘솔). GitHub 연동 전이라 병합만으로는 바뀌지 않고 관리자(`shinwook-k`)가 올립니다:
 
 ```bash
 vercel deploy --cwd web --prod --scope weglow-team

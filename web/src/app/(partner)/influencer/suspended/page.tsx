@@ -19,6 +19,7 @@ export default async function SuspendedPage() {
   }
   if (ctx.state === "ok") redirect(sellerPath(ctx, "/home"));
   if (ctx.state === "guest") redirect(sellerPath(ctx, "/apply"));
+  if (ctx.state === "foreign") redirect(`${sellerPath(ctx, "/login")}?switch=1`);
 
   return (
     <div className="console-auth">
@@ -34,7 +35,7 @@ export default async function SuspendedPage() {
         </p>
         <div className="foot">
           <span>{ctx.user.email ?? ""}</span>
-          <form method="post" action="/auth/signout">
+          <form method="post" action={`/auth/signout?next=${encodeURIComponent(sellerPath(ctx, "/login"))}`}>
             <button type="submit" className="ghost sm">
               로그아웃
             </button>

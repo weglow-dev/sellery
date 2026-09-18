@@ -9,7 +9,7 @@
 ## 저장소 · 배포
 
 - GitHub: `weglow-dev/sellery` (glo와 같은 조직 · 2026-09-15 에 `weglow-glo` → `weglow-dev` 로 이름 변경, 옛 이름은 리다이렉트되지 않음). `main`은 보호됨 — PR 필수, CI `프로토타입 점검` 통과, 리뷰 코멘트 해결, 관리자도 예외 없음.
-- 배포: **프로토타입은 GitHub Pages** https://weglow-dev.github.io/sellery/ (`main` 자동) 만 — Vercel 프로토타입 프로젝트 `sellery`(sellery-swart.vercel.app)는 2026-09-18 삭제했고 루트 `vercel.json`·`.vercelignore`도 없앴습니다. **앱(`web/`)은 Vercel `sellery-app` 하나** → https://sellery.life (고객) · https://inf.sellery.life (인플루언서 콘솔). 배포·도메인·환경변수는 web/DEPLOY.md, 콘솔 설계는 docs/inf-console-plan.md.
+- 배포: **프로토타입은 GitHub Pages** https://weglow-dev.github.io/sellery/ (`main` 자동) 만 — Vercel 프로토타입 프로젝트 `sellery`(sellery-swart.vercel.app)는 2026-09-18 삭제했고 루트 `vercel.json`·`.vercelignore`도 없앴습니다. **앱(`web/`)은 Vercel `sellery-app` 하나** → https://sellery.life (고객) · https://sellery.life/influencer (인플루언서 콘솔 — 경로 모드, 2026-09-18 유지보수 개발자 요청으로 서브도메인 대신 경로). 배포·도메인·환경변수는 web/DEPLOY.md, 콘솔 설계는 docs/inf-console-plan.md.
 - CI: `.github/workflows/ci.yml` → `node scripts/check.mjs` (Node 20+ · js 문법 · css/js 참조와 순서 · 자산 경로 대소문자 · 시드 키 · 주요 화면 함수 · 충돌 흔적). 로컬에서도 같은 명령.
 - Claude 봇: `.github/workflows/claude.yml` (glo와 같은 구성 + 셀러리용 안내문). Secrets `ANTHROPIC_API_KEY` + 조직 Claude GitHub 앱에 저장소 추가 필요.
 - 이 파일(CLAUDE.md)은 **커밋되는 팀 공용 메모**입니다. 개인 메모는 `CLAUDE.local.md`(gitignore). 줄바꿈은 `.gitattributes`가 모든 텍스트 파일을 LF로 강제합니다(Windows 포함).

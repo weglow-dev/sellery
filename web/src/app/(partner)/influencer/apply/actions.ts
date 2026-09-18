@@ -28,6 +28,7 @@ export async function completeSignup(_prev: ApplyState, formData: FormData): Pro
   }
   if (ctx.state === "ok") redirect(sellerPath(ctx, "/home"));
   if (ctx.state === "suspended") redirect(sellerPath(ctx, "/suspended"));
+  if (ctx.state === "foreign") redirect(`${sellerPath(ctx, "/login")}?switch=1`);
 
   if (!rateLimit(`apply:${ctx.user.id}`)) return { error: RATE_LIMIT_MESSAGE };
 

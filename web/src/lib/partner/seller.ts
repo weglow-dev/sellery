@@ -9,9 +9,10 @@ import "server-only";
  * 계정이 세션 동안 계속 들어온다.
  *
  *   getSellerContext(): 세션 → service role 로 `sellers.user_id = uid` 1행 + `celery_balances` 잔액. 상태는 넷:
- *     anon(세션 없음) · guest(세션은 있는데 행 없음 → /apply 보완 폼) · suspended(행은 있는데 active=false → /suspended) · ok
+ *     anon(세션 없음) · foreign(세션은 있는데 파트너 계정이 아님 — 경로 모드에서 고객 카카오 세션이 같은 쿠키로 들어온 경우 →
+ *     /login?switch=1 "다른 계정으로") · guest(파트너 세션인데 행 없음 → /apply 보완 폼) · suspended(active=false → /suspended) · ok
  *     React `cache()` 로 요청당 1회만 조회한다(layout 상단 바 + page 가 같이 불러도 DB 는 한 번).
- *   requireSeller({ next }): ok 가 아니면 redirect — anon → `/login?next=<next>` · guest → `/apply` · suspended → `/suspended`.
+ *   requireSeller({ next }): ok 가 아니면 redirect — anon → `/login?next=<next>` · foreign → `/login?switch=1` · guest → `/apply` · suspended → `/suspended`.
  *     경로는 전부 요청 host 기준 `consolePath`(호스트 모드 `/apply`, 경로 모드 `/influencer/apply`).
  *   assertSameSiteAction(): 서버 액션용 CSRF 가드 — `sec-fetch-site` 만 본다(`rejectCrossSite` 의 JSON 조건은 route handler 용:
  *     서버 액션 본문은 multipart/text-plain 이다). Next 가 Origin↔Host 도 따로 대조한다(data-security.md).
@@ -22,7 +23,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import type { Json } from "@/lib/database.types";
-import { getSessionUser, safeNext } from "@/lib/auth";
+import { getSessionUser, isPartnerUser, safeNext } from "@/lib/auth";
+import { linkSellerIdOf } from "@/lib/partner/signup";
 import { consolePath } from "@/lib/hosts";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -46,6 +48,8 @@ export type SellerSummary = {
 
 export type SellerContext =
   | { state: "anon"; host: string | null }
+  /** 파트너가 아닌 세션(카카오 고객 등) — 콘솔과 고객 사이트가 같은 호스트(경로 모드)라 쿠키를 공유할 때만 생긴다 */
+  | { state: "foreign"; host: string | null; user: User }
   | { state: "guest"; host: string | null; user: User }
   | { state: "suspended"; host: string | null; user: User; seller: SellerSummary }
   | { state: "ok"; host: string | null; user: User; seller: SellerSummary; balance: number };
@@ -66,7 +70,12 @@ export const getSellerContext = cache(async (): Promise<SellerContext> => {
     // DB 오류는 guest 로 취급하지 않는다(보완 폼이 새 행을 만들 수 있다) — 요청을 실패시킨다.
     throw new Error(`sellers lookup failed: ${error.message}`);
   }
-  if (!row) return { state: "guest", host, user };
+  if (!row) {
+    // 행이 없는 세션 — 파트너 가입 흔적(user_metadata.partner_role · app_metadata.link_seller_id)이 없으면 고객 세션이다.
+    // 비신뢰 값이지만 여기서는 "보완 폼을 보여줄지, 다른 계정으로 로그인하라고 할지" 만 가르므로 안전하다(행 생성은 RPC 가 다시 검사).
+    if (!isPartnerUser(user) && linkSellerIdOf(user) === null) return { state: "foreign", host, user };
+    return { state: "guest", host, user };
+  }
 
   const seller: SellerSummary = {
     id: row.id,
@@ -120,6 +129,10 @@ export async function requireSeller(opts: { next?: string } = {}): Promise<Selle
   if (ctx.state === "anon") {
     const next = sellerPath(ctx, opts.next ?? "/home");
     redirect(`${sellerPath(ctx, "/login")}?next=${encodeURIComponent(next)}`);
+  }
+  if (ctx.state === "foreign") {
+    const next = sellerPath(ctx, opts.next ?? "/home");
+    redirect(`${sellerPath(ctx, "/login")}?switch=1&next=${encodeURIComponent(next)}`);
   }
   if (ctx.state === "guest") redirect(sellerPath(ctx, "/apply"));
   redirect(sellerPath(ctx, "/suspended"));

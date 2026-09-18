@@ -38,7 +38,7 @@
 | 샘플 배송지 | 결제·요청 시 입력 → `campaigns.sample_shipping` (프로필 기본값은 `sellers.sample_address` 에 저장해 프리필) | 브랜드 발송 화면(슬라이스 2) 이 캠페인에서 읽는다. 개인정보 보존·파기는 `purge` 규칙에 포함. | 가능 |
 | 시드 인플루언서 8명(`*@sellery.demo`) 처리 | 실제 계약 인플루언서 행으로 재활용(`partner-admin.mjs invite <email> --link <seller_id>` 또는 `link <seller_id> <user_id>` 명시 연결, §4.7), 안 쓰는 행은 `suspend`(`active=false`) | 이메일 자동 매칭 금지(0001 헤더). 일반 가입은 새 행을 만들므로 시드 행 재활용은 반드시 운영자 초대 경로로. | 가능 |
 | 세션 쿠키 범위 | host-only(결정 10) | 브랜드 콘솔 때 재검토 | 가능 |
-| 콘솔 URL 표기 | **결정됨(2026-09-17)** — inf 호스트에서 접두 없는 경로(예 `https://inf.sellery.life/home`) | 리라이트 1겹. `/influencer/home` 그대로 두는 안은 코드는 단순하지만 URL 이 길다. | — |
+| 콘솔 URL 표기 | **결정 변경(2026-09-18, 유지보수 개발자 요청)**: 서브도메인(`inf.sellery.life/home`) 대신 **경로 모드 `sellery.life/influencer/home`**. 코드는 두 모드를 모두 지원하므로 Production 의 `NEXT_PUBLIC_INF_HOST` 를 제거해 전환했다(코드 변경 없음). 경로 모드에서는 고객·콘솔이 세션 쿠키를 공유하므로 `requireSeller()` 에 `foreign`(파트너 아닌 세션 → `/login?switch=1` 안내) 상태를 추가했다. 브랜드도 `sellery.life/brand`. | §2.2·§3 의 서브도메인 절차는 되돌릴 때 참고 | 결정됨 |
 | 정산 지급 수단 | 운영자 은행 이체 + 스크립트로 `payouts.paid` 표시 | 토스 페이아웃/펌뱅킹은 범위 밖. 계좌 폼 필드(주민번호·실명확인)에 영향 — §5.9 | 5단계 전 |
 | 미리보기 링크의 유입 쿠키 우회(`?preview=1`) | 넣지 않음(관찰만) | 인플루언서 본인이 자기 링크로 들어온 것이라 정책상 문제 없음 | 가능 |
 

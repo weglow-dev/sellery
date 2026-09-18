@@ -73,7 +73,7 @@ export function PartnerShell({
                   🥬 {me.balance}
                 </span>
               )}
-              <form method="post" action="/auth/signout">
+              <form method="post" action={`/auth/signout?next=${encodeURIComponent(consolePath(role, "/login", host))}`}>
                 <button type="submit" className="ghost sm" aria-label="로그아웃">
                   로그아웃
                 </button>

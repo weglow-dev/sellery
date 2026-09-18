@@ -4,7 +4,7 @@
 
 | Vercel 프로젝트 | 내용 | Root Directory | 주소 |
 |---|---|---|---|
-| `sellery-app` | 이 앱 — Vercel 에는 이 프로젝트 **하나** (프로토타입 프로젝트 `sellery` 는 2026-09-18 삭제, 프로토타입 데모는 GitHub Pages) | `web` | https://sellery.life (고객) · https://www.sellery.life → apex · https://inf.sellery.life (인플루언서 콘솔) · https://sellery-app.vercel.app (임시 확인·Preview) — §6 |
+| `sellery-app` | 이 앱 — Vercel 에는 이 프로젝트 **하나** (프로토타입 프로젝트 `sellery` 는 2026-09-18 삭제, 프로토타입 데모는 GitHub Pages) | `web` | https://sellery.life (고객) · https://sellery.life/influencer (인플루언서 콘솔 — **경로 모드**) · https://www.sellery.life → apex · https://sellery-app.vercel.app (임시 확인·Preview) — §6 |
 
 같은 GitHub 저장소(`weglow-dev/sellery`)에 두 프로젝트를 연결한다. `main` 병합 = 두 프로젝트 모두 Production 배포, PR = Preview. 값(키)은 이 문서·코드·PR 어디에도 쓰지 않는다 — `web/.env.local`(gitignored) 과 Vercel 환경변수에만.
 
@@ -180,16 +180,16 @@ Vercel 프로젝트는 `sellery-app` 하나이고 도메인 세 개가 전부 �
 
 | 호스트 | 레코드 | 용도 | 상태 |
 |---|---|---|---|
-| `inf` | `A 76.76.21.21` | 인플루언서 콘솔 — Production `NEXT_PUBLIC_INF_HOST=inf.sellery.life` | 연결 완료 · 호스트 모드 확인(`/api/health` hosts.mode=host) |
+| `inf` | (미사용) | 2026-09-18 유지보수 개발자 요청으로 **경로 모드**(`sellery.life/influencer`)로 전환 — Production 의 `NEXT_PUBLIC_INF_HOST` 제거, 도메인은 프로젝트에서 뗐다. 호스팅케이알의 `inf` A 레코드는 지워도 된다. 서브도메인으로 되돌리려면 env 하나 + 도메인 추가(코드 변경 없음) | 해제 |
 | `@` | `A 76.76.21.21` | 고객 사이트 — Production `NEXT_PUBLIC_SITE_URL=https://sellery.life`(2026-09-18 반영) | 연결 완료 · 인증서 발급(`vercel certs issue sellery.life` 로 수동 촉발) · `/influencer/*` → inf 308 확인 |
 | `www` | `A 76.76.21.21` 권장 (CNAME `cname.vercel-dns.com` 은 호스팅케이알이 1시간 넘게 존에 싣지 않았다 — 2026-09-18) | apex 로 리다이렉트(Vercel Domains 에서 설정) | DNS 대기 |
-| `brand` | (브랜드 콘솔 때) `A 76.76.21.21` | `NEXT_PUBLIC_BRAND_HOST` | 미정 |
+| `brand` | (미사용 — 경로 모드 `sellery.life/brand`) | 서브도메인이 필요해지면 `NEXT_PUBLIC_BRAND_HOST` | — |
 
 apex 가 붙은 뒤(1 은 완료):
 1. ~~Production 환경변수 `NEXT_PUBLIC_SITE_URL=https://sellery.life` → 재배포~~ 완료 2026-09-18 (Preview 는 그대로).
-2. Supabase → Authentication → URL Configuration: Site URL `https://sellery.life`, Redirect URLs 에 `https://sellery.life/**` · `https://inf.sellery.life/**`(§3.1).
+2. Supabase → Authentication → URL Configuration: Site URL `https://sellery.life`, Redirect URLs 에 `https://sellery.life/**`(경로 모드라 콘솔도 이걸로 충분 · §3.1).
 3. 토스 웹훅 URL `https://sellery.life/api/payments/webhook`(테스트·라이브 상점 각각).
-4. 확인: `curl -sI https://sellery.life/` 200 · `/c/<code>` 308 · `/robots.txt` 에 `/influencer` disallow · `https://sellery.life/influencer/home` → `https://inf.sellery.life/home` 308 · `/api/health` 200.
+4. 확인: `curl -sI https://sellery.life/` 200 · `/c/<code>` 308 · `/robots.txt` 에 `/influencer` disallow · `https://sellery.life/influencer/home` → 미로그인 302 `/influencer/login` · `/api/health` 의 `hosts.mode` 가 `path`.
 5. 롤백: 앱 문제는 Vercel Deployments → 이전 배포 "Promote to Production"(Instant Rollback). DB 마이그레이션은 되돌리지 않고 앞으로만 고친다.
 
 ## 7. 배포 전 체크리스트 (`docs/app-plan.md §13` — 사용자가 해야 할 것)

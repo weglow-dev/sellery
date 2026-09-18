@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { consoleRoleOf, consoleUrl } from "@/lib/hosts";
+import { safeNext } from "@/lib/auth";
 
 /**
  * Sign out server-side so the (possibly httpOnly) auth cookies are cleared. 303 (app-plan §4.1).
@@ -13,8 +14,11 @@ import { consoleRoleOf, consoleUrl } from "@/lib/hosts";
 export async function POST(request: Request) {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  // `?next=` 가 있으면(같은 오리진 상대 경로만 — safeNext) 그곳으로: 경로 모드 콘솔의 로그아웃 → `/influencer/login`
+  const nextRaw = new URL(request.url).searchParams.get("next");
+  const next = nextRaw ? safeNext(nextRaw) : null;
   const entry = consoleRoleOf(request.headers.get("host"));
   // entry 가 있으면 그 역할의 env 호스트가 반드시 있으므로 consoleUrl 은 항상 절대 URL 을 돌려준다
-  const to = entry ? consoleUrl(entry.role, "/login") : new URL("/", request.url);
+  const to = next && next !== "/" ? new URL(next, request.url) : entry ? consoleUrl(entry.role, "/login") : new URL("/", request.url);
   return NextResponse.redirect(to, { status: 303 });
 }

@@ -34,6 +34,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: Promis
   }
   if (ctx.state === "ok") redirect(sellerPath(ctx, "/home"));
   if (ctx.state === "suspended") redirect(sellerPath(ctx, "/suspended"));
+  if (ctx.state === "foreign") redirect(`${sellerPath(ctx, "/login")}?switch=1`);
 
   // guest — 멱등 재시도 (성공하면 폼 없이 홈으로)
   const retry = await createSellerFromSignup(ctx.user);
@@ -73,7 +74,7 @@ export default async function ApplyPage({ searchParams }: { searchParams: Promis
         )}
         <div className="foot">
           <span>{ctx.user.email ?? ""}</span>
-          <form method="post" action="/auth/signout">
+          <form method="post" action={`/auth/signout?next=${encodeURIComponent(sellerPath(ctx, "/login"))}`}>
             <button type="submit" className="ghost sm">
               로그아웃
             </button>
