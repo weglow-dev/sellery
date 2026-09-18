@@ -89,11 +89,56 @@ CI 는 이 값들 없이 더미(`.github/workflows/web-ci.yml` 의 `env`)로 빌
 
 외부 스크립트 `t1.daumcdn.net` — 체크아웃 배송지 입력에 쓴다. CSP 를 두면 허용 목록에 추가.
 
+### 3.5 파트너 이메일 인증 (Supabase Auth — 인플루언서 콘솔 2단계, `docs/inf-console-plan.md §4.1 · §4.8`)
+
+인플루언서(나중에 브랜드) 계정은 **이메일/비밀번호 + 인증 메일**이다(고객 카카오 계정과 별개). 인증 메일 링크를 누르는 요청(`/auth/confirm`)이 `sellers` 행을 만들고 바로 콘솔에 들여보낸다 — 수동 심사 없음. 아래 값은 저장소로는 확인할 수 없으므로 **대시보드에서 설정한 뒤 "현재값" 열에 기록**한다.
+
+| 항목 | 설정할 값 | 현재값(기록) |
+|---|---|---|
+| Authentication → Providers → **Email** | Enable **ON** · **Confirm email ON** · Minimum password length **8** (앱 규칙은 영문+숫자 8자 이상 — 클라이언트·서버가 따로 검사) · Secure email change ON(기본) | ☐ 미기록 |
+| Authentication → URL Configuration → **Redirect URLs** | 기존 4종(§3.1) + **`https://inf.sellery.life/**`** — 없으면 `emailRedirectTo`/`redirectTo` 가 Site URL 로 떨어져 `next` 를 잃고 콘솔이 아니라 고객 사이트에 착지한다 | ☐ |
+| Authentication → Emails → **SMTP Settings (Custom SMTP)** | **Resend**: Host `smtp.resend.com` · Port `465` · Username `resend` · Password = **Resend API key**(비밀 — 이 문서·코드·PR 어디에도 쓰지 않는다) · Sender email `no-reply@sellery.life` · Sender name `셀러리`. 기본 Supabase SMTP 는 시간당 소량·팀원 주소 위주라 외부 인플루언서에게 가지 않는다 | ☐ |
+| Resend 대시보드 → **Domains** | `sellery.life` 추가 → 호스팅케이알 "DNS 레코드 관리" 에 Resend 가 보여 주는 **DKIM(TXT 또는 CNAME) · SPF(TXT) · (권장) DMARC(TXT)** 를 그대로 추가 → Verified. 호스팅케이알은 반영에 20~40분(§6) | ☐ |
+| Authentication → **Rate Limits** | 이메일 발송 한도(시간당) 확인 — Custom SMTP 를 켜야 상향할 수 있다. 앱의 [메일 다시 보내기] 는 60초 쿨다운 | ☐ |
+| Authentication → Emails → **Templates** | 아래 3종의 링크를 **token_hash 방식**으로 바꾼다. 문구는 역할 중립('셀러리 파트너') — 템플릿은 프로젝트당 1벌이라 브랜드 가입 메일과 공유한다 | ☐ |
+
+**템플릿 3종.** 기본 `{{ .ConfirmationURL }}` 은 PKCE(`?code=`) 링크라 **가입한 브라우저에서만** 열리고, 데스크톱에서 가입하고 휴대폰 메일 앱에서 열면 실패한다. `{{ .RedirectTo }}` 는 앱이 넘긴 `emailRedirectTo`(예 `https://inf.sellery.life/auth/confirm?next=%2Fhome`) 그대로이므로 거기에 `&token_hash=…&type=…` 만 붙인다(`web/src/app/auth/confirm/route.ts` 가 `verifyOtp({ type, token_hash })` 로 세션을 만든다).
+
+Confirm signup — Subject `[셀러리] 이메일 인증을 완료해주세요`:
+
+```html
+<h2>셀러리 파트너 가입을 환영합니다</h2>
+<p>아래 버튼을 누르면 이메일 인증이 완료되고 바로 콘솔에 들어갈 수 있어요. 링크는 24시간 동안 유효하며 다른 기기에서 열어도 됩니다.</p>
+<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup">이메일 인증하고 시작하기</a></p>
+<p>본인이 가입한 것이 아니라면 이 메일은 무시하셔도 됩니다.</p>
+```
+
+Reset password — Subject `[셀러리] 비밀번호 재설정`:
+
+```html
+<h2>비밀번호 재설정</h2>
+<p>아래 버튼을 누르면 새 비밀번호를 정할 수 있어요. 링크는 1시간 동안 유효합니다.</p>
+<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery">새 비밀번호 설정</a></p>
+<p>요청한 적이 없다면 이 메일은 무시하셔도 됩니다 — 비밀번호는 바뀌지 않습니다.</p>
+```
+
+Invite user — Subject `[셀러리] 파트너 콘솔 초대`:
+
+```html
+<h2>셀러리 파트너 콘솔에 초대합니다</h2>
+<p>셀러리 운영팀이 이 이메일을 파트너 계정으로 초대했어요. 아래 버튼을 누르면 계정이 연결되고 비밀번호를 정할 수 있습니다.</p>
+<p><a href="{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=invite">초대 수락하고 비밀번호 정하기</a></p>
+<p>본인이 요청한 것이 아니라면 이 메일은 무시하셔도 됩니다.</p>
+```
+
+- 로컬·Preview 확인(실제 메일 없이): `auth.admin.generateLink({ type:'signup'|'magiclink'|'recovery', email })` 의 `hashed_token` 으로 `GET /auth/confirm?token_hash=…&type=…&next=/influencer/home` 을 열면 같은 경로를 탄다. 시드 연결은 `cd web && node scripts/dev-seller.mjs --email … --seller s1`(production 거부), 실제 계약자 초대는 `node scripts/partner-admin.mjs invite <email> --link s2`.
+- 운영 절차(관리자 화면 없음): 가입 완료·채널 [인증 확인] 은 Slack 한 줄(`SLACK_WEBHOOK_URL`, 선택 — 이메일·핸들 없이) → `node scripts/partner-admin.mjs channels --pending` → 인플루언서 프로필 bio 또는 `@sellery.official` DM 수신함에서 코드 `SLRY-XXXX` 확인 → `verify-channel <ch>`. 정지·복귀는 `suspend`/`reactivate`, 목록은 `list`. **`@sellery.official` DM 수신함 확인 담당자**를 정한다(`docs/inf-console-plan.md §7` 2단계).
+
 ## 4. 데이터베이스
 
 ### 4.1 마이그레이션 (저장소 루트에서)
 
-`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 2026-09-15 기준 클라우드 `sellery` 에 `0001~0008` 적용 완료(`supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0009_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
+`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 클라우드 `sellery` 에 `0001~0010` 적용 완료(`0001~0008` 2026-09-15 · `0010_partner_signup` 2026-09-18, `supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0011_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
 
 ```bash
 npx supabase login
@@ -156,6 +201,7 @@ apex 가 붙은 뒤(1 은 완료):
 - [ ] **Supabase CLI 링크**: `npx supabase login` + `link --project-ref ocxppeuoiysnkwwujvko`(DB 비밀번호) — `db push` · `gen:types` 전제.
 - [ ] **카카오 개발자 앱**: 로그인 활성화 · Redirect URI(Supabase 콜백) · 동의 항목 · REST API 키 · Client Secret · 비즈 앱 전환 여부 결정.
 - [ ] **Supabase Auth**: Kakao provider 키 입력 · Site URL · Redirect URLs 4종(§3.1).
+- [ ] **Supabase Email 인증(파트너 콘솔)**: Email provider ON · Confirm email ON · 최소 8 · Custom SMTP(Resend) + `sellery.life` DKIM/SPF · 템플릿 3종 token_hash 링크 · Redirect URLs 에 `https://inf.sellery.life/**` — §3.5 표에 현재값 기록. (선택) Vercel env `SLACK_WEBHOOK_URL`.
 - [ ] **Supabase 키**: URL · anon · service_role → `.env.local` + Vercel(Production + Preview).
 - [ ] **Vercel `sellery-app` 생성**: Root Directory `web` · outside-root off · 환경변수 표 · Deployment Protection(Preview off 또는 bypass 토큰) · `icn1`(vercel.json).
 - [ ] **브랜치 보호**: `main` required status check 에 `web-ci` 추가(`프로토타입 점검` 유지).
@@ -176,3 +222,4 @@ apex 가 붙은 뒤(1 은 완료):
 5. 토스 콘솔 "웹훅 테스트 전송" → 200, `payment_events` 1행. 임의 본문 `curl -X POST …/api/payments/webhook -d '{}'` → 400 · 행 없음.
 6. `/robots.txt` — `/api` `/checkout` `/account` `/login` `/auth` disallow, `/s` `/c` allow.
 7. Vercel → Logs 에 `permission denied for table`(0007 미적용) · `server-only` · env 누락 오류가 없는지.
+8. 콘솔(`https://inf.sellery.life`): `/login` 200(이메일 폼) · `/signup` 200 · 미로그인 `/home` → `/login?next=/home` 302 · 실제 외부 이메일로 가입 → 인증 메일(발신 `no-reply@sellery.life`) → 링크를 다른 기기에서 열어도 `/home` 에 활동명·스타터·🥬 3 · `db query` 로 `sellers`·`seller_channels`·`celery_ledger signup_bonus`·`profiles.role='seller'` 확인 · 같은 링크 재클릭 → `/login?error=expired`(행 1개 유지).

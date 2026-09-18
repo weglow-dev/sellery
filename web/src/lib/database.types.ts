@@ -1478,6 +1478,7 @@ export type Database = {
           updated_at: string
           url: string | null
           vcode: string | null
+          vcode_confirmed_at: string | null
           verified: boolean
         }
         Insert: {
@@ -1492,6 +1493,7 @@ export type Database = {
           updated_at?: string
           url?: string | null
           vcode?: string | null
+          vcode_confirmed_at?: string | null
           verified?: boolean
         }
         Update: {
@@ -1506,6 +1508,7 @@ export type Database = {
           updated_at?: string
           url?: string | null
           vcode?: string | null
+          vcode_confirmed_at?: string | null
           verified?: boolean
         }
         Relationships: [
@@ -1583,8 +1586,10 @@ export type Database = {
           recent_likes: number[]
           ref_code: string | null
           referred_by: string | null
+          sample_address: Json | null
           sample_extra: number
           settle_type: string | null
+          terms_agreed_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -1611,8 +1616,10 @@ export type Database = {
           recent_likes?: number[]
           ref_code?: string | null
           referred_by?: string | null
+          sample_address?: Json | null
           sample_extra?: number
           settle_type?: string | null
+          terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1639,8 +1646,10 @@ export type Database = {
           recent_likes?: number[]
           ref_code?: string | null
           referred_by?: string | null
+          sample_address?: Json | null
           sample_extra?: number
           settle_type?: string | null
+          terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1909,8 +1918,28 @@ export type Database = {
         Args: { s: Database["public"]["Tables"]["checkout_sessions"]["Row"] }
         Returns: Json
       }
+      create_seller_from_signup: {
+        Args: {
+          p_handle: string
+          p_link_id?: string
+          p_name: string
+          p_platform: string
+          p_referral_code?: string
+          p_terms_agreed_at?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       expire_checkout_sessions: { Args: { p_grace?: string }; Returns: number }
       grade_for_sales: { Args: { p_m3_sales: number }; Returns: string }
+      partner_identity_confirmed: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      partner_random_code: {
+        Args: { p_len?: number; p_prefix?: string }
+        Returns: string
+      }
       public_stats: { Args: never; Returns: Json }
       purge_checkout_pii: { Args: { p_older_than?: string }; Returns: number }
       recalc_campaign_sold_qty: {

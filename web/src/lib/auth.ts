@@ -5,6 +5,7 @@
  * - displayName(user): 카카오 user_metadata 에서 표시명
  * - safeNext(next):   오픈 리다이렉트 방지 — 로그인 시작·콜백·redirectTo 의 next 는 전부 이 함수를 거친다
  * - getRole(user):    profiles.role (app_role RPC) — 파트너 센터 게이트용, 슬라이스 1 에서는 화면 없음
+ * - isPartnerUser(user): user_metadata.partner_role 판정 — 비신뢰 값, 콜백의 ensureCustomer 생략 등 무해한 분기 전용
  */
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -68,6 +69,18 @@ export function safeNext(next: string | null | undefined): string {
   if (!out.startsWith("/") || out.startsWith("//")) return "/";
   if (out.startsWith("/auth/") || out.startsWith("/login")) return "/";
   return out;
+}
+
+/**
+ * `user_metadata.partner_role` 이 'seller' | 'brand' 인가 — **비신뢰 값**이다 (docs/inf-console-plan.md §4.2).
+ * 사용자가 `supabase.auth.updateUser({ data })` 로 언제든 바꿀 수 있으므로 **무해한 분기에만** 쓴다:
+ * `auth/callback`·`auth/confirm` 의 `ensureCustomer` 생략 · `?welcome=1` 생략 · 가입 생성 함수 호출 여부(실제 가드는 함수 안의
+ * 신원 확인·중복·유니크 검사). **권한·게이트·집계에는 절대 쓰지 않는다** — 콘솔 게이트의 진실은 `sellers.user_id and active`
+ * (`lib/partner/seller.ts requireSeller`). 시드 행 연결용 `link_seller_id` 는 `app_metadata`(service role 전용) 에 둔다.
+ */
+export function isPartnerUser(user: User | null | undefined): boolean {
+  const role = (user?.user_metadata as Record<string, unknown> | undefined)?.partner_role;
+  return role === "seller" || role === "brand";
 }
 
 /** `app_role()` RPC — 파트너 센터 게이트용 (슬라이스 1 에서는 화면 없음, app-plan §4.2). 세션이 없거나 값이 낯설면 null. */

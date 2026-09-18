@@ -997,6 +997,71 @@
   .console-tab:hover { color: var(--color-ink); background: var(--color-surface-2); }
   .console-tab[aria-current="page"] { color: var(--color-plat); border-top-color: var(--color-accent); background: var(--color-accent-soft); }
 
+  /* ---- 콘솔 2단계 (docs/inf-console-plan.md §7 "2. 로그인 · 가입 · 자동 생성"): 상단 바 우측 · 인증 폼 · 홈 카드 · 코드 박스 ----
+     400px 폭 가로 스크롤 없음 — 이름은 말줄임, 버튼은 줄바꿈 허용. */
+  .console-bar-right { flex-shrink: 1; min-width: 0; }
+  .console-me { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; flex-wrap: nowrap; }
+  .console-me .nm { font-weight: 700; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 400px: 워드마크(~150) + 우측(이름·🥬·로그아웃) 만 — 콘솔 라벨·등급 박스는 숨긴다(등급은 홈·내 정보에 있다) */
+  @media (max-width: 520px) {
+    .console-bar:has(.console-me) .console-label { display: none; }
+    .console-me .gradebox { display: none; }
+    .console-me .nm { max-width: 72px; }
+  }
+  .console-me .cel { font-family: var(--font-mono); font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .console-me form { margin: 0; }
+  .console-me button.sm, .console-me .btn.sm { margin: 0; padding: 5px 9px; }
+  .console-auth { max-width: 440px; margin: 8px auto 0; }
+  .console-auth .card { padding: 22px 20px 20px; }
+  .console-auth .fld input, .console-auth .fld select { width: calc(100% - 6px); }
+  .console-auth .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; font-size: 12.5px; color: var(--color-mute); }
+  .console-auth .foot a { text-decoration: underline; text-underline-offset: 2px; color: var(--color-ink); }
+  .console-check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.6; margin: 4px 3px 14px; color: var(--color-mute); }
+  .console-check input { margin-top: 4px; flex: 0 0 auto; }
+  .console-check a { text-decoration: underline; text-underline-offset: 2px; color: var(--color-ink); }
+  .console-err { color: var(--color-danger); font-size: 12.5px; min-height: 18px; margin: 0 3px 8px; }
+  .console-err:empty { display: none; }
+  .console-ok { color: var(--color-plat); font-size: 12.5px; margin: 0 3px 8px; }
+  .console-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 3px 14px; }
+  .console-head h2 { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.3; }
+  .console-head .cel { font-family: var(--font-mono); font-weight: 700; margin-left: auto; white-space: nowrap; }
+  .console-todo { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  .console-todo .card { margin: 0; }
+  .console-todo .card h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .console-todo .card .meta { margin: 0 0 12px; }
+  .console-code {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    background: var(--color-lime);
+    padding: 4px 16px;
+    box-shadow: var(--shadow-frame), var(--shadow-lift-s1);
+    user-select: all;
+  }
+  .console-code.lg { font-size: 26px; letter-spacing: 0.15em; padding: 6px 20px; }
+  .console-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .console-methods { display: grid; gap: 10px; grid-template-columns: 1fr; margin-top: 14px; }
+  .console-methods .card { margin: 0; padding: 14px 16px; box-shadow: var(--shadow-frame-soft); }
+  .console-methods .card:hover { transform: none; box-shadow: var(--shadow-frame-soft); }
+  .console-methods p { font-size: 12.5px; color: var(--color-mute); margin: 6px 0 0; }
+  .console-rows .rowitem { padding: 12px 14px; }
+  .console-rows .rowitem .nm { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 13.5px; }
+  .console-rows .rowitem .sub { font-size: 12px; }
+  .console-rows .rowacts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; flex: 1 0 100%; }
+  .console-rows .rowacts form { margin: 0; }
+  .console-rows .rowacts button, .console-rows .rowacts .btn { margin: 2px 0 2px 4px; }
+  .console-rows .plat { font-size: 18px; line-height: 1; flex: 0 0 auto; }
+  .console-rows .plat svg { width: 18px; height: 18px; }
+  .console-addrow { padding: 10px 14px; border-top: 1px solid var(--color-soft-line); }
+  @media (min-width: 560px) {
+    .console-todo { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .console-methods { grid-template-columns: 1fr 1fr; }
+    .console-rows .rowacts { flex: 0 0 auto; }
+    .console-me .nm { max-width: 160px; }
+  }
+
   /* ---- 반응형 (ux-spec §1.3: 1100 / 900 / 640 / 600) ---- */
   @media (max-width: 1100px) {
     .custgrid { grid-template-columns: 1fr; }

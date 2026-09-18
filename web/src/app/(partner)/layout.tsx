@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import "../globals.css";
 import { fontVars } from "@/app/fonts";
 import { consoleRoleOf, consoleUrl } from "@/lib/hosts";
-import { PartnerShell } from "./partner-shell";
+import { getSellerContext } from "@/lib/partner/seller";
+import { PartnerShell, type ShellMe } from "./partner-shell";
 
 /**
  * 파트너 콘솔 root layout — 앱의 **두 번째 root layout** (docs/inf-console-plan.md 결정 2·3).
@@ -50,11 +51,21 @@ export default async function PartnerRootLayout({ children }: Readonly<{ childre
   // 셸의 링크가 경로 모드(`/influencer/home`)로 맞게 나온다(inf-console-plan §2.2). 브랜드 콘솔이 생기면 role 도 host 로.
   const host = (await headers()).get("host");
   const role = consoleRoleOf(host)?.role ?? "seller";
+  // 상단 바 표시용(활동명·등급·🥬) — 게이트가 아니다. 같은 요청의 page 가 requireSeller() 를 불러도 React cache 로 DB 는 한 번.
+  // 세션·행이 없으면(공개 페이지·guest) 비워 둔다. 정지 계정은 이름만(잔액 없음).
+  let me: ShellMe | null = null;
+  try {
+    const ctx = await getSellerContext();
+    if (ctx.state === "ok") me = { name: ctx.seller.name, grade: ctx.seller.grade, balance: ctx.balance };
+    else if (ctx.state === "suspended") me = { name: ctx.seller.name, grade: null, balance: null };
+  } catch (e) {
+    console.error("[partner/layout] seller context failed:", e instanceof Error ? e.message : e);
+  }
   return (
     <html lang="ko" className={fontVars}>
       {/* body 에 Tailwind 폰트 스무딩 유틸을 붙이지 않는다 (Windows subpixel AA 유지 — app-plan §9.1) */}
       <body>
-        <PartnerShell role={role} host={host}>
+        <PartnerShell role={role} host={host} me={me}>
           {children}
         </PartnerShell>
       </body>
