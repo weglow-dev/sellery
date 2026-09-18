@@ -80,7 +80,7 @@ gh pr create --fill
 `gh`가 없으면 push 후 GitHub이 띄워주는 "Compare & pull request" 버튼을 누르면 됩니다.
 
 - CI(**프로토타입 점검** = `node scripts/check.mjs`)가 자동으로 돕니다. 초록불이어야 병합할 수 있습니다.
-- Vercel GitHub 앱이 연동되면 PR마다 **미리보기 URL**이 댓글로 달립니다 — 병합 전에 거기서 눌러보세요. (**현재 연동 전** — 브랜치를 받아 로컬에서 확인)
+- 앱(`web/`) 변경은 Vercel GitHub 앱이 연동되면 PR마다 **미리보기 URL**이 댓글로 달립니다 — 병합 전에 거기서 눌러보세요. (**현재 연동 전** — 브랜치를 받아 로컬에서 확인. 프로토타입은 GitHub Pages가 `main`만 서빙해 PR 미리보기가 없습니다)
 - 리뷰 코멘트는 전부 해결(resolve)해야 병합됩니다. 승인 수는 강제하지 않지만 1명 리뷰를 권합니다.
 
 ```bash
@@ -89,19 +89,14 @@ gh pr merge --squash --delete-branch
 
 ## 4. 배포
 
-main에 병합되면 GitHub Pages는 자동으로 갱신됩니다 (1~2분).
-→ https://weglow-dev.github.io/sellery/
-
-정식 주소인 Vercel → https://sellery-swart.vercel.app/ 은 **GitHub 앱 연동 전**이라 병합만으로는 바뀌지 않습니다. 관리자(`shinwook-k`)가 병합 후 직접 올립니다:
+- **프로토타입(저장소 루트)**: `main`에 병합되면 GitHub Pages가 자동 갱신됩니다 (1~2분) → https://weglow-dev.github.io/sellery/ . 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`). Vercel의 프로토타입 배포는 2026-09-18에 없앴습니다 — 프로토타입은 화면 참고용 데모이지 정식 주소가 아닙니다.
+- **앱(`web/`)**: Vercel 프로젝트는 `sellery-app` 하나 → https://sellery.life (고객) · https://inf.sellery.life (인플루언서 콘솔). GitHub 연동 전이라 병합만으로는 바뀌지 않고 관리자(`shinwook-k`)가 올립니다:
 
 ```bash
-vercel deploy --prod --scope weglow-team
+vercel deploy --cwd web --prod --scope weglow-team
 ```
 
-연동되면 main 병합 = 프로덕션 자동 배포, PR = 미리보기 자동입니다. (연동 절차: 조직 설정 → GitHub Apps → Vercel → Repository access 에 `sellery` 추가 → `vercel git connect`. 연동을 마치면 이 절과 §3의 미리보기 줄을 자동 배포 기준으로 되돌립니다.)
-(전환기 동안 GitHub Pages 도 같은 `main`을 그대로 서빙합니다. 정식 주소는 Vercel 쪽이며, 팀 합의 후 하나로 정리합니다.)
-
-반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`). Vercel 쪽은 관리자가 아직 안 올렸을 수 있으니 Pages 주소로 먼저 확인하세요.
+연동되면 `main` 병합 = 프로덕션 자동 배포, PR = 미리보기 자동입니다. 환경변수·도메인·확인 절차는 [web/DEPLOY.md](web/DEPLOY.md).
 
 ## 앱(`web/`)을 고칠 때
 

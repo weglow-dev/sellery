@@ -2,10 +2,11 @@
 
 > 좋은 브랜드를 만나는 공간, 셀러리
 
-브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
+브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼. (주)위글로우 · 오픈 준비 중. 저장소 루트는 클릭 가능한 UI/UX 프로토타입(화면 설계 원본), `web/`은 실제 서비스 앱(Next.js)입니다.
 
-**데모** → https://sellery-swart.vercel.app/ (Vercel · `main` 자동 배포 — 전환기 동안 GitHub Pages https://weglow-dev.github.io/sellery/ 도 같은 `main`을 서빙)
-**로그인** → https://sellery-swart.vercel.app/login.html (데모 계정은 왼쪽 안내 패널 하단 목록(모바일에선 폼 아래)에서 **채우기** · 비밀번호 아무거나 · `login.html?role=brand` 로 브랜드 탭)
+**앱(정식 서비스)** → https://sellery.life (고객 구매 페이지) · https://inf.sellery.life (인플루언서 콘솔, 구축 중) — `web/` Next.js 앱 · Vercel 프로젝트 `sellery-app` 하나 (실행 web/README.md · 배포·도메인 web/DEPLOY.md)
+**프로토타입(클릭 데모)** → https://weglow-dev.github.io/sellery/ (GitHub Pages · `main` 자동 · 화면 참고용, 정식 주소 아님)
+**프로토타입 로그인 데모** → https://weglow-dev.github.io/sellery/login.html (데모 계정은 왼쪽 안내 패널 하단 목록(모바일에선 폼 아래)에서 **채우기** · 비밀번호 아무거나 · `login.html?role=brand` 로 브랜드 탭)
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
 **로컬 미리보기** → 저장소 폴더에서 `python -m http.server 8080` → http://localhost:8080 (`index.html` 더블클릭도 되지만, 로그인·링크 흐름까지 보려면 로컬 서버 권장)
 
@@ -61,8 +62,6 @@ scripts/check.mjs   배포 전 자가 점검 (CI에서도 동일 실행)
 .github/            CI(프로토타입 점검 = node scripts/check.mjs) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
 CONTRIBUTING.md     수정하고 올리는 절차 (브랜치 → 점검 → PR → 병합)
 CLAUDE.md           팀 공용 에이전트 지침 (CLAUDE.local.md는 개인용 · git 제외)
-.vercelignore       Vercel 배포 제외 목록 — docs/ · scripts/ · *.md 는 배포되지 않음 (문서 링크는 GitHub에서만 열림)
-vercel.json         빌드 없이 루트 그대로 서빙 (framework null)
 .gitattributes      줄바꿈 LF 통일 (Windows 포함)
 ```
 
@@ -90,7 +89,7 @@ vercel.json         빌드 없이 루트 그대로 서빙 (framework null)
 
 ## 수정하고 올리기
 
-[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` (Node 20+) → PR → 병합 → Vercel 자동 배포. `main`에는 직접 올리지 않습니다.
+[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 요약하면 브랜치 → `node scripts/check.mjs` (Node 20+) → PR → 병합 (프로토타입은 GitHub Pages 자동 갱신 · 앱은 web/DEPLOY.md). `main`에는 직접 올리지 않습니다.
 
 ---
 

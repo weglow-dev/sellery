@@ -4,8 +4,7 @@
 
 | Vercel 프로젝트 | 내용 | Root Directory | 주소 |
 |---|---|---|---|
-| `sellery` (기존) | 프로토타입 — 저장소 루트를 빌드 없이 서빙(`vercel.json` framework null, `.vercelignore` 가 `web` 제외) | `/` | https://sellery-swart.vercel.app/ → 도메인 이전 후 `demo.sellery.life`(§6) |
-| `sellery-app` (신규) | 이 앱 | `web` | `https://sellery-app.vercel.app` → 준비되면 `https://sellery.life`(§6) |
+| `sellery-app` | 이 앱 — Vercel 에는 이 프로젝트 **하나** (프로토타입 프로젝트 `sellery` 는 2026-09-18 삭제, 프로토타입 데모는 GitHub Pages) | `web` | https://sellery.life (고객) · https://www.sellery.life → apex · https://inf.sellery.life (인플루언서 콘솔) · https://sellery-app.vercel.app (임시 확인·Preview) — §6 |
 
 같은 GitHub 저장소(`weglow-dev/sellery`)에 두 프로젝트를 연결한다. `main` 병합 = 두 프로젝트 모두 Production 배포, PR = Preview. 값(키)은 이 문서·코드·PR 어디에도 쓰지 않는다 — `web/.env.local`(gitignored) 과 Vercel 환경변수에만.
 
@@ -18,7 +17,7 @@ Vercel → team `weglow-team` → Add New Project → 저장소 `weglow-dev/sell
 | 항목 | 값 | 이유 |
 |---|---|---|
 | Project Name | `sellery-app` | |
-| **Root Directory** | `web` | 모노레포 형태. 지정하지 않으면 루트의 프로토타입 `vercel.json`(framework null) 을 읽어 Next 빌드를 하지 않는다 |
+| **Root Directory** | `web` | 모노레포 형태 — 루트에는 `vercel.json` 이 없다(CLI 배포는 `--cwd web`) |
 | **Include source files outside of the Root Directory** | **off** | 앱은 루트 파일(`js/`, `css/`, `supabase/`)을 import 하지 않는다. 켜면 업로드 범위만 커진다 |
 | Framework Preset | Next.js (자동 감지) | |
 | Build / Install Command | 기본값 (`next build` / `npm install`) | `web/package.json` 에 `prebuild` 훅 없음 |
@@ -128,26 +127,25 @@ cd web && npm run gen:types                                 # src/lib/database.t
 - `.github/workflows/web-ci.yml` — job `web-ci`: `web/` 에서 `npm ci → next typegen → typecheck → lint → build`(Node 20, 더미 env). 모든 PR 과 `main` push 에서 돈다(paths 필터 없음 — required check 는 항상 결과를 보고해야 한다).
 - 기존 `.github/workflows/ci.yml`(job `프로토타입 점검` = `node scripts/check.mjs`)은 그대로.
 - **브랜치 보호(`main`) → Require status checks** 에 `web-ci` 를 **추가**한다(`프로토타입 점검` 과 둘 다). job `name` 을 바꾸면 보호 규칙도 같이 바꿀 것.
-- Vercel GitHub 연동이 되면 PR 마다 `sellery`(프로토타입) · `sellery-app`(앱) Preview 댓글이 각각 달린다.
+- Vercel GitHub 연동이 되면 PR 마다 `sellery-app` Preview 댓글이 달린다(프로토타입은 GitHub Pages 라 미리보기 없음).
 
-## 6. 도메인 이전 절차 (`sellery.life`: 프로토타입 → 앱)
+## 6. 도메인 (`sellery.life` — 2026-09-18 상태)
 
-앱이 준비되면(§7 체크리스트 완료 + Preview 에서 §11.2/§11.3 시나리오 통과) 정식 도메인을 `sellery` 프로젝트에서 `sellery-app` 으로 옮긴다. 프로토타입은 지우지 않고 서브도메인으로 유지한다(제안서 데모 · 이해관계자 시연용).
+Vercel 프로젝트는 `sellery-app` 하나이고 도메인 세 개가 전부 여기에 붙어 있다(프로토타입 프로젝트는 삭제 — 옮길 대상이 없다). 등록기관 호스팅케이알, 네임서버 `ns1~4.hosting.co.kr`. DNS 레코드는 호스팅케이알 → 도메인 → "DNS 레코드 관리" 에서.
 
-1. **결정**: 프로토타입 주소를 `demo.sellery.life` 로 할지 확정(§13 열린 결정). 이전 시각은 트래픽이 적은 시간으로.
-2. **사전 준비 (이전 전날까지)**
-   - Vercel `sellery-app` Production 환경변수에 **라이브 토스 키 짝** · `NEXT_PUBLIC_SITE_URL=https://sellery.life` 입력 → 재배포.
-   - Supabase URL Configuration: Site URL 을 `https://sellery.life` 로, Redirect URLs 에 `https://sellery.life/**` 가 있는지(§3.1). 카카오 Redirect URI 는 Supabase 콜백이라 변경 없음.
-   - 토스 라이브 상점 웹훅 URL 을 `https://sellery.life/api/payments/webhook` 으로 **미리 추가**(테스트 상점은 그대로 둔다).
-   - `web/next.config.ts` 의 `redirects()` 에 프로토타입 경로 리다이렉트 추가(A 파티션 파일): `/index.html` → `/`, `/login.html` → `/login`. 해시 라우트(`/#s/c1`, `/#customer`)는 서버가 볼 수 없어 리다이렉트 불가 — 제안서 · SNS 에 뿌린 `/#s/{code}` 링크가 있으면 홈에서 안내(다음 슬라이스).
-   - 프로토타입 저장소 안내 링크(루트 `README.md` · `CONTRIBUTING.md` 의 데모 주소)를 `demo.sellery.life` 기준으로 바꿀 PR 준비.
-3. **이전 (Vercel 대시보드)**
-   - `sellery` 프로젝트 → Settings → Domains 에서 `sellery.life`(과 `www`) **제거** → `sellery-app` → Domains 에 **추가**. 같은 팀 안에서는 Vercel 이 DNS 검증 없이 넘겨 준다. DNS 가 Vercel 네임서버가 아니면(등록기관 관리) Vercel 이 안내하는 A/CNAME 레코드가 그대로인지 확인 — 보통 레코드는 바뀌지 않는다.
-   - `sellery` 프로젝트에 `demo.sellery.life` 추가 → DNS 에 CNAME `cname.vercel-dns.com` 추가.
-   - `www.sellery.life` → `sellery.life` 리다이렉트는 Vercel Domains 설정에서.
-4. **확인 (5분 안에)**: `curl -sI https://sellery.life/` 200 · `https://sellery.life/s/<handle>/<code>` 200 · `https://sellery.life/c/<code>` 308 · `/login` 에서 카카오 로그인 왕복 · 토스 라이브 키로 **소액 실결제 1건 후 즉시 취소**(내 주문에서 환불 → 카드사 취소 확인) · 토스 콘솔 "웹훅 테스트 전송" 200 · `robots.txt` 에 `/api` `/checkout` `/account` disallow.
-5. **사후**: 준비한 README/CONTRIBUTING PR 병합 · 제안서 · 카카오 채널 · 인플루언서에게 알린 링크 형식은 `https://sellery.life/s/{handle}/{code}`(`@` 없는 핸들) · 토스 테스트 상점 웹훅은 그대로 Preview/로컬용.
-6. **롤백**: 도메인을 다시 `sellery` 프로젝트로 옮기면 즉시 프로토타입으로 돌아간다(두 프로젝트 모두 살아 있다). 앱 자체 문제는 Vercel Deployments → 이전 배포 "Promote to Production"(Instant Rollback). DB 마이그레이션은 forward-only — 되돌리려면 새 마이그레이션.
+| 호스트 | 레코드 | 용도 | 상태 |
+|---|---|---|---|
+| `inf` | `A 76.76.21.21` | 인플루언서 콘솔 — Production `NEXT_PUBLIC_INF_HOST=inf.sellery.life` | 연결 완료 · 호스트 모드 확인(`/api/health` hosts.mode=host) |
+| `@` | `A 76.76.21.21` | 고객 사이트 | DNS 입력됨 · Vercel 검증 대기 |
+| `www` | `CNAME cname.vercel-dns.com` (또는 `A 76.76.21.21`) | apex 로 리다이렉트(Vercel Domains 에서 설정) | DNS 대기 |
+| `brand` | (브랜드 콘솔 때) `A 76.76.21.21` | `NEXT_PUBLIC_BRAND_HOST` | 미정 |
+
+apex 가 붙은 뒤:
+1. Production 환경변수 `NEXT_PUBLIC_SITE_URL=https://sellery.life` → 재배포(고객 호스트 판정 · 판매 링크 · metadataBase 기준. Preview 는 그대로).
+2. Supabase → Authentication → URL Configuration: Site URL `https://sellery.life`, Redirect URLs 에 `https://sellery.life/**` · `https://inf.sellery.life/**`(§3.1).
+3. 토스 웹훅 URL `https://sellery.life/api/payments/webhook`(테스트·라이브 상점 각각).
+4. 확인: `curl -sI https://sellery.life/` 200 · `/c/<code>` 308 · `/robots.txt` 에 `/influencer` disallow · `https://sellery.life/influencer/home` → `https://inf.sellery.life/home` 308 · `/api/health` 200.
+5. 롤백: 앱 문제는 Vercel Deployments → 이전 배포 "Promote to Production"(Instant Rollback). DB 마이그레이션은 되돌리지 않고 앞으로만 고친다.
 
 ## 7. 배포 전 체크리스트 (`docs/app-plan.md §13` — 사용자가 해야 할 것)
 
