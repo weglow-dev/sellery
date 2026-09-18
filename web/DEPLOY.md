@@ -131,17 +131,17 @@ cd web && npm run gen:types                                 # src/lib/database.t
 
 ## 6. 도메인 (`sellery.life` — 2026-09-18 상태)
 
-Vercel 프로젝트는 `sellery-app` 하나이고 도메인 세 개가 전부 여기에 붙어 있다(프로토타입 프로젝트는 삭제 — 옮길 대상이 없다). 등록기관 호스팅케이알, 네임서버 `ns1~4.hosting.co.kr`. DNS 레코드는 호스팅케이알 → 도메인 → "DNS 레코드 관리" 에서.
+Vercel 프로젝트는 `sellery-app` 하나이고 도메인 세 개가 전부 여기에 붙어 있다(프로토타입 프로젝트는 삭제 — 옮길 대상이 없다). 등록기관 호스팅케이알, 네임서버 `ns1~4.hosting.co.kr`. DNS 레코드는 호스팅케이알 → 도메인 → "DNS 레코드 관리" 에서. **호스팅케이알 주의**: 레코드 목록에 보여도 네임서버 4대에 실리기까지 20~40분, 서버마다 시차가 있다(`nslookup -type=A <host> ns1.hosting.co.kr` 로 서버별 확인). 로컬 KT 리졸버는 더 늦으니 `8.8.8.8`/`1.1.1.1` 로 본다. Vercel 인증서가 "being generated" 에서 멈추면 `vercel certs issue <domain> --scope weglow-team`.
 
 | 호스트 | 레코드 | 용도 | 상태 |
 |---|---|---|---|
 | `inf` | `A 76.76.21.21` | 인플루언서 콘솔 — Production `NEXT_PUBLIC_INF_HOST=inf.sellery.life` | 연결 완료 · 호스트 모드 확인(`/api/health` hosts.mode=host) |
-| `@` | `A 76.76.21.21` | 고객 사이트 | DNS 입력됨 · Vercel 검증 대기 |
-| `www` | `CNAME cname.vercel-dns.com` (또는 `A 76.76.21.21`) | apex 로 리다이렉트(Vercel Domains 에서 설정) | DNS 대기 |
+| `@` | `A 76.76.21.21` | 고객 사이트 — Production `NEXT_PUBLIC_SITE_URL=https://sellery.life`(2026-09-18 반영) | 연결 완료 · 인증서 발급(`vercel certs issue sellery.life` 로 수동 촉발) · `/influencer/*` → inf 308 확인 |
+| `www` | `A 76.76.21.21` 권장 (CNAME `cname.vercel-dns.com` 은 호스팅케이알이 1시간 넘게 존에 싣지 않았다 — 2026-09-18) | apex 로 리다이렉트(Vercel Domains 에서 설정) | DNS 대기 |
 | `brand` | (브랜드 콘솔 때) `A 76.76.21.21` | `NEXT_PUBLIC_BRAND_HOST` | 미정 |
 
-apex 가 붙은 뒤:
-1. Production 환경변수 `NEXT_PUBLIC_SITE_URL=https://sellery.life` → 재배포(고객 호스트 판정 · 판매 링크 · metadataBase 기준. Preview 는 그대로).
+apex 가 붙은 뒤(1 은 완료):
+1. ~~Production 환경변수 `NEXT_PUBLIC_SITE_URL=https://sellery.life` → 재배포~~ 완료 2026-09-18 (Preview 는 그대로).
 2. Supabase → Authentication → URL Configuration: Site URL `https://sellery.life`, Redirect URLs 에 `https://sellery.life/**` · `https://inf.sellery.life/**`(§3.1).
 3. 토스 웹훅 URL `https://sellery.life/api/payments/webhook`(테스트·라이브 상점 각각).
 4. 확인: `curl -sI https://sellery.life/` 200 · `/c/<code>` 308 · `/robots.txt` 에 `/influencer` disallow · `https://sellery.life/influencer/home` → `https://inf.sellery.life/home` 308 · `/api/health` 200.
