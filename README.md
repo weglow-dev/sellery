@@ -4,7 +4,7 @@
 
 브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
 
-**데모** → https://sellery-swart.vercel.app/ (Vercel · `main` 자동 배포) — 첫 화면에서 센터를 고릅니다.
+**정식 서비스** → https://sellery.life (아래 "현재 서비스 상태" 참고). **SvelteKit 데모(apps/*)** 는 로컬 `npm run build && npm run serve` 로 확인합니다 — 첫 화면에서 센터를 고릅니다. (예전 Vercel 데모 주소 sellery-swart.vercel.app 은 2026-09-18 삭제)
 
 | 주소 | 화면 |
 |---|---|
@@ -16,6 +16,12 @@
 | `/influencer/login` · `/brand/login` | 파트너 로그인 데모 (계정 목록은 화면 안 · 비밀번호 8자 이상 아무거나) |
 
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
+
+## 현재 서비스 상태 (2026-09-18)
+
+- **정식 주소 https://sellery.life 는 아직 `web/`(Next.js 16 · Supabase · 토스페이먼츠) 가 서비스합니다** — 판매 링크·카카오 로그인·토스 결제·내 주문·약관/처리방침, 인플루언서 콘솔 1~2단계(`/influencer` 가입·로그인·홈·채널 인증). Vercel 프로젝트 `sellery-app`(Root Directory `web`, `main` 자동 배포). 실행·배포는 [web/README.md](web/README.md) · [web/DEPLOY.md](web/DEPLOY.md), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md).
+- `apps/*`(SvelteKit 앱 4개)는 아직 localStorage 데모입니다. **이후 작업은 `web/` 의 기능을 `apps/shop` → `apps/influencer` → `apps/brand` → `apps/admin` 순서로 옮기는 것**이며, 같은 수준에 도달하면 도메인을 옮기고 `web/` 를 지웁니다. 그 전까지 `web/` 는 손대지 않습니다(버그 수정만).
+- Supabase 스키마는 `supabase/migrations/0001~0010` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입). 새 변경은 새 번호로.
 
 ## 기술 스택
 

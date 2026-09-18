@@ -118,3 +118,7 @@ main에 병합되면 Vercel 이 `npm run build` 를 돌려 https://sellery-swart
 - 화면·helper 안에서 상태 직접 변경 (`actions.ts` 로)
 - `dist/` · `.svelte-kit/` 커밋 (빌드 산출물 · gitignore 되어 있음)
 - 제안서 PDF에 인쇄된 옛 데모 저장소(`junho763-dotcom/sellery-prototype`) 지우기
+
+## `web/` (현재 sellery.life 서비스 중인 Next.js 앱)
+
+`web/` 는 별도 패키지(npm workspaces 밖)입니다. 고칠 때는 `cd web && npm install && npm run typecheck && npm run lint && npm run build`, PR 에서 `web-ci` 가 같은 순서를 돌립니다. 비밀키는 `web/.env.local` 과 Vercel 환경변수에만. 자세한 건 [web/README.md](web/README.md) · [web/DEPLOY.md](web/DEPLOY.md).
