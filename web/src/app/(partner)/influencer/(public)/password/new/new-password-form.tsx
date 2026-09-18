@@ -4,7 +4,11 @@ import { useState, type FormEvent } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PASSWORD_RE } from "@/lib/partner/signup-rules";
 
-/** `updateUser({ password })` → 콘솔 홈(전체 이동). 규칙은 가입과 동일(영문+숫자 8자 이상). */
+/**
+ * New password form: updateUser({ password }) then full navigation to the console home.
+ * Password rule is the same as signup (letters + digits, 8+ chars) — Turbopack's code-frame highlighter panics on
+ * non-ASCII text in the first line of a diagnostic frame (Vercel build, Next 16.2.9), so this header stays ASCII.
+ */
 export function NewPasswordForm({ homePath }: { homePath: string }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
