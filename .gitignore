@@ -30,3 +30,9 @@ node_modules/
 # 원본·누끼 소스(배경 제거 전 png, 포토샵 원본 등)는 assets/_src/ 에 두며 배포에 불필요하므로 무시.
 # (product images live in assets/ and are committed; raw/cutout sources live in assets/_src/ and are ignored)
 assets/_src/
+
+# SvelteKit · 빌드 산출물 (Vercel 이 빌드 때 생성)
+.svelte-kit/
+build/
+dist/
+!.env.example

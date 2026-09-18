@@ -1,0 +1,26 @@
+{
+  "name": "sellery",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:influencer": "npm run dev -w apps/influencer",
+    "dev:brand": "npm run dev -w apps/brand",
+    "dev:admin": "npm run dev -w apps/admin",
+    "dev:shop": "npm run dev -w apps/shop",
+    "build": "node scripts/build.mjs",
+    "check": "npm run check --workspaces --if-present",
+    "build:apps": "npm run build --workspaces --if-present",
+    "serve": "node scripts/serve-dist.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.10"
+  }
+}

@@ -2,6 +2,7 @@ name: CI
 
 # PR 필수 상태 검사. 브랜치 보호 규칙의 required status check 컨텍스트는
 # 아래 job 의 name("프로토타입 점검") 이다 — 이름을 바꾸면 보호 규칙도 같이 바꿀 것.
+# 내용: 앱 4개 svelte-check(타입·템플릿) + 배포와 같은 빌드(scripts/build.mjs → dist/).
 
 on:
   pull_request:
@@ -19,6 +20,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: node scripts/check.mjs
-        run: node scripts/check.mjs
+          node-version: '22'
+          cache: npm
+      - name: npm ci
+        run: npm ci
+      - name: svelte-check (apps/*)
+        run: npm run check
+      - name: build (dist/)
+        run: npm run build

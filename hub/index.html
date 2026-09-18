@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>셀러리 — 센터 선택</title>
+<meta name="description" content="좋은 브랜드를 만나는 공간, 셀러리. 인플루언서 · 브랜드 · 관리자 · 고객 센터로 이동합니다." />
+<link rel="icon" href="/assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;900&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+	:root { --cream: #efede2; --ink: #111; --green: #457c28; --yellow: #f7df3e; }
+	* { box-sizing: border-box; }
+	html, body { margin: 0; background: var(--cream); color: var(--ink); font-family: 'IBM Plex Sans KR', system-ui, sans-serif; font-synthesis: none; word-break: keep-all; }
+	main { min-height: 100svh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 20px; gap: 28px; }
+	.mark { display: flex; align-items: center; gap: 12px; font-family: Archivo, sans-serif; font-weight: 900; font-size: 34px; letter-spacing: -0.02em; }
+	.mark svg { width: 40px; height: 40px; transform: rotate(-14deg); }
+	.tag { margin: -14px 0 0; font-size: 15px; color: #444; }
+	.tag mark { background: var(--yellow); padding: 0 4px; }
+	.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; width: min(920px, 100%); }
+	a.card { display: block; text-decoration: none; color: inherit; background: #fff; border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 22px 20px 20px; transition: transform .08s, box-shadow .08s; }
+	a.card:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+	a.card:active { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--ink); }
+	.card b { display: block; font-family: Archivo, sans-serif; font-weight: 900; font-size: 20px; margin-bottom: 6px; }
+	.card span { font-size: 13px; color: #555; line-height: 1.5; }
+	.card em { display: inline-block; font-style: normal; font-size: 11px; font-weight: 700; color: var(--green); border: 1.5px solid var(--green); padding: 1px 7px; margin-bottom: 10px; }
+	footer { font-size: 12px; color: #666; }
+</style>
+</head>
+<body>
+<main>
+	<div class="mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M30 60c-2-14 1-27 8-38" fill="none" stroke="#457c28" stroke-width="7" stroke-linecap="round"/><path d="M38 22c-8-6-9-14-4-19 6 4 9 11 4 19z" fill="#6aa84f"/><path d="M38 22c2-9 9-13 15-11-1 7-7 12-15 11z" fill="#457c28"/><path d="M38 22c-9 0-16-5-17-12 7-1 14 4 17 12z" fill="#457c28"/></svg>SELLERY</div>
+	<p class="tag">좋은 브랜드를 만나는 공간, <mark>셀러리</mark> — 들어갈 센터를 선택하세요</p>
+	<div class="grid">
+		<a class="card" href="/shop/"><em>CUSTOMER</em><b>고객 판매 페이지</b><span>진행 중인 판매 · 장바구니 · 카카오 로그인 · 내 주문</span></a>
+		<a class="card" href="/influencer/"><em>INFLUENCER</em><b>인플루언서 센터</b><span>캠페인 · DM · 상품 갤러리 · 정산 · 랭킹·등급 · 셀러리 샵</span></a>
+		<a class="card" href="/brand/"><em>BRAND</em><b>브랜드 센터</b><span>상품 관리 · 주문·발주 · 고객 문의 · 인플루언서 갤러리</span></a>
+		<a class="card" href="/admin/"><em>ADMIN</em><b>관리자</b><span>검수 · 매칭·자동 제안 · 매출·순수익 · 정산 실행</span></a>
+	</div>
+	<footer>프로토타입 · 데모 데이터는 이 브라우저에만 저장됩니다 · 관리자 대시보드에서 초기화</footer>
+</main>
+</body>
+</html>
