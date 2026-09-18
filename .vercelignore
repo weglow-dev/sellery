@@ -1,13 +1,14 @@
-# Vercel 은 npm ci → npm run build (scripts/build.mjs) → dist/ 를 서빙한다. 빌드에 필요 없는 것만 제외.
+# 저장소 루트 기준 제외 목록. 패턴은 반드시 `/` 로 시작(루트 고정) — `supabase` 처럼 쓰면 web/src/lib/supabase 같은 하위 폴더까지 지워져
+# Vercel 빌드에서 "Module not found" 가 난다(2026-09-18 실제 발생). `web/`(Root Directory) 는 Next 빌드에 통째로 필요.
 .git
 .github
 .claude
 .vscode
-docs
-supabase
-assets/_src
+/docs
+/supabase
+/assets/_src
 *.md
-_site
-_preview.html
+/_site
+/_preview.html
 .env*
 .vercel

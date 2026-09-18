@@ -356,3 +356,38 @@ on conflict do nothing;
 update public.brands b
    set grade = public.brand_grade_for_gmv(public.brand_gmv(b.id))
  where b.code in ('b1','b2');
+
+-- ============================================================
+-- 15) 앱 검증용 LIVE 캠페인 — 실행일 기준 30일 (app-plan §10.1 G 완료 기준: "오늘 기준 LIVE 캠페인 1건 이상")
+--   7) 의 c1/c12 는 최초 투입일 기준 ±2~3일이라 며칠 뒤에는 end_date 가 지나 isBuyable/app_confirm_checkout 이 NOT_LIVE 가 된다.
+--   이 절은 재투입(`npx supabase db push --linked --include-seed`)할 때마다 "오늘(KST)부터 30일" 인 LIVE 캠페인 2건을 보장한다.
+--   · 기준일은 current_date(세션 UTC) 가 아니라 KST 날짜 — campaign_card().campaign.today · app_confirm_checkout 의 v_today 와 같은 식.
+--   · on conflict do nothing 이라 이미 있는 c14/c15 의 날짜는 바뀌지 않는다. 30일이 지나 되살리려면 두 행(과 주문)을 지우고 재투입.
+--   · (seller, product) 는 campaigns_active_pair_uidx(활성 캠페인 1개) 에 걸리지 않는 새 조합, 인플루언서는 공개(hidden=false).
+--     c14 혜린(s2) × 데일리 플랜트 프로틴(p5, b1) · c15 소민(s7) × 수분광 앰플 마스크(p10, b2). 두 상품 모두 options='[]' 라
+--     campaign_card 의 resolve_product_options(1개 / 2개 세트 · 5% 추가 할인 / 3개 세트 · 10% 추가 할인) 경로를 검증한다.
+--   · 재고 500 (p5 stock 900 · p10 stock 1800, 다른 기간 점유 캠페인 없음). 주문 시드는 없음(sold_qty 0 → 잔여 500).
+-- ============================================================
+insert into public.campaigns (id, code, seller_id, product_id, status, start_date, end_date, qty, created_at,
+                              purchased, sample_price, sample_cel, sample_cash, sample_method, invited, cel_used)
+select v.id, v.code, v.seller_id, v.product_id, 'LIVE', t.d, t.d + 30, 500, (t.d - 7)::timestamptz,
+       false, null, 0, 0, null, false, 0
+  from (select (now() at time zone 'Asia/Seoul')::date as d) t
+ cross join (values
+   ('c0000000-0000-4000-8000-000000000014'::uuid, 'c14', 'a0000000-0000-4000-8000-000000000002'::uuid, 'd0000000-0000-4000-8000-000000000005'::uuid),
+   ('c0000000-0000-4000-8000-000000000015'::uuid, 'c15', 'a0000000-0000-4000-8000-000000000007'::uuid, 'd0000000-0000-4000-8000-000000000010'::uuid)
+ ) as v(id, code, seller_id, product_id)
+on conflict do nothing;
+
+-- c14/c15 스레드: 일정 확정 + 판매 시작 (7)/9) 의 c1/c12 와 같은 형식)
+insert into public.campaign_events (id, campaign_id, kind, sender, actor_role, body, event_type, payload, created_at)
+select md5('sellery:event:' || c.code || ':' || e.n)::uuid, c.id, 'system', 'system', 'system',
+       case e.n when 1 then '일정 확정 ' || to_char(c.start_date, 'FMMM/FMDD') || ' – ' || to_char(c.end_date, 'FMMM/FMDD') || ' · 배정 재고 ' || c.qty
+                else '판매 링크 활성화 — 판매 시작' end,
+       case e.n when 1 then 'schedule_confirmed' else 'went_live' end,
+       case e.n when 1 then jsonb_build_object('start', c.start_date, 'end', c.end_date, 'qty', c.qty) else '{}'::jsonb end,
+       case e.n when 1 then (c.start_date - 5)::timestamptz + interval '1 minute' else c.start_date::timestamptz + interval '1 minute' end
+  from public.campaigns c
+ cross join (values (1), (2)) as e(n)
+ where c.code in ('c14', 'c15')
+on conflict do nothing;

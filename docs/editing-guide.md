@@ -27,7 +27,7 @@
 
 > 셀러리 프로토타입은 **빌드가 없는 정적 사이트**입니다. `index.html` 하나가 `css/` 2개와 `js/` 12개를 불러오고, 데이터는 방문자 **브라우저의 localStorage**에만 저장됩니다(서버 없음). `main`에 머지되면 **Vercel 이 자동 배포**합니다 (1분 내). PR 미리보기 URL 은 Vercel GitHub 앱 연동 여부에 따라 달라집니다 — §5 참고.
 >
-> - 배포 주소: https://sellery-swart.vercel.app/
+> - 배포 주소(프로토타입 데모 · GitHub Pages): https://weglow-dev.github.io/sellery/ — 정식 서비스(앱)는 https://sellery.life
 > - 저장소: https://github.com/weglow-dev/sellery
 
 ---
@@ -173,7 +173,7 @@ Sellery/
 - **CI 프로토타입 점검 통과 필수** — PR 의 Checks 탭에 `CI / 프로토타입 점검`으로 보입니다 (`scripts/check.mjs`). 검사 6종: (1) `js/*.js` + `index.html`·`login.html` 인라인 스크립트 문법, (2) 병합 충돌 표시(`<<<<<<<`)·`debugger` 잔여물, (3) `const LS='sellery-proto-vNN'` 존재, (4) 주요 화면 함수(`vSellerHome` · `vBrandHome` · `vAdminOrders` · `vBrandCS` · `vCustHome` · `vStore` · `vAdminSettle` · `render`) 존재, (5) html/css/js 가 가리키는 로컬 경로가 실제 파일로 — **대소문자까지** — 해석되는지(참조 무결성), (6) `index.html`이 `css/`·`js/`의 모든 파일을 정확히 한 번씩 링크하고 `<script>` 순서가 `js/` 사전순과 같은지.
 - **리뷰 코멘트는 모두 해결(resolve)** 해야 머지 버튼이 열립니다 (Conversation resolution).
 - 승인 수를 강제하진 않지만 **1명 리뷰를 권장**합니다. 카피 변경은 마케팅, 디자인 변경은 디자인, 정책 변경은 기획 + 개발자에게 리뷰를 요청하세요.
-- 머지 → **Vercel 자동 배포 1분 내** (https://sellery-swart.vercel.app/). Vercel GitHub 앱이 연동돼 있으면 PR 댓글에 **미리보기 URL**이 달리니 머지 전에 거기서 확인하세요. 댓글이 없으면(연동 전) 브랜치를 받아 로컬에서 확인(§6-8)하고 PR에 스크린샷을 첨부하세요. 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`).
+- 머지 → **GitHub Pages 자동 갱신 1~2분** (https://weglow-dev.github.io/sellery/). Vercel GitHub 앱이 연동돼 있으면 PR 댓글에 **미리보기 URL**이 달리니 머지 전에 거기서 확인하세요. 댓글이 없으면(연동 전) 브랜치를 받아 로컬에서 확인(§6-8)하고 PR에 스크린샷을 첨부하세요. 반영이 안 보이면 강력 새로고침(`Ctrl+Shift+R`).
 
 ---
 

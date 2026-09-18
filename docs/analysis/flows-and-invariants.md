@@ -268,7 +268,7 @@ r(v) = round(v/100)*100
 
 ### 3.6 판매 링크·진입 보호
 
-- 링크 형식: `sellery.co.kr/s/{handle without @}/{cid}` (L1842, L3546, L3502, L4411); 상세 미리보기 `sellery.co.kr/p/{pid}` (L3502).
+- 링크 형식: `sellery.life/s/{handle without @}/{cid}` (L1842, L3546, L3502, L4411); 상세 미리보기 `sellery.life/p/{pid}` (L3502).
 - 프로토타입 해시 진입: `#s/cN` 또는 `#link/cN` — 정규식 `/^(?:s|link)\/(c\d+)$/` (L1591, L1596). 존재하는 캠페인이면 customer 뷰로 잠그고 `S.linkCtx={cid}` 저장.
 - `LINKCTX_KEY='slry-linkctx'` localStorage `{cid, at}` L1566-1567. 해제 조건 L1573-1575: 캠페인이 사라졌거나 `(today − P(c.end))/DAY > 7` (종료 후 7일 초과). 미종료(end 없음)면 무기한 유지.
 - 보호 규칙 `custVisible(c)` L3255-3260: linkCtx 가 있으면 링크 판매자의 캠페인은 모두 표시, 타 판매자 캠페인은 `p.id != lp.id && p.cat != lp.cat` 일 때만 표시 (같은 상품 OR 같은 카테고리 숨김).

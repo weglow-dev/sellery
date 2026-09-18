@@ -205,7 +205,7 @@
 | 코드 발급 | 시드에 고정 문자열: 인플루언서 `refCode`(JIYU10·HYERIN·MINJI5·SEOA88·LOLA00·HANEUL·SOMIN7·YUNA88), 브랜드 `refCode`(VYNE-01·GLO-002). 런타임 발급 로직 없음 |
 | 연결 관계 | `referredBy`(시드 전용): s3 민지 ← s1 지유, b2 글로헬스 ← b1 바인허브. 화면 배너 "🌱 추천 부스트 적용 중 — ○○님 추천으로 가입했어요"·"🌱 추천 혜택 적용 중 — ○○ 추천으로 입점" |
 | 코드 입력 | `login.html` 가입 폼의 "추천 코드 (선택)"(`#jRef`, placeholder "예: JIYU01 — 첫 5회 판매 수수료 +1%p")는 값을 대문자로 읽어 `pendingJoin.ref`에 넣지만 세션에 저장하지 않고, 신규 계정은 데모 첫 계정(s1/b1)으로 입장한다 → **코드 입력 → `referredBy` 연결은 미정(코드 미구현)** |
-| 코드 공유 | `copyRef`: "셀러리에서 같이 판매해요! 가입할 때 추천 코드 ○○ 입력하면 첫 5회 판매 수수료 +1% → sellery.co.kr" · `copyBrandRef`: "셀러리에 브랜드 입점하세요! 가입 시 추천 코드 ○○ 입력하면 첫 3회 판매 플랫폼 수수료 −1%p → sellery.co.kr/brand" |
+| 코드 공유 | `copyRef`: "셀러리에서 같이 판매해요! 가입할 때 추천 코드 ○○ 입력하면 첫 5회 판매 수수료 +1% → sellery.life" · `copyBrandRef`: "셀러리에 브랜드 입점하세요! 가입 시 추천 코드 ○○ 입력하면 첫 3회 판매 플랫폼 수수료 −1%p → sellery.life/brand" |
 | 시드 실적 | `refEarnings`: s1 ← s3 ₩186,400(지난 판매) · `brandRefEarnings`: b1 ← b2 ₩318,000(지난 판매) |
 
 - 문구 불일치(코드 내부): `copyRef` 메시지는 "+1%"(p 누락), 화면·`login.html`은 "+1%p".
