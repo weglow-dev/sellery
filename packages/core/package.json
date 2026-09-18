@@ -1,0 +1,16 @@
+{
+  "name": "@sellery/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "svelte": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

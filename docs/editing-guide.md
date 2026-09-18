@@ -1,5 +1,26 @@
 # 셀러리 수정 가이드 — 데모 데이터 · 화면 · 디자인 (비개발자용 상세판)
 
+> **⚠ 2026-09-18 구조 변경 안내.** 프로토타입이 바닐라 JS 한 페이지에서 **SvelteKit 모노레포**로 바뀌었습니다. 아래 본문의 `index.html` · `js/…` · `css/…` 경로는 옛 구조 기준이라, 파일 위치는 이 표로 바꿔 읽어 주세요. 필드 이름·정책 숫자·화면 설명은 그대로 유효합니다. 짧은 절차는 [CONTRIBUTING.md](../CONTRIBUTING.md) 를 먼저 보세요.
+>
+> | 옛 파일 | 지금 파일 |
+> |---|---|
+> | `js/01-seed.js` (데모 데이터) | `packages/core/src/seed.ts` |
+> | `js/00-core.js` · `js/02-state.js` 의 상수 | `packages/core/src/constants.ts` |
+> | `js/02-state.js` 의 helper (정산 계산 등) | `packages/core/src/helpers.ts` |
+> | `js/80-actions.js` (버튼이 하는 일) | `packages/core/src/actions.ts` |
+> | `js/20-seller.js` 인플루언서 센터 | `apps/influencer/src/routes/<화면>/+page.svelte` |
+> | `js/40-brand.js` 브랜드 센터 | `apps/brand/src/routes/<화면>/+page.svelte` |
+> | `js/50-admin.js` 관리자 | `apps/admin/src/routes/<화면>/+page.svelte` |
+> | `js/60-customer.js` 고객 · 소개 | `apps/shop/src/routes/<화면>/+page.svelte` |
+> | `js/30-shared.js` · `js/70-campaign.js` (샵 · 매출 · 캠페인 상세 · 모달) | `packages/ui/src/views/` · `packages/ui/src/modals/` |
+> | `js/10-render.js` 앱바·탭 | `packages/ui/src/components/AppShell.svelte` |
+> | `css/base.css` · `css/skin.css` | `packages/ui/src/css/theme.css` (+ `css/legacy/`) |
+> | `login.html` | `packages/ui/src/views/LoginPage.svelte` (`/influencer/login` · `/brand/login`) |
+> | `index.html` | 없음 — 첫 화면은 `hub/index.html`, 각 앱은 `apps/<앱>/src/app.html` |
+> | `node scripts/check.mjs` | `npm run check` (+ `npm run build`) |
+>
+> 이제는 파일을 고치기 전에 `npm install` 한 번이 필요하고, GitHub.com 웹 편집기로 고쳐도 됩니다(병합되면 Vercel 이 빌드해서 배포).
+
 > 짧은 절차는 [CONTRIBUTING.md](../CONTRIBUTING.md) 를 먼저 보세요. 이 문서는 "어느 파일의 어떤 필드를 고치면 되는지"를 자세히 적은 레퍼런스입니다.
 
 이 문서는 **개발자가 아닌 팀원**(마케팅 · 디자인 · 기획)도 프로토타입에 직접 기여할 수 있도록 만든 가이드입니다. 개발자용 규칙(파일 분리 · 액션 맵 · 정책 상수)도 함께 담았습니다.
