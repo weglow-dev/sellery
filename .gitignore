@@ -3,6 +3,7 @@ CLAUDE.local.md
 
 # Editor / IDE / 에이전트 설정
 .claude/
+.kiro/
 .vscode/
 .idea/
 *.swp
