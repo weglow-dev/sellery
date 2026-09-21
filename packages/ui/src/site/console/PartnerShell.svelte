@@ -6,7 +6,7 @@
 	 * href 는 전부 `consolePath(role, …)`(경로 모드 고정 — `/influencer/home`). 호스트 모드(`host` prop)는 결정 11 로 폐기됐다.
 	 * 우측 자리(`me`)는 앱 레이아웃이 `getSellerContext()`(DB 게이트 아님 — 표시용) 로 채운다. 세션·행이 없으면 비워 둔다(공개 페이지).
 	 * 정지 계정은 이름만(grade · balance null). 로그아웃은 콘솔 전용 `POST /influencer/auth/signout?next=/influencer/login`(결정 15).
-	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` 다(결정 6). 탭 5개 전부 활성(상품·캠페인 3단계 · 매출 5단계 — `/sales` `/settle` 은 (demo) 그룹에서 빠졌다). `disabled` 옵션은 브랜드 콘솔 예고용으로 남긴다.
+	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` · `requireBrand()` 다(결정 6). 인플루언서 탭 5개는 전부 활성(상품·캠페인 3단계 · 매출 5단계), 브랜드는 1단계라 홈만 활성 — 나머지는 `disabled` 예고(brand-console-plan §6).
 	 */
 	import type { ConsoleRole } from '@sellery/db/console-paths';
 	import type { ConsoleTab } from './ConsoleTabs.svelte';
@@ -19,7 +19,7 @@
 		brand: '브랜드 콘솔'
 	};
 
-	/* 탭 href 는 접두 없는 콘솔 경로 — 셸이 consolePath 로 접두를 붙인다. 브랜드 콘솔 때 확정(inf-console-plan §9) — 지금은 같은 골격(§5.5). */
+	/* 탭 href 는 접두 없는 콘솔 경로 — 셸이 consolePath 로 접두를 붙인다. */
 	export const TABS: Record<ConsoleRole, ConsoleTab[]> = {
 		seller: [
 			{ href: '/home', label: '홈', icon: 'home' },
@@ -28,12 +28,14 @@
 			{ href: '/sales', label: '매출', icon: 'chart' },
 			{ href: '/my', label: '내 정보', icon: 'user' }
 		],
+		// 브랜드 = 홈 · 상품 · 캠페인 · 주문 · 내 정보 (docs/brand-console-plan.md 결정 6 — 매일 할 일은 발송·CS; /sales /settle /cs 는 홈·주문·내 정보 안의 링크).
+		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) — 상품·캠페인 2단계 · 주문 4단계 · 내 정보 5단계에서 각각 푼다.
 		brand: [
 			{ href: '/home', label: '홈', icon: 'home' },
-			{ href: '/products', label: '상품', icon: 'box' },
-			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
-			{ href: '/sales', label: '매출', icon: 'chart' },
-			{ href: '/my', label: '내 정보', icon: 'user' }
+			{ href: '/products', label: '상품', icon: 'box', disabled: true, title: '2단계에서 열립니다' },
+			{ href: '/campaigns', label: '캠페인', icon: 'flag', disabled: true, title: '2단계에서 열립니다' },
+			{ href: '/orders', label: '주문', icon: 'truck', disabled: true, title: '4단계에서 열립니다' },
+			{ href: '/my', label: '내 정보', icon: 'user', disabled: true, title: '5단계에서 열립니다' }
 		]
 	};
 </script>

@@ -69,11 +69,11 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `PUBLIC_TOSS_CLIENT_KEY` | 필수 — Production `live_gck_…`(실판매 직전) · Preview `test_gck_…` | **필수(4단계 샘플 결제 · 2026-09-21 PR-B 부터)** — shop 과 **같은 값**(같은 상점 · Production/Preview 짝 동일) | — | 결제위젯 연동 키 클라이언트 키. `TOSS_SECRET_KEY` 와 **짝**(gck ↔ gsk) — §5.3. 빌드 시 인라인이라 값 변경은 Redeploy |
 | `PUBLIC_TOSS_WIDGET_VARIANT` | 선택 | 선택(shop 과 같은 값) | — | 상점관리자에서 확인한 결제수단 UI 변형 이름 · 비우면 `DEFAULT-2` |
 | `PUBLIC_DEV_LOGIN` | Preview 선택(`1`) | — | — | 개발용 이메일 로그인 폼 — dev 또는 `VERCEL_ENV=preview` 에서만 렌더, Production 은 값이 있어도 안 뜬다 |
-| `PUBLIC_DEMO` | — | 선택(`1` 이면 `(demo)` 그룹 노출) | `1`(예약 — 지금 코드는 읽지 않는다) | `monorepo-migration.md` 결정 8 · C · §1.2 |
-| `SUPABASE_SERVICE_ROLE_KEY` | **비밀** | **비밀**(Production + Preview) | — | RLS 우회 — `$lib/server/env.ts` → `configureDb()` 에서만 읽는다 |
+| `PUBLIC_DEMO` | — | 선택(`1` 이면 `(demo)` 그룹 노출) | **brand: `1` 을 Production 에 둔다(2단계 병합까지 — 그 전엔 데모가 브랜드에게 보여줄 유일한 화면, brand-console-plan §6) · 없으면 `/brand/demo` 등 데모 경로 404** · admin: 예약 | `monorepo-migration.md` 결정 8 · C · §1.2 · brand-console-plan §2.1 |
+| `SUPABASE_SERVICE_ROLE_KEY` | **비밀** | **비밀**(Production + Preview) | **brand: 비밀(Production + Preview) — 브랜드 콘솔 1단계부터 `requireBrand()` · `create_brand_from_signup` 이 쓴다** · admin: — | RLS 우회 — `$lib/server/env.ts` → `configureDb()` 에서만 읽는다 |
 | `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | — | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
 | `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503 |
-| `SLACK_WEBHOOK_URL` | 선택 | 선택 | — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] 한 줄(이메일·핸들 없이) |
+| `SLACK_WEBHOOK_URL` | 선택 | 선택 | brand: 선택 · admin: — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] · 브랜드 가입·정지 한 줄(이메일·핸들·사업자번호 없이) |
 | `RRN_ENC_KEY` | — | **비밀(5단계 0013 · Production + Preview 는 서로 다른 값)** | — | 주민등록번호 `pgp_sym_encrypt` 키 → `configureDb({ rrnEncKey })`. **DB·코드·마이그레이션에 없다.** 없으면 `/settle` 의 주민번호 저장만 `RRN_KEY_MISSING`(다른 화면 정상). 생성·회전·백업은 §6.4 |
 
 앱 환경변수가 **아닌** 것(대시보드에만 입력): 카카오 REST API 키 · Client Secret → Supabase Authentication → Providers → Kakao(§5.2). `NEXT_PUBLIC_INF_HOST` · `NEXT_PUBLIC_BRAND_HOST`(호스트 모드)는 폐기 — 경로 모드만(결정 11). 4 SvelteKit 앱은 `kit.env.dir: '../..'` 로 로컬에서 **루트 `.env.local` 하나**를 읽는다(§7). 비밀은 `$env/dynamic/private`(런타임)라 빌드·CI 에 불필요 — 빌드가 실제 키를 요구하면 설계 위반. `sellery-app` 의 환경변수는 동결 상태 그대로 두고 건드리지 않는다(롤백 시 그대로 쓰인다). 대시보드에서 저장이 실패할 때는 §8.3.
@@ -87,8 +87,8 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 | `source` | `destination` | 이유 |
 |---|---|---|
 | `/influencer` · `/influencer/` · `/influencer/:path*` | `https://sellery-influencer.vercel.app/influencer…` | 인플루언서 콘솔(SvelteKit · S5 PR-10 #20 부터). 콘솔 전용 `/influencer/auth/{confirm,signout}` 도 이 줄로 간다(결정 15) |
-| `/brand` · `/brand/` · `/brand/:path*` | `https://sellery-brand.vercel.app/brand…` | 결정 D — 데모 노출(데모 띠 + `noindex` + `/brand/robots.txt` disallow) |
-| `/admin` · `/admin/` · `/admin/:path*` | `https://sellery-admin.vercel.app/admin…` | 〃 |
+| `/brand` · `/brand/` · `/brand/:path*` | `https://sellery-brand.vercel.app/brand…` | **브랜드 콘솔(SvelteKit SSR · 1단계부터)** — 콘솔 전용 `/brand/auth/{confirm,signout}` 도 이 줄로 간다. 데모 화면은 `(demo)` 그룹(`/brand/demo` · `/brand/demo-*` · `/brand/camps` …)으로 옮겨져 `PUBLIC_DEMO=1` 일 때만 열린다(데모 띠 + `noindex` + `/brand/robots.txt` disallow 는 그대로) |
+| `/admin` · `/admin/` · `/admin/:path*` | `https://sellery-admin.vercel.app/admin…` | 결정 D — 데모 노출(데모 띠 + `noindex` + `/admin/robots.txt` disallow) |
 
 콘솔이 도메인 루트에서 쓰는 경로는 리라이트 없이 **shop 의 SvelteKit 포트**가 받는다(1:1 이식 — 결정 15): 옛 가입 메일 착지 `GET /auth/confirm?token_hash=…&type=signup&next=/influencer/home`(파트너면 `createSellerFromSignup` 뒤 `/influencer/home` 302) · `/api/health`. S5 부터 콘솔은 자기 사본 `/influencer/auth/{confirm,signout}` 을 쓴다(가입 메일 `emailRedirectTo` 는 `${origin}/influencer/auth/confirm?next=…`).
 
@@ -367,6 +367,8 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 |---|---|---|
 | `packages/db/scripts/partner-admin.mjs` | 인플루언서 운영(관리자 화면 없음) — `list [--inactive]` · `suspend <seller> ["사유"]` · `reactivate` · `link <seller> <user_id>` · `invite <email> --link <seller>`(초대 메일 → `${PUBLIC_SITE_URL}/influencer/auth/confirm?next=/influencer/password/new`) · `channels [--pending]` · `verify-channel <ch>` · `unverify-channel` · **4단계** `payments [--pending] [--seller s7]`(결제 표 · 운영 큐) · `refund-sample <payment id | slrp_ orderId> ["사유"]`(브랜드 발송 전 취소 — 토스 전액 취소 → `app_partner_payment_refund`: 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED, 두 번 실행해도 원장 1행 · `TOSS_SECRET_KEY` 필요). production 허용 | `node packages/db/scripts/partner-admin.mjs payments --pending` |
 | `packages/db/scripts/dev-seller.mjs` | 개발용 인플루언서 계정(확인 완료) + 시드 `sellers` 행 연결. **production 거부** | `node packages/db/scripts/dev-seller.mjs --email dev-seller@sellery.test --seller s1` |
+| `packages/db/scripts/partner-admin.mjs` (브랜드) | 브랜드 운영(브랜드 콘솔 1단계 · 0014) — `brands [--inactive]` · `suspend-brand <b> ["사유"]`(listed 상품은 자동으로 내리지 않고 경고) · `reactivate-brand <b>` · `link-brand <b> <user_id>` · `invite-brand <email> --link <b>`(초대 메일 → `${PUBLIC_SITE_URL}/brand/auth/confirm?next=/brand/password/new`). 시드 b1·b2 는 `*.example` 이라 실제 담당자 메일로 | `node packages/db/scripts/partner-admin.mjs brands` |
+| `packages/db/scripts/dev-brand.mjs` | 개발용 브랜드 계정(확인 완료) + 시드 `brands` 행 연결(`create_brand_from_signup(p_link_id)`). **production 거부**. 표준 테스트 계정 `dev-brand@sellery.test ← b1 바인허브` | `node packages/db/scripts/dev-brand.mjs --email dev-brand@sellery.test --brand b1` |
 | `packages/db/scripts/dev-user.mjs` | 개발용 고객 이메일/비밀번호 계정(`PUBLIC_DEV_LOGIN=1` 폼용) | `node --env-file=.env.local packages/db/scripts/dev-user.mjs <email> <password>` |
 | `packages/db/scripts/gen-types.mjs` | Supabase 타입 → `packages/db/src/database.types.ts`(UTF-8 · LF). `supabase link` 전제(§6.1) | `npm run gen:types` |
 

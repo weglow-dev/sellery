@@ -1,4 +1,4 @@
-// 인플루언서 운영 스크립트 — 관리자 화면 없이 운영하는 최소 구현 (docs/inf-console-plan.md §4.7). service role · production 허용.
+// 파트너(인플루언서 · 브랜드) 운영 스크립트 — 관리자 화면 없이 운영하는 최소 구현 (docs/inf-console-plan.md §4.7 · brand-console-plan.md §3). service role · production 허용.
 //
 //   node packages/db/scripts/partner-admin.mjs <cmd> [args]   (저장소 루트에서)
 //
@@ -19,9 +19,17 @@
 //                                           (2) app_partner_payment_refund → 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED · REFUNDED + payment_events(sample_refund)
 //                                           두 번 실행해도 원장 1행(already). 발송 뒤(캠페인이 SAMPLE_PURCHASED 가 아님)면 함수가 거부 — 수동 조정.
 //
-//   <seller> · <channel> 은 code('s1' · 'ch1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
+//   ── 브랜드 콘솔 1단계 (0014 create_brand_from_signup · docs/brand-console-plan.md §3 · §6) ──
+//   brands [--inactive]                     브랜드 표 (code · 상호 · 카테고리 · 담당자 · 이메일 · 사업자번호 · 등급 · active · 계정 연결 · 입점일)
+//   suspend-brand <brand> ["<사유>"]        brands.active=false — 다음 요청부터 requireBrand() 가 /brand/suspended 로 보낸다. listed 상품은 자동으로 내리지 않는다(경고 출력 — §8)
+//   reactivate-brand <brand>                brands.active=true
+//   link-brand <brand> <user_id>            create_brand_from_signup(p_link_id) 연결 경로 — 대상 행 user_id null · 그 user 로 만든 행 없음이 전제
+//   invite-brand <email> --link <brand>     auth.admin.inviteUserByEmail(partner_role:'brand') + app_metadata.link_brand_id → 초대 메일 링크(type=invite) → /brand/auth/confirm
+//                                           → 시드 행 연결 → /brand/password/new. 시드 b1·b2(*.example)는 실제 메일을 못 받으므로 실제 담당자 메일로
+//
+//   <seller> · <channel> · <brand> 는 code('s1' · 'ch1' · 'b1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
-//   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample 한 줄 — 이메일·핸들·URL 없이.
+//   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
 
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -72,6 +80,7 @@ function usage(code = 2) {
       "  list [--inactive] | suspend <seller> [reason] | reactivate <seller> | link <seller> <user_id>",
       "  invite <email> --link <seller> | channels [--pending] | verify-channel <channel> | unverify-channel <channel>",
       "  payments [--pending] [--seller <seller>] [--limit N] | refund-sample <payment id | slrp_ orderId> [reason]",
+      "  brands [--inactive] | suspend-brand <brand> [reason] | reactivate-brand <brand> | link-brand <brand> <user_id> | invite-brand <email> --link <brand>",
     ].join("\n"),
   );
   process.exit(code);
@@ -114,11 +123,10 @@ async function findChannel(ref) {
 }
 
 /** 콘솔 오리진·경로 — 경로 모드만(PUBLIC_SITE_URL + /influencer, docs/monorepo-migration.md 결정 11·15). 호스트 모드(NEXT_PUBLIC_INF_HOST)는 폐기. */
-function consoleRedirectTo(path) {
-  // 초대 링크는 콘솔 전용 `/influencer/auth/confirm` 으로 (결정 15 · §5.4) — apps/influencer 가 받는다(sellery.life 는 shop 의 rewrite 를 거쳐, Preview 는 자기 오리진).
-  // web(Next) 이 아직 `/influencer/*` 를 서비스하는 동안(S4~S5 사이)에는 그쪽 `/auth/confirm` 만 있으므로 PR-10(리라이트 교체) 뒤에 실행한다.
+function consoleRedirectTo(path, prefix = "/influencer") {
+  // 초대 링크는 콘솔 전용 `/influencer/auth/confirm` · `/brand/auth/confirm` 으로 (결정 15 · §5.4) — 각 앱이 받는다(sellery.life 는 shop 의 rewrite 를 거쳐, Preview 는 자기 오리진).
   const site = (process.env.PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:5176").replace(/\/$/, "");
-  return `${site}/influencer/auth/confirm?next=${encodeURIComponent(`/influencer${path}`)}`;
+  return `${site}${prefix}/auth/confirm?next=${encodeURIComponent(`${prefix}${path}`)}`;
 }
 
 function fmtDate(s) {
@@ -230,6 +238,102 @@ async function cmdVerify(verified) {
   const who = c.sellers ? `${c.sellers.code ?? ""} ${c.sellers.name ?? ""}`.trim() : c.seller_id;
   console.log(`[partner-admin] ${verified ? "인증 완료" : "인증 해제"}: ${c.code ?? c.id} (${c.platform} · ${who})`);
   await notifySlack(`[셀러리] 채널 ${verified ? "인증 완료" : "인증 해제"} · ${c.code ?? c.id} · ${c.platform}`);
+}
+
+/* ------------------------------------------------------------ 브랜드 콘솔 1단계 (0014) ------------------------------------------------------------ */
+
+async function findBrand(ref) {
+  if (!ref) usage();
+  const q = admin.from("brands").select("id, code, name, category, manager_name, email, biz_no, grade, active, user_id, created_at");
+  const { data, error } = UUID_RE.test(ref) ? await q.eq("id", ref).maybeSingle() : await q.eq("code", ref).maybeSingle();
+  if (error) throw new Error(`brands read failed: ${error.message}`);
+  if (!data) {
+    console.error(`[partner-admin] 브랜드 없음: ${ref}`);
+    process.exit(1);
+  }
+  return data;
+}
+
+async function cmdBrands() {
+  let q = admin
+    .from("brands")
+    .select("code, name, category, manager_name, email, biz_no, grade, active, user_id, created_at")
+    .order("created_at", { ascending: true });
+  if (flags.inactive) q = q.eq("active", false);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  console.table(
+    (data ?? []).map((b) => ({
+      code: b.code,
+      상호: b.name,
+      카테고리: b.category,
+      담당자: b.manager_name ?? "",
+      이메일: b.email ?? "",
+      사업자번호: b.biz_no ?? "",
+      등급: b.grade ?? "",
+      active: b.active,
+      계정: b.user_id ? `연결 (${b.user_id.slice(0, 8)}…)` : "미연결",
+      입점일: fmtDate(b.created_at),
+    })),
+  );
+}
+
+async function cmdSuspendBrand(active) {
+  const b = await findBrand(positional[0]);
+  const reason = positional[1] ?? "";
+  const { error } = await admin.from("brands").update({ active }).eq("id", b.id);
+  if (error) throw new Error(error.message);
+  const verb = active ? "복귀" : "정지";
+  console.log(`[partner-admin] 브랜드 ${verb}: ${b.code ?? b.id} ${b.name}${reason ? ` — ${reason}` : ""}`);
+  if (!active) {
+    // 정지된 브랜드의 listed 상품은 자동으로 내리지 않는다(진행 중 캠페인·주문이 있을 수 있다 — brand-console-plan §8). 운영자가 판단해 review-product(2단계) 로 paused.
+    const { count } = await admin.from("products").select("id", { count: "exact", head: true }).eq("brand_id", b.id).eq("status", "listed").is("deleted_at", null);
+    if (count) console.warn(`[partner-admin] 경고: 이 브랜드의 listed 상품 ${count}개는 그대로 노출됩니다 — 필요하면 상품 상태를 따로 내리세요.`);
+  }
+  await notifySlack(`[셀러리] 브랜드 ${verb} · ${b.code ?? b.id} · ${b.name}${reason ? ` · ${reason}` : ""}`);
+}
+
+async function cmdLinkBrand() {
+  const b = await findBrand(positional[0]);
+  const userId = positional[1];
+  if (!userId || !UUID_RE.test(userId)) usage();
+  const { data, error } = await admin.rpc("create_brand_from_signup", {
+    p_user_id: userId,
+    p_name: "",
+    p_biz_no: "",
+    p_manager_name: "",
+    p_manager_phone: "",
+    p_category: "",
+    p_link_id: b.id,
+  });
+  if (error) throw new Error(error.message);
+  console.log(`[partner-admin] link-brand ${b.code ?? b.id} ← ${userId}:`, JSON.stringify(data));
+  if (data && data.ok === false) process.exit(1);
+}
+
+async function cmdInviteBrand() {
+  const email = (positional[0] ?? "").trim().toLowerCase();
+  const linkRef = flags.link;
+  if (!email || !email.includes("@") || !linkRef || linkRef === true) usage();
+  const b = await findBrand(linkRef);
+  if (b.user_id) {
+    console.error(`[partner-admin] ${b.code ?? b.id} 는 이미 계정에 연결돼 있습니다 (user ${b.user_id}).`);
+    process.exit(1);
+  }
+  const redirectTo = consoleRedirectTo("/password/new", "/brand");
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { data: { partner_role: "brand" }, redirectTo });
+  if (error) {
+    if (error.code === "email_exists" || /already/i.test(error.message)) {
+      console.error(`[partner-admin] 이미 가입된 이메일입니다 — 그 계정의 user_id 로 \`link-brand ${b.code ?? b.id} <user_id>\` 를 쓰세요.`);
+      process.exit(1);
+    }
+    throw new Error(`inviteUserByEmail failed: ${error.message}`);
+  }
+  const uid = data.user.id;
+  const { error: metaError } = await admin.auth.admin.updateUserById(uid, { app_metadata: { link_brand_id: b.id } });
+  if (metaError) throw new Error(`updateUserById failed: ${metaError.message}`);
+  console.log(`[partner-admin] 초대 메일 발송: ${email} → ${b.code ?? b.id} ${b.name} (user ${uid}) · redirectTo ${redirectTo}`);
+  console.log("  메일의 링크(type=invite) → /brand/auth/confirm → 시드 행 연결 → /brand/password/new 에서 비밀번호 설정.");
 }
 
 /* ------------------------------------------------------------ 4단계 샘플 결제 ------------------------------------------------------------ */
@@ -393,6 +497,21 @@ try {
       break;
     case "unverify-channel":
       await cmdVerify(false);
+      break;
+    case "brands":
+      await cmdBrands();
+      break;
+    case "suspend-brand":
+      await cmdSuspendBrand(false);
+      break;
+    case "reactivate-brand":
+      await cmdSuspendBrand(true);
+      break;
+    case "link-brand":
+      await cmdLinkBrand();
+      break;
+    case "invite-brand":
+      await cmdInviteBrand();
       break;
     default:
       usage();

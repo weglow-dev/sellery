@@ -10,9 +10,11 @@
     "./database.types": "./src/database.types.ts",
     "./*": "./src/*.ts",
     "./partner/*": "./src/partner/*.ts",
+    "./brand/*": "./src/brand/*.ts",
     "./legal/*": "./src/legal/*.ts",
     "./server/*": "./src/server/*.server.ts",
-    "./server/partner/*": "./src/server/partner/*.server.ts"
+    "./server/partner/*": "./src/server/partner/*.server.ts",
+    "./server/brand/*": "./src/server/brand/*.server.ts"
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",
