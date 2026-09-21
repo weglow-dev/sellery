@@ -2,7 +2,7 @@
 	/**
 	 * 처리 대기 큐 — 프로토타입 브랜드 홈 "승인·처리 대기" 행(인플루언서 · 등급 · 팔로워 · 할 일 라벨 · 버튼) + CampaignDetail 브랜드 액션 카드(승인·거절 · 발송 처리) 를 행 카드 하나로.
 	 * 행마다: 인플루언서(아바타 · 이름 · 핸들 · 등급 · 팔로워 · ✓ 인증 채널) · 상품 · 요청일 · 샘플 구분(무상 · 구매 결제 · 브랜드 제안) · 배송지 등록 여부 · 상태 칩 → 액션(action.kind).
-	 *   approve: [승인] · [거절](사유 textarea — details 로 접힘) · ship: 택배사 셀렉트 + 송장 + [발송 처리] · confirm_schedule: 제안 기간 표시 + "일정 확정은 3단계".
+	 *   approve: [승인] · [거절](사유 textarea — details 로 접힘) · ship: 택배사 셀렉트 + 송장 + [발송 처리] · confirm_schedule(3단계 · 0016): 제안 기간 · 배정/잔여 재고 + [확정](confirm) · [반려](사유 — details).
 	 * 실패한 발송 제출은 `form`(fail 400 · code 일치 행)으로 값 유지 · 필드 강조. 인플루언서 배송지 원문은 상세(`/campaigns/<code>`)에서만.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
@@ -93,9 +93,24 @@
 					<a href={c.href} class="btn ghost sm">상세</a>
 				</form>
 			{:else if c.action.kind === 'confirm_schedule'}
-				<div class="rowacts">
-					<span class="meta console-mono">{c.proposed_start ? md(c.proposed_start) : '—'}–{c.proposed_end ? md(c.proposed_end) : '—'} · 재고 {fmtNum(c.proposed_qty ?? 0)}</span>
-					<span class="btn ghost sm" aria-disabled="true" title="일정 확정은 3단계에서 열립니다">3단계에서 확정 가능</span>
+				{@const short = (c.proposed_qty ?? 0) > c.stock_left}
+				<div class="rowacts console-schedacts">
+					<span class="meta console-mono">
+						{c.proposed_start ? md(c.proposed_start) : '—'}–{c.proposed_end ? md(c.proposed_end) : '—'} · 배정 {fmtNum(c.proposed_qty ?? 0)}
+						<span class={short ? 'console-danger' : ''}>(잔여 {fmtNum(c.stock_left)})</span>
+					</span>
+					<form method="post" action="?/confirm" onsubmit={(e) => { if (!confirm(`${c.product.name} · ${c.proposed_start ? md(c.proposed_start) : '—'}–${c.proposed_end ? md(c.proposed_end) : '—'} · 배정 ${fmtNum(c.proposed_qty ?? 0)}개로 확정할까요? 판매가 · 수수료율이 지금 값으로 잠겨요.`)) e.preventDefault(); }}>
+						<input type="hidden" name="code" value={c.code} />
+						<button type="submit" class="pri sm">확정</button>
+					</form>
+					<details class="console-reject">
+						<summary class="btn danger sm">반려</summary>
+						<form method="post" action="?/rejectSchedule" class="console-form console-reject-form">
+							<input type="hidden" name="code" value={c.code} />
+							<textarea name="reason" rows="2" maxlength={REJECT_REASON_MAX} placeholder="반려 사유 (선택 · 인플루언서에게 전달돼요 · {REJECT_REASON_MAX}자 이내)"></textarea>
+							<button type="submit" class="danger sm">반려 확정</button>
+						</form>
+					</details>
 					<a href={c.href} class="btn ghost sm">상세</a>
 				</div>
 			{:else}

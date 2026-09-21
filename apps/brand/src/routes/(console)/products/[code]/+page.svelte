@@ -45,6 +45,25 @@
 	</div>
 </section>
 
+<!-- 3단계(0016): 인플루언서 직접 제안 — 노출 중 상품만 (프로토타입 갤러리 → inviteModal 의 진입점을 상품 쪽에 둔다) -->
+<section class="card static console-invite-entry" style="margin-top:14px">
+	<div class="grow">
+		<b>인플루언서 직접 제안</b>
+		<div class="meta" style="margin-top:4px">
+			{#if p.status === 'listed'}
+				기다리지 말고 먼저 제안해보세요 — 수락하면 샘플 발송 단계부터 바로 시작돼요(무상 · 인플루언서 월 한도 미차감). 플래티넘 이하 공개 인플루언서에게 보낼 수 있어요.
+			{:else}
+				노출 중인 상품만 제안할 수 있어요 — 지금은 {p.chip.label} 상태예요.
+			{/if}
+		</div>
+	</div>
+	{#if p.status === 'listed'}
+		<a href={data.inviteHref} class="btn pri sm">인플루언서 초대 →</a>
+	{:else}
+		<span class="btn ghost sm" aria-disabled="true">노출 후 가능</span>
+	{/if}
+</section>
+
 <section class="card static" style="margin-top:14px">
 	<ProductForm
 		values={form?.values ?? data.values}

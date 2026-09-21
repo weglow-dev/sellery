@@ -6,6 +6,7 @@ import { PRODUCT_FORM_IMAGE_ACCEPT, PRODUCT_FORM_IMAGE_MAX_BYTES, productFormVal
 /**
  * `/products/[code]` — 상품 수정 2단계 (docs/brand-console-plan.md §5 `/brand/products/[code]` · 프로토타입 productModal 수정 분기 · saveProduct 잠금/재검수).
  * load: `getBrandProduct(brand.id, code)` — **내 것이 아니면 null → 404**(§6 2단계 (g)). 잠금(`locked`) · 배정량(`allocated`) · 독점 확정 여부를 폼에 넘긴다.
+ * 3단계(0016): 노출 중 상품이면 [인플루언서 초대] → `/products/[code]/invite` (inviteHref).
  * action save: `saveProductAction(event, code)` → 성공 303 `?msg=saved|rereview|pending_saved` · 실패 fail(400)(LOCKED_FIELD · STOCK_BELOW_ALLOCATED · INVALID_INPUT{field} 문구).
  */
 const MESSAGES: Record<string, (name: string) => { tone: 'ok' | 'info'; text: string }> = {
@@ -44,7 +45,8 @@ export const load: PageServerLoad = async (event) => {
 		msg: MESSAGES[key]?.(product.name) ?? null,
 		imageAccept: PRODUCT_FORM_IMAGE_ACCEPT,
 		imageMaxMb: Math.round(PRODUCT_FORM_IMAGE_MAX_BYTES / 1024 / 1024),
-		listPath: brandPath('/products')
+		listPath: brandPath('/products'),
+		inviteHref: brandPath(`/products/${encodeURIComponent(product.code ?? code)}/invite`)
 	};
 };
 
