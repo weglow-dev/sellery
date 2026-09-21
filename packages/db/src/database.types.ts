@@ -249,9 +249,11 @@ export type Database = {
           regongu: boolean
           sample_cash: number
           sample_cel: number
+          sample_courier: string | null
           sample_method: string | null
           sample_price: number | null
           sample_refunded: boolean
+          sample_shipped_at: string | null
           sample_shipping: Json | null
           seller_id: string
           settled_at: string | null
@@ -286,9 +288,11 @@ export type Database = {
           regongu?: boolean
           sample_cash?: number
           sample_cel?: number
+          sample_courier?: string | null
           sample_method?: string | null
           sample_price?: number | null
           sample_refunded?: boolean
+          sample_shipped_at?: string | null
           sample_shipping?: Json | null
           seller_id: string
           settled_at?: string | null
@@ -323,9 +327,11 @@ export type Database = {
           regongu?: boolean
           sample_cash?: number
           sample_cel?: number
+          sample_courier?: string | null
           sample_method?: string | null
           sample_price?: number | null
           sample_refunded?: boolean
+          sample_shipped_at?: string | null
           sample_shipping?: Json | null
           seller_id?: string
           settled_at?: string | null
@@ -2058,6 +2064,48 @@ export type Database = {
       }
     }
     Functions: {
+      app_admin_review_product: {
+        Args: { p_decision: string; p_product_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_brand_approve_sample: {
+        Args: { p_brand_id: string; p_campaign_id: string }
+        Returns: Json
+      }
+      app_brand_campaign: {
+        Args: { p_brand_id: string; p_campaign_id: string }
+        Returns: Json
+      }
+      app_brand_campaigns: { Args: { p_brand_id: string }; Returns: Json }
+      app_brand_delete_product: {
+        Args: { p_brand_id: string; p_product_id: string }
+        Returns: Json
+      }
+      app_brand_reject_sample: {
+        Args: { p_brand_id: string; p_campaign_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_brand_requests: {
+        Args: { p_brand_id: string; p_statuses?: string[] }
+        Returns: Json
+      }
+      app_brand_set_listing: {
+        Args: { p_brand_id: string; p_listed: boolean; p_product_id: string }
+        Returns: Json
+      }
+      app_brand_ship_sample: {
+        Args: {
+          p_brand_id: string
+          p_campaign_id: string
+          p_courier: string
+          p_tracking_no: string
+        }
+        Returns: Json
+      }
+      app_brand_upsert_product: {
+        Args: { p_brand_id: string; p_input: Json; p_product_id: string }
+        Returns: Json
+      }
       app_checkout_reserved: {
         Args: { p_campaign_id: string }
         Returns: number
@@ -2199,6 +2247,10 @@ export type Database = {
         }
         Returns: Json
       }
+      brand_campaign_json: {
+        Args: { c: Database["public"]["Tables"]["campaigns"]["Row"] }
+        Returns: Json
+      }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       campaign_card: { Args: { p_code: string }; Returns: Json }
@@ -2266,6 +2318,11 @@ export type Database = {
         Args: { p_rrn: string; p_skip_checksum?: boolean }
         Returns: boolean
       }
+      product_allocated: {
+        Args: { p_except_campaign_id?: string; p_product_id: string }
+        Returns: number
+      }
+      product_is_locked: { Args: { p_product_id: string }; Returns: boolean }
       public_stats: { Args: never; Returns: Json }
       purge_checkout_pii: { Args: { p_older_than?: string }; Returns: number }
       recalc_campaign_sold_qty: {

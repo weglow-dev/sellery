@@ -6,9 +6,9 @@
 
 | import | 어디서 |
 |---|---|
-| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/brand/signup-rules` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
+| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/brand/{signup-rules,product-rules,campaign-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
 | `@sellery/db/browser` (`createBrowserSupabase(url, anonKey)`) | 브라우저 도달 코드(로그인·인증 확인)만. `+*.server.ts` 금지 |
-| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` · `@sellery/db/server/brand/{brand,signup}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
+| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` · `@sellery/db/server/brand/{brand,signup,products,campaigns}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
 
 서버 함수의 관례(§2.4 · §3.4):
 
@@ -31,6 +31,12 @@ src/partner/settle-rules.ts   매출·정산 규칙 (순수 · 0013): calcSeller
                               · validateRrn · maskAccount · maskBizNo · BANKS(core BANKS − '선택') · SETTLE_TYPES · parseSettleInfoInput(/settle 폼)
                               · RPC 파서 parseSettleInfo · parseSetSettleInfoResult · parseSetRrnResult · parseSellerSales · parseSellerSettlements · 문구 SETTLE_FAIL_MESSAGES · settlementStatusLabel · whtLine · rateLine
 src/brand/signup-rules.ts     브랜드 가입 폼·서버 공용 규칙 (순수 · 브랜드 콘솔 1단계 · 0014): BRAND_CATEGORIES · BIZ_NO_RE · PHONE_RE · normalizePhone · parseBrandSignupMeta · BRAND_SIGNUP_FAIL_MESSAGES (사업자번호 정규화는 partner/settle-rules normalizeBizNo 재수출)
+src/brand/product-rules.ts    브랜드 상품 규칙 (순수 · 브랜드 콘솔 2단계 · 0015 app_brand_upsert_product 와 같은 조건): parseProductInput(폼 → p_input · 첫 실패 필드 + 문구) · parseOptionLines/optionLines
+                              · autoOptions(0008 resolve_product_options 와 같은 결과) · totalRateToCommission/commissionToTotalRate(총 요율 % ↔ 인플루언서 수수료율 · 하한 0.05)
+                              · isProductLocked · allocatedOf · stockLeftOf · canDeleteProduct · productStatusChip · PRODUCT_FAIL_MESSAGES · productFailMessage · productSavedMessage
+src/brand/campaign-rules.ts   브랜드 시점 캠페인 규칙 (순수 · 0015): parseBrandCampaignRow(s)/parseBrandCampaignDetail(brand_campaign_json jsonb) · brandNextAction(상태 → approve·ship·confirm_schedule·wait·live·ended)
+                              · BRAND_TURN_STATUSES · matchesBrandCampaignFilter · parseShipInput(택배사 + 송장 6~30) · parseRejectInput · parseSampleActionResult · SAMPLE_ACTION_FAIL_MESSAGES · shippingLine
+                              · 칩·스테퍼·택배사는 partner/sample-rules · carriers 재수출
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
@@ -40,8 +46,10 @@ src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rate
                                 · sales(getSellerSales — 0013 app_seller_sales) · settle(getSellerSettleInfo · saveSettleInfo · setSellerRrn(configureDb rrnEncKey) · listSellerSettlements
                                   · uploadBizDoc(Storage partner-docs → sellers.biz_doc_url object path) · getBizDocSignedUrl) — 콘솔 5단계. 정산 실행은 없다(관리자)
 src/server/brand/*.server.ts    brand(getBrandContext · requireBrand — 상태 anon · foreign(kind seller|customer) · guest · suspended · ok · brandPath · consoleNextOf) · signup(createBrandFromSignup · linkBrandIdOf · isBrandAccount) — 브랜드 콘솔 1단계, 0014 create_brand_from_signup
+                                · products(listBrandProducts · getBrandProduct · listCategories · upsertBrandProduct · setBrandListing · deleteBrandProduct · uploadProductImage(Storage public-assets products/<brand>/<uuid>.<ext> → 공개 URL))
+                                · campaigns(listBrandRequests · listBrandCampaigns · getBrandCampaign · approveSample · rejectSample · shipSample) — 브랜드 콘솔 2단계, 0015 app_brand_* RPC
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
-scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund · 브랜드 brands/suspend-brand/reactivate-brand/link-brand/invite-brand) · dev-seller · dev-brand · dev-user (Node · 루트 .env.local)
+scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund · 브랜드 brands/suspend-brand/reactivate-brand/link-brand/invite-brand · 2단계 products/review-product = 0015 app_admin_review_product) · dev-seller · dev-brand · dev-user (Node · 루트 .env.local)
 ```
 
 ## gen:types
