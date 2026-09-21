@@ -1,2 +1,4 @@
 /* 고객 사이트 스타일 = web/src/app/globals.css 의 이식 (docs/monorepo-migration.md 결정 12). 데모 theme.css 는 쓰지 않는다. */
 @import '@sellery/ui/css/site.css';
+/* Tailwind v4 자동 소스 탐지는 앱 폴더(apps/shop) 안만 훑는다 — packages/ui 의 사이트 컴포넌트가 쓰는 유틸리티(체크아웃 결제 바 `max-[640px]:hidden` 등)를 생성하려면 명시한다. */
+@source '../../../packages/ui/src/site';

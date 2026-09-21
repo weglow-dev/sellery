@@ -24,6 +24,7 @@ jobs:
       PUBLIC_SUPABASE_URL: https://example.supabase.co
       PUBLIC_SUPABASE_ANON_KEY: ci
       PUBLIC_SITE_URL: http://localhost:5176
+      PUBLIC_TOSS_CLIENT_KEY: test_gck_ci # S3 apps/shop 체크아웃(결제위젯) — 이름만 있으면 된다 (docs/monorepo-migration.md §8.3)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
