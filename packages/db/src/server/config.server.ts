@@ -18,6 +18,8 @@ export type DbConfig = {
   serviceKey?: string;
   /** SLACK_WEBHOOK_URL — 없으면 알림을 보내지 않는다 */
   slackWebhookUrl?: string;
+  /** RRN_ENC_KEY — 주민등록번호 pgp_sym_encrypt 키 (0013 · docs/inf-console-plan.md §5.9). 없으면 setSellerRrn 이 RRN_KEY_MISSING (DB 에는 저장하지 않는다) */
+  rrnEncKey?: string;
 };
 
 let config: DbConfig = {};
@@ -25,7 +27,7 @@ let config: DbConfig = {};
 /** 부분 갱신 — 빈 문자열은 "없음" 으로 정규화한다 */
 export function configureDb(next: DbConfig): void {
   const clean: DbConfig = {};
-  for (const k of ["url", "anonKey", "serviceKey", "slackWebhookUrl"] as const) {
+  for (const k of ["url", "anonKey", "serviceKey", "slackWebhookUrl", "rrnEncKey"] as const) {
     const v = next[k];
     if (typeof v === "string" && v.trim()) clean[k] = v.trim();
     else if (k in next) clean[k] = undefined;

@@ -6,9 +6,9 @@
 
 | import | 어디서 |
 |---|---|
-| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
+| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
 | `@sellery/db/browser` (`createBrowserSupabase(url, anonKey)`) | 브라우저 도달 코드(로그인·인증 확인)만. `+*.server.ts` 금지 |
-| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
+| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
 
 서버 함수의 관례(§2.4 · §3.4):
 
@@ -27,12 +27,17 @@ src/auth.ts linkctx.ts campaign.ts console-paths.ts order-status.ts carriers.ts 
 src/partner/signup-rules.ts   가입 폼·서버 공용 규칙 (순수)
 src/partner/sample-rules.ts   샘플 견적(app_sample_quote jsonb) → 버튼·안내 문구 · 배송지 폼 검증 · 캠페인 상태 칩/스테퍼 (순수)
                               · 샘플 결제(0012 partner_payments): PartnerPaymentView · isPayable · payLine · partnerPaymentStatusLabel · RPC 결과 파서 · PARTNER_PAY_FAIL_MESSAGES
+src/partner/settle-rules.ts   매출·정산 규칙 (순수 · 0013): calcSellerShare(calc 의 인플루언서 라인 — sf · gBonus · boost · sfTotal · wht · payout) · sellerWhtRate · settleDue
+                              · validateRrn · maskAccount · maskBizNo · BANKS(core BANKS − '선택') · SETTLE_TYPES · parseSettleInfoInput(/settle 폼)
+                              · RPC 파서 parseSettleInfo · parseSetSettleInfoResult · parseSetRrnResult · parseSellerSales · parseSellerSettlements · 문구 SETTLE_FAIL_MESSAGES · settlementStatusLabel · whtLine · rateLine
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
                                 · products(listProductsForSeller · getProductForSeller · requestFreeSample) · campaigns(listSellerCampaigns · getSellerCampaign · receiveSample)
                                 · home(getHomeWidgets) · my(saveSampleAddress) — 콘솔 3단계, 0011 RPC(app_sample_quote(s) · app_request_free_sample · app_receive_sample)
                                 · 샘플 결제(0012 app_partner_payment_*) 의 서버 함수는 토스 호출과 묶여야 하므로 @sellery/payments/server/partner-sample 에 있다
+                                · sales(getSellerSales — 0013 app_seller_sales) · settle(getSellerSettleInfo · saveSettleInfo · setSellerRrn(configureDb rrnEncKey) · listSellerSettlements
+                                  · uploadBizDoc(Storage partner-docs → sellers.biz_doc_url object path) · getBizDocSignedUrl) — 콘솔 5단계. 정산 실행은 없다(관리자)
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
 scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund) · dev-seller · dev-user (Node · 루트 .env.local)
 ```

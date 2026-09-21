@@ -74,6 +74,7 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | — | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
 | `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503 |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] 한 줄(이메일·핸들 없이) |
+| `RRN_ENC_KEY` | — | **비밀(5단계 0013 · Production + Preview 는 서로 다른 값)** | — | 주민등록번호 `pgp_sym_encrypt` 키 → `configureDb({ rrnEncKey })`. **DB·코드·마이그레이션에 없다.** 없으면 `/settle` 의 주민번호 저장만 `RRN_KEY_MISSING`(다른 화면 정상). 생성·회전·백업은 §6.4 |
 
 앱 환경변수가 **아닌** 것(대시보드에만 입력): 카카오 REST API 키 · Client Secret → Supabase Authentication → Providers → Kakao(§5.2). `NEXT_PUBLIC_INF_HOST` · `NEXT_PUBLIC_BRAND_HOST`(호스트 모드)는 폐기 — 경로 모드만(결정 11). 4 SvelteKit 앱은 `kit.env.dir: '../..'` 로 로컬에서 **루트 `.env.local` 하나**를 읽는다(§7). 비밀은 `$env/dynamic/private`(런타임)라 빌드·CI 에 불필요 — 빌드가 실제 키를 요구하면 설계 위반. `sellery-app` 의 환경변수는 동결 상태 그대로 두고 건드리지 않는다(롤백 시 그대로 쓰인다). 대시보드에서 저장이 실패할 때는 §8.3.
 
@@ -283,7 +284,7 @@ signInWithPassword(email, password) → rpc('app_role') === 'admin'
 
 ### 6.1 마이그레이션 (저장소 루트에서)
 
-`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 클라우드 `sellery` 에 `0001~0011` 적용 완료(`0001~0008` 2026-09-15 · `0010_partner_signup` 2026-09-18 · `0011_sample_request` 2026-09-21, `supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0012_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
+`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 클라우드 `sellery` 에 `0001~0013` 적용 완료(`0001~0008` 2026-09-15 · `0010_partner_signup` 2026-09-18 · `0011_sample_request` · `0012_partner_payments` · `0013_partner_settlement` 2026-09-21, `supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0014_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
 
 ```bash
 npx supabase login
@@ -305,6 +306,18 @@ npm run check                                            # 타입 깨짐 확인 
 ### 6.3 수동 운영 잡
 
 크론 없음(슬라이스 1) — reconcile · 세션 만료 · PII 파기 · 운영 큐는 §8.2 표대로 손으로 돌린다. 슬라이스 4 에서 캠페인 스케줄러와 함께 Vercel Cron(`apps/shop/vercel.json` `crons`) 으로 옮긴다(`app-plan.md §12`).
+
+### 6.4 주민등록번호 암호화 키 `RRN_ENC_KEY` (0013 · 인플루언서 콘솔 5단계)
+
+인플루언서 개인(`settle_type='personal'`)의 3.3% 원천징수 지급명세서에 필요한 주민등록번호는 `sellers.rrn_enc` 에 `pgcrypto` `pgp_sym_encrypt` 로만 저장된다(`inf-console-plan.md §5.9`). **키는 DB 에 없고** 서버 env `RRN_ENC_KEY` 가 RPC 인자(`app_set_seller_rrn(p_key)` · `app_seller_rrn_decrypt(p_key)`)로 흐른다 — 마이그레이션·시드·코드 어디에도 값이 없다.
+
+1. **생성**: `openssl rand -base64 48` (아무 긴 문자열이면 된다 — 32바이트 이상 권장). Production 과 Preview 는 **다른 값**.
+2. **등록**: Vercel `sellery-influencer` → Environment Variables → `RRN_ENC_KEY`(Sensitive · Production / Preview 각각) → Redeploy(§8.3). 로컬은 루트 `.env.local`.
+3. **백업**: 키를 잃으면 저장된 번호는 복구할 수 없다(운영자 비밀 금고에 별도 보관 — 대시보드만 믿지 않는다). 콘솔은 `has_rrn`/마스크만 보므로 키 없이도 화면은 뜬다.
+4. **키 없음 판정**: `app_set_seller_rrn(…, p_key => '')` → `{ok:false, code:'RRN_KEY_MISSING'}`(스모크에서 확인). 앱은 `configureDb({ rrnEncKey })` 가 비면 DB 를 부르지 않고 같은 코드를 돌려준다.
+5. **열람(복호)**: 콘솔 함수가 아니다 — 지급명세서 제출 시 운영 스크립트가 `app_seller_rrn_decrypt(seller_id, key, actor, purpose)` 를 호출하고, 호출마다 `sensitive_access_log`(field='rrn' · actor · purpose · at) 1행이 남는다(키 불일치도 로그). `npx supabase db query --linked "select * from sensitive_access_log order by at desc limit 20"` 로 감사.
+6. **회전**: 새 키를 발급한 뒤 행마다 `app_seller_rrn_decrypt(옛 키)` → `app_set_seller_rrn(새 키, p_skip_checksum => true)` 를 한 트랜잭션으로 돌리는 스크립트(미작성 — 필요할 때 `packages/db/scripts/`)를 실행하고 env 를 바꾼다. 그 사이의 저장은 새 키로만 되므로 회전은 점검 시간에.
+7. 계좌번호(`bank_info`)는 §5.9 의 의도적 결정대로 평문 jsonb(service role 전용 · 콘솔 마스킹)이다 — 정산 지급 수단 확정 때 같은 키로 옮길지 결정.
 
 ---
 
