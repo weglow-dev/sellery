@@ -9,6 +9,8 @@
  *   4단계(0012 · /pay/*): quoteSample · getProductBrief · getSellerCampaignCode — 토스·결제 행 동기화는 `./payments`(@sellery/payments/server/partner-sample)
  *   5단계(0013 · /sales /settle): getSellerSales · getSellerSettleInfo · saveSettleInfo · setSellerRrn · listSellerSettlements · uploadBizDoc · getBizDocSignedUrl
  *              — 순수 규칙(calcSellerShare · validateRrn · maskAccount · BANKS · parseSettleInfoInput · 문구)은 `@sellery/db/partner/settle-rules`
+ *   브랜드 3단계 짝(0016 · 캠페인 상세): getScheduleContext · proposeSchedule · passCampaign · acceptInvite · declineInvite(`./schedule`) · sendCampaignChat('seller', …)(`./chat`)
+ *              — 순수 규칙(parseScheduleInput · sellerNextAction · 문구)은 `@sellery/db/partner/schedule-rules` · 채팅은 `@sellery/db/partner/chat-rules`
  */
 import './env';
 
@@ -21,3 +23,5 @@ export * from '@sellery/db/server/partner/home';
 export * from '@sellery/db/server/partner/my';
 export * from '@sellery/db/server/partner/sales';
 export * from '@sellery/db/server/partner/settle';
+export * from '@sellery/db/server/partner/schedule';
+export * from '@sellery/db/server/partner/chat';

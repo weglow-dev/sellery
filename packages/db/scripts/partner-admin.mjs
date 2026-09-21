@@ -32,7 +32,10 @@
 //   review-product <product> approve|reject|pause ["<사유>"]   approve: pending/rejected/paused → listed(재고 0 이면 platform_settings.default_stock_on_approve)
 //                                           · reject: → rejected + 사유(필수 · 브랜드 상품 화면에 표시) · pause: listed → paused(정지 브랜드 상품 내리기 §8). Slack 한 줄
 //
-//   <seller> · <channel> · <brand> · <product> 는 code('s1' · 'ch1' · 'b1' · 'p1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
+//   ── 브랜드 콘솔 3단계 (0016 — 조회만 · 전이는 두 콘솔이 RPC 로) ──
+//   campaign <campaign>                     캠페인 1건: 상태 · 인플루언서 · 상품 · 제안/확정 일정 · 잠금 가격 · 잔여 재고 · 스레드(campaign_events 시간순, chat 은 leak 표시)
+//
+//   <seller> · <channel> · <brand> · <product> · <campaign> 는 code('s1' · 'ch1' · 'b1' · 'p1' · 'c3') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
 
@@ -87,6 +90,7 @@ function usage(code = 2) {
       "  payments [--pending] [--seller <seller>] [--limit N] | refund-sample <payment id | slrp_ orderId> [reason]",
       "  brands [--inactive] | suspend-brand <brand> [reason] | reactivate-brand <brand> | link-brand <brand> <user_id> | invite-brand <email> --link <brand>",
       "  products [--pending] [--brand <brand>] [--limit N] | review-product <product> approve|reject|pause [\"사유\"]",
+      "  campaign <campaign>",
     ].join("\n"),
   );
   process.exit(code);
@@ -387,6 +391,53 @@ async function cmdProducts() {
   );
 }
 
+async function cmdCampaign() {
+  const ref = positional[0];
+  if (!ref) usage();
+  const sel =
+    "id, code, status, invited, purchased, regongu, test_due, proposed_start, proposed_end, proposed_qty, start_date, end_date, qty, sold_qty, price_locked, rate_locked, decision_reason, sample_courier, tracking_no, created_at, updated_at, " +
+    "sellers(code, name, handle, grade), products(id, code, name, sale_price, commission_rate, stock, status), brands(code, name)";
+  const q = UUID_RE.test(ref) ? admin.from("campaigns").select(sel).eq("id", ref) : admin.from("campaigns").select(sel).eq("code", ref);
+  const { data: c, error } = await q.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new Error(`캠페인을 찾을 수 없습니다: ${ref}`);
+  const { data: alloc } = await admin.rpc("product_allocated", { p_product_id: c.products?.id, p_except_campaign_id: c.id });
+  const stockLeft = Math.max(0, (c.products?.stock ?? 0) - (alloc ?? 0));
+  console.table([
+    {
+      code: c.code,
+      상태: c.status,
+      인플루언서: c.sellers ? `${c.sellers.code} ${c.sellers.name} ${c.sellers.handle} (${c.sellers.grade ?? "-"})` : "",
+      브랜드: c.brands ? `${c.brands.code ?? ""} ${c.brands.name}`.trim() : "",
+      상품: c.products ? `${c.products.code} ${c.products.name} ₩${c.products.sale_price} · ${Math.round(Number(c.products.commission_rate) * 1000) / 10}% · 재고 ${c.products.stock} (${c.products.status})` : "",
+      "잔여 재고": stockLeft,
+      "제안 일정": c.proposed_start ? `${c.proposed_start} ~ ${c.proposed_end} · ${c.proposed_qty}` : "",
+      "확정 일정": c.start_date ? `${c.start_date} ~ ${c.end_date} · ${c.qty} (판매 ${c.sold_qty})` : "",
+      "잠금 가격": c.price_locked !== null ? `₩${c.price_locked} · ${Math.round(Number(c.rate_locked) * 1000) / 10}%` : "",
+      "테스트 기한": c.test_due ?? "",
+      "샘플 송장": c.sample_courier ? `${c.sample_courier} ${c.tracking_no}` : "",
+      플래그: [c.invited ? "invited" : "", c.purchased ? "purchased" : "", c.regongu ? "regongu" : ""].filter(Boolean).join(" "),
+      "종결 사유": c.decision_reason ?? "",
+      생성: fmtDate(c.created_at),
+      수정: fmtDate(c.updated_at),
+    },
+  ]);
+  const { data: ev, error: evErr } = await admin
+    .from("campaign_events")
+    .select("kind, sender, actor_role, event_type, body, leak_flag, created_at")
+    .eq("campaign_id", c.id)
+    .order("created_at", { ascending: true });
+  if (evErr) throw new Error(evErr.message);
+  console.table(
+    (ev ?? []).map((e) => ({
+      시각: fmtDate(e.created_at),
+      종류: e.kind === "chat" ? `chat(${e.sender})${e.leak_flag ? " ⚠leak" : ""}` : (e.event_type ?? "system"),
+      발신: e.actor_role ?? "",
+      본문: (e.body ?? "").replace(/[\r\n]+/g, " ").slice(0, 90),
+    })),
+  );
+}
+
 async function cmdReviewProduct() {
   const p = await findProduct(positional[0]);
   const decision = (positional[1] ?? "").toLowerCase();
@@ -594,6 +645,9 @@ try {
       break;
     case "review-product":
       await cmdReviewProduct();
+      break;
+    case "campaign":
+      await cmdCampaign();
       break;
     default:
       usage();

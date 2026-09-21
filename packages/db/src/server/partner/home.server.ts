@@ -17,10 +17,10 @@ export type HomeTodoKind =
   | "channel_verify" // 메인 채널 미인증 → /my (인증하기)
   | "channel_pending" // [인증 확인] 누름 · 운영자 확인 중 → /my
   | "bank_info" // 정산 계좌 미등록 → /settle (5단계 정산 정보 폼)
-  | "invited" // 브랜드 제안 · 수락 대기 → /campaigns/<code> (수락·거절은 다음 단계)
+  | "invited" // 브랜드 제안 · 수락 대기 → /campaigns/<code> [수락 · 거절] (0016)
   | "receive_sample" // SAMPLE_SHIPPED → 수령 확인
-  | "testing" // TESTING · 테스트 기한 D-n
-  | "schedule_proposed" // 일정 승인 대기 (브랜드 차례 — 안내)
+  | "testing" // TESTING · 테스트 기한 D-n → [일정 제안] (0016)
+  | "schedule_proposed" // 일정 승인 대기 (브랜드 차례 — 안내 · 재제안 가능)
   | "first_product"; // 캠페인이 하나도 없음 → /products
 
 export type HomeTodo = {
@@ -169,14 +169,14 @@ export async function getHomeWidgets(seller: SellerSummary, balance: number, adm
       case "TESTING": {
         const left = c.test_due ? daysBetween(today, c.test_due) : NaN;
         const dd = Number.isNaN(left) ? "" : left < 0 ? " · 기한 지남" : left === 0 ? " · 오늘 마감" : ` · D-${left}`;
-        camp("testing", c, `${name} 테스트 중${dd}`, c.test_due ? `테스트 기한 ${md(c.test_due)} — 판매 일정 제안은 다음 단계에서 열립니다` : "테스트 기한 미정", null, c.test_due);
+        camp("testing", c, `${name} 테스트 중${dd}`, c.test_due ? `테스트 기한 ${md(c.test_due)} — 테스트 뒤 판매 일정(시작일 · 기간 · 재고)을 제안하세요` : "테스트 뒤 판매 일정을 제안하세요", "일정 제안", c.test_due);
         break;
       }
       case "INVITED":
-        camp("invited", c, `${name} 브랜드 제안이 도착했어요`, "수락·거절은 다음 단계에서 열립니다 — 스레드에서 내용을 확인하세요", "확인");
+        camp("invited", c, `${name} 브랜드 제안이 도착했어요`, "수락하면 샘플 요청 없이 바로 샘플 발송 단계로 — 스레드에서 내용을 확인하고 수락·거절하세요", "확인");
         break;
       case "SCHEDULE_PROPOSED":
-        camp("schedule_proposed", c, `${name} 일정 승인 대기`, "브랜드가 제안 일정을 검토 중이에요", null);
+        camp("schedule_proposed", c, `${name} 일정 승인 대기`, "브랜드가 제안 일정을 검토 중이에요 — 다른 기간으로 다시 제안할 수도 있어요", null);
         break;
     }
   }
