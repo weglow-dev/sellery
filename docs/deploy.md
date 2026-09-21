@@ -28,7 +28,7 @@
                                                              + (demo) 그룹(dev 또는 PUBLIC_DEMO=1) · 자기 /influencer/auth/{confirm,signout}
    sellery-brand      (Root apps/brand · /brand)           ── 데모 SPA(ssr=false) + hooks(세션만)
    sellery-admin      (Root apps/admin · /admin)           ── 데모 SPA(ssr=false) + hooks(세션만)
-   sellery-app        (Root web · Next 16)                 ── **동결**(빌드 안 함 · 도메인 없음 · 롤백 전용 · 2026-09-28 삭제 예정, §1.1)
+   (sellery-app · Next 16 · Root web)                     ── 2026-09-21 삭제됨 — 도메인 전환 당일 정리(§1.1 · §3.6)
 
    Supabase sellery (ocxppeuoiysnkwwujvko · Seoul) ── 4 프로젝트가 같은 URL · anon · service_role
    토스페이먼츠 NHN_shingoonk ── 웹훅 URL https://sellery.life/api/payments/webhook (불변 · shop 이 받는다)
@@ -42,7 +42,7 @@
 
 ### 1.1 설정 표
 
-| 항목 | `sellery-shop` | `sellery-influencer` | `sellery-brand` | `sellery-admin` | `sellery-app` (Next · **동결**) |
+| 항목 | `sellery-shop` | `sellery-influencer` | `sellery-brand` | `sellery-admin` | `sellery-app` (Next · **2026-09-21 삭제됨** — 기록용) |
 |---|---|---|---|---|---|
 | 역할 | 고객 사이트 + 도메인 루트 + 리라이트 출발점 | 인플루언서 콘솔 1~2단계(리라이트 대상) | 브랜드 센터 데모 | 관리자 데모 | **롤백 전용** — 빌드하지 않는다. 마지막 Production 배포 `sellery-lhpqlxil7-weglow-team.vercel.app`(커밋 `e6ccd1f`) 을 유지 |
 | Root Directory | `apps/shop` | `apps/influencer` | `apps/brand` | `apps/admin` | `web`(저장소에서 삭제됨 — 배포는 남아 있다) |
@@ -55,7 +55,7 @@
 | Deployment Protection | Preview **Off**(토스 `successUrl` 복귀 · 카카오 콜백 · 웹훅 테스트) · Production Off | Preview Off(콘솔 Preview 의 이메일 링크 착지) | Off | Off | Off |
 | Ignored Build Step | `git diff --quiet HEAD^ HEAD -- . ../../packages ../../package.json ../../package-lock.json` | 〃 | 〃 | 〃 | **`exit 0`**(항상 스킵 — 다시는 빌드하지 않는다) |
 | Git | 같은 저장소 · Production Branch `main` · PR = Preview(앱별 URL 댓글) | 〃 | 〃 | 〃 | 연결은 남아 있으나 위 스킵으로 무효 |
-| 삭제 시점 | — | — | — | — | **2026-09-28 경**(S5 뒤 1주 · 결정 10 · A) — 그 전에 Supabase Redirect URLs 에서 `https://sellery-app.vercel.app/**` 제거(§5.1) |
+| 삭제 시점 | — | — | — | — | **2026-09-21 삭제 완료**(전환 당일 — 결제·환불·가입·채널 인증까지 실서비스 확인 뒤 1주 대기 없이 정리). 같은 날 옛 Supabase secret key(`default`) 삭제 · Redirect URLs 에서 `https://sellery-app.vercel.app/**` 제거 |
 
 Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자기 base). shop Preview 의 리라이트는 **프로덕션** 콘솔·데모를 가리킨다(결정 H). 정적 자산(`/assets/*`)은 shop 만 응답하므로 다른 앱 Preview 에서는 이미지 대신 이모지 폴백. Preview 의 결제 테스트는 브랜치 고정 도메인(`sellery-shop-git-<branch>-weglow-team.vercel.app`)을 쓰면 Supabase Redirect URL(와일드카드) · 토스 웹훅 URL 을 매번 바꾸지 않아도 된다.
 
@@ -150,8 +150,8 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 
 ### 3.6 롤백
 
-- **2026-09-28 `sellery-app` 삭제 전**: Vercel → `sellery-shop` → Settings → Domains 에서 `sellery.life` · `www.sellery.life` Remove → `sellery-app` → Domains 에 Add(`www` 는 apex 로 리다이렉트). `sellery-app` 의 동결된 마지막 Production 배포(`sellery-lhpqlxil7-weglow-team.vercel.app` · `e6ccd1f` · Next 고객 사이트 + Next 콘솔)가 **즉시** 서비스한다 — 빌드 없음, 환경변수 그대로. DB 는 변경이 없으니 되돌릴 것이 없다. Supabase Redirect URLs 에 `https://sellery-app.vercel.app/**` 가 남아 있어야 카카오·메일 링크가 돈다(그래서 삭제 전까지 남긴다).
-- **삭제 뒤**: 도메인 롤백 대상이 없다 — shop 앱 자체의 문제면 도메인은 두고 Vercel → `sellery-shop` → Deployments → 이전 배포 "Promote to Production"(Instant Rollback). 콘솔 문제면 `sellery-influencer` 에서 같은 방법.
+- ~~`sellery-app` 도메인 되돌리기~~ — `sellery-app` 은 2026-09-21 삭제됐다(동결 배포 `sellery-lhpqlxil7…` 포함). 도메인 롤백 대상은 없다.
+- **현재 롤백 수단**: shop 앱 자체의 문제면 도메인은 두고 Vercel → `sellery-shop` → Deployments → 이전 배포 "Promote to Production"(Instant Rollback). 콘솔 문제면 `sellery-influencer` 에서 같은 방법.
 
 ### 3.7 전환 뒤 정리 (같은 날)
 
@@ -180,7 +180,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 | S4 도메인 이동 | `sellery.life` · `www` → `sellery-shop` · `PUBLIC_SITE_URL` 4 프로젝트 · `sellery-app` 동결 | ✅ 2026-09-21 (§3) |
 | S5 PR-11 | `web/` 삭제 · `.github/workflows/web-ci.yml` 삭제 · `web/DEPLOY.md §3 · §4 · §6 · §8` 을 이 문서 §5 · §6 · §3.8 · §10 으로 이동 · README/CLAUDE.md 서비스 상태 갱신 | ✅ 이 PR (2026-09-21) |
 | 브랜치 보호 | required check 는 `프로토타입 점검` 뿐(`web-ci` 는 required 가 아니었다) — 제거할 것 없음 | ✅ 확인 2026-09-21 |
-| **2026-09-28 경** | Supabase Redirect URLs 에서 `https://sellery-app.vercel.app/**` 제거 → Vercel `sellery-app` 프로젝트 삭제(결정 10 · A). 그 뒤 롤백은 §3.6 "삭제 뒤" | ☐ |
+| 뒷정리 | Supabase Redirect URLs 에서 `https://sellery-app.vercel.app/**` 제거 · 옛 secret key `default` 삭제(2026-09-21 대화 노출로 회전) → Vercel `sellery-app` 프로젝트 삭제(결정 10 · A — 1주 대기 없이 당일) | ✅ 2026-09-21 |
 | 이후 | 인플루언서 콘솔 3~6단계(`inf-console-plan.md §7`) → `apps/brand` → `apps/admin` | ☐ |
 
 ---
@@ -194,7 +194,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 - **Authentication → Providers → Kakao**: Enabled, Client ID = 카카오 REST API 키, Client Secret = 카카오 Client Secret(§5.2). 콜백 URL 은 Supabase 가 보여 주는 `https://ocxppeuoiysnkwwujvko.supabase.co/auth/v1/callback`.
 - **Authentication → URL Configuration**:
   - Site URL: `https://sellery.life`
-  - Redirect URLs (전부 있어야 한다): `https://sellery.life/**` · `https://sellery-shop.vercel.app/**` · `https://*-weglow-team.vercel.app/**`(Preview) · `http://localhost:5176/**`(shop dev) · `https://sellery-app.vercel.app/**`(**2026-09-28 `sellery-app` 삭제 때 제거**, §4).
+  - Redirect URLs (전부 있어야 한다): `https://sellery.life/**` · `https://sellery-shop.vercel.app/**` · `https://*-weglow-team.vercel.app/**`(Preview) · `http://localhost:5176/**`(shop dev).
   - 여기 없는 `redirectTo` 는 Site URL 로 떨어져 `next` 를 잃는다 — Preview 브랜치 도메인도 와일드카드로 포함시킬 것. Next 시절의 `http://localhost:3000/**` · `https://inf.sellery.life/**` 는 더 쓰지 않는다.
 - **키**: Settings → API 의 URL · anon · service_role 을 §1.2 표대로. service_role 은 서버 전용.
 - 스키마·권한: §6.
@@ -345,7 +345,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 - `.github/workflows/ci.yml` — job **`프로토타입 점검`**(이름이 required check 컨텍스트): `npm ci` → `npm run check` → `npm test` → `node scripts/check-boundaries.mjs` → `npm run build`(더미 `PUBLIC_*` — 비밀 없음). 앱·패키지 PR 전부.
 - `.github/workflows/web-ci.yml`(Next `web/`)은 S5 PR-11 에서 삭제됐다. required check 는 `프로토타입 점검` 하나(2026-09-21 확인).
 - `main` 보호: PR 필수 · 위 check · 대화 해결 · 관리자 예외 없음. squash 병합(`gh pr merge --squash --delete-branch`).
-- Vercel GitHub 연동: `main` 병합 = 4 프로젝트 Production(Ignored Build Step 으로 무관한 앱은 스킵 · `sellery-app` 은 항상 스킵) · PR = 앱별 Preview 댓글.
+- Vercel GitHub 연동: `main` 병합 = 4 프로젝트 Production(Ignored Build Step 으로 무관한 앱은 스킵) · PR = 앱별 Preview 댓글.
 
 ---
 
