@@ -27,7 +27,12 @@
 //   invite-brand <email> --link <brand>     auth.admin.inviteUserByEmail(partner_role:'brand') + app_metadata.link_brand_id → 초대 메일 링크(type=invite) → /brand/auth/confirm
 //                                           → 시드 행 연결 → /brand/password/new. 시드 b1·b2(*.example)는 실제 메일을 못 받으므로 실제 담당자 메일로
 //
-//   <seller> · <channel> · <brand> 는 code('s1' · 'ch1' · 'b1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
+//   ── 브랜드 콘솔 2단계 (0015 app_admin_review_product · docs/brand-console-plan.md §0 결정 9 — 상품 검수는 관리자 콘솔 전까지 여기서) ──
+//   products [--pending] [--brand <brand>] [--limit N]   상품 표(최신순 100 · 삭제 제외) — --pending = 검수 대기(status 'pending') 만 (운영 큐)
+//   review-product <product> approve|reject|pause ["<사유>"]   approve: pending/rejected/paused → listed(재고 0 이면 platform_settings.default_stock_on_approve)
+//                                           · reject: → rejected + 사유(필수 · 브랜드 상품 화면에 표시) · pause: listed → paused(정지 브랜드 상품 내리기 §8). Slack 한 줄
+//
+//   <seller> · <channel> · <brand> · <product> 는 code('s1' · 'ch1' · 'b1' · 'p1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
 
@@ -81,6 +86,7 @@ function usage(code = 2) {
       "  invite <email> --link <seller> | channels [--pending] | verify-channel <channel> | unverify-channel <channel>",
       "  payments [--pending] [--seller <seller>] [--limit N] | refund-sample <payment id | slrp_ orderId> [reason]",
       "  brands [--inactive] | suspend-brand <brand> [reason] | reactivate-brand <brand> | link-brand <brand> <user_id> | invite-brand <email> --link <brand>",
+      "  products [--pending] [--brand <brand>] [--limit N] | review-product <product> approve|reject|pause [\"사유\"]",
     ].join("\n"),
   );
   process.exit(code);
@@ -336,6 +342,76 @@ async function cmdInviteBrand() {
   console.log("  메일의 링크(type=invite) → /brand/auth/confirm → 시드 행 연결 → /brand/password/new 에서 비밀번호 설정.");
 }
 
+/* ------------------------------------------------------------ 브랜드 2단계 — 상품 검수 (0015 app_admin_review_product) ------------------------------------------------------------ */
+
+async function findProduct(ref) {
+  if (!ref) usage();
+  const q = admin.from("products").select("id, code, name, status, stock, reject_reason, deleted_at, brands(code, name)");
+  const { data, error } = UUID_RE.test(ref) ? await q.eq("id", ref).maybeSingle() : await q.eq("code", ref).maybeSingle();
+  if (error) throw new Error(`products read failed: ${error.message}`);
+  if (!data) {
+    console.error(`[partner-admin] 상품 없음: ${ref}`);
+    process.exit(1);
+  }
+  return data;
+}
+
+async function cmdProducts() {
+  let q = admin
+    .from("products")
+    .select("code, name, category, sale_price, commission_rate, stock, status, reject_reason, created_at, updated_at, brands(code, name)")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(Number(flags.limit) || 100);
+  if (flags.pending) q = q.eq("status", "pending");
+  if (typeof flags.brand === "string") {
+    const b = await findBrand(flags.brand);
+    q = q.eq("brand_id", b.id);
+  }
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  console.table(
+    (data ?? []).map((p) => ({
+      code: p.code,
+      상품: p.name,
+      브랜드: p.brands ? `${p.brands.code ?? ""} ${p.brands.name}`.trim() : "",
+      카테고리: p.category,
+      판매가: p.sale_price,
+      "인플 수수료": `${Math.round(Number(p.commission_rate) * 1000) / 10}%`,
+      재고: p.stock,
+      상태: p.status,
+      "반려 사유": p.reject_reason ?? "",
+      등록: fmtDate(p.created_at),
+      수정: fmtDate(p.updated_at),
+    })),
+  );
+}
+
+async function cmdReviewProduct() {
+  const p = await findProduct(positional[0]);
+  const decision = (positional[1] ?? "").toLowerCase();
+  const reason = positional[2] ?? "";
+  if (!["approve", "reject", "pause"].includes(decision)) usage();
+  if (decision === "reject" && !reason.trim()) {
+    console.error("[partner-admin] reject 는 사유가 필요합니다 (브랜드 화면에 표시됩니다) — 예: \"건강·웰니스 카테고리 범위 밖\"");
+    process.exit(2);
+  }
+  const { data, error } = await admin.rpc("app_admin_review_product", { p_product_id: p.id, p_decision: decision, p_reason: reason || undefined });
+  if (error) throw new Error(`app_admin_review_product failed: ${error.message}`);
+  if (!data?.ok) {
+    console.error(`[partner-admin] 검수 실패: ${data?.code ?? "BAD_RESULT"}${data?.status ? ` (현재 ${data.status})` : ""}`);
+    process.exit(1);
+  }
+  const verb = decision === "approve" ? "승인 → listed" : decision === "reject" ? "반려 → rejected" : "노출 중단 → paused";
+  const brand = p.brands ? `${p.brands.code ?? ""} ${p.brands.name}`.trim() : "";
+  console.log(
+    `[partner-admin] 상품 검수 ${data.already ? "(이미 됨) " : ""}${verb}: ${p.code ?? p.id} ${p.name} · ${brand}` +
+      (decision === "approve" ? ` · 재고 ${data.stock}` : "") +
+      (reason ? ` — ${reason}` : ""),
+  );
+  if (!data.already) await notifySlack(`[셀러리] 상품 검수 ${verb} · ${p.code ?? p.id} · ${p.name} · ${brand}${reason ? ` · ${reason}` : ""}`);
+}
+
 /* ------------------------------------------------------------ 4단계 샘플 결제 ------------------------------------------------------------ */
 
 const PAYMENT_COLS =
@@ -512,6 +588,12 @@ try {
       break;
     case "invite-brand":
       await cmdInviteBrand();
+      break;
+    case "products":
+      await cmdProducts();
+      break;
+    case "review-product":
+      await cmdReviewProduct();
       break;
     default:
       usage();

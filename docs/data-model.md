@@ -607,6 +607,22 @@ due_on              = campaigns.end_date + clear_days(21)
 | 독점권 승인 시 `products.exclusive_seller_id` 세팅, 채널 인증 코드 발급/확인, primary 채널 변경 시 `sellers.platform/followers` 동기화 | L3924, L3961-3971 | 다중 행 갱신 |
 | 프로토타입 `createProduct` 기본 카테고리 `'건기식'` 은 `categories` FK 로 거부됨 → 앱이 유효 카테고리를 넘겨야 함 | L1406 밖 값 | FK 가 막는다(의도) |
 
+#### 5.2.1 위 규칙 중 RPC(security definer · service role) 로 이관된 것 — 0010~0015
+
+"앱이 강제" 로 시작했던 규칙 가운데 파트너 콘솔 단계에서 **DB 함수 안으로** 옮긴 것. 함수는 전부 `{ok, code}` 를 돌려주고 라우트가 문구로 바꾼다(`packages/db/src/{partner,brand}/*-rules.ts`). 나머지 행(기간제 · 정산 계산 · 스케줄러 · 링크 보호 · 마스킹)은 그대로 앱/크론.
+
+| 규칙(위 표) | 마이그레이션 · 함수 | 비고 |
+|---|---|---|
+| 샘플 규칙(월 한도 · 무상 자격 · 상품당 1회 · 독점 잠금 · paused/pending 불가) | 0011 `app_sample_quote(s)` · `app_request_free_sample` · `app_receive_sample`(TESTING · test_due +14) | 인플루언서 콘솔 3단계 |
+| 🥬 잔액 검사 · 차감 · 샘플 결제 | 0012 `celery_spend` · `app_partner_payment_*` | 인플루언서 4단계 |
+| 정산 정보(주민번호 암호화 · 열람 로그) · 매출 읽기 | 0013 `app_seller_sales` · `app_seller_settle_info` · `app_seller_set_*` | 인플루언서 5단계 (정산 **실행**은 여전히 관리자) |
+| 브랜드 가입(사업자번호 정규화 · 유니크 · 🥬 입점 이벤트) | 0014 `create_brand_from_signup(p_user_id, p_name, p_biz_no, p_manager_name, p_manager_phone, p_category, p_referral_code, p_terms_agreed_at, p_link_id)` — NOT_CONFIRMED · INVALID_INPUT{field} · BIZ_NO_TAKEN · EMAIL_TAKEN · LINK_TARGET_{NOT_FOUND,TAKEN} · already | 브랜드 1단계 |
+| **가격·수수료 잠금 + 미잠금 변경 시 `listed → pending` 재검수, `commission_rate >= min_seller_rate`, 이미지 ≤ 4장** | 0015 `app_brand_upsert_product(p_brand_id, p_product_id\|null, p_input jsonb)` — INVALID_INPUT{field} · LOCKED_FIELD{consumer_price\|sale_price\|total_rate\|options} · **STOCK_BELOW_ALLOCATED{allocated}**(재고 < `product_allocated()` — 데모에 없던 가드) · rereview | 브랜드 2단계. 총 요율(%) 입력 → `greatest(min_seller_rate, 총/100 − 0.10)`. 옵션은 잠금 중 전체 불변(brand-console-plan §8). 헬퍼 `product_allocated(pid, except)` · `product_is_locked(pid)` |
+| 노출 토글 · 소프트 삭제 | 0015 `app_brand_set_listing(…, p_listed)` — NOT_REVIEWED{status} · `app_brand_delete_product` — HAS_ACTIVE_CAMPAIGNS{count}(SETTLED 도 이력) | |
+| 상태 전이 T3~T5(샘플 승인 · 거절 · 발송) + `campaign_events(system)` 이력 | 0015 `app_brand_approve_sample` · `app_brand_reject_sample(…, p_reason)` · `app_brand_ship_sample(…, p_courier, p_tracking_no)` — NOT_FOUND · WRONG_STATUS{status} · BAD_COURIER · BAD_TRACKING · already. 열 `campaigns.sample_courier`(orders.courier 와 같은 5개) · `sample_shipped_at` | 브랜드 2단계. 시스템 메시지 원문 = 데모 pushSys(<b> 제거) |
+| 브랜드 시점 읽기(인플루언서 요약 조립) | 0015 `brand_campaign_json(campaigns)` · `app_brand_requests(p_brand_id, p_statuses)` · `app_brand_campaigns` · `app_brand_campaign`(행 + sample_shipping + events · 남의 것 null) | 브랜드에게는 hidden 인플루언서도 신원 노출(샘플 요청 당사자) |
+| 상품 검수(`pending → listed` 재고 기본값 · `→ rejected` 사유) | 0015 `app_admin_review_product(p_product_id, 'approve'\|'reject'\|'pause', p_reason)` — 운영 스크립트 `partner-admin.mjs review-product` 전용(관리자 콘솔 전) | |
+
 ---
 
 ## 6. 접근 제어 요약 (RLS)
