@@ -2,7 +2,7 @@
 	/**
 	 * 상품 상세 — 프로토타입 productDetailModal(js/20-seller.js) 을 페이지로 + 샘플 섹션(sampleBuyModal 의 금액 표 · reqSample 의 배송지 입력).
 	 * 익명 실적 표(인플루언서별 팔로워·참여율·매출 + 데이터패스 마스킹)는 다음 단계 — 지금은 집계 두 개(캠페인 수 · 확정 판매 수량)만.
-	 * 샘플 섹션은 `quote.mode`: free(배송지 폼 → ?/requestFree) · buy(비활성 + 4단계 예고 + 🥬 분할) · locked(독점 안내) · active(캠페인 링크) · unlisted.
+	 * 샘플 섹션은 `quote.mode`: free(배송지 폼 → ?/requestFree) · buy(금액 표 + [샘플 구매 ₩N] → /pay/new?product= · 🥬 사용 선택은 결제 화면) · locked(독점 안내) · active(캠페인 링크) · unlisted.
 	 * 실패한 제출은 `form`(fail 400) 으로 돌아온다 — 입력값 유지 · 실패 필드 강조 · 문구는 REQUEST_FREE_SAMPLE_MESSAGES / notFreeMessage 원문.
 	 */
 	import { GRADES, SAMPLE_CEL_WON } from '@sellery/core/constants';
@@ -137,26 +137,22 @@
 				{/if}
 			</tbody>
 		</table>
-		<div class="lbl-sm" style="margin:14px 0 6px">결제 수단 (4단계)</div>
-		<dl class="console-kv">
-			<dt>현금</dt>
-			<dd>₩{fmtNum(price)} (셀러리 안전결제)</dd>
-			<dt>🥬 우선</dt>
-			<dd>
-				{#if celMax > 0}
-					🥬 {celMax}{cashRest ? ` + ₩${fmtNum(cashRest)}` : ''} <span style="color:var(--color-mute)">(1🥬 = ₩{fmtNum(celWon)} · 보유 🥬 {data.balance})</span>
-				{:else}
-					해당 없음 <span style="color:var(--color-mute)">(₩{fmtNum(celWon)} 미만)</span>
-				{/if}
-			</dd>
-		</dl>
 		<p class="meta" style="margin-top:12px">
+			결제 수단은 <b>현금</b>(셀러리 안전결제) 또는 <b>🥬 우선</b>{#if celMax > 0}
+				(🥬 {celMax}{cashRest ? ` + ₩${fmtNum(cashRest)}` : ''} · 1🥬 = ₩{fmtNum(celWon)} · 보유 🥬 {data.balance}){:else}
+				(₩{fmtNum(celWon)} 미만이라 🥬 사용 불가){/if} — 다음 화면에서 고르고 배송지를 확인한 뒤 결제합니다.
+		</p>
+		<p class="meta" style="margin-top:8px">
 			구매 샘플은 브랜드 승인 없이 바로 발송 단계로 넘어가고, 이달 무상 한도를 쓰지 않습니다. 브랜드는 일반 판매 1건과 동일하게 정산받습니다(플랫폼 수수료 10% 동일).{#if q?.refund}{' '}<b>이 상품은 판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
 		</p>
 		<div class="btnrow" style="justify-content:flex-end;margin-top:12px">
-			<button type="button" class="pri" disabled aria-disabled="true" title={b.title ?? undefined} style="opacity:.6">{b.label}</button>
+			{#if !b.disabled && data.payHref}
+				<a href={data.payHref} class="btn pri" title={b.title ?? undefined}>{b.label} →</a>
+			{:else}
+				<button type="button" class="pri" disabled aria-disabled="true" title={b.title ?? undefined} style="opacity:.6">{b.label}</button>
+			{/if}
 		</div>
-		<p class="meta" style="margin-top:8px;text-align:right">{BUY_COMING_SOON} — 샘플 구매는 <b>4단계</b>에서 열립니다.</p>
+		{#if b.disabled}<p class="meta" style="margin-top:8px;text-align:right">{BUY_COMING_SOON}</p>{/if}
 	</section>
 {:else if b.kind === 'locked'}
 	<section class="card static">

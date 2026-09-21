@@ -6,6 +6,7 @@
  *   createSellerFromSignup(user, form?) · linkSellerIdOf(user) · notifySlack(text) · rateLimit(key)
  *   3단계(0011): listProductsForSeller · getProductForSeller · requestFreeSample · listSellerCampaigns · getSellerCampaign · receiveSample
  *              · getHomeWidgets(seller, balance) · saveSampleAddress — 순수 규칙(버튼 문구 · 배송지 검증 · 칩)은 `@sellery/db/partner/sample-rules`
+ *   4단계(0012 · /pay/*): quoteSample · getProductBrief · getSellerCampaignCode — 토스·결제 행 동기화는 `./payments`(@sellery/payments/server/partner-sample)
  */
 import './env';
 

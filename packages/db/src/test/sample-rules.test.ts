@@ -4,6 +4,7 @@ import {
   BUY_COMING_SOON,
   CAMPAIGN_STEPS,
   SAMPLE_BUY_ENABLED,
+  samplePayHref,
   campaignChip,
   isRequestFreeSampleCode,
   notFreeMessage,
@@ -86,14 +87,19 @@ describe("sampleButton — 프로토타입 sampleBtn 분기 · 문구", () => {
     const b = sampleButton(q({ mode: "free", reason: null, free: true }));
     expect(b).toMatchObject({ kind: "free", label: "무상 샘플 요청", disabled: false, title: null, price: null });
   });
-  it("buy → 샘플 구매 ₩N — 3단계는 비활성 + 사유 + 4단계 예고", () => {
+  it("buy → 샘플 구매 ₩N — 4단계부터 활성 · title 은 사유만 (예고 문구 없음)", () => {
     const b = sampleButton(q({}));
     expect(b.kind).toBe("buy");
     expect(b.label).toBe("샘플 구매 ₩21,520");
     expect(b.price).toBe(21520);
-    expect(b.disabled).toBe(!SAMPLE_BUY_ENABLED);
-    expect(b.title).toContain("무상 기준 등급 미달");
-    expect(b.title).toContain(BUY_COMING_SOON);
+    expect(SAMPLE_BUY_ENABLED).toBe(true);
+    expect(b.disabled).toBe(false);
+    expect(b.title).toBe("무상 기준 등급 미달");
+    expect(b.title).not.toContain(BUY_COMING_SOON);
+  });
+  it("samplePayHref → /influencer/pay/new?product=<code> (인코딩)", () => {
+    expect(samplePayHref("p4")).toBe("/influencer/pay/new?product=p4");
+    expect(samplePayHref("p 4/x")).toBe("/influencer/pay/new?product=p%204%2Fx");
   });
   it.each([
     ["HAD_FREE", "무상 샘플은 상품당 1회"],

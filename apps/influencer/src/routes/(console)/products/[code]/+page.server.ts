@@ -8,6 +8,7 @@ import {
 	quotaLine,
 	sampleButton,
 	sampleLine,
+	samplePayHref,
 	type ShippingField
 } from '@sellery/db/partner/sample-rules';
 import { getProductForSeller, RATE_LIMIT_MESSAGE, rateLimit, requestFreeSample, requireSeller, sellerPath } from '$lib/server/partner';
@@ -15,7 +16,8 @@ import { getProductForSeller, RATE_LIMIT_MESSAGE, rateLimit, requestFreeSample, 
 /**
  * `/products/[code]` — 상품 상세 + 샘플 섹션 3단계 (docs/inf-console-plan.md §6 `/products/[code]` · 프로토타입 productDetailModal · sampleBuyModal 진입 · reqSample).
  * load: `getProductForSeller(seller.id, code)` — listed 가 아니거나 없는 코드는 404(셸 안 +error). 견적(`quote.mode`)으로 샘플 섹션이 갈린다:
- *   free → 배송지 폼(프리필 `sellers.sample_address`) → `?/requestFree` · buy → [샘플 구매 ₩N] 비활성 + 4단계 예고 + 🥬 분할 표시 · locked → 독점 안내 · active → 진행 중 캠페인 링크.
+ *   free → 배송지 폼(프리필 `sellers.sample_address`) → `?/requestFree` · buy → [샘플 구매 ₩N] 링크 → `/pay/new?product=<code>`(4단계 결제 화면 · 🥬 사용 선택은 거기서)
+ *   · locked → 독점 안내 · active → 진행 중 캠페인 링크.
  * action requestFree: requireSeller → rateLimit → `parseShippingInput(FormData)` → `requestFreeSample` RPC → 성공 `redirect(303, /campaigns/<code>)`.
  *   실패는 `fail(400, { message, field, values, campaignCode })` — 평범한 POST 라 입력값을 `form` 으로 되돌려 다시 그린다(JS 불필요).
  *   ALREADY_ACTIVE 는 그 캠페인 링크, NOT_FREE 는 `notFreeMessage(reason)`(그 사이 한도·등급이 바뀐 경우).
@@ -58,6 +60,7 @@ export const load: PageServerLoad = async (event) => {
 		quotaText: q && q.mode !== 'unlisted' ? quotaLine(q) : null,
 		shipping: parseStoredShipping(seller.sample_address),
 		campaignHref: q?.campaign_code ? sellerPath(`/campaigns/${encodeURIComponent(q.campaign_code)}`) : null,
+		payHref: q?.mode === 'buy' ? samplePayHref(product.code ?? code) : null,
 		listPath: sellerPath('/products'),
 		campaignsPath: sellerPath('/campaigns'),
 		myPath: sellerPath('/my')
