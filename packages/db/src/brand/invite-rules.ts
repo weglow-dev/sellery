@@ -2,7 +2,7 @@
  * 브랜드 직접 제안(초대) 규칙 — 순수 모듈 (`/brand/campaigns/invite` 폼 · 서버 양쪽). DB 호출은 `../server/brand/invite.server.ts`.
  * 원본: 프로토타입 inviteModal(노출 중 상품만 · 메시지) · actions.ts confirmInvite(독점 확정 상품 불가 · 다이아/블랙 🥬 10) · 0016 app_brand_invite_candidates / app_brand_invite_seller.
  *
- *   INVITE_MAX_GRADE · INVITE_GATED_GRADES · isInvitableGrade(grade)   3단계 초대 대상 = 골드 이하(우선권 등급 아님). 플래티넘 이상은 6단계 🥬 게이트 (brand-console-plan §4 · §8)
+ *   INVITE_MAX_GRADE · INVITE_GATED_GRADES · isInvitableGrade(grade)   3단계 초대 대상 = 플래티넘 이하(grade_tiers.invite_cost_cel = 0). 다이아·블랙은 6단계 🥬 제안권 게이트 (0017 · brand-console-plan §8 · constants SHOP.brand.diamond)
  *   INVITE_MESSAGE_MAX · parseInviteInput(form)                          seller_id(uuid) · product_id(uuid) · message ≤ 500
  *   parseInviteCandidates(json)                                          app_brand_invite_candidates jsonb → { product, candidates } (ok:false 는 null)
  *   parseInviteResult(json) · INVITE_FAIL_MESSAGES · inviteFailMessage   app_brand_invite_seller 결과
@@ -12,10 +12,10 @@ import { cleanText } from "../text";
 
 /* ---------------- 등급 게이트 ---------------- */
 
-/** 3단계에서 초대 가능한 최고 등급 (`grade_tiers.is_priority = false` 중 최상위). 위 등급은 PRIORITY_INVITE_GATED. */
-export const INVITE_MAX_GRADE = "골드";
+/** 3단계에서 초대 가능한 최고 등급 (`grade_tiers.invite_cost_cel = 0` 중 최상위 — 플래티넘은 기간 우선권은 있어도 제안권은 무료). 위 등급은 PRIORITY_INVITE_GATED. */
+export const INVITE_MAX_GRADE = "플래티넘";
 
-/** 우선권 등급(플래티넘 이상) — GRADES 의 tierIdx 0~2. 초대는 6단계(🥬 제안권) 부터 */
+/** 제안권 게이트 등급(다이아·블랙 · `invite_cost_cel` 10) — GRADES 의 tierIdx 0~1. 초대는 6단계(🥬 제안권) 부터 (0017) */
 export const INVITE_GATED_GRADES: readonly string[] = GRADES.slice(0, GRADES.findIndex((g) => g.g === INVITE_MAX_GRADE)).map((g) => g.g);
 
 export function isInvitableGrade(grade: string | null | undefined): boolean {
@@ -23,7 +23,7 @@ export function isInvitableGrade(grade: string | null | undefined): boolean {
 }
 
 /** 게이트 안내 (PRIORITY_INVITE_GATED · 후보 목록에 없는 이유) */
-export const INVITE_GATED_NOTICE = "플래티넘 이상 인플루언서 제안은 🥬 제안권과 함께 다음 단계에서 열려요";
+export const INVITE_GATED_NOTICE = "다이아 · 블랙 인플루언서 제안은 🥬 제안권과 함께 다음 단계에서 열려요";
 
 /* ---------------- 폼 ---------------- */
 
