@@ -1,11 +1,11 @@
 <script lang="ts">
 	/**
-	 * 마이페이지 — web influencer/my/page.tsx 1:1 (프로토타입 js/20-seller.js vMy · channelModal · verifyModal). 정산 정보 폼·배송지는 3·5단계.
+	 * 마이페이지 — web influencer/my/page.tsx 1:1 (프로토타입 js/20-seller.js vMy · channelModal · verifyModal). 샘플 배송지(3단계 `?/saveAddress`) · 정산 정보 폼은 5단계.
 	 * 폼은 전부 SvelteKit 이름 있는 액션(`?/issueVerifyCode` …, +page.server.ts) — 평범한 POST 뒤 303 으로 `/my?msg=` 에 돌아온다(JS 불필요).
 	 * 칩 규칙: verified → "✓ 인증됨" · vcode_confirmed_at → "인증 대기" · 그 외 → "미인증". 인증된 채널만 [메인 SNS로 설정]. 메인 채널은 삭제 불가.
 	 */
 	import { PLATFORM_LABELS, isPlatform } from '@sellery/db/partner/signup-rules';
-	import { CopyButton, DeleteChannelForm, GradeBox, PlatIcon, PlatformHandle, StatusChip } from '@sellery/ui/site';
+	import { CopyButton, DeleteChannelForm, GradeBox, PlatIcon, PlatformHandle, ShippingFields, StatusChip } from '@sellery/ui/site';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -162,6 +162,19 @@
 		<a href="{data.myPath}?add=1#channel-form" class="btn sm" data-sveltekit-preload-data="off">+ 채널 추가</a>
 	</div>
 </div>
+
+<div class="sec" id="address" style="margin-top:22px">
+	샘플 배송지 <StatusChip tone={data.shipping ? 'green' : 'gray'}>{data.shipping ? '등록됨' : '미등록'}</StatusChip>
+</div>
+<section class="card static console-form">
+	<p class="meta" style="margin:0 0 12px">무상 샘플 요청 · 샘플 구매 때 배송지 기본값으로 채워져요. 요청 폼에서 바꾸면 여기도 같이 갱신됩니다.</p>
+	<form method="post" action="?/saveAddress">
+		<ShippingFields value={data.shipping} invalid={data.invalidField} idPrefix="addr" />
+		<div class="btnrow" style="justify-content:flex-end">
+			<button type="submit" class="pri sm">배송지 저장</button>
+		</div>
+	</form>
+</section>
 
 <div class="sec" style="margin-top:22px">
 	정산 정보 <StatusChip tone={seller.has_bank_info ? 'green' : 'red'}>{seller.has_bank_info ? '등록 완료' : '미등록 — 등록 전까지 정산 지급 보류'}</StatusChip>

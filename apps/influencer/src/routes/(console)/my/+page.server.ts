@@ -2,9 +2,10 @@ import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import type { Database } from '@sellery/db/database.types';
 import { isPlatform } from '@sellery/db/partner/signup-rules';
+import { parseShippingInput, parseStoredShipping } from '@sellery/db/partner/sample-rules';
 import { cleanText } from '@sellery/db/text';
 import { createAdminClient, type Admin } from '$lib/server/db';
-import { notifySlack, rateLimit, requireSeller, sellerPath, type SellerReady } from '$lib/server/partner';
+import { notifySlack, rateLimit, requireSeller, saveSampleAddress, sellerPath, type SellerReady } from '$lib/server/partner';
 
 /**
  * `/my` — 마이페이지 2단계 (web influencer/my/page.tsx + actions.ts 1:1 · docs/inf-console-plan.md §4.7 · §6 `/my` · docs/monorepo-migration.md §2.4 · §5.2).
@@ -20,6 +21,7 @@ import { notifySlack, rateLimit, requireSeller, sellerPath, type SellerReady } f
  *   setPrimaryCh     [메인 SNS로 설정]  verified 채널만 · sellers.platform/handle/followers 동기화
  *   saveChannel      추가·수정  핸들/플랫폼이 바뀌면 verified=false, vcode=null, vcode_confirmed_at=null (primary 는 유지)
  *   deleteChannel    삭제  primary 불가
+ *   saveAddress      샘플 배송지(3단계)  `parseShippingInput` → `saveSampleAddress`(sellers.sample_address) — 상품 상세 무상 요청 폼 · 4단계 결제 폼의 프리필
  */
 type Ch = Database['public']['Tables']['seller_channels']['Row'];
 
@@ -37,6 +39,8 @@ const MY_MESSAGES: Record<string, MyMessage> = {
 	err_primary_delete: { tone: 'danger', text: '메인 SNS 채널은 삭제할 수 없어요 — 먼저 다른 채널을 메인으로 설정하세요.' },
 	err_not_verified: { tone: 'danger', text: '인증된 채널만 메인 SNS 로 설정할 수 있어요.' },
 	err_handle_taken: { tone: 'danger', text: '같은 플랫폼에 이미 등록된 핸들이에요.' },
+	address_saved: { tone: 'ok', text: '샘플 배송지를 저장했어요 — 상품 상세의 무상 샘플 요청 폼에 기본값으로 채워집니다.' },
+	err_address: { tone: 'danger', text: '배송지를 확인해주세요 — 수취인 · 연락처(숫자 8~15자리) · 우편번호 · 주소는 필수예요.' },
 	err_input: { tone: 'danger', text: '입력값을 확인해주세요.' },
 	err_rate: { tone: 'danger', text: '요청이 너무 많아요 — 잠시 후 다시 시도해주세요.' },
 	err_db: { tone: 'danger', text: '저장 중 문제가 생겼어요 — 잠시 후 다시 시도해주세요.' }
@@ -67,7 +71,18 @@ export const load: PageServerLoad = async (event) => {
 	const editing = editId ? (list.find((c) => c.id === editId) ?? null) : null;
 	const adding = sp.get('add') === '1';
 
-	return { seller, balance, channels: list, msg, verifying, editing, adding, myPath: sellerPath('/my') };
+	return {
+		seller,
+		balance,
+		channels: list,
+		msg,
+		verifying,
+		editing,
+		adding,
+		shipping: parseStoredShipping(seller.sample_address),
+		invalidField: sp.get('field'),
+		myPath: sellerPath('/my')
+	};
 };
 
 // ------------------------------------------------------------
@@ -250,5 +265,14 @@ export const actions: Actions = {
 			back('msg=err_db');
 		}
 		back('msg=deleted');
+	},
+
+	saveAddress: async (event) => {
+		const { ctx, formData } = await enter(event, 'address');
+		const parsed = parseShippingInput(formData);
+		if (!parsed.ok) back(`msg=err_address&field=${parsed.field}#address`);
+		const res = await saveSampleAddress(ctx.seller.id, parsed.shipping);
+		if (!res.ok) back('msg=err_db');
+		back('msg=address_saved#address');
 	}
 };
