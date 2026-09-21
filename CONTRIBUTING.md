@@ -19,7 +19,7 @@ npm run dev:brand       # 브랜드    http://localhost:5174/brand
 npm run dev:admin       # 관리자    http://localhost:5175/admin
 ```
 
-앱마다 포트가 달라 동시에 띄워도 됩니다. 로그인 데모는 `/influencer/login` · `/brand/login` (계정 목록이 화면에 있고 비밀번호는 8자 이상 아무거나). 배포된 것과 같은 모양으로 한 번에 보려면 `npm run build && npm run serve` → http://localhost:4173 .
+앱마다 포트가 달라 동시에 띄워도 됩니다. 로그인 데모는 `/influencer/login` · `/brand/login` (계정 목록이 화면에 있고 비밀번호는 8자 이상 아무거나). 처음이라면 `.env.example` 을 `.env.local` 로 복사해 두세요 — `PUBLIC_SUPABASE_*` 이름이 없으면 `npm run check`·`npm run build` 가 실패합니다(값은 비워도 됨). 배포된 모양(한 도메인 아래 4 앱)은 PR 의 앱별 Vercel Preview URL 로 봅니다.
 
 > 저장소 권한은 `shinwook-k`에게 GitHub username을 알려주고 collaborator로 추가받으세요.
 > 이 저장소는 GitHub 조직 `weglow-dev` 안에 있습니다. 조직 이름이 바뀌면 저장소 URL도 바뀌고 GitHub는 옛 조직 이름을 리다이렉트하지 않으므로, 그때 `git remote set-url origin https://github.com/<새조직>/sellery.git` 을 한 번 실행해 주세요.
@@ -53,8 +53,7 @@ git switch -c fix/brand-cs-routing
 | 수수료 · 정산 · 등급 · 샘플 · 포인트 상수 | `packages/core/src/constants.ts` (`PG_RATE` `PLAT_RATE` `WHT` `CLEAR_DAYS` `GRADES` `DATA_PRICE` …) + `docs/*.md` |
 | 정산 계산 · 등급 판정 · 샘플 자격 (읽기 전용 helper) | `packages/core/src/helpers.ts` (`calc` `sellerWht` `settleDue` `sample*`) |
 | 로그인 / 가입 / 구글 로그인 데모 | `packages/ui/src/views/LoginPage.svelte` |
-| 첫 화면(센터 선택) | `hub/index.html` |
-| 아바타 · 상품 이미지 · 파비콘 | `assets/` (원본·누끼 소스는 `assets/_src/` — git에 안 올라감) |
+| 아바타 · 상품 이미지 · 파비콘 | `apps/shop/static/assets/` (앱 4개 공용 · 원본·누끼 소스는 `apps/shop/static/assets/_src/` — git에 안 올라감) |
 
 - **상태를 바꾸는 코드는 `actions.ts` 에만.** 화면(`.svelte`)이나 helper 안에서 `S`·`D_()` 를 고치면 Svelte 가 `state_unsafe_mutation` 으로 멈춰 빈 화면이 됩니다. 화면은 `act.xxx()` 를 부르기만 합니다.
 - **데이터 구조(상품·캠페인·주문 필드)를 바꿨다면** `packages/core/src/constants.ts` 의 `LS = 'sellery-proto-vNN'` 숫자를 하나 올려주세요. 안 올리면 기존 방문자의 localStorage에 옛 데이터가 남아 화면이 깨집니다.
@@ -116,7 +115,7 @@ main에 병합되면 Vercel 이 `npm run build` 를 돌려 https://sellery-swart
 - `LS` 키 버전을 안 올리고 시드 구조 바꾸기
 - `docs/` 정책 숫자와 코드 상수를 따로 고치기
 - 화면·helper 안에서 상태 직접 변경 (`actions.ts` 로)
-- `dist/` · `.svelte-kit/` 커밋 (빌드 산출물 · gitignore 되어 있음)
+- `.vercel/` · `.svelte-kit/` 커밋 (빌드 산출물 · gitignore 되어 있음)
 - 제안서 PDF에 인쇄된 옛 데모 저장소(`junho763-dotcom/sellery-prototype`) 지우기
 
 ## `web/` (현재 sellery.life 서비스 중인 Next.js 앱)

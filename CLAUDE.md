@@ -17,21 +17,21 @@
 **SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4 · npm workspaces.** 이전의 바닐라 JS 한 페이지(`index.html` + `js/00~90`)는 이 커밋에서 제거됐고, 기능·정책·디자인은 그대로 이식됐습니다.
 
 ```
-apps/shop apps/influencer apps/brand apps/admin   SvelteKit 앱 4개 · SPA(ssr=false) · 각각 base /shop /influencer /brand /admin
+apps/shop apps/influencer apps/brand apps/admin   SvelteKit 앱 4개 · SPA(ssr=false) · shop 은 base '' (도메인 루트) · 나머지 /influencer /brand /admin
+  svelte.config.js · vercel.json · src/hooks.server.ts   @sveltejs/adapter-vercel(nodejs22.x · env.dir '../..' = 루트 .env.local) · 리전 icn1 (shop 의 vercel.json 은 /influencer /brand /admin → 각 프로젝트 rewrites)
+                              · Supabase SSR hooks(locals.supabase · safeGetSession — PUBLIC_SUPABASE_URL/ANON_KEY 가 비면 null 로 통과) — docs/monorepo-migration.md §1 · §2
   src/routes/+layout.ts       ssr=false · load() 에서 S.role 지정 (렌더 밖에서)
   src/routes/+layout.svelte   AppShell 에 탭·우측 슬롯·페르소나 전달
   src/routes/<화면>/+page.svelte   화면 하나 = 폴더 하나 (c/[cid] 캠페인 스레드 · s/[cid] 판매 상세)
 packages/core/src   프레임워크 무관 로직 — constants.ts(정책 숫자 · LS 키) · seed.ts · state.svelte.ts(S=$state · D_ · save)
                     · ui.svelte.ts(toast · modal · go) · helpers.ts(읽기 전용 계산) · actions.ts(상태 변경 전부) · storage.ts(localStorage · supabase.ts 는 스텁)
 packages/ui/src     css/theme.css(Tailwind + @theme 토큰 + css/legacy/{base,skin}.css 를 layer 로) · components/ · modals/(ModalHost) · views/(CampaignDetail · Store · Shop · Sales · DM · LoginPage)
-hub/index.html      첫 화면(센터 선택) — 정적 · dist 루트로 복사
-assets/             앱 4개 공용 이미지·파비콘 — 개발은 scripts/vite-root-assets.mjs 가 /assets/ 로 서빙, 빌드는 dist/assets 로 복사
-api/auth/kakao.js   카카오 콜백 자리 (Vercel 서버리스 · KAKAO_REST_KEY 없으면 501)
-scripts/build.mjs   앱 4개 빌드 → dist/<app> + hub + assets   ·   scripts/serve-dist.mjs  dist 로컬 서빙(SPA 폴백)
+apps/shop/static/   앱 4개 공용 이미지·파비콘·email/celery.png — 프로덕션은 shop 이 /assets/ /favicon.svg /email/ 로 서빙, 개발은 scripts/vite-root-assets.mjs 가 4 앱 dev 서버에 서빙 (원본 _src/ 는 git 제외)
 docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
+.env.example        4 앱 공용 환경변수 이름 표 → .env.local (PUBLIC_* 는 $env/static/public — 이름이 없으면 check·build 실패, CI 는 더미)
 ```
 
-- 앱 4개가 **같은 origin** 에 배포되므로 localStorage 데모 데이터를 공유합니다 (개발 서버는 포트가 달라 앱별로 분리됨 — `npm run build && npm run serve` 로 합쳐 볼 수 있음).
+- 앱 4개가 **같은 origin** 에 배포되므로 localStorage 데모 데이터를 공유합니다 (개발 서버는 포트가 달라 앱별로 분리됨 — README "로컬 개발" 포트 표).
 - **상태 변경은 `packages/core/src/actions.ts` 에서만.** `$derived`·컴포넌트 init·helper 안에서 `S`/`D_()` 를 쓰면 `state_unsafe_mutation` 으로 앱이 빈 화면이 됩니다. 초기화가 필요한 배열(`D_().cs` 등)도 액션 안에서 만듭니다. 역할 지정은 `+layout.ts` `load()`, 부트 시 자동 제안(`autoTick`)은 `onMount`.
 - 화면 링크는 앱 기준(`/camps`)으로 쓰고 `AppShell`·`go.*` 가 base 를 붙입니다. 직접 `<a href>` 를 쓰면 `$app/paths` 의 `base` 를 앞에.
 - 파일 수정은 해당 화면의 `+page.svelte` 하나만 열면 됩니다. 앵커 문자열 충돌 걱정은 사라졌습니다.
@@ -39,8 +39,8 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 ## 저장소 · 배포
 
 - GitHub: `weglow-dev/sellery` (glo와 같은 조직 · 2026-09-15 에 `weglow-glo` → `weglow-dev` 로 이름 변경, 옛 이름은 리다이렉트되지 않음). `main`은 보호됨 — PR 필수, CI `프로토타입 점검` 통과, 리뷰 코멘트 해결, 관리자도 예외 없음.
-- 배포: **Vercel** (team `weglow-team` / project `sellery`) → https://sellery-swart.vercel.app/ . `vercel.json`: `npm ci` → `npm run build`(scripts/build.mjs) → `dist/` 서빙, 앱별 SPA rewrites. GitHub 앱 연동 → `main` 병합 = 프로덕션, PR = 미리보기 URL 댓글. GitHub Pages 는 빌드가 없어 이 구조에서는 쓰지 않습니다.
-- CI: `.github/workflows/ci.yml` → `npm ci` · `npm run check`(앱 4개 svelte-check) · `npm run build`. 로컬에서도 같은 명령.
+- 배포: **Vercel** 프로젝트 4개 (team `weglow-team`) `sellery-shop`(Root Directory `apps/shop` · 도메인 루트) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>` · "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel`). `apps/shop/vercel.json` rewrites 가 `/influencer/*` `/brand/*` `/admin/*` 를 각 프로젝트 프로덕션 URL 로 프록시 → 브라우저 오리진 하나 · 세션 쿠키 공유. GitHub 앱 연동 → `main` 병합 = 프로덕션, PR = 앱별 미리보기 URL 댓글. 정식 도메인 `sellery.life` 는 S4 까지 `sellery-app`(web/). 절차·단계는 docs/monorepo-migration.md §1 · §7.
+- CI: `.github/workflows/ci.yml` → `npm ci` · `npm run check`(앱 4개 svelte-check) · `npm run build`(4 앱 `.vercel/output`) — job env 에 더미 `PUBLIC_SUPABASE_URL` `PUBLIC_SUPABASE_ANON_KEY`(`$env/static/public` 은 이름이 없으면 실패). 로컬에서도 같은 명령 — `.env.local` 에 같은 이름(`.env.example` 복사).
 - Claude 봇: `.github/workflows/claude.yml` (glo와 같은 구성 + 셀러리용 안내문). Secrets `ANTHROPIC_API_KEY` + 조직 Claude GitHub 앱에 저장소 추가 필요.
 - 이 파일(CLAUDE.md)은 **커밋되는 팀 공용 메모**입니다. 개인 메모는 `CLAUDE.local.md`(gitignore). 줄바꿈은 `.gitattributes`가 모든 텍스트 파일을 LF로 강제합니다(Windows 포함).
 - 로컬: `npm install` → `npm run dev:shop|influencer|brand|admin` (5176 · 5173 · 5174 · 5175, 각 base 경로로 접속).
@@ -69,7 +69,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 
 **셀러리 포인트** 확정 매출 ₩500만당 1🥬 (`CELERY_PER`), 1🥬 ≈ ₩20,000 상당. 데이터 열람 가격은 `DATA_PRICE`. → docs/points-policy.md
 
-**링크 유입 보호** 인플루언서 판매링크(`/shop/s/<cid>`)로 들어온 고객에게는 같은 카테고리 상품을 노출하지 않습니다.
+**링크 유입 보호** 인플루언서 판매링크(`/s/<cid>` — shop 앱, 도메인 루트)로 들어온 고객에게는 같은 카테고리 상품을 노출하지 않습니다.
 홈으로 이동하거나 새로고침해도 유지됩니다 (`custVisible()`, `S.linkCtx`, 캠페인 종료 +7일에 해제).
 
 **고객 CS** 고객 문의는 관리자를 거치지 않고 **브랜드사로 바로** 갑니다 (브랜드 센터 "고객 문의" 탭). 관리자는 주문·CS 화면에서 열람만 합니다.
@@ -97,7 +97,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 
 인플루언서 8명: 지유 jiyu@ · 혜린 hyerin@ · 민지 minji@ · 서아 seoa@ · 로라 lola@ · 하늘 haneul@ · 소민 somin@ · 유나 yuna@ (`@sellery.demo`) · 브랜드: 바인허브 `partner@vyneherb.co` · 글로헬스 `official@weglow.biz` · 관리자 `admin@sellery.co.kr`.
 비밀번호는 **8자 이상이면 아무거나**(데모 버튼은 `sellery2026` 자동 입력). 로그인 탭(인플루언서/브랜드)과 계정 역할이 맞아야 하고, 관리자는 어느 탭에서든 됩니다. 구글 로그인은 데모 계정 선택 팝업(`GOOGLE_CLIENT_ID` 자리표시자).
-고객 카카오 로그인은 `KAKAO_JS_KEY` 가 비어 있으면 데모 계정 선택 모달(`KAKAO_DEMO`), 키가 들어오면 SDK v2 `authorize()` → `/api/auth/kakao` 콜백.
+고객 카카오 로그인은 `KAKAO_JS_KEY` 가 비어 있으면 데모 계정 선택 모달(`KAKAO_DEMO`), 키가 들어오면 SDK v2 `authorize()` → 콜백(옛 `api/auth/kakao.js` 자리는 S1 에서 삭제 — 실로그인은 S3 의 Supabase OAuth `/auth/callback`).
 
 ## 아직 안 붙은 것
 

@@ -16,7 +16,7 @@
 > | `js/10-render.js` 앱바·탭 | `packages/ui/src/components/AppShell.svelte` |
 > | `css/base.css` · `css/skin.css` | `packages/ui/src/css/theme.css` (+ `css/legacy/`) |
 > | `login.html` | `packages/ui/src/views/LoginPage.svelte` (`/influencer/login` · `/brand/login`) |
-> | `index.html` | 없음 — 첫 화면은 `hub/index.html`, 각 앱은 `apps/<앱>/src/app.html` |
+> | `index.html` | 없음 — 각 앱은 `apps/<앱>/src/app.html` (센터 선택 첫 화면은 없어졌고, 앱은 README "로컬 개발" 포트 표로 엽니다) |
 > | `node scripts/check.mjs` | `npm run check` (+ `npm run build`) |
 >
 > 이제는 파일을 고치기 전에 `npm install` 한 번이 필요하고, GitHub.com 웹 편집기로 고쳐도 됩니다(병합되면 Vercel 이 빌드해서 배포).

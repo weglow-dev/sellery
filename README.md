@@ -4,15 +4,15 @@
 
 브랜드사와 인플루언서(셀러)를 잇는 **건강·웰니스 전용** 브랜드사 협업판매 중개 플랫폼의 클릭 가능한 UI/UX 프로토타입입니다. (주)위글로우 · 오픈 준비 중.
 
-**정식 서비스** → https://sellery.life (아래 "현재 서비스 상태" 참고). **SvelteKit 데모(apps/*)** 는 로컬 `npm run build && npm run serve` 로 확인합니다 — 첫 화면에서 센터를 고릅니다. (예전 Vercel 데모 주소 sellery-swart.vercel.app 은 2026-09-18 삭제)
+**정식 서비스** → https://sellery.life (아래 "현재 서비스 상태" 참고). **SvelteKit 데모(apps/*)** 는 로컬에서 앱별 dev 서버로 봅니다(아래 "로컬 개발" 포트 표). (예전 Vercel 데모 주소 sellery-swart.vercel.app 은 2026-09-18 삭제)
 
 | 주소 | 화면 |
 |---|---|
-| `/shop/` | 고객 판매 페이지 · 장바구니 · 카카오 로그인(데모) · 내 주문 |
+| `/` | 고객 판매 페이지 · 장바구니 · 카카오 로그인(데모) · 내 주문 (shop 앱 — 도메인 루트) |
 | `/influencer/` | 인플루언서 센터 (캠페인 · DM · 상품 갤러리 · 정산 · 랭킹·등급 · 셀러리 샵 · 추천) |
 | `/brand/` | 브랜드 센터 (상품 관리 · 주문·발주 · 고객 문의 · 인플루언서 갤러리 · 정산) |
 | `/admin/` | 관리자 (검수 · 매칭·자동 제안 · 매출·순수익 · 정산 실행 · 데이터 초기화) |
-| `/shop/s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
+| `/s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
 | `/influencer/login` · `/brand/login` | 파트너 로그인 데모 (계정 목록은 화면 안 · 비밀번호 8자 이상 아무거나) |
 
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
@@ -25,18 +25,31 @@
 
 ## 기술 스택
 
-**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래 경로(`/shop` `/influencer` `/brand` `/admin`)로 배포되며, 같은 origin 이라 데모 데이터(localStorage)를 앱끼리 공유합니다 — 브랜드 센터에서 승인하면 인플루언서 센터에 바로 보입니다. 서버·결제·실인증은 아직 없습니다 (Supabase 스키마는 설계·적용 완료, 앱 미연동).
+**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래(shop 은 루트 `/`, 나머지는 `/influencer` `/brand` `/admin` 경로 — Vercel rewrite)로 배포되며, 같은 origin 이라 데모 데이터(localStorage)를 앱끼리 공유합니다 — 브랜드 센터에서 승인하면 인플루언서 센터에 바로 보입니다. 결제·실인증은 아직 없습니다 (Supabase 스키마는 설계·적용 완료 · 앱마다 `hooks.server.ts` 가 Supabase 세션 자리를 갖고 있고 화면 연동은 이후 단계).
+
+## 로컬 개발
 
 ```bash
-npm install             # 처음 한 번 (Node 20+)
-npm run dev:shop        # 고객 앱      → http://localhost:5176/shop
-npm run dev:influencer  # 인플루언서   → http://localhost:5173/influencer
-npm run dev:brand       # 브랜드       → http://localhost:5174/brand
-npm run dev:admin       # 관리자       → http://localhost:5175/admin
-npm run check           # 앱 4개 svelte-check (CI 와 동일)
-npm run build           # 배포와 같은 빌드 → dist/ (허브 + 앱 4개 + assets)
-npm run serve           # dist/ 를 Vercel 규칙(SPA 폴백)으로 로컬 서빙 → http://localhost:4173
+npm install                  # 처음 한 번 (Node 22+)
+cp .env.example .env.local   # PUBLIC_SUPABASE_URL · PUBLIC_SUPABASE_ANON_KEY — 값은 비워도 됨 (이름이 없으면 check·build 가 실패)
+npm run check                # 앱 4개 svelte-check (CI 와 동일)
+npm run build                # 앱 4개 vite build → apps/*/.vercel/output (adapter-vercel · CI 와 동일)
 ```
+
+| 앱 | 명령 | 주소 |
+|---|---|---|
+| 고객 (shop) | `npm run dev:shop` | http://localhost:5176/ (base `''` — 도메인 루트) |
+| 인플루언서 | `npm run dev:influencer` | http://localhost:5173/influencer |
+| 브랜드 | `npm run dev:brand` | http://localhost:5174/brand |
+| 관리자 | `npm run dev:admin` | http://localhost:5175/admin |
+
+4 앱은 `kit.env.dir: '../..'` 로 **루트 `.env.local` 하나**만 읽습니다 — `vercel env pull` 은 앱 폴더가 아니라 루트 파일로(`vercel env pull ../../.env.local`, `apps/<앱>/.env.local` 은 읽히지 않음). 개발 서버는 포트가 달라 localStorage 가 앱별로 분리되고, 다른 앱 링크(`/influencer/…`)는 shop dev 서버에 없으니 위 포트로 직접 엽니다. 공용 이미지·파비콘(`/assets/*` `/favicon.svg` `/email/*`)은 `apps/shop/static/` 한 곳에 있고 `scripts/vite-root-assets.mjs` 가 4 앱 dev 서버에서 서빙합니다.
+
+> Windows 에서 `npm run build` 는 adapter-vercel 이 만드는 심링크 때문에 `EPERM` 으로 실패할 수 있습니다 — 설정 → 개발자 모드를 켜거나 WSL 에서 빌드하세요. CI(ubuntu)·Vercel 은 영향 없고, `npm run check` 와 `npm run dev:*` 는 Windows 에서 그대로 됩니다.
+
+## 배포
+
+Vercel 프로젝트 4개 — `sellery-shop`(Root Directory `apps/shop`, 도메인 루트) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>`; "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel` · 리전 `icn1`). 브라우저 오리진은 하나 — `apps/shop/vercel.json` 의 rewrites 가 `/influencer/*` `/brand/*` `/admin/*` 를 각 프로젝트의 프로덕션 URL 로 프록시하므로 세션 쿠키를 4 앱이 공유합니다. `main` 병합 = 프로덕션, PR = 앱별 Preview URL. 정적 자산은 shop 만 서빙합니다(다른 앱의 Preview URL 에서는 이미지 대신 이모지). 정식 도메인 `sellery.life` 는 도메인 전환(S4) 전까지 `web/`(`sellery-app`) 이 계속 서비스합니다. 상세·단계는 [docs/monorepo-migration.md](docs/monorepo-migration.md) §1 · §7.
 
 ## 구현된 흐름
 
@@ -63,7 +76,9 @@ npm run serve           # dist/ 를 Vercel 규칙(SPA 폴백)으로 로컬 서�
 
 ```
 apps/                 SvelteKit 앱 4개 — 라우트 = 화면 (폴더 이름이 URL)
-  shop/               고객 판매 페이지 (base /shop)      src/routes/{+page, influencers, cart, orders, about, s/[cid]}
+  shop/               고객 판매 페이지 (base '' — 도메인 루트)  src/routes/{+page, influencers, cart, orders, about, s/[cid]}
+    static/           아바타 SVG · 상품 이미지 · 파비콘 · email/celery.png — 앱 4개 공용, /assets/ /favicon.svg /email/ 로 서빙 (원본은 static/assets/_src/, git 제외)
+  */svelte.config.js · vercel.json · src/hooks.server.ts   adapter-vercel(nodejs22.x · env.dir '../..') · 리전 icn1 (shop 은 /influencer /brand /admin rewrites) · Supabase SSR 세션 hooks
   influencer/         인플루언서 센터 (base /influencer)  src/routes/{+page, camps, dm, explore, sales, settle, rank, shop, ref, my, login, c/[cid], s/[cid]}
   brand/              브랜드 센터 (base /brand)           src/routes/{+page, camps, products, orders, cs, gallery, settle, my, dm, sales, shop, login, c/[cid], s/[cid]}
   admin/              관리자 (base /admin)                src/routes/{+page, products, influencers, brands, orders, match, revenue, settle, c/[cid], s/[cid]}
@@ -79,15 +94,11 @@ packages/ui/src/      공용 UI
   components/         AppShell(앱바·탭) · HeroBand · Sec · CampRow · ProdCard · Chips …
   modals/             ModalHost 가 종류별로 렌더 (일정 · 샘플 구매 · 제안 · 상품 등록 · CS · 카카오 …)
   views/              CampaignDetail · Store · Shop · Sales · DM · LoginPage (여러 앱이 공유)
-hub/                  첫 화면(센터 선택) — 정적 HTML, dist/ 루트로 복사
-assets/               아바타 SVG · 상품 이미지 · 파비콘 — 앱 4개 공용, /assets/ 로 서빙 (원본은 assets/_src/, git 제외)
-api/auth/kakao.js     카카오 로그인 콜백 자리 (Vercel 서버리스 함수 · KAKAO_REST_KEY 설정 전까지 501)
-scripts/build.mjs     앱 4개 빌드 → dist/<app> + 허브 + assets (Vercel buildCommand)
-scripts/serve-dist.mjs dist/ 로컬 서빙 (SPA 폴백 = vercel.json rewrites)
-docs/                 운영 정책 문서 · 수정 가이드 · 데이터 모델 (아래)
-supabase/             Supabase 스키마 — migrations/0001~0006 + seed.sql (클라우드 프로젝트 `sellery` 적용 완료 · 앱 미연동 · docs/data-model.md §8)
-.github/              CI(프로토타입 점검 = npm run check + build) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
-vercel.json           npm ci → npm run build → dist/ 서빙 · 앱별 SPA 리라이트
+scripts/vite-root-assets.mjs   dev 전용 — apps/shop/static 을 4 앱 dev 서버에서 /assets/ /email/ /favicon.svg 로 서빙
+docs/                 운영 정책 문서 · 수정 가이드 · 데이터 모델 · 이식 계획(monorepo-migration.md) (아래)
+supabase/             Supabase 스키마 — migrations/0001~0010 + seed.sql (클라우드 프로젝트 `sellery` 적용 완료 · docs/data-model.md §8)
+.github/              CI(프로토타입 점검 = npm run check + build · 더미 PUBLIC_*) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
+.env.example          4 앱 공용 환경변수 이름 표 → 복사해서 .env.local (gitignored)
 ```
 
 ## 정책 문서
