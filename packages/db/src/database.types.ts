@@ -1049,6 +1049,131 @@ export type Database = {
           },
         ]
       }
+      partner_payments: {
+        Row: {
+          amount_cash: number
+          amount_cel: number
+          amount_total: number
+          approved_at: string | null
+          brand_id: string | null
+          campaign_id: string | null
+          cel_won: number
+          created_at: string
+          expires_at: string
+          fail_code: string | null
+          fail_message: string | null
+          id: string
+          kind: string
+          order_name: string
+          owner_type: string
+          payment_key: string | null
+          payment_method: string | null
+          product_id: string | null
+          quote: Json | null
+          raw_cancel: Json | null
+          raw_payment: Json | null
+          refunded_at: string | null
+          seller_id: string | null
+          shipping: Json
+          status: string
+          toss_order_id: string
+          updated_at: string
+          use_cel: boolean
+          user_id: string | null
+        }
+        Insert: {
+          amount_cash: number
+          amount_cel?: number
+          amount_total: number
+          approved_at?: string | null
+          brand_id?: string | null
+          campaign_id?: string | null
+          cel_won?: number
+          created_at?: string
+          expires_at?: string
+          fail_code?: string | null
+          fail_message?: string | null
+          id?: string
+          kind?: string
+          order_name: string
+          owner_type?: string
+          payment_key?: string | null
+          payment_method?: string | null
+          product_id?: string | null
+          quote?: Json | null
+          raw_cancel?: Json | null
+          raw_payment?: Json | null
+          refunded_at?: string | null
+          seller_id?: string | null
+          shipping: Json
+          status?: string
+          toss_order_id: string
+          updated_at?: string
+          use_cel?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          amount_cash?: number
+          amount_cel?: number
+          amount_total?: number
+          approved_at?: string | null
+          brand_id?: string | null
+          campaign_id?: string | null
+          cel_won?: number
+          created_at?: string
+          expires_at?: string
+          fail_code?: string | null
+          fail_message?: string | null
+          id?: string
+          kind?: string
+          order_name?: string
+          owner_type?: string
+          payment_key?: string | null
+          payment_method?: string | null
+          product_id?: string | null
+          quote?: Json | null
+          raw_cancel?: Json | null
+          raw_payment?: Json | null
+          refunded_at?: string | null
+          seller_id?: string | null
+          shipping?: Json
+          status?: string
+          toss_order_id?: string
+          updated_at?: string
+          use_cel?: boolean
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_payments_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_payments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_payments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_payments_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_events: {
         Row: {
           event_type: string | null
@@ -1898,6 +2023,60 @@ export type Database = {
         }
         Returns: Json
       }
+      app_partner_payment_cancel: {
+        Args: { p_payment_id: string; p_reason?: string; p_seller_id?: string }
+        Returns: Json
+      }
+      app_partner_payment_claim: {
+        Args: {
+          p_order_id?: string
+          p_product_id: string
+          p_seller_id: string
+          p_shipping: Json
+          p_use_cel: boolean
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      app_partner_payment_confirm: {
+        Args: {
+          p_amount_cash: number
+          p_payment_id: string
+          p_seller_id: string
+          p_toss: Json
+        }
+        Returns: Json
+      }
+      app_partner_payment_confirming: {
+        Args: {
+          p_payment_id: string
+          p_payment_key: string
+          p_seller_id: string
+          p_stale?: string
+        }
+        Returns: Json
+      }
+      app_partner_payment_fail: {
+        Args: {
+          p_code: string
+          p_message?: string
+          p_payment_id: string
+          p_raw?: Json
+        }
+        Returns: Json
+      }
+      app_partner_payment_refund: {
+        Args: { p_payment_id: string; p_raw?: Json; p_reason?: string }
+        Returns: Json
+      }
+      app_partner_payments_expire: {
+        Args: { p_grace?: string }
+        Returns: number
+      }
+      app_partner_payments_stale: {
+        Args: { p_age?: string; p_limit?: number }
+        Returns: Json[]
+      }
       app_receive_sample: {
         Args: { p_campaign_id: string; p_seller_id: string }
         Returns: Json
@@ -1937,6 +2116,18 @@ export type Database = {
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       campaign_card: { Args: { p_code: string }; Returns: Json }
+      celery_spend: {
+        Args: {
+          p_delta: number
+          p_memo?: string
+          p_owner_id: string
+          p_owner_type: string
+          p_reason: string
+          p_ref_id?: string
+          p_ref_type?: string
+        }
+        Returns: number
+      }
       checkout_session_brief: {
         Args: { s: Database["public"]["Tables"]["checkout_sessions"]["Row"] }
         Returns: Json
@@ -1958,6 +2149,11 @@ export type Database = {
       partner_identity_confirmed: {
         Args: { p_user_id: string }
         Returns: boolean
+      }
+      partner_normalize_shipping: { Args: { p_shipping: Json }; Returns: Json }
+      partner_payment_brief: {
+        Args: { p: Database["public"]["Tables"]["partner_payments"]["Row"] }
+        Returns: Json
       }
       partner_random_code: {
         Args: { p_len?: number; p_prefix?: string }
