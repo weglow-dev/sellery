@@ -580,3 +580,4 @@ curl -sI https://inf.sellery.life/login                  # 200 콘솔 로그인(
 | 관리자(슬라이스 4) | `/admin` 경로(호스트 없음) + `app_role()='admin'` + Basic Auth 이중 잠금. 정지·복구·시드 행 연결·채널 인증 확인(`channels --pending` 큐)·샘플 취소·payouts.paid 화면은 이 문서의 SQL/스크립트를 버튼으로 감싼다. `partner_payments CANCEL_PENDING`·`payment_events handled=false` 큐 화면. |
 | 세션 쿠키 host-only · `.sellery.life` 공유 전환 | 브랜드 콘솔 때 재검토 — 전환 시 `lib/supabase/options.ts` 한 곳 + Preview 분기 + `clearAuthCookiesAtScopes` 실측 |
 | 문서 | `docs/app-plan.md §12` 슬라이스 2 행에 "호스트 brand.sellery.life · (partner)/brand" 반영, §10.1 파티션 J |
+| **브랜드 콘솔 단계 계획(2026-09-21)** | 이 표를 씨앗으로 [`docs/brand-console-plan.md`](brand-console-plan.md) 를 썼다 — 결정 요약 · 상태 기계(두 콘솔 연결) · `apps/brand` `(console)`/`(demo)` 구조 · `create_brand_from_signup`/`requireBrand` · 0014~0018 RPC · 화면 · 6단계 · 검증 · 열린 결정. 브랜드 작업은 그 문서를 정본으로. |
