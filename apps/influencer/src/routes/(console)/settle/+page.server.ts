@@ -65,7 +65,7 @@ export const load: PageServerLoad = async (event) => {
 		docHref: sellerPath('/settle/doc'),
 		settlePath: sellerPath('/settle'),
 		campaignsPath: sellerPath('/campaigns'),
-		privacyHref: '/privacy'
+		privacyHref: '/privacy#partner-settlement'
 	};
 };
 
