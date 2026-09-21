@@ -2,7 +2,7 @@
 	/**
 	 * `(demo)` 그룹 레이아웃 — 이전 루트 +layout.svelte(데모 AppShell 10탭 · DemoBanner) 를 그대로 옮긴 것 (docs/brand-console-plan.md §2 · monorepo-migration.md 결정 C).
 	 * CSS 는 콘솔의 site.css 가 아니라 데모의 theme.css(legacy base+skin + Galmuri) — 두 파일을 한 페이지에 섞지 않는다(결정 12).
-	 * 콘솔과 겹치는 경로는 `/demo-*` 로 옮겼다(홈 `/demo` · 로그인 `/demo-login` · `/demo-products` `/demo-orders` `/demo-cs` `/demo-sales` `/demo-settle` `/demo-my`).
+	 * 콘솔과 겹치는 경로는 `/demo-*` 로 옮겼다(홈 `/demo` · 로그인 `/demo-login` · `/demo-orders` `/demo-cs` `/demo-sales` `/demo-settle` `/demo-my`). 상품 관리 탭은 2단계에서 콘솔 `/products` 로 넘어가 데모에서 뺐다(`go.screen('products')` 는 콘솔 화면에 닿는다).
 	 * core 의 `go.screen('products')`('/products') 같은 화면 경로는 마운트 뒤 `demoPathOf` 로 다시 연결한다 — 콘솔이 그 화면을 실제로 만드는 단계에서 항목을 지운다.
 	 */
 	import '@sellery/ui/css/theme.css';
@@ -18,7 +18,7 @@
 	const csN = $derived(csOpen(S.actingBrand).length);
 	const tabs = $derived([
 		{ href: '/demo', label: '홈' }, { href: '/dm', label: 'DM', badge: dmN }, { href: '/camps', label: '내 캠페인' }, { href: '/demo-orders', label: '주문·발주' }, { href: '/demo-cs', label: '고객 문의', badge: csN },
-		{ href: '/demo-sales', label: '실시간 매출' }, { href: '/demo-settle', label: '정산' }, { href: '/demo-products', label: '상품 관리' }, { href: '/gallery', label: '인플루언서 갤러리' }, { href: '/shop', label: '셀러리 샵' }
+		{ href: '/demo-sales', label: '실시간 매출' }, { href: '/demo-settle', label: '정산' }, { href: '/gallery', label: '인플루언서 갤러리' }, { href: '/shop', label: '셀러리 샵' }
 	]);
 	const me = $derived(brand(S.actingBrand));
 	// AppShell 이 init 에서 등록한 goto(base + p) 를 덮어쓴다 — 콘솔과 겹치는 화면 경로만 /demo-* 로 (콘솔 루트·탭과 충돌 방지).
