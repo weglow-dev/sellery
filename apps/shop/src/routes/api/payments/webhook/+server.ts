@@ -2,7 +2,10 @@ import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
 import { createAdminClient } from '$lib/server/db';
+import { isPartnerOrderId } from '@sellery/payments/money';
+import type { PartnerPaymentView } from '@sellery/db/partner/sample-rules';
 import {
+	findPartnerPaymentForWebhook,
 	isTossError,
 	isUncertain,
 	logPaymentEvent,
@@ -10,6 +13,7 @@ import {
 	ORDER_LITE_COLS,
 	SESSION_LITE_COLS,
 	syncFromPayment,
+	syncPartnerFromPayment,
 	tossGetPayment,
 	TOSS_KEY_RE,
 	type EventSource,
@@ -22,7 +26,8 @@ import {
  *
  * 토스 웹훅은 서명이 없다 — 공개 엔드포인트이며 **paymentKey 재조회가 유일한 인증**이다. 본문의 상태값은 절대 쓰지 않는다.
  *   1. 형식 검사(저장 전): 본문 ≤ 64KB · JSON · eventType 문자열 · orderId/paymentKey 는 ^[A-Za-z0-9_-]{6,200}$ → 실패 400, 로그 없음
- *   2. 매칭(재조회 전): orderId → checkout_sessions.toss_order_id, 없으면 paymentKey → 세션·주문. 모르는 주문 → 200 ignored
+ *   2. 매칭(재조회 전): orderId 가 `slrp_` 면 partner_payments(인플루언서 샘플 결제, 0012 · inf-console-plan §5.6), 아니면 checkout_sessions.toss_order_id;
+ *      없으면 paymentKey → 세션 → 주문 → partner_payments. 모르는 주문 → 200 ignored
  *      (재조회·payload 저장 없음 — 공개 엔드포인트라 로그 팽창을 막는다)
  *   3. 매칭되면 payment_events insert(handled=false, payload 원문)
  *   4. 저장된 payment_key(없으면 본문 data.paymentKey — 응답 orderId 일치 확인)로 GET /v1/payments/{paymentKey} 재조회
@@ -83,11 +88,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const admin = createAdminClient();
 
-	// 2) 매칭 — 세션(toss_order_id) → 세션(payment_key) → 주문(payment_key)
+	// 2) 매칭 — 파트너(slrp_ orderId) → 세션(toss_order_id) → 세션(payment_key) → 주문(payment_key) → 파트너(payment_key)
 	let session: SessionLite | null = null;
 	let order: OrderLite | null = null;
+	let partner: PartnerPaymentView | null = null;
 
-	if (orderId) {
+	if (orderId && isPartnerOrderId(orderId)) {
+		partner = await findPartnerPaymentForWebhook(admin, { orderId, paymentKey: bodyPaymentKey });
+	} else if (orderId) {
 		const { data: s } = await admin.from('checkout_sessions').select(SESSION_LITE_COLS).eq('toss_order_id', orderId).maybeSingle();
 		session = (s as SessionLite | null) ?? null;
 	}
@@ -98,8 +106,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			const { data: o } = await admin.from('orders').select(ORDER_LITE_COLS).eq('payment_key', bodyPaymentKey).limit(1).maybeSingle();
 			order = (o as OrderLite | null) ?? null;
 		}
+		if (!session && !order) partner = await findPartnerPaymentForWebhook(admin, { orderId: null, paymentKey: bodyPaymentKey });
 	}
-	if (!session && !order) {
+	if (!session && !order && !partner) {
 		// 모르는 주문 — 재조회·payload 저장 없이 200 (토스 재시도 폭주 방지). 공개 엔드포인트라 로그도 남기지 않는다.
 		console.warn('[webhook] ignored unknown order', { eventType, orderId, hasKey: !!bodyPaymentKey });
 		return json({ ok: true, ignored: true });
@@ -110,14 +119,14 @@ export const POST: RequestHandler = async ({ request }) => {
 	const eventId = await logPaymentEvent(admin, {
 		source,
 		event_type: eventType,
-		toss_order_id: session?.toss_order_id ?? orderId,
-		payment_key: session?.payment_key ?? order?.payment_key ?? bodyPaymentKey,
+		toss_order_id: session?.toss_order_id ?? partner?.toss_order_id ?? orderId,
+		payment_key: session?.payment_key ?? order?.payment_key ?? partner?.payment_key ?? bodyPaymentKey,
 		payload: body,
 		handled: false
 	});
 
 	// 4) 재조회 — 저장된 payment_key 우선. PENDING(confirm 미도달) 세션은 본문 paymentKey 로 조회 후 orderId 일치 확인.
-	const storedKey = session?.payment_key ?? order?.payment_key ?? null;
+	const storedKey = session?.payment_key ?? order?.payment_key ?? partner?.payment_key ?? null;
 	const lookupKey = storedKey ?? bodyPaymentKey;
 	if (!lookupKey) {
 		await markPaymentEvent(admin, eventId, { handled: true, result: 'ignored: no payment_key' });
@@ -141,6 +150,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	const payment = look.body;
 
 	// 저장된 키가 없어 본문 키로 조회한 경우: 응답의 orderId 가 세션과 같아야 한다 (불일치 → ignored)
+	if (partner && payment.orderId !== partner.toss_order_id) {
+		// 파트너 결제: 저장 키든 본문 키든 응답 orderId 가 행과 달라야 할 이유가 없다
+		await markPaymentEvent(admin, eventId, { handled: !storedKey, result: storedKey ? 'error: orderId mismatch' : 'ignored: orderId mismatch' });
+		return json({ ok: true, ignored: true });
+	}
 	if (!storedKey && session && payment.orderId !== session.toss_order_id) {
 		await markPaymentEvent(admin, eventId, { handled: true, result: 'ignored: orderId mismatch' });
 		return json({ ok: true, ignored: true });
@@ -150,8 +164,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ ok: true, ignored: true });
 	}
 
-	// 5) 동기화 — 재조회 결과로만
-	const { result, handled } = await syncFromPayment(admin, { session, order }, payment, source);
+	// 5) 동기화 — 재조회 결과로만 (파트너 결제는 partner-sample 의 분기표)
+	const { result, handled } = partner
+		? await syncPartnerFromPayment(admin, partner, payment, source)
+		: await syncFromPayment(admin, { session, order }, payment, source);
 	await markPaymentEvent(admin, eventId, { handled, result });
 
 	return json({ ok: true, result });

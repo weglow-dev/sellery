@@ -382,6 +382,7 @@ Supabase → Authentication → Providers → **Email ON · Confirm email ON · 
 | RLS | 새 테이블 없음 — 변경 없음 |
 
 **0011_partner_payments.sql** → **적용 기록(2026-09-21)**: 3단계 부분집합(`campaigns.sample_shipping` · `app_sample_quote` · 일괄 `app_sample_quotes` · `app_request_free_sample` · `app_receive_sample`)은 **`0011_sample_request.sql`** 로 먼저 적용했다(Supabase CLI 는 `<숫자>_이름.sql` 만 인식해 "0011a" 대신 0011). 아래 결제 테이블·함수는 **`0012_partner_payments.sql`** 로 간다(4단계). 견적 응답 키는 0011 파일 헤더가 정본이고 앱 쪽 타입은 `packages/db/src/partner/sample-rules.ts` `SampleQuote`.
+**0012 적용 기록(2026-09-21, 4단계 PR-A)**: `partner_payments` + `app_partner_payment_{claim,confirming,confirm,fail,cancel,refund}` · `app_partner_payments_{expire,stale}` · `celery_spend` · `partner_normalize_shipping` · `partner_payment_brief` · `recalc_campaign_sold_qty` 재정의를 클라우드에 적용했다. 아래 초안과의 **이름 차이**(구현에서 확정 — 0012 파일 헤더가 정본): `price_total`→`amount_total` · `cel_won_snapshot`→`cel_won` · `app_begin_sample_purchase`→`app_partner_payment_claim`(orderId 는 인자 `p_order_id`, 없으면 DB 생성) · `app_claim_partner_payment`→`app_partner_payment_confirming` · `app_confirm_sample_purchase`→`app_partner_payment_confirm` · `app_fail/cancel_…`→`app_partner_payment_fail/cancel/refund`(cancel = 결제 전 그만둠, refund = §5.7 운영자 취소) · `expire/stale_partner_payments`→`app_partner_payments_expire/stale` · 상태에 `CANCELED`·`REFUNDED` 추가, `SUPERSEDED`·`CANCEL_PENDING` 은 상태가 아니라 `fail_code`. 서버 계층은 `@sellery/payments/server/partner-sample`, 순수 규칙은 `sample-rules.ts` 끝 절. 화면·API 라우트·reconcile 배선·취소 스크립트는 PR-B.
 
 | 컬럼 | 타입 · 제약 |
 |---|---|
