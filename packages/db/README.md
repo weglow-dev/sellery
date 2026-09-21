@@ -34,7 +34,7 @@ src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rate
                                 · home(getHomeWidgets) · my(saveSampleAddress) — 콘솔 3단계, 0011 RPC(app_sample_quote(s) · app_request_free_sample · app_receive_sample)
                                 · 샘플 결제(0012 app_partner_payment_*) 의 서버 함수는 토스 호출과 묶여야 하므로 @sellery/payments/server/partner-sample 에 있다
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
-scripts/*.mjs            gen-types · partner-admin · dev-seller · dev-user (Node · 루트 .env.local)
+scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund) · dev-seller · dev-user (Node · 루트 .env.local)
 ```
 
 ## gen:types

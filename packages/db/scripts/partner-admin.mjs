@@ -12,9 +12,16 @@
 //   verify-channel <channel>                운영자가 프로필 bio / @sellery.official DM 에서 코드를 확인한 뒤 → verified=true, vcode=null
 //   unverify-channel <channel>              사칭 발견 시 → verified=false, vcode_confirmed_at=null (메인 채널이면 primary 는 유지)
 //
+//   ── 4단계 샘플 결제 (0012 partner_payments · docs/inf-console-plan.md §5.7 "결제 후 취소 요청") ──
+//   payments [--pending] [--seller <seller>] [--limit N]   partner_payments 표(최신순 50) — --pending = PENDING · CONFIRMING · FAILED(CANCEL_PENDING) 만 (운영 큐)
+//   refund-sample <payment id | slrp_ orderId> ["<사유>"]  결제 후·브랜드 발송 전 취소 = @sellery/payments refundSamplePurchase 와 같은 두 단계를 인라인으로:
+//                                           (1) 현금분이 있으면 토스 전액 취소(POST /v1/payments/{paymentKey}/cancel · Idempotency-Key `${id}:refund` · TOSS_SECRET_KEY)
+//                                           (2) app_partner_payment_refund → 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED · REFUNDED + payment_events(sample_refund)
+//                                           두 번 실행해도 원장 1행(already). 발송 뒤(캠페인이 SAMPLE_PURCHASED 가 아님)면 함수가 거부 — 수동 조정.
+//
 //   <seller> · <channel> 은 code('s1' · 'ch1') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
-//   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
-//   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel 한 줄 — 이메일·핸들·URL 없이.
+//   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
+//   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample 한 줄 — 이메일·핸들·URL 없이.
 
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -22,7 +29,7 @@ import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 function loadEnv() {
-  if ((process.env.PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+  if ((process.env.PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.TOSS_SECRET_KEY) return;
   const p = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".env.local"); // 저장소 루트 (4 앱 공용, 결정 11)
   if (!existsSync(p) || typeof process.loadEnvFile !== "function") return;
   try {
@@ -64,6 +71,7 @@ function usage(code = 2) {
       "usage: node scripts/partner-admin.mjs <cmd>",
       "  list [--inactive] | suspend <seller> [reason] | reactivate <seller> | link <seller> <user_id>",
       "  invite <email> --link <seller> | channels [--pending] | verify-channel <channel> | unverify-channel <channel>",
+      "  payments [--pending] [--seller <seller>] [--limit N] | refund-sample <payment id | slrp_ orderId> [reason]",
     ].join("\n"),
   );
   process.exit(code);
@@ -224,10 +232,146 @@ async function cmdVerify(verified) {
   await notifySlack(`[셀러리] 채널 ${verified ? "인증 완료" : "인증 해제"} · ${c.code ?? c.id} · ${c.platform}`);
 }
 
+/* ------------------------------------------------------------ 4단계 샘플 결제 ------------------------------------------------------------ */
+
+const PAYMENT_COLS =
+  "id, status, kind, seller_id, product_id, campaign_id, toss_order_id, payment_key, order_name, amount_total, amount_cel, amount_cash, use_cel, fail_code, fail_message, approved_at, expires_at, created_at, sellers(code, name), products(code, name)";
+
+async function findPayment(ref) {
+  if (!ref) usage();
+  const q = admin.from("partner_payments").select(PAYMENT_COLS);
+  const { data, error } = UUID_RE.test(ref)
+    ? await q.eq("id", ref).maybeSingle()
+    : ref.startsWith("slrp_")
+      ? await q.eq("toss_order_id", ref).maybeSingle()
+      : { data: null, error: null };
+  if (error) throw new Error(`partner_payments read failed: ${error.message}`);
+  if (!data) {
+    console.error(`[partner-admin] 결제 없음: ${ref} (uuid 또는 slrp_ orderId)`);
+    process.exit(1);
+  }
+  return data;
+}
+
+function fmtPay(p) {
+  const cel = p.amount_cel > 0 ? `🥬${p.amount_cel}+₩${p.amount_cash}` : `₩${p.amount_cash}`;
+  return { status: p.status, fail: p.fail_code ?? "", amount: `${p.amount_total} (${cel})` };
+}
+
+async function cmdPayments() {
+  const limit = Math.min(Number(flags.limit) || 50, 500);
+  let q = admin.from("partner_payments").select(PAYMENT_COLS).order("created_at", { ascending: false }).limit(limit);
+  if (flags.pending) q = q.or("status.eq.PENDING,status.eq.CONFIRMING,and(status.eq.FAILED,fail_code.eq.CANCEL_PENDING)");
+  if (flags.seller) q = q.eq("seller_id", (await findSeller(String(flags.seller))).id);
+  const { data, error } = await q;
+  if (error) throw new Error(`partner_payments read failed: ${error.message}`);
+  console.table(
+    (data ?? []).map((p) => ({
+      id: p.id,
+      orderId: p.toss_order_id,
+      ...fmtPay(p),
+      seller: p.sellers ? `${p.sellers.code ?? ""} ${p.sellers.name ?? ""}`.trim() : p.seller_id,
+      product: p.products ? `${p.products.code ?? ""} ${p.products.name ?? ""}`.trim() : p.product_id,
+      campaign: p.campaign_id ? "✓" : "",
+      created: String(p.created_at).slice(0, 16).replace("T", " "),
+    })),
+  );
+}
+
+/** @sellery/payments toss.server tossCancel 과 같은 호출 (Basic base64(`${secret}:`) · Idempotency-Key). 응답 본문은 그대로 돌려준다. */
+async function tossCancel(paymentKey, reason, idempotencyKey) {
+  const secret = process.env.TOSS_SECRET_KEY;
+  if (!secret) throw new Error("TOSS_SECRET_KEY 가 없습니다 — 루트 .env.local 을 확인하세요 (값은 출력하지 않습니다).");
+  const res = await fetch(`https://api.tosspayments.com/v1/payments/${encodeURIComponent(paymentKey)}/cancel`, {
+    method: "POST",
+    headers: { Authorization: `Basic ${Buffer.from(`${secret}:`).toString("base64")}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ cancelReason: reason.slice(0, 200) }),
+  });
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { ok: res.ok, status: res.status, body };
+}
+
+async function logEvent(ev) {
+  const { error } = await admin.from("payment_events").insert({
+    source: "cancel",
+    event_type: "sample_refund",
+    toss_order_id: ev.orderId,
+    payment_key: ev.paymentKey ?? null,
+    payload: ev.payload ?? {},
+    handled: ev.handled,
+    result: ev.result,
+  });
+  if (error) console.error("[partner-admin] payment_events insert failed:", error.message);
+}
+
+async function cmdRefundSample() {
+  const p = await findPayment(positional[0]);
+  const reason = (positional[1] ?? "샘플 구매 취소 (브랜드 발송 전)").slice(0, 200);
+  const who = p.sellers ? `${p.sellers.code ?? ""} ${p.sellers.name ?? ""}`.trim() : p.seller_id;
+  console.log(`[partner-admin] 결제 ${p.id} · ${p.toss_order_id} · ${p.status}${p.fail_code ? `(${p.fail_code})` : ""} · ${fmtPay(p).amount} · ${who} · ${p.products?.name ?? p.product_id}`);
+  if (p.status === "REFUNDED") {
+    console.log("[partner-admin] 이미 환불된 결제입니다 (already).");
+    return;
+  }
+  if (p.status !== "CONFIRMED") {
+    console.error(`[partner-admin] 결제 완료(CONFIRMED) 상태가 아니라 환불할 수 없습니다: ${p.status}`);
+    process.exit(1);
+  }
+
+  // (1) 토스 현금분 전액 취소 — 실패하면 DB 는 건드리지 않는다 (refundSamplePurchase 와 같은 순서)
+  let raw = null;
+  let tossCanceled = p.amount_cash === 0;
+  if (p.amount_cash > 0 && p.payment_key) {
+    const r = await tossCancel(p.payment_key, reason, `${p.id}:refund`);
+    const already = !r.ok && r.body && r.body.code === "ALREADY_CANCELED_PAYMENT";
+    if (!r.ok && !already) {
+      const code = r.body?.code ?? `HTTP_${r.status}`;
+      await logEvent({ orderId: p.toss_order_id, paymentKey: p.payment_key, payload: { partner_payment_id: p.id, cancel: r.body, status: r.status, script: true }, handled: false, result: "error: cancel failed" });
+      console.error(`[partner-admin] 토스 취소 실패: ${code} ${r.body?.message ?? ""} — DB 는 변경하지 않았습니다. 잠시 후 같은 명령으로 재시도(같은 Idempotency-Key).`);
+      process.exit(1);
+    }
+    raw = r.body;
+    tossCanceled = true;
+    console.log(`[partner-admin] 토스 취소 ${already ? "이미 됨" : "완료"}: ₩${p.amount_cash}`);
+  }
+
+  // (2) DB 환불 — 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED · REFUNDED
+  const { data, error } = await admin.rpc("app_partner_payment_refund", { p_payment_id: p.id, p_reason: reason, p_raw: raw ?? undefined });
+  if (error) {
+    await logEvent({ orderId: p.toss_order_id, paymentKey: p.payment_key, payload: { partner_payment_id: p.id, error: error.message, toss_canceled: tossCanceled, script: true }, handled: false, result: "error: db refund failed" });
+    throw new Error(`app_partner_payment_refund failed: ${error.message} (토스 취소는 ${tossCanceled ? "완료됨 — 수동 조정 필요" : "안 함"})`);
+  }
+  const ok = data && data.ok === true;
+  await logEvent({
+    orderId: p.toss_order_id,
+    paymentKey: p.payment_key,
+    payload: { partner_payment_id: p.id, result: data, toss_canceled: tossCanceled, script: true },
+    handled: !!ok,
+    result: ok ? (data.already ? "noop" : "refunded") : `needs_manual_adjust: ${data?.code ?? "BAD_RESULT"}`.slice(0, 200),
+  });
+  if (!ok) {
+    console.error(`[partner-admin] 환불 기록 실패: ${data?.code ?? "BAD_RESULT"} ${data?.message ?? ""} (토스 취소는 ${tossCanceled ? "완료됨 — 수동 조정 필요" : "안 함"})`);
+    process.exit(1);
+  }
+  console.log(`[partner-admin] 환불 ${data.already ? "이미 됨" : "완료"}: 🥬 복구 ${p.amount_cel} · 잔액 ${data.balance ?? "?"} · 캠페인 ${data.campaign_id ?? p.campaign_id ?? "-"} → DECLINED`);
+  await notifySlack(`[셀러리] 샘플 결제 환불 · ${p.toss_order_id} · 🥬${p.amount_cel} + ₩${p.amount_cash}`);
+}
+
 try {
   switch (cmd) {
     case "list":
       await cmdList();
+      break;
+    case "payments":
+      await cmdPayments();
+      break;
+    case "refund-sample":
+      await cmdRefundSample();
       break;
     case "suspend":
       await cmdSuspend(false);
