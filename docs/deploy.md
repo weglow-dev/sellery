@@ -79,6 +79,8 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 
 ---
 
+> **2026-09-21 PR-10 적용**: `/influencer*` 는 이제 `sellery-influencer`(SvelteKit 콘솔) 로 간다. `/_next/:path*` 규칙은 제거됐다. 아래 표의 "S5 뒤 값" 이 현재 값이다.
+
 ## 2. rewrite (`apps/shop/vercel.json`)
 
 JSON 이라 주석을 못 넣으므로 각 줄의 뜻과 시점별 값은 여기에 둔다. 규칙(`monorepo-migration.md §1.3`): shop 앱에는 `/influencer` `/brand` `/admin` `/_next` 로 시작하는 라우트를 두지 않는다 · shop `/robots.txt` 는 이 셋을 disallow(이미) · 리라이트 대상 SvelteKit 앱의 `_app/immutable/*` 은 자기 base 아래라 별도 항목이 없다.
