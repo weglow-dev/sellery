@@ -1,5 +1,7 @@
 # 이식 계획 — `web/`(Next) 의 서비스 기능을 `apps/*`(SvelteKit 모노레포) 로
 
+> **상태(2026-09-21): S1~S5 와 도메인 전환(S4) 완료.** `web/` 은 S5 PR-11 에서 삭제됐고 `sellery.life` 는 `sellery-shop` 이 받는다. 이 문서는 계획·결정의 기록이며 현재 배포·운영 정본은 [`deploy.md`](deploy.md). 아래 본문의 `web/…` 경로는 삭제 전 코드 기준.
+
 작성 2026-09-18 · 기준 커밋 `fb17f5a`(`main`) · 사용자 결정 2026-09-18: **같은 저장소 · SvelteKit 앱 4개 + 한 도메인 경로 rewrite · 하나의 Supabase · 기존 기능·UI/UX 동일 유지 · 순서 골격 → shop 동일 재현 → 인플루언서 → 브랜드 → 관리자 · `sellery.life` 는 apps/shop 이 같은 수준이 될 때까지 `web/` 가 계속 서비스.**
 
 이 문서는 **어디로 어떻게 옮기는가**만 다룬다. 정책·API·DB 계약의 원본은 `docs/app-plan.md`(고객 사이트) · `docs/inf-console-plan.md`(인플루언서 콘솔) · `web/DEPLOY.md`(현 배포) 이고 그대로 유지한다(결정 J). 여기 적힌 파일 경로·시그니처는 전부 2026-09-18 의 코드(`web/src/**` · `apps/**` · `packages/**` · `node_modules/@supabase/ssr@0.12.7` · `node_modules/@sveltejs/kit@2.70.3`)를 읽고 쓴 것이다.

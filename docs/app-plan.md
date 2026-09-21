@@ -1,5 +1,7 @@
 # 셀러리 앱 구현 계획 — 슬라이스 1 (돈이 흐르는 고객 경로)
 
+> **상태(2026-09-21): 슬라이스 1 은 `apps/shop`(SvelteKit) 으로 이식 완료 · S1~S5 + 도메인 전환 완료 · `web/` 은 S5 PR-11 에서 삭제.** 정책·API·DB 계약은 그대로 유효(결정 J), 파일 경로는 `docs/monorepo-migration.md §3~§4` 이식 표로, 배포·운영은 [`deploy.md`](deploy.md) 로 읽는다.
+>
 > 대상: `web/` (Next.js 16 App Router) 를 구현하는 개발자·병렬 에이전트. 근거 문서: `docs/data-model.md`, `docs/analysis/access-model.md`, `docs/analysis/flows-and-invariants.md`, 마이그레이션 `supabase/migrations/0001~0008`, 프로토타입 `js/60-customer.js`·`js/02-state.js`·`js/80-actions.js`·`css/base.css`·`css/skin.css`. glo 앱(`E:/위글로우/Glo/web`)은 읽기 전용 참고.
 >
 > 슬라이스 1 범위: 판매 링크 페이지(`/s/[handle]/[code]`, `/c/[code]`) · 고객 홈(`/`, 최소) · 카카오 로그인 · 체크아웃(토스 결제위젯 v2 → 서버 승인) · 웹훅 · 취소/환불 · 내 주문. 파트너 센터(브랜드/인플루언서/관리자)는 §12 에 방향만.

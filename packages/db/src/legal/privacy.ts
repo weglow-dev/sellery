@@ -2,7 +2,7 @@ import type { LegalDoc } from "../legal";
 
 /**
  * 셀러리 개인정보처리방침 v1.0 — 고객(구매자)용. 파트너(브랜드사·인플루언서)는 별도 약관·계약.
- * 사실 근거: docs/app-plan.md §5.1(보존·파기)·§8(링크 유입) · web/DEPLOY.md §3(외부 서비스)·§4.3(수동 파기 잡) ·
+ * 사실 근거: docs/app-plan.md §5.1(보존·파기)·§8(링크 유입) · docs/deploy.md §5(외부 서비스)·§8.2(수동 파기 잡) · (이하 옛 web/ 경로 — 이식은 packages/db · apps/shop)
  *   web/src/lib/company.ts · web/src/lib/linkctx.ts(쿠키 수명 90일) · web/src/app/api/checkout/route.ts(주문 저장 항목) ·
  *   web/src/app/checkout/checkout-client.tsx(토스 전달 항목) · supabase/migrations/0008_app_checkout.sql(purge_checkout_pii).
  * 사업자 확정값(2026-09-17): 통신판매업신고번호 제2022-서울강남-00726호 · 보호책임자 이준호. 국외 이전 상대의 연락처·로그 보존일은 사용자 결정으로 넣지 않는다.

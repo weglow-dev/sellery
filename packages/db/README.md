@@ -1,6 +1,6 @@
 # @sellery/db
 
-`web/src/lib/**`(Next) 의 데이터 계층을 SvelteKit 앱 4개가 쓰도록 옮긴 패키지 — Supabase 클라이언트 · 인증 · 캠페인 · 주문 · 고객 · 링크 유입 · 법적 문서 · 사업자 정보 · 파트너(인플루언서) 가입/게이트. 이동 표와 근거는 [docs/monorepo-migration.md §3](../../docs/monorepo-migration.md) 이 원본이다. 빌드 없음 — 소스를 그대로 export 하고 앱의 Vite 가 컴파일한다.
+옛 `web/src/lib/**`(Next · S5 PR-11 에서 삭제) 의 데이터 계층을 SvelteKit 앱 4개가 쓰도록 옮긴 패키지 — Supabase 클라이언트 · 인증 · 캠페인 · 주문 · 고객 · 링크 유입 · 법적 문서 · 사업자 정보 · 파트너(인플루언서) 가입/게이트. 이동 표와 근거는 [docs/monorepo-migration.md §3](../../docs/monorepo-migration.md) 이 원본이다. 빌드 없음 — 소스를 그대로 export 하고 앱의 Vite 가 컴파일한다.
 
 ## 경계 규칙
 
@@ -40,4 +40,4 @@ npm run gen:types                  # 루트에서 — packages/db/src/database.t
 npm run check                      # 타입 깨짐 확인 — 같은 PR 에 넣는다
 ```
 
-사전 조건 `supabase login` + `supabase link --project-ref …`. 절차 원문은 `web/DEPLOY.md §4.1`(web 삭제 뒤 `docs/deploy.md`).
+사전 조건 `supabase login` + `supabase link --project-ref …`. 절차 원문은 `docs/deploy.md §6.1`.
