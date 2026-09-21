@@ -6,8 +6,8 @@
 //   (a) apps/*/src 의 브라우저 도달 파일(`.svelte` · `+page.ts` · `+layout.ts` · `src/lib/(server 밖)` 등 — `*.server.ts` · `+server.ts` · `hooks.server.ts` ·
 //       `src/lib/server/**` 가 아닌 전부)이 `@sellery/db/server/*` · `@sellery/payments/server/*` · `$lib/server/*` · 상대 `*.server` 모듈을 import → 실패
 //   (b) apps/shop · apps/influencer 의 `(demo)` 밖 파일(서버 파일 포함)이 `@sellery/core` 를 bare 로, 또는
-//       `@sellery/core/{state.svelte,actions,seed,storage,ui.svelte,helpers}` 를 import → 실패.  brand · admin(ssr=false 데모)은 허용.
-//       shop 은 S2(SSR 전환), influencer 는 S5(콘솔 이식) 부터 **error** — influencer 의 데모 화면은 `routes/(demo)/**` 안에서만 허용(allowlist, 결정 C).
+//       `@sellery/core/{state.svelte,actions,seed,storage,ui.svelte,helpers}` 를 import → 실패.  admin(ssr=false 데모)은 허용.
+//       shop 은 S2(SSR 전환), influencer 는 S5(콘솔 이식), brand 는 브랜드 콘솔 1단계부터 **error** — 데모 화면은 `routes/(demo)/**` 안에서만 허용(allowlist, 결정 C).
 //   (c) packages/{db,payments}/src 의 `.server.ts` 가 아닌 파일이 `server/` 모듈을 import → 실패 (테스트 파일 포함 — 순수 규칙만 테스트한다)
 //   (d) packages/ui/src/site/** 가 `@sellery/core` 를 bare 로 import → 실패 (폴더가 아직 없으면 건너뛴다)
 //   (e) 서버 파일(`*.server.ts` · `+server.ts` · `src/lib/server/**`)이 `@sellery/db/browser` 를 import → 실패 (브라우저 클라이언트는 브라우저에서만)
@@ -24,6 +24,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEMO_RULE = {
   shop: "error", // S2(shop SSR 전환)에서 error 로 올림 — shop 은 @sellery/core/{constants,util,icons,types} 만
   influencer: "error", // S5(콘솔 이식)에서 error 로 올림 — 데모 상태는 routes/(demo)/** 에서만
+  brand: "error", // 브랜드 콘솔 1단계(docs/brand-console-plan.md §2)에서 error 로 올림 — 데모 상태는 routes/(demo)/** 에서만
 };
 
 const DEMO_CORE_SUBPATHS = ["state.svelte", "actions", "seed", "storage", "ui.svelte", "helpers"];

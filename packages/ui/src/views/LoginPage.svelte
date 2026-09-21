@@ -3,7 +3,8 @@
 	import { S, D_, LOGO_ICON, persistSession, toast, type Session } from '@sellery/core';
 	import { goto } from '$app/navigation';
 	import { base } from '$app/paths';
-	let { role: initRole = 'seller' }: { role?: 'seller' | 'brand' } = $props();
+	/* `home` = 로그인 뒤 갈 데모 홈(접두 없는 경로) — 콘솔과 겹치지 않게 (demo) 그룹이 홈을 옮긴 앱은 '/demo' 를 넘긴다 */
+	let { role: initRole = 'seller', home = '/' }: { role?: 'seller' | 'brand'; home?: string } = $props();
 	let role = $state<'seller' | 'brand'>(initRole);
 	let mode = $state<'login' | 'join' | 'reset'>('login');
 	let email = $state(''), pw = $state(''), name = $state(''), msg = $state('');
@@ -17,7 +18,7 @@
 	function finish(ss: Session) {
 		persistSession(ss); S.session = ss;
 		if (ss.role === 'seller') S.actingSeller = ss.id; if (ss.role === 'brand') S.actingBrand = ss.id;
-		toast(`${ss.name}님, 로그인했어요`); goto(base + '/');
+		toast(`${ss.name}님, 로그인했어요`); goto(base + home);
 	}
 	function login() {
 		const e = email.trim().toLowerCase(); if (!e) { msg = '이메일을 입력해주세요'; return; }
