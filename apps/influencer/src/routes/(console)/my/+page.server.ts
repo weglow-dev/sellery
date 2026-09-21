@@ -9,7 +9,7 @@ import { notifySlack, rateLimit, requireSeller, saveSampleAddress, sellerPath, t
 
 /**
  * `/my` — 마이페이지 2단계 (web influencer/my/page.tsx + actions.ts 1:1 · docs/inf-console-plan.md §4.7 · §6 `/my` · docs/monorepo-migration.md §2.4 · §5.2).
- * load: 프로필(활동명·핸들·등급·🥬·추천 코드) + 채널 목록 3칩(✓ 인증됨 / 인증 대기 / 미인증) + 인증 패널 (프로토타입 vMy · channelModal · verifyModal).
+ * load: 프로필(활동명·핸들·등급·🥬·추천 코드) + 채널 목록 3칩(✓ 인증됨 / 인증 대기 / 미인증) + 인증 패널 (프로토타입 vMy · channelModal · verifyModal). 정산 정보 폼은 5단계 `/settle` — 여기는 등록 여부 요약 + 링크만.
  *   ?verify=<id>  인증 패널(코드 + 방법 1 프로필 bio · 방법 2 @sellery.official DM) — vcode 가 있는 본인 채널만
  *   ?edit=<id> | ?add=1  채널 폼   ?msg=<code>  안내 문구(MY_MESSAGES)
  * 칩 규칙(§4.7): verified → "✓ 인증됨", vcode_confirmed_at → "인증 대기"(운영자 확인 중), 그 외 → "미인증". 읽기는 service role + seller_id 필터.
@@ -81,7 +81,8 @@ export const load: PageServerLoad = async (event) => {
 		adding,
 		shipping: parseStoredShipping(seller.sample_address),
 		invalidField: sp.get('field'),
-		myPath: sellerPath('/my')
+		myPath: sellerPath('/my'),
+		settlePath: sellerPath('/settle')
 	};
 };
 

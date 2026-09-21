@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * 콘솔 홈 — 프로토타입 vSellerHome(js/20-seller.js) 의 3위젯: 지금 할 일(rowitem + 액션 버튼) · 진행 중 판매(LIVE 카드 · mini-stats 오늘/누적 매출·주문 · 링크) · 내 자산(🥬 · 등급 · 다음 등급까지 · 샘플 한도).
-	 * 데이터는 전부 서버(`getHomeWidgets`) — 할 일은 kind 별 href/action, 매출은 PAID 주문 집계(샘플 제외). 내 장부·추천 상품·랭킹 피라미드는 5단계(매출·정산) 이후.
+	 * 데이터는 전부 서버(`getHomeWidgets`) — 할 일은 kind 별 href/action, 매출은 PAID 주문 집계(샘플 제외). 실시간 매출·정산은 5단계 `/sales` `/settle`(내 자산의 정산 정보 칸 · 버튼) — 추천 상품·랭킹 피라미드는 이후.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, kstToday, md } from '@sellery/db/dates';
@@ -90,12 +90,13 @@
 		<div><span class="ms-l">셀러리</span><span class="ms-v">🥬 {a.balance}</span></div>
 		<div><span class="ms-l">다음 1🥬까지</span><span class="ms-v">₩{fmtNum(data.toNextCel)}</span></div>
 		<div><span class="ms-l">이달 무상 샘플</span><span class="ms-v">{a.sample.left}회 남음</span><span class="ms-s">한도 {a.sample.quota + a.sample.extra}회 · 사용 {a.sample.used}회</span></div>
-		<div><span class="ms-l">정산 정보</span><span class="ms-v">{seller.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">{seller.has_bank_info ? 'D+21 지급' : '등록은 5단계'}</span></div>
+		<div><span class="ms-l">정산 정보</span><span class="ms-v">{seller.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">{seller.has_bank_info ? 'D+21 지급' : '정산 화면에서 등록'}</span></div>
 	</div>
 	<p class="meta" style="margin-top:10px">등급은 최근 3개월 확정 매출로 매달 다시 계산되고, 🥬 는 확정 매출 ₩500만당 1개씩 쌓여요.</p>
 	<div class="btnrow" style="margin-top:10px">
 		<a href={data.productsPath} class="btn sm ghost">상품 갤러리</a>
 		<a href={data.campaignsPath} class="btn sm ghost">내 캠페인</a>
+		<a href={data.salesPath} class="btn sm ghost">실시간 매출</a>
 		<a href={data.myPath} class="btn sm ghost">내 정보</a>
 	</div>
 </div>

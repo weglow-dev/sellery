@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * 마이페이지 — web influencer/my/page.tsx 1:1 (프로토타입 js/20-seller.js vMy · channelModal · verifyModal). 샘플 배송지(3단계 `?/saveAddress`) · 정산 정보 폼은 5단계.
+	 * 마이페이지 — web influencer/my/page.tsx 1:1 (프로토타입 js/20-seller.js vMy · channelModal · verifyModal). 샘플 배송지(3단계 `?/saveAddress`) · 정산 정보는 5단계 `/settle` 로 — 여기는 등록 여부 카드 + 링크.
 	 * 폼은 전부 SvelteKit 이름 있는 액션(`?/issueVerifyCode` …, +page.server.ts) — 평범한 POST 뒤 303 으로 `/my?msg=` 에 돌아온다(JS 불필요).
 	 * 칩 규칙: verified → "✓ 인증됨" · vcode_confirmed_at → "인증 대기" · 그 외 → "미인증". 인증된 채널만 [메인 SNS로 설정]. 메인 채널은 삭제 불가.
 	 */
@@ -180,5 +180,17 @@
 	정산 정보 <StatusChip tone={seller.has_bank_info ? 'green' : 'red'}>{seller.has_bank_info ? '등록 완료' : '미등록 — 등록 전까지 정산 지급 보류'}</StatusChip>
 </div>
 <section class="card static">
-	<p class="meta">계좌·원천징수 자료 입력은 <b>5단계</b>에서 열립니다. 그 전까지는 운영팀이 이메일로 안내드려요.</p>
+	<div class="mini-stats" style="margin:0 0 10px">
+		<div><span class="ms-l">정산 유형</span><span class="ms-v">{seller.settle_type === 'biz' ? '사업자' : seller.settle_type === 'personal' ? '개인' : '미선택'}</span><span class="ms-s">{seller.settle_type === 'biz' ? '세금계산서 · 원천징수 없음' : '원천징수 3.3%'}</span></div>
+		<div><span class="ms-l">정산 계좌</span><span class="ms-v">{seller.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">판매 종료 D+21 지급</span></div>
+		{#if seller.settle_type === 'biz'}
+			<div><span class="ms-l">세금계산서 정보</span><span class="ms-v">{seller.has_tax_info ? '등록 완료' : '미등록'}</span><span class="ms-s">상호 · 대표자 · 이메일</span></div>
+		{:else}
+			<div><span class="ms-l">원천징수 자료</span><span class="ms-v">{seller.has_rrn ? '등록 완료' : '미등록'}</span><span class="ms-s">주민등록번호 · 암호화 저장</span></div>
+		{/if}
+	</div>
+	<p class="meta" style="margin:0 0 10px">계좌 · 정산 유형 · 원천징수 자료(개인) 또는 사업자등록증(사업자)은 정산 화면에서 등록하고, 정산 내역도 거기서 확인해요.</p>
+	<div class="btnrow">
+		<a href={data.settlePath} class="btn {seller.has_bank_info ? 'ghost' : 'pri'} sm">{seller.has_bank_info ? '정산 정보 · 내역 보기' : '정산 정보 등록'}</a>
+	</div>
 </section>

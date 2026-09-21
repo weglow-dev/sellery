@@ -29,6 +29,7 @@ export const load: PageServerLoad = async (event) => {
 		toNextCel: CELERY_PER - (m3 % CELERY_PER),
 		productsPath: sellerPath('/products'),
 		campaignsPath: sellerPath('/campaigns'),
+		salesPath: sellerPath('/sales'),
 		myPath: sellerPath('/my')
 	};
 };

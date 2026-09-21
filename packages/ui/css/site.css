@@ -1166,6 +1166,59 @@
     .console-det-body { grid-template-columns: 1fr 340px; }
   }
 
+  /* ---- 콘솔 5단계 (docs/inf-console-plan.md §7 "5. 매출 · 정산 자료"): 실시간 매출(합계 · 캠페인 카드 · 판매 링크 · 수수료 kv · 7일 막대 · 주문 피드) · 정산(정산 유형 라디오 · 마스킹 값 · 개인정보 안내 · 내역 표).
+     프로토타입 base.css barwrap/bars(320–333) · feed(334) · livegrid 의 이식 — 색은 site 토큰. 375px: 막대는 7칸 flex, 표는 .tblw 안에서만 가로 스크롤. ---- */
+  .console-totals { margin-bottom: 18px; }
+  .console-sales .card { margin-bottom: 16px; }
+  .console-sales .hd { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .console-sales .hd .ttl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .console-sales .hd .ttl b { font-size: 15px; }
+  .console-sales .hd .ttl .sub { color: var(--color-mute); font-size: 12px; display: block; }
+  .console-link { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); padding: 8px 12px; margin: 2px 3px 12px; }
+  .console-link .url { font-family: var(--font-mono); font-size: 11.5px; flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); }
+  .console-link .btnrow { gap: 4px; flex: 0 0 auto; }
+  .console-link .btnrow form { margin: 0; }
+  .console-sales-body { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+  .console-fee .console-kv { margin-top: 8px; }
+  .console-fee .console-kv .meta { font-size: 11.5px; }
+  .console-barwrap { padding: 20px 4px 22px; }
+  .console-bars { display: flex; align-items: flex-end; gap: 6px; height: 104px; }
+  .console-bars .b { flex: 1 1 0; min-width: 0; position: relative; background: var(--color-accent); box-shadow: var(--shadow-frame-soft); min-height: 3px; transition: height 0.2s; }
+  .console-bars .b .bl { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 9.5px; color: var(--color-mute); white-space: nowrap; }
+  .console-bars .b .bd { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 9.5px; color: var(--color-mute); white-space: nowrap; }
+  .console-feed .rowitem { padding: 9px 14px; gap: 10px; }
+  .console-feed .rowitem .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .console-feed .rowitem .sub { margin-left: 6px; }
+  .console-hold { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; box-shadow: 0 0 0 2px var(--color-danger), var(--shadow-lift-2) !important; margin-bottom: 14px; }
+  .console-hold > b { color: var(--color-danger); white-space: nowrap; }
+  .console-hold .meta { flex: 1 1 240px; margin: 0; }
+  .console-grid2 { display: grid; grid-template-columns: 1fr; gap: 0 12px; }
+  .console-form .fld .lbl { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-mute); margin-bottom: 5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .console-form .fld.invalid select { box-shadow: 0 -2px 0 0 var(--color-danger), 0 2px 0 0 var(--color-danger), -2px 0 0 0 var(--color-danger), 2px 0 0 0 var(--color-danger); }
+  .console-radio { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 2px 3px; }
+  .console-radio label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); cursor: pointer; font-size: 13px; }
+  .console-radio label.on { background: var(--color-lime-soft); box-shadow: var(--shadow-frame); }
+  .console-form .console-radio input[type="radio"] { margin: 3px 0 0; flex: 0 0 auto; width: auto; }
+  .console-radio label > span { flex: 1 1 auto; min-width: 0; }
+  .console-radio small { display: block; font-size: 11.5px; color: var(--color-mute); margin-top: 2px; line-height: 1.5; }
+  .console-mask { font-family: var(--font-mono); letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+  .console-privacy { margin: 0 0 4px; padding-left: 18px; font-size: 12.5px; color: var(--color-mute); line-height: 1.7; }
+  .console-privacy b { color: var(--color-ink); }
+  .console-privacy a { text-decoration: underline; text-underline-offset: 2px; color: var(--color-ink); }
+  .console-settle-table table { min-width: 760px; }
+  .console-settle-table td { font-size: 12.5px; }
+  .console-cell-prod { display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit; white-space: nowrap; }
+  .console-cell-prod:hover b { text-decoration: underline; }
+  .console-cell-prod small { display: block; font-size: 11px; color: var(--color-mute); }
+  .console-cell-prod .picon { flex: 0 0 auto; }
+  @media (min-width: 560px) {
+    .console-grid2 { grid-template-columns: 1fr 1fr; }
+    .console-radio { grid-template-columns: 1fr 1fr; }
+  }
+  @media (min-width: 900px) {
+    .console-sales-body { grid-template-columns: 1fr 1fr; }
+  }
+
   /* ---- 반응형 (ux-spec §1.3: 1100 / 900 / 640 / 600) ---- */
   @media (max-width: 1100px) {
     .custgrid { grid-template-columns: 1fr; }
