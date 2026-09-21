@@ -1,1 +1,5 @@
-@import '@sellery/ui/css/theme.css';
+/* 인플루언서 콘솔 스타일 = web/src/app/globals.css 의 이식 `@sellery/ui/css/site.css` (docs/monorepo-migration.md 결정 12 · S5 PR-9).
+   (demo) 그룹은 이 파일을 쓰지 않고 자기 레이아웃에서 theme.css(legacy base+skin) 를 가져온다 — 두 파일을 한 페이지에 섞지 않는다. */
+@import '@sellery/ui/css/site.css';
+/* Tailwind v4 자동 소스 탐지는 앱 폴더 안만 훑는다 — packages/ui 의 사이트 컴포넌트가 쓰는 유틸리티를 생성하려면 명시한다. */
+@source '../../../packages/ui/src/site';
