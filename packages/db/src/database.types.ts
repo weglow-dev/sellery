@@ -93,11 +93,13 @@ export type Database = {
           logo_url: string | null
           mail_order_no: string | null
           manager_name: string | null
+          manager_phone: string | null
           name: string
           po_email: string | null
           po_enabled: boolean
           ref_code: string | null
           referred_by: string | null
+          terms_agreed_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -118,11 +120,13 @@ export type Database = {
           logo_url?: string | null
           mail_order_no?: string | null
           manager_name?: string | null
+          manager_phone?: string | null
           name: string
           po_email?: string | null
           po_enabled?: boolean
           ref_code?: string | null
           referred_by?: string | null
+          terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -143,11 +147,13 @@ export type Database = {
           logo_url?: string | null
           mail_order_no?: string | null
           manager_name?: string | null
+          manager_phone?: string | null
           name?: string
           po_email?: string | null
           po_enabled?: boolean
           ref_code?: string | null
           referred_by?: string | null
+          terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -2210,6 +2216,20 @@ export type Database = {
       }
       checkout_session_brief: {
         Args: { s: Database["public"]["Tables"]["checkout_sessions"]["Row"] }
+        Returns: Json
+      }
+      create_brand_from_signup: {
+        Args: {
+          p_biz_no: string
+          p_category: string
+          p_link_id?: string
+          p_manager_name: string
+          p_manager_phone: string
+          p_name: string
+          p_referral_code?: string
+          p_terms_agreed_at?: string
+          p_user_id: string
+        }
         Returns: Json
       }
       create_seller_from_signup: {
