@@ -7,6 +7,7 @@
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, kstToday, md } from '@sellery/db/dates';
+	import { payLine, samplePaidLine } from '@sellery/db/partner/sample-rules';
 	import { CampaignStepper, CopyButton, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
 	import type { PageData } from './$types';
 
@@ -19,6 +20,8 @@
 	const who = (sender: string) => (sender === 'brand' ? c.brand.name : sender === 'admin' ? '셀러리 운영팀' : data.seller.name);
 	const LEAK_WARN = '⚠ 연락처/외부 메신저 공유가 감지되었습니다. 플랫폼 밖 거래는 정산·분쟁 보호를 받지 못합니다.';
 	const sh = $derived(data.sample_shipping);
+	/** "샘플 결제 ₩75,650 (🥬 3 + ₩15,650)" — 구매 캠페인만 (4단계 · sample-rules samplePaidLine) */
+	const paidLine = $derived(samplePaidLine(c));
 </script>
 
 <svelte:head>
@@ -86,9 +89,7 @@
 		{:else if c.status === 'SAMPLE_PURCHASED'}
 			<div class="card static">
 				<h4>결제 완료 · 샘플 발송 준비 중 ⏳</h4>
-				<p class="hint">
-					샘플 구매 ₩{fmtNum(c.sample_price ?? 0)}{c.sample_cel ? ` (🥬 ${c.sample_cel} + ₩${fmtNum(c.sample_cash)})` : ' (현금)'} — 브랜드가 발송하면 운송장이 표시됩니다.
-				</p>
+				<p class="hint">{paidLine || '샘플 구매'} — 브랜드가 발송하면 운송장이 표시됩니다. 발송 전에는 고객센터로 취소를 요청할 수 있어요.</p>
 			</div>
 		{:else if c.status === 'SAMPLE_APPROVED'}
 			<div class="card static"><h4>샘플 발송 준비 중 ⏳</h4><p class="hint">브랜드가 요청을 승인했어요. 샘플이 발송되면 운송장이 여기 표시됩니다.</p></div>
@@ -159,6 +160,7 @@
 				<dd>{c.chip.label}{c.chip.turn ? ` · ${c.chip.turn === 'seller' ? '내 차례' : '브랜드 차례'}` : ''}</dd>
 				<dt>요청일</dt>
 				<dd>{md(c.created_at)}{c.invited ? ' · 브랜드 제안' : c.purchased ? ' · 샘플 구매' : ' · 무상 샘플'}</dd>
+				{#if paidLine}<dt>샘플 결제</dt><dd>{payLine({ amount_total: c.sample_price ?? 0, amount_cel: c.sample_cel, amount_cash: c.sample_cash })}</dd>{/if}
 				{#if c.tracking_no}<dt>운송장</dt><dd>{c.tracking_no}</dd>{/if}
 				{#if c.received_at}<dt>수령 확인</dt><dd>{md(c.received_at)}</dd>{/if}
 				{#if c.test_due}<dt>테스트 기한</dt><dd>{md(c.test_due)}</dd>{/if}

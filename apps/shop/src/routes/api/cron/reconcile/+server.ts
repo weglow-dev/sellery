@@ -4,11 +4,14 @@ import type { RequestHandler } from './$types';
 import { createAdminClient, type Admin } from '$lib/server/db';
 import {
 	cronSecret,
+	expirePartnerPayments,
 	failSession,
 	isTossError,
 	isUncertain,
+	listStalePartnerPayments,
 	logPaymentEvent,
 	parseSessionLite,
+	reconcilePartnerPayment,
 	resolveCancelPending,
 	SESSION_LITE_COLS,
 	syncFromPayment,
@@ -35,6 +38,9 @@ import {
  *        CANCEL_PENDING · READY/IN_PROGRESS/ABORTED/EXPIRED → 잡힌 돈 없음 → fail_code = 원래 code (stale 목록 영구 잔류 방지)
  *      (CONFIRMING 의 미승인 분기만 여기서, 나머지는 checkout-sync syncFromPayment 가 웹훅과 공유)
  *   4. 결과는 payment_events(source='confirm' | 'cancel', event_type='reconcile', result=…) 에 남긴다.
+ *   5. 파트너 샘플 결제(0012 partner_payments · inf-console-plan §5.6 마지막 줄 — 4단계 PR-B): app_partner_payments_expire() → app_partner_payments_stale(같은 age·limit)
+ *      → 각 행 `reconcilePartnerPayment`(@sellery/payments partner-sample — 재조회 → syncPartnerFromPayment · CANCEL_PENDING 재취소 · payment_events 'reconcile').
+ *      응답의 `partner: { expired, checked, results }`. 고객 세션 처리와 독립 — 한쪽 오류가 다른 쪽을 막지 않는다.
  */
 export const config: Config = { maxDuration: 60 };
 
@@ -152,7 +158,29 @@ async function run(request: Request, url: URL): Promise<Response> {
 		results.push({ id: s.id, toss_order_id: s.toss_order_id, status: s.status, fail_code: s.fail_code, result });
 	}
 
-	return json({ ok: true, expired, checked: results.length, results });
+	// 5. 파트너 샘플 결제 — 만료 + 고착·CANCEL_PENDING 종결 (함수들은 예외를 던지지 않고 오류를 로그 + 0/[] 로 돌려준다)
+	const partnerExpired = doExpire ? await expirePartnerPayments(admin) : 0;
+	const stalePartner = await listStalePartnerPayments(admin, STALE_AGE, BATCH);
+	const partnerResults: Outcome[] = [];
+	for (const p of stalePartner) {
+		let result: string;
+		try {
+			result = await reconcilePartnerPayment(admin, p);
+		} catch (e) {
+			result = `error: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200);
+			console.error('[reconcile] partner payment', p.id, result);
+		}
+		partnerResults.push({ id: p.id, toss_order_id: p.toss_order_id, status: p.status, fail_code: p.fail_code, result });
+	}
+	if (partnerExpired || partnerResults.length) console.log(`[reconcile] partner expired=${partnerExpired} checked=${partnerResults.length}`);
+
+	return json({
+		ok: true,
+		expired,
+		checked: results.length,
+		results,
+		partner: { expired: partnerExpired, checked: partnerResults.length, results: partnerResults }
+	});
 }
 
 export const GET: RequestHandler = ({ request, url }) => run(request, url);
