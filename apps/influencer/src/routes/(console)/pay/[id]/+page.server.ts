@@ -27,11 +27,14 @@ export const load: PageServerLoad = async (event) => {
 	]);
 	const payable = isPayable(p.status, p.expires_at);
 	const productCode = product?.code ?? null;
+	// PENDING 인데 만료 시각이 지났다(크론이 아직 EXPIRED 로 바꾸기 전) — 화면은 만료로 그린다
+	const shownStatus = p.status === 'PENDING' && !payable ? 'EXPIRED' : p.status;
+	const ended = shownStatus === 'FAILED' || shownStatus === 'CANCELED' || shownStatus === 'EXPIRED';
 
 	return {
 		payment: {
 			id: p.id,
-			status: p.status,
+			status: shownStatus,
 			toss_order_id: p.toss_order_id,
 			order_name: p.order_name,
 			amount_total: p.amount_total,
@@ -42,9 +45,9 @@ export const load: PageServerLoad = async (event) => {
 			expires_at: p.expires_at
 		},
 		payable,
-		chip: partnerPaymentStatusLabel(p.status, p.fail_code),
+		chip: partnerPaymentStatusLabel(shownStatus, p.fail_code),
 		amountText: payLine(p),
-		failText: p.status === 'FAILED' || p.status === 'CANCELED' || p.status === 'EXPIRED' ? partnerPayFailMessage(p.fail_code ?? p.status, p.fail_message) : null,
+		failText: ended ? partnerPayFailMessage(p.fail_code ?? shownStatus, p.fail_message) : null,
 		product: product ? { code: productCode, name: product.name, emoji: product.emoji, thumb_url: product.thumb_url, brand: product.brand_name, refund: product.sample_refund } : null,
 		customer: { key: user.id, name: seller.name, email: user.email ?? null },
 		paths: {

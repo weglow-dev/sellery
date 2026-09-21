@@ -52,7 +52,8 @@ export const load: PageServerLoad = async (event) => {
 	]);
 	return {
 		view: 'ok' as const,
-		already: outcome.already,
+		// paymentId 경로(🥬 전액)는 /pay/new 액션이 이미 확정했으므로 여기 already 는 항상 true — 새로고침 안내는 토스 경로에서만
+		already: paymentIdQ ? false : outcome.already,
 		amountText: payLine({ amount_total: p?.amount_total ?? outcome.amountCash, amount_cel: outcome.amountCel, amount_cash: outcome.amountCash }),
 		amountCel: outcome.amountCel,
 		amountCash: outcome.amountCash,

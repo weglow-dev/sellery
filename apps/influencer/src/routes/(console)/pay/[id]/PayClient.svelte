@@ -66,18 +66,23 @@
 			});
 			// Redirect 방식: 여기 아래는 결제창이 닫히지 않는 한 실행되지 않는다
 		} catch (e) {
+			// 결제창 닫힘(USER_CANCEL) · 팝업 차단 · 결제 수단 미선택 등 — 콘솔 셸에는 ToastHost 가 없으므로 카드 안에 그대로 보여준다
+			console.error('[pay] requestPayment failed', e);
 			const message = e instanceof Error && e.message ? e.message : '결제 요청에 실패했어요 — 다시 시도해주세요';
+			payError = message;
 			showToast(message);
 			submitting = false;
 		}
 	}
 
+	let payError = $state<string | null>(null);
 	const payDisabled = $derived(!ready || !!widgetError || !agreedRequired);
 </script>
 
 <PaymentWidget clientKey={PUBLIC_TOSS_CLIENT_KEY} {variantKey} {customerKey} {amount} {onReady} onError={onWidgetError} {onAgreementChange} />
 
 <div class="card static">
+	{#if payError}<div class="notice danger" role="alert" style="margin:0 0 10px">{payError}</div>{/if}
 	<div class="btnrow" style="justify-content:flex-end">
 		<button type="button" class="pri buy" onclick={handlePay} disabled={payDisabled || submitting} aria-busy={submitting || undefined}>
 			{submitting ? '결제 준비 중…' : `₩${fmtNum(amount)} 결제하기`}

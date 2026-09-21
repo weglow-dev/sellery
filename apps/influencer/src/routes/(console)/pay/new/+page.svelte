@@ -57,7 +57,8 @@
 	<p class="notice danger" role="alert">{form.message}</p>
 {/if}
 
-<form method="post" action="?/begin">
+<!-- action 의 쿼리가 URL 쿼리를 통째로 대체하므로 product 를 다시 싣는다 (없으면 액션·재로드가 상품을 못 찾아 404) -->
+<form method="post" action={`?/begin&product=${encodeURIComponent(p.code)}`}>
 	<div class="sec" style="margin-top:20px">결제 수단</div>
 	<section class="card static">
 		<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13.5px;line-height:1.5">
