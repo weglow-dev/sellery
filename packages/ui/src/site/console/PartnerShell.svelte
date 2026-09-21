@@ -6,7 +6,7 @@
 	 * href 는 전부 `consolePath(role, …)`(경로 모드 고정 — `/influencer/home`). 호스트 모드(`host` prop)는 결정 11 로 폐기됐다.
 	 * 우측 자리(`me`)는 앱 레이아웃이 `getSellerContext()`(DB 게이트 아님 — 표시용) 로 채운다. 세션·행이 없으면 비워 둔다(공개 페이지).
 	 * 정지 계정은 이름만(grade · balance null). 로그아웃은 콘솔 전용 `POST /influencer/auth/signout?next=/influencer/login`(결정 15).
-	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` 다(결정 6). 탭 5개 중 상품·캠페인은 3단계, 매출 탭은 5단계까지 비활성(`disabled` · title 예고 — `/sales` 는 (demo) 그룹이 아직 쓴다).
+	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` 다(결정 6). 탭 5개 전부 활성(상품·캠페인 3단계 · 매출 5단계 — `/sales` `/settle` 은 (demo) 그룹에서 빠졌다). `disabled` 옵션은 브랜드 콘솔 예고용으로 남긴다.
 	 */
 	import type { ConsoleRole } from '@sellery/db/console-paths';
 	import type { ConsoleTab } from './ConsoleTabs.svelte';
@@ -25,7 +25,7 @@
 			{ href: '/home', label: '홈', icon: 'home' },
 			{ href: '/products', label: '상품', icon: 'box' },
 			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
-			{ href: '/sales', label: '매출', icon: 'chart', disabled: true, title: '매출 · 정산은 5단계에서 열립니다' },
+			{ href: '/sales', label: '매출', icon: 'chart' },
 			{ href: '/my', label: '내 정보', icon: 'user' }
 		],
 		brand: [

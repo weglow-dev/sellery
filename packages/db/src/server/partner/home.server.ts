@@ -16,7 +16,7 @@ import { sellerPath, type SellerSummary } from "./seller.server";
 export type HomeTodoKind =
   | "channel_verify" // 메인 채널 미인증 → /my (인증하기)
   | "channel_pending" // [인증 확인] 누름 · 운영자 확인 중 → /my
-  | "bank_info" // 정산 계좌 미등록 → /my (5단계 /settle 전까지 안내만)
+  | "bank_info" // 정산 계좌 미등록 → /settle (5단계 정산 정보 폼)
   | "invited" // 브랜드 제안 · 수락 대기 → /campaigns/<code> (수락·거절은 다음 단계)
   | "receive_sample" // SAMPLE_SHIPPED → 수령 확인
   | "testing" // TESTING · 테스트 기한 D-n
@@ -208,11 +208,11 @@ export async function getHomeWidgets(seller: SellerSummary, balance: number, adm
     todos.push({
       kind: "bank_info",
       title: "정산 계좌 등록",
-      desc: "판매 종료 D+21 정산을 받으려면 계좌가 필요해요 (등록 화면은 5단계에서 열립니다)",
-      href: sellerPath("/my"),
+      desc: "판매 종료 D+21 정산을 받으려면 계좌가 필요해요 — 정산 정보에서 등록하세요",
+      href: sellerPath("/settle"),
       campaignCode: null,
       due: null,
-      action: null,
+      action: "등록하기",
     });
   }
   if (campaigns.length === 0) {
