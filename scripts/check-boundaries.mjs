@@ -23,7 +23,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** 규칙 (b) 의 강제 수준 — 앱별. 'error' 로 바꾸는 시점은 위 주석. */
 const DEMO_RULE = {
-  shop: "warn", // S2 에서 'error'
+  shop: "error", // S2(shop SSR 전환)에서 error 로 올림 — shop 은 @sellery/core/{constants,util,icons,types} 만
   influencer: "warn", // S5 에서 'error'
 };
 

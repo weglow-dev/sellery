@@ -1,1 +1,2 @@
-@import '@sellery/ui/css/theme.css';
+/* 고객 사이트 스타일 = web/src/app/globals.css 의 이식 (docs/monorepo-migration.md 결정 12). 데모 theme.css 는 쓰지 않는다. */
+@import '@sellery/ui/css/site.css';
