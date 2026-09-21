@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * 콘솔 셸 안의 오류 페이지 — web influencer/not-found.tsx 1:1 (docs/monorepo-migration.md §5.1 "콘솔 404").
-	 * `[...rest]/+page.server.ts` 의 error(404)(아직 없는 탭 /products · /campaigns · /sales 포함)와 page 의 error(404) 가 여기로 온다 —
+	 * `[...rest]/+page.server.ts` 의 error(404)와 page 의 error(404)(없는 상품 코드 · 남의 캠페인 코드 포함)가 여기로 온다 —
 	 * 셸(상단 바 · 하단 탭) 안에서 렌더된다. 404 외 상태는 간단 문구. 제목 규칙: web `%s — 셀러리 파트너`.
 	 */
 	import { page } from '$app/state';

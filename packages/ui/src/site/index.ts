@@ -88,3 +88,6 @@ export { default as ConsoleTabs } from './console/ConsoleTabs.svelte';
 export type { ConsoleTab, ConsoleTabIcon } from './console/ConsoleTabs.svelte';
 export { default as CopyButton } from './console/CopyButton.svelte';
 export { default as DeleteChannelForm } from './console/DeleteChannelForm.svelte';
+// 콘솔 3단계 (docs/inf-console-plan.md §7 3. — 배송지 폼 · 스테퍼)
+export { default as ShippingFields } from './console/ShippingFields.svelte';
+export { default as CampaignStepper } from './console/CampaignStepper.svelte';
