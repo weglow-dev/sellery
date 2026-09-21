@@ -39,6 +39,10 @@ export type SellerSummary = {
   has_bank_info: boolean;
   sample_address: Json | null;
   ref_code: string | null;
+  /** 최근 3개월 확정 매출 (등급 기준) — 홈 "내 자산" 다음 등급까지 남은 금액 */
+  m3_sales: number;
+  /** 월 무상 샘플 한도 추가분 (sampleExtra) */
+  sample_extra: number;
   created_at: string;
 };
 
@@ -53,7 +57,7 @@ export type SellerContext =
 export type SellerReady = Extract<SellerContext, { state: "ok" }>;
 
 const SELLER_COLS =
-  "id, code, name, handle, platform, grade, active, followers, settle_type, bank_info, sample_address, ref_code, created_at";
+  "id, code, name, handle, platform, grade, active, followers, settle_type, bank_info, sample_address, ref_code, m3_sales, sample_extra, created_at";
 
 const MEMO_KEY = "seller_context";
 
@@ -88,6 +92,8 @@ export function getSellerContext(event: DbEvent, admin?: Admin): Promise<SellerC
       has_bank_info: row.bank_info !== null && typeof row.bank_info === "object",
       sample_address: row.sample_address,
       ref_code: row.ref_code,
+      m3_sales: Number(row.m3_sales) || 0,
+      sample_extra: row.sample_extra ?? 0,
       created_at: row.created_at,
     };
     if (!seller.active) return { state: "suspended", user, seller };

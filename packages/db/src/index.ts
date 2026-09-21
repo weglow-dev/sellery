@@ -28,3 +28,4 @@ export type { OrderLike, CampaignLike, StatusTone, RefundBlockCode, RefundReason
 export * from "./legal";
 export * from "./company";
 export * from "./partner/signup-rules";
+export * from "./partner/sample-rules";

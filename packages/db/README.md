@@ -6,9 +6,9 @@
 
 | import | 어디서 |
 |---|---|
-| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/signup-rules` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
+| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
 | `@sellery/db/browser` (`createBrowserSupabase(url, anonKey)`) | 브라우저 도달 코드(로그인·인증 확인)만. `+*.server.ts` 금지 |
-| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
+| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
 
 서버 함수의 관례(§2.4 · §3.4):
 
@@ -25,9 +25,12 @@ src/database.types.ts    Supabase 생성 타입 — 직접 고치지 않는다 (
 src/browser.ts           createBrowserSupabase(url, anonKey)
 src/auth.ts linkctx.ts campaign.ts console-paths.ts order-status.ts carriers.ts dates.ts text.ts types.ts legal.ts company.ts
 src/partner/signup-rules.ts   가입 폼·서버 공용 규칙 (순수)
+src/partner/sample-rules.ts   샘플 견적(app_sample_quote jsonb) → 버튼·안내 문구 · 배송지 폼 검증 · 캠페인 상태 칩/스테퍼 (순수)
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
+                                · products(listProductsForSeller · getProductForSeller · requestFreeSample) · campaigns(listSellerCampaigns · getSellerCampaign · receiveSample)
+                                · home(getHomeWidgets) · my(saveSampleAddress) — 콘솔 3단계, 0011 RPC(app_sample_quote(s) · app_request_free_sample · app_receive_sample)
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
 scripts/*.mjs            gen-types · partner-admin · dev-seller · dev-user (Node · 루트 .env.local)
 ```
