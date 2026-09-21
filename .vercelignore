@@ -1,8 +1,7 @@
-# 저장소 루트 기준 제외 목록 — Vercel 프로젝트 5개(sellery-app=web · sellery-shop/influencer/brand/admin=apps/*)가 같은 저장소를 쓰고
+# 저장소 루트 기준 제외 목록. `.git` 은 넣지 않는다 — Vercel 의 "Ignored Build Step"(git diff) 이 빌드 컨테이너의 .git 을 쓴다(2026-09-21).
 # 각각 Root Directory 를 다르게 두므로("Include source files outside of the Root Directory" ON) 이 파일 하나를 공유한다.
 # 패턴은 반드시 `/` 로 시작(루트 고정) — `supabase` 처럼 쓰면 web/src/lib/supabase 같은 하위 폴더까지 지워져
 # Vercel 빌드에서 "Module not found" 가 난다(2026-09-18 실제 발생). `web/` 는 sellery-app(Root Directory web) 이 계속 쓰므로 제외하지 않는다.
-.git
 .github
 .claude
 .vscode
