@@ -17,12 +17,12 @@ import { parseBrandCampaignRow, parseScheduleActionResult, periodLine, scheduleA
 const S6 = "a0000000-0000-4000-8000-000000000006";
 const P3 = "d0000000-0000-4000-8000-000000000003";
 
-describe("등급 게이트 — 3단계는 골드 이하만 (플래티넘 이상 = grade_tiers.is_priority = 6단계 🥬)", () => {
-  it("게이트 등급은 GRADES 의 상위 3개", () => {
-    expect(INVITE_MAX_GRADE).toBe("골드");
-    expect(INVITE_GATED_GRADES).toEqual(["블랙", "다이아", "플래티넘"]);
-    for (const g of ["골드", "실버", "브론즈", "스타터"]) expect(isInvitableGrade(g)).toBe(true);
-    for (const g of ["플래티넘", "다이아", "블랙"]) expect(isInvitableGrade(g)).toBe(false);
+describe("등급 게이트 — 3단계는 플래티넘 이하 (다이아·블랙 = grade_tiers.invite_cost_cel 10 = 6단계 🥬 · 0017)", () => {
+  it("게이트 등급은 GRADES 의 상위 2개 — 플래티넘은 기간 우선권은 있어도 제안은 무료", () => {
+    expect(INVITE_MAX_GRADE).toBe("플래티넘");
+    expect(INVITE_GATED_GRADES).toEqual(["블랙", "다이아"]);
+    for (const g of ["플래티넘", "골드", "실버", "브론즈", "스타터"]) expect(isInvitableGrade(g)).toBe(true);
+    for (const g of ["다이아", "블랙"]) expect(isInvitableGrade(g)).toBe(false);
     expect(isInvitableGrade(null)).toBe(false);
   });
 });

@@ -4,18 +4,18 @@ import { ENDED_STATUSES } from '@sellery/db/partner/sample-rules';
 import { listSellerCampaigns, requireSeller, sellerPath } from '$lib/server/partner';
 
 /**
- * `/campaigns` — 내 캠페인 목록 3단계 (docs/inf-console-plan.md §6 `/campaigns` · 프로토타입 js/20-seller.js vSellerCamps · campRow. 캘린더는 다음).
+ * `/campaigns` — 내 캠페인 목록 3단계 (docs/inf-console-plan.md §6 `/campaigns` · 프로토타입 js/20-seller.js vSellerCamps · campRow. 캘린더는 다음). 3단계 짝(0016): INVITED 수락·거절 · TESTING 일정 제안·패스 · SCHEDULE_PROPOSED 확인 중.
  * 읽기: `listSellerCampaigns(seller.id)` — 본인 것만(최신순) + 상품·브랜드 요약 + 상태 칩. 진행 중 / 끝난 캠페인(`ENDED_STATUSES`) 두 묶음.
  * 행의 "다음 할 일" 한 줄은 프로토타입 vSellerHome `TODO_L` 원문 — 인플루언서 차례인 상태만.
  */
 const NEXT_HINT: Record<string, string> = {
-	INVITED: '브랜드 직접 제안 — 수락/거절 (다음 단계)',
+	INVITED: '브랜드 직접 제안 — 수락 · 거절',
 	SAMPLE_SHIPPED: '샘플 수령 확인',
-	TESTING: '테스트 후 일정 제안 (다음 단계)',
+	TESTING: '테스트 후 일정 제안 · 패스',
 	SAMPLE_APPROVED: '샘플 배송 대기 (브랜드 발송 중)',
 	SAMPLE_PURCHASED: '샘플 구매 완료 · 브랜드 발송 대기',
 	SAMPLE_REQUESTED: '브랜드 승인 대기 중',
-	SCHEDULE_PROPOSED: '브랜드 일정 승인 대기'
+	SCHEDULE_PROPOSED: '브랜드 일정 확인 중 — 다시 제안 가능'
 };
 
 export const load: PageServerLoad = async (event) => {

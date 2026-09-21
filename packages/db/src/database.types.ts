@@ -2426,6 +2426,7 @@ export type Database = {
         Args: { p_options: Json; p_sale_price: number }
         Returns: Json
       }
+      seller_invite_gated: { Args: { p_seller_id: string }; Returns: boolean }
       seller_is_priority: { Args: { p_seller_id: string }; Returns: boolean }
       seller_is_public: { Args: { p_seller: string }; Returns: boolean }
       stale_checkout_sessions: {
