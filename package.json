@@ -13,6 +13,9 @@
     "dev:admin": "npm run dev -w apps/admin",
     "dev:shop": "npm run dev -w apps/shop",
     "check": "npm run check --workspaces --if-present",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "test": "vitest run",
+    "gen:types": "npm run gen:types -w packages/db",
     "build": "npm run build --workspaces --if-present",
     "build:apps": "npm run build --workspaces --if-present"
   },
@@ -22,5 +25,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.1"
   }
 }

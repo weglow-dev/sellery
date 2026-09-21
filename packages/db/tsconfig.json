@@ -1,0 +1,20 @@
+{
+	// 빌드 없음 — 소스(.ts)를 그대로 export 하고 앱의 Vite 가 컴파일한다 (packages/ui 관례). 이 파일은 `npm run check`(tsc --noEmit) 전용.
+	// lib 에 DOM 을 넣는 이유: fetch · Response · AbortSignal · crypto · btoa 등 서버 코드가 쓰는 Web API 를 @types/node 없이 해석하기 위해 (SvelteKit 앱의 .svelte-kit/tsconfig.json 과 같은 lib).
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"types": [],
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		"forceConsistentCasingInFileNames": true,
+		"noUnusedLocals": true
+	},
+	"include": ["src/**/*.ts"]
+}

@@ -2,7 +2,8 @@ name: CI
 
 # PR 필수 상태 검사. 브랜치 보호 규칙의 required status check 컨텍스트는
 # 아래 job 의 name("프로토타입 점검") 이다 — 이름을 바꾸면 보호 규칙도 같이 바꿀 것.
-# 내용: 앱 4개 svelte-check(타입·템플릿) + 배포와 같은 빌드(@sveltejs/adapter-vercel → apps/*/.vercel/output).
+# 내용(docs/monorepo-migration.md §8.1): 앱 4개 svelte-check + packages/{db,payments} tsc → vitest(순수 규칙) → 패키지 경계 검사(scripts/check-boundaries.mjs)
+# → 배포와 같은 빌드(@sveltejs/adapter-vercel → apps/*/.vercel/output).
 #
 # PUBLIC_* 는 $env/static/public(빌드 시 인라인)이라 check·build 때 이름이 있어야 한다 — 더미 값을 job env 로 준다.
 # web-ci.yml 과 같은 원칙: 빌드가 실제 키를 요구하면 설계 위반. 비밀키는 CI 에 넣지 않는다 (docs/monorepo-migration.md 결정 11 · §8.3).
@@ -30,7 +31,11 @@ jobs:
           cache: npm
       - name: npm ci
         run: npm ci
-      - name: svelte-check (apps/*)
+      - name: svelte-check (apps/*) · tsc (packages/db · packages/payments)
         run: npm run check
+      - name: vitest (packages/db · packages/payments 순수 규칙)
+        run: npm test
+      - name: 패키지 경계 검사 (scripts/check-boundaries.mjs)
+        run: node scripts/check-boundaries.mjs
       - name: build (apps/*/.vercel/output)
         run: npm run build
