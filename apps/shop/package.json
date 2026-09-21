@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@sellery/core": "*",
-    "@sellery/ui": "*"
+    "@sellery/ui": "*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0"
   }
 }
