@@ -12,15 +12,15 @@
     "dev:brand": "npm run dev -w apps/brand",
     "dev:admin": "npm run dev -w apps/admin",
     "dev:shop": "npm run dev -w apps/shop",
-    "build": "node scripts/build.mjs",
     "check": "npm run check --workspaces --if-present",
-    "build:apps": "npm run build --workspaces --if-present",
-    "serve": "node scripts/serve-dist.mjs"
+    "build": "npm run build --workspaces --if-present",
+    "build:apps": "npm run build --workspaces --if-present"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
-  "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.10"
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0"
   }
 }

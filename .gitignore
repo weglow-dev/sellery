@@ -28,12 +28,11 @@ _site/
 # Dependencies (도구를 붙이게 되면)
 node_modules/
 
-# 원본·누끼 소스(배경 제거 전 png, 포토샵 원본 등)는 assets/_src/ 에 두며 배포에 불필요하므로 무시.
-# (product images live in assets/ and are committed; raw/cutout sources live in assets/_src/ and are ignored)
-assets/_src/
+# 원본·누끼 소스(배경 제거 전 png, 포토샵 원본 등)는 apps/shop/static/assets/_src/ 에 두며 배포에 불필요하므로 무시.
+# (product images live in apps/shop/static/assets/ and are committed; raw/cutout sources live in …/assets/_src/ and are ignored)
+apps/shop/static/assets/_src/
 
-# SvelteKit · 빌드 산출물 (Vercel 이 빌드 때 생성)
+# SvelteKit · 빌드 산출물 (Vercel 이 빌드 때 생성 — adapter-vercel 은 apps/*/.vercel/output)
 .svelte-kit/
 build/
-dist/
 !.env.example
