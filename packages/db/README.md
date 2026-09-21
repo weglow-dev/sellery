@@ -6,15 +6,15 @@
 
 | import | 어디서 |
 |---|---|
-| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
+| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/brand/signup-rules` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
 | `@sellery/db/browser` (`createBrowserSupabase(url, anonKey)`) | 브라우저 도달 코드(로그인·인증 확인)만. `+*.server.ts` 금지 |
-| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
+| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` · `@sellery/db/server/brand/{brand,signup}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
 
 서버 함수의 관례(§2.4 · §3.4):
 
 - 요청이 필요한 함수는 **`event`(SvelteKit `RequestEvent` 의 부분집합 `DbEvent`) 를 첫 인자**로 받는다 — `event.locals.supabase`(hooks 가 만든 SSR 클라이언트, 키가 없으면 `null` → 함수는 "없음" 으로 응답) · `event.locals.safeGetSession()` · `event.locals.memo`(요청당 메모, React `cache()` 대체).
 - **비밀은 앱의 `hooks.server.ts` 가 `$env/dynamic/private` 에서 읽어 모듈 로드 시 1회 주입**한다: `configureDb({ url, anonKey, serviceKey, slackWebhookUrl })`. 패키지는 `$env` 도 `process.env` 도 읽지 않는다. `createAdminClient()` 는 키가 없으면 **호출 시점에만** throw(빌드는 통과). service role 이 필요한 함수는 `admin` 을 마지막 인자로 주입할 수도 있다.
-- **redirect 를 던지지 않는다** — `requireSeller(event, { next })` 는 `{ ok:false, state, location }` 을 돌려주고 앱이 `redirect(303, location)` 한다.
+- **redirect 를 던지지 않는다** — `requireSeller(event, { next })` · `requireBrand(event, { next })` 는 `{ ok:false, state, location }` 을 돌려주고 앱이 `redirect(303, location)` 한다.
 - 호스트 모드(`inf.sellery.life`)는 폐기 — `console-paths.ts` 는 경로 모드(`/influencer/*`)만 안다.
 
 ## 파일
@@ -30,6 +30,7 @@ src/partner/sample-rules.ts   샘플 견적(app_sample_quote jsonb) → 버튼·
 src/partner/settle-rules.ts   매출·정산 규칙 (순수 · 0013): calcSellerShare(calc 의 인플루언서 라인 — sf · gBonus · boost · sfTotal · wht · payout) · sellerWhtRate · settleDue
                               · validateRrn · maskAccount · maskBizNo · BANKS(core BANKS − '선택') · SETTLE_TYPES · parseSettleInfoInput(/settle 폼)
                               · RPC 파서 parseSettleInfo · parseSetSettleInfoResult · parseSetRrnResult · parseSellerSales · parseSellerSettlements · 문구 SETTLE_FAIL_MESSAGES · settlementStatusLabel · whtLine · rateLine
+src/brand/signup-rules.ts     브랜드 가입 폼·서버 공용 규칙 (순수 · 브랜드 콘솔 1단계 · 0014): BRAND_CATEGORIES · BIZ_NO_RE · PHONE_RE · normalizePhone · parseBrandSignupMeta · BRAND_SIGNUP_FAIL_MESSAGES (사업자번호 정규화는 partner/settle-rules normalizeBizNo 재수출)
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
@@ -38,8 +39,9 @@ src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rate
                                 · 샘플 결제(0012 app_partner_payment_*) 의 서버 함수는 토스 호출과 묶여야 하므로 @sellery/payments/server/partner-sample 에 있다
                                 · sales(getSellerSales — 0013 app_seller_sales) · settle(getSellerSettleInfo · saveSettleInfo · setSellerRrn(configureDb rrnEncKey) · listSellerSettlements
                                   · uploadBizDoc(Storage partner-docs → sellers.biz_doc_url object path) · getBizDocSignedUrl) — 콘솔 5단계. 정산 실행은 없다(관리자)
+src/server/brand/*.server.ts    brand(getBrandContext · requireBrand — 상태 anon · foreign(kind seller|customer) · guest · suspended · ok · brandPath · consoleNextOf) · signup(createBrandFromSignup · linkBrandIdOf · isBrandAccount) — 브랜드 콘솔 1단계, 0014 create_brand_from_signup
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
-scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund) · dev-seller · dev-user (Node · 루트 .env.local)
+scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund · 브랜드 brands/suspend-brand/reactivate-brand/link-brand/invite-brand) · dev-seller · dev-brand · dev-user (Node · 루트 .env.local)
 ```
 
 ## gen:types

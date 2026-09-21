@@ -5,7 +5,7 @@
  *
  * - displayName(user): 카카오 user_metadata 에서 표시명
  * - safeNext(next):   오픈 리다이렉트 방지 — 로그인 시작·콜백·redirectTo 의 next 는 전부 이 함수를 거친다
- * - isPartnerUser(user): user_metadata.partner_role 판정 — 비신뢰 값, 콜백의 ensureCustomer 생략 등 무해한 분기 전용
+ * - isPartnerUser(user) · partnerRoleOf(user): user_metadata.partner_role 판정 — 비신뢰 값, 콜백의 ensureCustomer 생략 등 무해한 분기 전용
  */
 import type { User } from "@supabase/supabase-js";
 
@@ -73,6 +73,12 @@ export function safeNext(next: string | null | undefined): string {
  * (`server/partner/seller.server.ts requireSeller`). 시드 행 연결용 `link_seller_id` 는 `app_metadata`(service role 전용) 에 둔다.
  */
 export function isPartnerUser(user: User | null | undefined): boolean {
+  return partnerRoleOf(user) !== null;
+}
+
+/** `user_metadata.partner_role` 의 값('seller' | 'brand') — 그 밖의 값·없음은 null. `isPartnerUser` 와 같은 **비신뢰 값**이라 무해한 분기 전용
+ *  (브랜드 콘솔 `/brand/auth/confirm` 이 인플루언서 세션에 brands 행을 만들지 않게 가르는 용도 — docs/brand-console-plan.md §3). */
+export function partnerRoleOf(user: User | null | undefined): "seller" | "brand" | null {
   const role = (user?.user_metadata as Record<string, unknown> | undefined)?.partner_role;
-  return role === "seller" || role === "brand";
+  return role === "seller" || role === "brand" ? role : null;
 }
