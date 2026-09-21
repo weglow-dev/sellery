@@ -1,0 +1,23 @@
+{
+	// svelte-check 대상 = props-only 사이트 컴포넌트(src/site/**)만. 데모 컴포넌트(src/components · modals · views)는 `$app/*` 를 import 하므로
+	// 앱 안에서만 타입이 풀린다 — 각 앱의 svelte-check 가 본다. 옵션은 apps/*/tsconfig.json 과 같다.
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ESNext", "DOM", "DOM.Iterable"],
+		"rewriteRelativeImportExtensions": true,
+		"allowJs": true,
+		"checkJs": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		"noEmit": true,
+		"types": ["svelte"]
+	},
+	"include": ["src/site/**/*.ts", "src/site/**/*.svelte"]
+}

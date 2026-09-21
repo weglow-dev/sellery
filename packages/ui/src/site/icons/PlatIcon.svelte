@@ -1,0 +1,7 @@
+<script lang="ts">
+	/** `seller.platform` / `channels[].platform` 문자열로 플랫폼 아이콘 — 모르는 값이면 아무것도 렌더하지 않는다. web icons.tsx PLAT_ICONS · PlatIcon */
+	import { isPlatform } from './icons';
+	let { platform }: { platform: string | null | undefined } = $props();
+</script>
+
+{#if platform === 'instagram'}<svg class="plic" viewBox="0 0 24 24" width="14" height="14" role="img" aria-label="Instagram"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="none" stroke="#C13584" stroke-width="2.4" /><circle cx="12" cy="12" r="4.4" fill="none" stroke="#C13584" stroke-width="2.4" /><circle cx="17.6" cy="6.4" r="1.5" fill="#C13584" /></svg>{:else if platform === 'youtube'}<svg class="plic" viewBox="0 0 24 24" width="15" height="15" role="img" aria-label="YouTube"><rect x="1.5" y="5" width="21" height="14" rx="4" fill="#FF0000" /><path d="M10 9.3v5.4l4.8-2.7z" fill="#fff" /></svg>{:else if platform === 'naver'}<svg class="plic" viewBox="0 0 24 24" width="13" height="13" role="img" aria-label="Naver Blog"><rect width="24" height="24" rx="4" fill="#03C75A" /><path d="M6.5 5.5h3.6l3.3 5V5.5h4.1v13h-3.6l-3.3-5v5H6.5z" fill="#fff" /></svg>{:else if platform === 'tiktok'}<svg class="plic" viewBox="0 0 24 24" width="13" height="13" role="img" aria-label="TikTok"><path d="M15.2 2c.4 2.4 1.9 4 4.3 4.3v3.2c-1.7 0-3.2-.5-4.3-1.4v6.9a5.8 5.8 0 11-5.8-5.8c.4 0 .7 0 1.1.1v3.3a2.6 2.6 0 101.6 2.4V2h3.1z" fill="#191919" /></svg>{:else if isPlatform(platform)}{''}{/if}
