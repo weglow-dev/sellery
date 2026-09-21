@@ -11,7 +11,7 @@
 - **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` `/login` `/auth/*` `/checkout*` `/account/*` `/api/*` `/terms` `/privacy` · Supabase SSR · 토스페이먼츠). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐고(설계 문서의 `web/src/…` 경로는 역사 — 이식 위치는 docs/monorepo-migration.md §3~§5 표), Vercel `sellery-app` 은 2026-09-21 삭제됨(롤백은 `sellery-shop` 이전 배포 Promote — docs/deploy.md §3.6).
 - `apps/shop/vercel.json` 리라이트: `/influencer/*` → `sellery-influencer`(**`apps/influencer` 인플루언서 콘솔 1~2단계** — 가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증 · SSR · `(demo)` 그룹은 dev/`PUBLIC_DEMO=1` 만), `/brand/*` `/admin/*` → `sellery-brand` · `sellery-admin`(**localStorage 데모 — 데모 띠 `DemoBanner` · `noindex` · `/brand/robots.txt` `/admin/robots.txt` disallow**, 결정 D). 배포·운영 정본은 [docs/deploy.md](docs/deploy.md)(외부 서비스 대시보드 §5 · DB §6 · 운영 §8 포함). 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
 - **다음 작업은 인플루언서 콘솔 3~6단계**(docs/inf-console-plan.md §7 — 상품 갤러리 · 샘플 · 캠페인 · 결제 · 정산 · 🥬), 이어서 `apps/brand` → `apps/admin` 을 데모에서 실서비스로.
-- Supabase 스키마는 `supabase/migrations/0001~0010` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입). 새 변경은 새 번호로.
+- Supabase 스키마는 `supabase/migrations/0001~0011` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011 샘플 견적/무상 요청/수령 확인 — 콘솔 3단계, 계획서의 "0011a"; 결제 테이블은 0012). 새 변경은 새 번호로.
 
 ## 스택 · 구조 (2026-09-18 SvelteKit 모노레포로 전환)
 

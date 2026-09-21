@@ -381,7 +381,7 @@ Supabase → Authentication → Providers → **Email ON · Confirm email ON · 
 | 인덱스 | `seller_channels (vcode_confirmed_at) where vcode_confirmed_at is not null and not verified`(대기 목록용, 선택) |
 | RLS | 새 테이블 없음 — 변경 없음 |
 
-**0011_partner_payments.sql**
+**0011_partner_payments.sql** → **적용 기록(2026-09-21)**: 3단계 부분집합(`campaigns.sample_shipping` · `app_sample_quote` · 일괄 `app_sample_quotes` · `app_request_free_sample` · `app_receive_sample`)은 **`0011_sample_request.sql`** 로 먼저 적용했다(Supabase CLI 는 `<숫자>_이름.sql` 만 인식해 "0011a" 대신 0011). 아래 결제 테이블·함수는 **`0012_partner_payments.sql`** 로 간다(4단계). 견적 응답 키는 0011 파일 헤더가 정본이고 앱 쪽 타입은 `packages/db/src/partner/sample-rules.ts` `SampleQuote`.
 
 | 컬럼 | 타입 · 제약 |
 |---|---|

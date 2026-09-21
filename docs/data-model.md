@@ -1,6 +1,6 @@
 # 셀러리(Sellery) 데이터 모델 — Supabase(Postgres) 스키마
 
-> **상태(2026-09-21): 0001~0010 클라우드 적용 · 앱은 SvelteKit(`apps/shop` · `apps/influencer`) — S1~S5 + 도메인 전환 완료, `web/` 은 S5 PR-11 에서 삭제.** 아래 `web/src/lib/database.types.ts` · `web/scripts/*` · `cd web && npm run gen:types` 는 각각 `packages/db/src/database.types.ts` · `packages/db/scripts/*` · 루트 `npm run gen:types` 로 읽는다(마이그레이션 절차 정본은 [`deploy.md`](deploy.md) §6).
+> **상태(2026-09-21): 0001~0011 클라우드 적용(0011 = 콘솔 3단계 샘플 견적 `app_sample_quote(s)` · `app_request_free_sample` · `app_receive_sample` · `campaigns.sample_shipping`) · 앱은 SvelteKit(`apps/shop` · `apps/influencer`) — S1~S5 + 도메인 전환 완료, `web/` 은 S5 PR-11 에서 삭제.** 아래 `web/src/lib/database.types.ts` · `web/scripts/*` · `cd web && npm run gen:types` 는 각각 `packages/db/src/database.types.ts` · `packages/db/scripts/*` · 루트 `npm run gen:types` 로 읽는다(마이그레이션 절차 정본은 [`deploy.md`](deploy.md) §6).
 
 | 항목 | 내용 |
 |---|---|

@@ -246,6 +246,7 @@ export type Database = {
           sample_method: string | null
           sample_price: number | null
           sample_refunded: boolean
+          sample_shipping: Json | null
           seller_id: string
           settled_at: string | null
           sold_qty: number
@@ -282,6 +283,7 @@ export type Database = {
           sample_method?: string | null
           sample_price?: number | null
           sample_refunded?: boolean
+          sample_shipping?: Json | null
           seller_id: string
           settled_at?: string | null
           sold_qty?: number
@@ -318,6 +320,7 @@ export type Database = {
           sample_method?: string | null
           sample_price?: number | null
           sample_refunded?: boolean
+          sample_shipping?: Json | null
           seller_id?: string
           settled_at?: string | null
           sold_qty?: number
@@ -1895,6 +1898,10 @@ export type Database = {
         }
         Returns: Json
       }
+      app_receive_sample: {
+        Args: { p_campaign_id: string; p_seller_id: string }
+        Returns: Json
+      }
       app_refund_precheck: {
         Args: { p_actor: string; p_order_id: string }
         Returns: Json
@@ -1910,7 +1917,23 @@ export type Database = {
         }
         Returns: Json
       }
+      app_request_free_sample: {
+        Args: { p_product_id: string; p_seller_id: string; p_shipping: Json }
+        Returns: Json
+      }
       app_role: { Args: never; Returns: string }
+      app_sample_quote: {
+        Args: { p_product_id: string; p_seller_id: string; p_use_cel?: boolean }
+        Returns: Json
+      }
+      app_sample_quotes: {
+        Args: {
+          p_product_ids: string[]
+          p_seller_id: string
+          p_use_cel?: boolean
+        }
+        Returns: Json
+      }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       campaign_card: { Args: { p_code: string }; Returns: Json }

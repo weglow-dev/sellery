@@ -248,7 +248,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 
 ### 6.1 마이그레이션 (저장소 루트에서)
 
-`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 클라우드 `sellery` 에 `0001~0010` 적용 완료(`0001~0008` 2026-09-15 · `0010_partner_signup` 2026-09-18, `supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0011_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
+`supabase/` 는 **저장소 루트**에 있고 CLI 도 루트에서 실행한다. 클라우드 `sellery` 에 `0001~0011` 적용 완료(`0001~0008` 2026-09-15 · `0010_partner_signup` 2026-09-18 · `0011_sample_request` 2026-09-21, `supabase_migrations.schema_migrations` 로 확인). 이후 변경은 이미 적용된 파일을 고치지 말고 **새 번호(`0012_…`)** 로 추가 → PR → 병합 → 로그인 · 링크된 PC 에서:
 
 ```bash
 npx supabase login
