@@ -2064,6 +2064,10 @@ export type Database = {
       }
     }
     Functions: {
+      app_accept_invite: {
+        Args: { p_campaign_id: string; p_seller_id: string; p_shipping?: Json }
+        Returns: Json
+      }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
         Returns: Json
@@ -2077,11 +2081,33 @@ export type Database = {
         Returns: Json
       }
       app_brand_campaigns: { Args: { p_brand_id: string }; Returns: Json }
+      app_brand_confirm_schedule: {
+        Args: { p_brand_id: string; p_campaign_id: string }
+        Returns: Json
+      }
       app_brand_delete_product: {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: Json
       }
+      app_brand_invite_candidates: {
+        Args: { p_brand_id: string; p_product_id: string }
+        Returns: Json
+      }
+      app_brand_invite_seller: {
+        Args: {
+          p_actor_user_id?: string
+          p_brand_id: string
+          p_message?: string
+          p_product_id: string
+          p_seller_id: string
+        }
+        Returns: Json
+      }
       app_brand_reject_sample: {
+        Args: { p_brand_id: string; p_campaign_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_brand_reject_schedule: {
         Args: { p_brand_id: string; p_campaign_id: string; p_reason?: string }
         Returns: Json
       }
@@ -2106,6 +2132,16 @@ export type Database = {
         Args: { p_brand_id: string; p_input: Json; p_product_id: string }
         Returns: Json
       }
+      app_campaign_chat: {
+        Args: {
+          p_actor_id: string
+          p_actor_role: string
+          p_actor_user_id: string
+          p_body: string
+          p_campaign_id: string
+        }
+        Returns: Json
+      }
       app_checkout_reserved: {
         Args: { p_campaign_id: string }
         Returns: number
@@ -2125,6 +2161,10 @@ export type Database = {
           p_recover?: boolean
           p_session_id: string
         }
+        Returns: Json
+      }
+      app_decline_invite: {
+        Args: { p_campaign_id: string; p_reason?: string; p_seller_id: string }
         Returns: Json
       }
       app_partner_payment_cancel: {
@@ -2181,6 +2221,20 @@ export type Database = {
         Args: { p_age?: string; p_limit?: number }
         Returns: Json[]
       }
+      app_pass_campaign: {
+        Args: { p_campaign_id: string; p_seller_id: string }
+        Returns: Json
+      }
+      app_propose_schedule: {
+        Args: {
+          p_campaign_id: string
+          p_end: string
+          p_qty: number
+          p_seller_id: string
+          p_start: string
+        }
+        Returns: Json
+      }
       app_receive_sample: {
         Args: { p_campaign_id: string; p_seller_id: string }
         Returns: Json
@@ -2227,6 +2281,10 @@ export type Database = {
         Returns: Json
       }
       app_seller_sales: { Args: { p_seller_id: string }; Returns: Json }
+      app_seller_schedule_context: {
+        Args: { p_campaign_id: string; p_seller_id: string }
+        Returns: Json
+      }
       app_seller_settle_info: { Args: { p_seller_id: string }; Returns: Json }
       app_seller_settlements: { Args: { p_seller_id: string }; Returns: Json }
       app_set_seller_rrn: {
@@ -2254,6 +2312,40 @@ export type Database = {
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       campaign_card: { Args: { p_code: string }; Returns: Json }
+      campaign_event_json: {
+        Args: { e: Database["public"]["Tables"]["campaign_events"]["Row"] }
+        Returns: Json
+      }
+      campaign_leak_detected: { Args: { p_body: string }; Returns: boolean }
+      campaign_normalize_shipping: { Args: { p_shipping: Json }; Returns: Json }
+      campaign_period_block: {
+        Args: {
+          p_end: string
+          p_except_campaign_id: string
+          p_product_id: string
+          p_seller_id: string
+          p_start: string
+        }
+        Returns: Json
+      }
+      campaign_period_holders: {
+        Args: {
+          p_end: string
+          p_except_campaign_id?: string
+          p_product_id: string
+          p_start: string
+        }
+        Returns: Json
+      }
+      campaign_post_chat: {
+        Args: {
+          p_actor_user_id: string
+          p_body: string
+          p_campaign_id: string
+          p_role: string
+        }
+        Returns: Json
+      }
       celery_spend: {
         Args: {
           p_delta: number
@@ -2318,6 +2410,7 @@ export type Database = {
         Args: { p_rrn: string; p_skip_checksum?: boolean }
         Returns: boolean
       }
+      period_len_max: { Args: never; Returns: number }
       product_allocated: {
         Args: { p_except_campaign_id?: string; p_product_id: string }
         Returns: number
@@ -2333,6 +2426,7 @@ export type Database = {
         Args: { p_options: Json; p_sale_price: number }
         Returns: Json
       }
+      seller_is_priority: { Args: { p_seller_id: string }; Returns: boolean }
       seller_is_public: { Args: { p_seller: string }; Returns: boolean }
       stale_checkout_sessions: {
         Args: { p_age?: string; p_limit?: number }

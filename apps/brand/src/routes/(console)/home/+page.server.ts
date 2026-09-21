@@ -34,7 +34,7 @@ export const load: PageServerLoad = async (event) => {
 	const todos: HomeTodo[] = [];
 	if (nReq) todos.push({ kind: 'sample_requested', icon: '📨', title: `샘플 요청 검토 ${nReq}건`, desc: '인플루언서 프로필을 보고 승인·거절해주세요 — 보통 24시간 내 응답', href: requestsPath, action: '검토', n: nReq });
 	if (nShip) todos.push({ kind: 'sample_ship', icon: '📦', title: `샘플 발송 대기 ${nShip}건`, desc: '택배사·송장번호를 입력하면 인플루언서에게 배송 추적이 전달돼요', href: requestsPath, action: '발송', n: nShip });
-	if (nSched) todos.push({ kind: 'schedule_proposed', icon: '📅', title: `일정 승인 대기 ${nSched}건`, desc: '인플루언서가 제안한 판매 일정 — 확정·반려는 3단계에서 열립니다', href: requestsPath, action: null, n: nSched });
+	if (nSched) todos.push({ kind: 'schedule_proposed', icon: '📅', title: `일정 승인 대기 ${nSched}건`, desc: '인플루언서가 제안한 판매 기간 · 배정 재고를 확인하고 승인·반려해주세요 — 승인하면 판매가 확정돼요', href: requestsPath, action: '승인', n: nSched });
 	if (pc('rejected')) todos.push({ kind: 'product_rejected', icon: '⚠️', title: `반려된 상품 ${pc('rejected')}건`, desc: '반려 사유를 확인하고 수정 후 저장하면 다시 검수를 요청합니다', href: productsPath, action: '수정', n: pc('rejected') });
 	if (pc('pending')) todos.push({ kind: 'product_pending', icon: '🔍', title: `검수 대기 상품 ${pc('pending')}건`, desc: '운영팀 검수(영업일 1~2일) 뒤 인플루언서에게 노출돼요', href: productsPath, action: null, n: pc('pending') });
 	if (soldOut.length) todos.push({ kind: 'stock_out', icon: '📉', title: `재고 소진 상품 ${soldOut.length}건`, desc: `${soldOut.map((p) => p.name).slice(0, 2).join(' · ')}${soldOut.length > 2 ? ' 외' : ''} — 재고를 늘리거나 노출을 중단해주세요`, href: productsPath, action: '재고', n: soldOut.length });

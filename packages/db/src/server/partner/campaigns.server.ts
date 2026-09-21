@@ -7,11 +7,13 @@
  *   getSellerCampaign(sellerId, code)      캠페인 1건 + 배송지 + 스레드(campaign_events 시간순). 본인 것이 아니면 null
  *   receiveSample(sellerId, campaignCode)  `app_receive_sample` RPC — SAMPLE_SHIPPED → TESTING · test_due = 오늘+14 · 멱등
  *   getSellerCampaignCode(sellerId, campaignId)  결제 행의 campaign_id → code (4단계 결제 완료 화면 링크) · 본인 것만
- * 상태 칩·스테퍼는 순수 모듈 `../../partner/sample-rules.ts` (campaignChip · stepIndex).
+ * 상태 칩·스테퍼는 순수 모듈 `../../partner/sample-rules.ts` (campaignChip · stepIndex). 인플루언서 액션 패널(`action`)은 `../../partner/schedule-rules.ts` sellerNextAction (0016 · 3단계).
+ * 3단계 쓰기(일정 제안 · 패스 · 초대 수락/거절)는 `./schedule.server.ts`, 채팅은 `./chat.server.ts`.
  */
 import type { Shipping } from "../../types";
 import { CAMPAIGN_CODE_RE } from "../../campaign";
 import { campaignChip, parseStoredShipping, type CampaignChip } from "../../partner/sample-rules";
+import { sellerNextAction, type SellerNextAction } from "../../partner/schedule-rules";
 import { createAdminClient, type Admin } from "../admin.server";
 
 export type SellerCampaign = {
@@ -19,6 +21,8 @@ export type SellerCampaign = {
   code: string;
   status: string;
   chip: CampaignChip;
+  /** 인플루언서 차례 액션 패널 (0016 · accept_invite · receive_sample · propose_schedule · wait · live · ended) */
+  action: SellerNextAction;
   created_at: string;
   invited: boolean;
   auto_proposed: boolean;
@@ -28,6 +32,8 @@ export type SellerCampaign = {
   sample_cel: number;
   sample_cash: number;
   sample_method: string | null;
+  /** 샘플 발송 택배사 (0015) — trackingUrlOf(sample_courier, tracking_no) 조회 링크 */
+  sample_courier: string | null;
   tracking_no: string | null;
   received_at: string | null;
   test_due: string | null;
@@ -38,6 +44,9 @@ export type SellerCampaign = {
   end_date: string | null;
   qty: number;
   sold_qty: number;
+  /** 확정 시점 판매가 · 수수료율 스냅샷 (0016 — 확정 전 null) */
+  price_locked: number | null;
+  rate_locked: number | null;
   decision_reason: string | null;
   settled_at: string | null;
   product: {
@@ -76,7 +85,7 @@ export type SellerCampaignDetail = {
 
 const CAMPAIGN_SELECT =
   "id,code,status,created_at,invited,auto_proposed,regongu,purchased,sample_price,sample_cel,sample_cash,sample_method," +
-  "tracking_no,received_at,test_due,proposed_start,proposed_end,proposed_qty,start_date,end_date,qty,sold_qty,decision_reason,settled_at,sample_shipping," +
+  "sample_courier,tracking_no,received_at,test_due,proposed_start,proposed_end,proposed_qty,start_date,end_date,qty,sold_qty,price_locked,rate_locked,decision_reason,settled_at,sample_shipping," +
   "product:products!campaigns_product_id_fkey(id,code,name,emoji,thumb_url,category,sale_price,consumer_price,commission_rate,sample_text)," +
   "brand:brands!campaigns_brand_id_fkey(id,code,name,logo_url)";
 
@@ -93,6 +102,7 @@ type RawCampaign = {
   sample_cel: number;
   sample_cash: number;
   sample_method: string | null;
+  sample_courier: string | null;
   tracking_no: string | null;
   received_at: string | null;
   test_due: string | null;
@@ -103,6 +113,8 @@ type RawCampaign = {
   end_date: string | null;
   qty: number;
   sold_qty: number;
+  price_locked: number | null;
+  rate_locked: number | string | null;
   decision_reason: string | null;
   settled_at: string | null;
   sample_shipping: unknown;
@@ -128,6 +140,7 @@ function toCampaign(r: RawCampaign): SellerCampaign | null {
     code: r.code,
     status: r.status,
     chip: campaignChip(r.status),
+    action: sellerNextAction(r.status),
     created_at: r.created_at,
     invited: r.invited,
     auto_proposed: r.auto_proposed,
@@ -137,6 +150,7 @@ function toCampaign(r: RawCampaign): SellerCampaign | null {
     sample_cel: r.sample_cel ?? 0,
     sample_cash: r.sample_cash ?? 0,
     sample_method: r.sample_method,
+    sample_courier: r.sample_courier ?? null,
     tracking_no: r.tracking_no,
     received_at: r.received_at,
     test_due: r.test_due,
@@ -147,6 +161,8 @@ function toCampaign(r: RawCampaign): SellerCampaign | null {
     end_date: r.end_date,
     qty: r.qty ?? 0,
     sold_qty: r.sold_qty ?? 0,
+    price_locked: r.price_locked ?? null,
+    rate_locked: r.rate_locked === null || r.rate_locked === undefined ? null : Number(r.rate_locked),
     decision_reason: r.decision_reason,
     settled_at: r.settled_at,
     product: {

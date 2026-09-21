@@ -607,7 +607,7 @@ due_on              = campaigns.end_date + clear_days(21)
 | 독점권 승인 시 `products.exclusive_seller_id` 세팅, 채널 인증 코드 발급/확인, primary 채널 변경 시 `sellers.platform/followers` 동기화 | L3924, L3961-3971 | 다중 행 갱신 |
 | 프로토타입 `createProduct` 기본 카테고리 `'건기식'` 은 `categories` FK 로 거부됨 → 앱이 유효 카테고리를 넘겨야 함 | L1406 밖 값 | FK 가 막는다(의도) |
 
-#### 5.2.1 위 규칙 중 RPC(security definer · service role) 로 이관된 것 — 0010~0015
+#### 5.2.1 위 규칙 중 RPC(security definer · service role) 로 이관된 것 — 0010~0016
 
 "앱이 강제" 로 시작했던 규칙 가운데 파트너 콘솔 단계에서 **DB 함수 안으로** 옮긴 것. 함수는 전부 `{ok, code}` 를 돌려주고 라우트가 문구로 바꾼다(`packages/db/src/{partner,brand}/*-rules.ts`). 나머지 행(기간제 · 정산 계산 · 스케줄러 · 링크 보호 · 마스킹)은 그대로 앱/크론.
 
@@ -622,6 +622,10 @@ due_on              = campaigns.end_date + clear_days(21)
 | 상태 전이 T3~T5(샘플 승인 · 거절 · 발송) + `campaign_events(system)` 이력 | 0015 `app_brand_approve_sample` · `app_brand_reject_sample(…, p_reason)` · `app_brand_ship_sample(…, p_courier, p_tracking_no)` — NOT_FOUND · WRONG_STATUS{status} · BAD_COURIER · BAD_TRACKING · already. 열 `campaigns.sample_courier`(orders.courier 와 같은 5개) · `sample_shipped_at` | 브랜드 2단계. 시스템 메시지 원문 = 데모 pushSys(<b> 제거) |
 | 브랜드 시점 읽기(인플루언서 요약 조립) | 0015 `brand_campaign_json(campaigns)` · `app_brand_requests(p_brand_id, p_statuses)` · `app_brand_campaigns` · `app_brand_campaign`(행 + sample_shipping + events · 남의 것 null) | 브랜드에게는 hidden 인플루언서도 신원 노출(샘플 요청 당사자) |
 | 상품 검수(`pending → listed` 재고 기본값 · `→ rejected` 사유) | 0015 `app_admin_review_product(p_product_id, 'approve'\|'reject'\|'pause', p_reason)` — 운영 스크립트 `partner-admin.mjs review-product` 전용(관리자 콘솔 전) | |
+| **등급 우선 기간제**(`periodBlock`) — 제안(T11)·승인(T12) 두 시점 검사 | 0016 `seller_is_priority(seller)` · `campaign_period_block(product, start, end, except, seller)` · `campaign_period_holders(…)` — `app_propose_schedule` · `app_brand_confirm_schedule` 이 호출 → `PERIOD_BLOCKED{by, handle, grade, start, end, campaign_code}` | 브랜드 3단계(인플루언서 짝). 배타 제약 없이 함수 안에서 `campaigns_period_idx` 로 겹침 조회 후 `grade_tiers.is_priority` 판정 — 위 표의 설명 그대로 |
+| 재고 배정 `qty <= stock − allocated` (제안·승인 시) | 0016 `app_propose_schedule(p_seller_id, p_campaign_id, p_start, p_end, p_qty)` → `QTY_EXCEEDS_STOCK{left}` · `app_brand_confirm_schedule` → `STOCK_SHORT{left}` — `products for update` 로 직렬화 | `price_locked/rate_locked` 스냅샷(0003 컬럼)은 확정 시 `products.sale_price/commission_rate` 를 기록 — "추정" 이었던 설계가 확정됨 |
+| 상태 전이 T10(패스) · T11(제안) · T12(확정) · T13(반려) · T2(초대) · T2'(수락/거절) | 0016 `app_pass_campaign` · `app_propose_schedule` · `app_brand_confirm_schedule` · `app_brand_reject_schedule(…, p_reason)` · `app_brand_invite_seller(p_brand_id, p_seller_id, p_product_id, p_message, p_actor_user_id)` · `app_accept_invite(…, p_shipping)` · `app_decline_invite(…, p_reason)` — NOT_FOUND · WRONG_STATUS{status} · NOT_LISTED · EXCLUSIVE_LOCKED · ALREADY_ACTIVE · PRIORITY_INVITE_GATED{grade, cost_cel} · SELLER_HIDDEN · BAD_SHIPPING{field} · already | 초대 후보 `app_brand_invite_candidates`(골드 이하 · 공개 · 인증 채널 · 진행 중 쌍 없음) · 인플루언서 폼 컨텍스트 `app_seller_schedule_context`(stock_left · holders · len_choices) |
+| 연락처/외부 메신저 감지 → `leak_flag` | 0016 `app_campaign_chat(p_actor_role, p_actor_id, p_actor_user_id, p_campaign_id, p_body)` — `campaign_leak_detected(text)`(데모 정규식) → 행 `leak_flag=true` + 시스템 행 `leak_warned` · 당사자 확인 · 1~1000자 | 두 콘솔 공용. "insert 시 서버 정규식" 이 DB 함수로 이동 |
 
 ---
 

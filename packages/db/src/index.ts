@@ -30,3 +30,5 @@ export * from "./company";
 export * from "./partner/signup-rules";
 export * from "./partner/sample-rules";
 export * from "./partner/settle-rules";
+export * from "./partner/schedule-rules";
+export * from "./partner/chat-rules";

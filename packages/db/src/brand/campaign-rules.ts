@@ -6,11 +6,14 @@
  *   brandNextAction(status)                                        상태별 브랜드 차례(ST[*].turn) → 액션 패널 종류 · 문구 (데모 CampaignDetail 브랜드 분기)
  *   parseShipInput(form) · parseRejectInput(form)                   발송(택배사 + 송장) · 거절 사유 폼 — 0015 함수와 같은 조건
  *   SAMPLE_ACTION_FAIL_MESSAGES · sampleActionFailMessage(r)        승인·거절·발송 RPC 의 ok:false → 문구
+ *   parseScheduleActionResult(json) · SCHEDULE_ACTION_FAIL_MESSAGES · scheduleActionFailMessage · periodLine   일정 승인·반려(0016 · 3단계) — 서버는 ../server/brand/schedule.server.ts
  *   상태 칩 · 스테퍼는 인플루언서와 같은 것을 재수출(campaignChip · CAMPAIGN_STEPS · stepIndex · ENDED_STATUSES · samplePaidLine).
+ *   초대(0016 app_brand_invite_*)는 ./invite-rules.ts · 채팅은 ../partner/chat-rules.ts.
  */
 import { ST } from "@sellery/core/constants";
 import type { Status } from "@sellery/core/types";
 import { COURIERS, isCourier, type Courier } from "../carriers";
+import { md } from "../dates";
 import { campaignChip, parseStoredShipping, type CampaignChip } from "../partner/sample-rules";
 import { cleanText } from "../text";
 import type { Shipping } from "../types";
@@ -46,9 +49,9 @@ export function brandNextAction(status: string): BrandNextAction {
     case "SAMPLE_PURCHASED":
       return { kind: "ship", label: "샘플 발송 처리 (구매 샘플)", hint: "인플루언서가 결제한 샘플이에요 — 택배사와 송장번호를 입력해주세요" };
     case "SCHEDULE_PROPOSED":
-      return { kind: "confirm_schedule", label: "일정 승인 · 반려", hint: "인플루언서가 제안한 판매 일정을 검토해주세요 (3단계에서 열려요)" };
+      return { kind: "confirm_schedule", label: "일정 승인 · 반려", hint: "제안한 기간 · 배정 재고를 확인하고 승인하면 판매가 확정돼요 (판매가 · 수수료율이 이 시점 값으로 잠깁니다)" };
     case "INVITED":
-      return { kind: "wait", label: "인플루언서 수락 대기", hint: "초대를 받은 인플루언서가 수락하면 샘플 발송 대기로 넘어가요" };
+      return { kind: "wait", label: "인플루언서 수락 대기", hint: "제안을 받은 인플루언서가 수락하면 배송지가 전달되고 샘플 발송 대기로 넘어가요" };
     case "SAMPLE_SHIPPED":
       return { kind: "wait", label: "인플루언서 수령 대기", hint: "인플루언서가 수령 확인을 하면 테스트(14일)가 시작돼요" };
     case "TESTING":
@@ -81,6 +84,8 @@ export type BrandSellerSummary = {
   grade: string | null;
   followers: number;
   hidden: boolean;
+  /** 우선권 등급(플래티넘 이상, grade_tiers.is_priority) — 0016 */
+  is_priority: boolean;
   /** 메인 채널 — verified 가 인증 여부 (없으면 null) */
   primary_channel: { platform: string; handle: string; url: string | null; followers: number; verified: boolean } | null;
 };
@@ -128,10 +133,16 @@ export type BrandCampaignRow = {
   end_date: string | null;
   qty: number;
   sold_qty: number;
+  /** 확정 시점 판매가 · 인플루언서 수수료율 스냅샷 (0016 app_brand_confirm_schedule · 확정 전 null) */
+  price_locked: number | null;
+  rate_locked: number | null;
   decision_reason: string | null;
   settled_at: string | null;
   /** 배송지 스냅샷 존재 여부 (원문은 상세에서만) */
   has_shipping: boolean;
+  /** 상품 재고 · 잔여(재고 − 다른 캠페인 배정량) — 일정 승인 패널 (0016) */
+  stock: number;
+  stock_left: number;
   product: BrandCampaignProduct;
   seller: BrandSellerSummary;
 };
@@ -186,6 +197,7 @@ function parseSeller(json: unknown): BrandSellerSummary | null {
     grade: strOrNull(o.grade),
     followers: int(o.followers),
     hidden: o.hidden === true,
+    is_priority: o.is_priority === true,
     primary_channel: ch
       ? { platform: str(ch.platform), handle: str(ch.handle), url: strOrNull(ch.url), followers: int(ch.followers), verified: ch.verified === true }
       : null,
@@ -251,9 +263,13 @@ export function parseBrandCampaignRow(json: unknown): BrandCampaignRow | null {
     end_date: strOrNull(o.end_date),
     qty: int(o.qty),
     sold_qty: int(o.sold_qty),
+    price_locked: intOrNull(o.price_locked),
+    rate_locked: Number.isFinite(numOr(o.rate_locked, Number.NaN)) ? numOr(o.rate_locked) : null,
     decision_reason: strOrNull(o.decision_reason),
     settled_at: strOrNull(o.settled_at),
     has_shipping: o.has_shipping === true,
+    stock: int(o.stock),
+    stock_left: int(o.stock_left),
     product,
     seller,
   };
@@ -432,4 +448,114 @@ export function shippingLine(s: Shipping | null): string {
   if (!s) return "";
   const phone = s.phone.length === 11 ? `${s.phone.slice(0, 3)}-${s.phone.slice(3, 7)}-${s.phone.slice(7)}` : s.phone;
   return [s.recipient, phone, `(${s.postcode}) ${s.address1}${s.address2 ? " " + s.address2 : ""}`, s.memo ? `메모: ${s.memo}` : ""].filter(Boolean).join(" · ");
+}
+
+/* ---------------- 일정 승인 · 반려 RPC 결과 (0016 app_brand_confirm_schedule · app_brand_reject_schedule) — 3단계 ---------------- */
+
+export type ScheduleActionCode = "NOT_FOUND" | "WRONG_STATUS" | "PERIOD_PAST" | "PERIOD_BLOCKED" | "STOCK_SHORT" | "DB_ERROR";
+
+export const SCHEDULE_ACTION_CODES: readonly ScheduleActionCode[] = ["NOT_FOUND", "WRONG_STATUS", "PERIOD_PAST", "PERIOD_BLOCKED", "STOCK_SHORT", "DB_ERROR"];
+
+export function isScheduleActionCode(v: unknown): v is ScheduleActionCode {
+  return typeof v === "string" && (SCHEDULE_ACTION_CODES as readonly string[]).includes(v);
+}
+
+export type ScheduleActionResult =
+  | {
+      ok: true;
+      already: boolean;
+      campaignId: string;
+      campaignCode: string;
+      status: string;
+      /** confirm 일 때 — 확정 기간 · 배정 · 잠금 스냅샷 */
+      start?: string | null;
+      end?: string | null;
+      qty?: number | null;
+      priceLocked?: number | null;
+      rateLocked?: number | null;
+      priority?: boolean;
+    }
+  | {
+      ok: false;
+      code: ScheduleActionCode;
+      status?: string | null;
+      /** STOCK_SHORT */
+      left?: number | null;
+      qty?: number | null;
+      /** PERIOD_BLOCKED — 선점한 인플루언서 · PERIOD_PAST — 제안 시작일 */
+      by?: string | null;
+      grade?: string | null;
+      start?: string | null;
+      end?: string | null;
+    };
+
+/** app_brand_{confirm,reject}_schedule jsonb → 결과. 형식이 어긋나면 DB_ERROR. */
+export function parseScheduleActionResult(json: unknown): ScheduleActionResult {
+  const o = obj(json);
+  if (!o) return { ok: false, code: "DB_ERROR" };
+  if (o.ok === true) {
+    const campaignId = strOrNull(o.campaign_id);
+    const campaignCode = strOrNull(o.campaign_code);
+    const status = strOrNull(o.status);
+    if (!campaignId || !campaignCode || !status) return { ok: false, code: "DB_ERROR" };
+    return {
+      ok: true,
+      already: o.already === true,
+      campaignId,
+      campaignCode,
+      status,
+      start: strOrNull(o.start),
+      end: strOrNull(o.end),
+      qty: intOrNull(o.qty),
+      priceLocked: intOrNull(o.price_locked),
+      rateLocked: Number.isFinite(numOr(o.rate_locked, Number.NaN)) ? numOr(o.rate_locked) : null,
+      priority: o.priority === true,
+    };
+  }
+  return {
+    ok: false,
+    code: isScheduleActionCode(o.code) ? o.code : "DB_ERROR",
+    status: strOrNull(o.status),
+    left: intOrNull(o.left),
+    qty: intOrNull(o.qty),
+    by: strOrNull(o.by),
+    grade: strOrNull(o.grade),
+    start: strOrNull(o.start),
+    end: strOrNull(o.end),
+  };
+}
+
+/** 실패 코드 → 문구 (프로토타입 confirmSchedule 토스트 원문). PERIOD_BLOCKED · STOCK_SHORT 는 `scheduleActionFailMessage()` 가 값을 채운다. */
+export const SCHEDULE_ACTION_FAIL_MESSAGES: Record<ScheduleActionCode, string> = {
+  NOT_FOUND: "캠페인을 찾을 수 없어요",
+  WRONG_STATUS: "지금 상태에서는 처리할 수 없어요 — 화면을 새로고침해주세요",
+  PERIOD_PAST: "제안된 시작일이 이미 지났어요 — 반려하고 다시 제안을 요청하세요",
+  PERIOD_BLOCKED: "제안 이후 상위 등급 인플루언서가 이 기간을 선점했어요 — 반려하고 재제안을 요청하세요",
+  STOCK_SHORT: "잔여 재고보다 많은 수량입니다 — 재고를 늘리거나 반려하세요",
+  DB_ERROR: "처리 중 문제가 생겼어요 — 잠시 후 다시 시도해주세요",
+};
+
+export function scheduleActionFailMessage(r: Extract<ScheduleActionResult, { ok: false }>): string {
+  switch (r.code) {
+    case "WRONG_STATUS":
+      return r.status ? `지금 상태(${campaignChip(r.status).label})에서는 처리할 수 없어요 — 화면을 새로고침해주세요` : SCHEDULE_ACTION_FAIL_MESSAGES.WRONG_STATUS;
+    case "PERIOD_BLOCKED":
+      return `제안 이후 ${r.grade ?? "상위"} 등급 인플루언서${r.by ? `(${r.by})` : ""}가 이 기간을 선점했어요 — 반려하고 재제안을 요청하세요`;
+    case "STOCK_SHORT":
+      return `잔여 재고(${(r.left ?? 0).toLocaleString("ko-KR")}개)보다 많은 수량${r.qty ? `(${r.qty.toLocaleString("ko-KR")}개)` : ""}입니다 — 재고를 늘리거나 반려하세요`;
+    default:
+      return SCHEDULE_ACTION_FAIL_MESSAGES[r.code];
+  }
+}
+
+/** 성공 토스트 (프로토타입 confirmSchedule · rejectSchedule 원문) */
+export const SCHEDULE_ACTION_DONE_MESSAGES = {
+  confirm: "일정 확정 — 캘린더 잠금",
+  reject: "반려 — 인플루언서 재제안 대기",
+} as const;
+
+/** 확정 일정 한 줄 — "9/27 – 10/1 · 배정 600" (proposed_* 또는 start/end/qty 어느 쪽이든 · 비면 "") */
+export function periodLine(start: string | null, end: string | null, qty: number | null = null): string {
+  if (!start || !end) return "";
+  return `${md(start)} – ${md(end)}${qty !== null ? ` · 배정 ${qty.toLocaleString("ko-KR")}` : ""}`;
 }
