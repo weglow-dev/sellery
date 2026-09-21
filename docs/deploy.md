@@ -66,12 +66,12 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `PUBLIC_SUPABASE_URL` | 필수 | 필수 | 필수 | `$env/static/public` — 빌드 시 인라인. **이름이 없으면 빌드 실패**(hooks.server.ts 가 import). Supabase → Project `sellery` → Settings → API |
 | `PUBLIC_SUPABASE_ANON_KEY` | 필수 | 필수 | 필수 | 〃 |
 | `PUBLIC_SITE_URL` | **Production `https://sellery.life`** · Preview `https://sellery-shop.vercel.app` | Production `https://sellery.life` · Preview `https://sellery-shop.vercel.app` | Production `https://sellery.life` · Preview `https://sellery-shop.vercel.app` | og · canonical · 메일 링크 절대 URL(2026-09-21 4 프로젝트 모두 반영 · 재배포). OAuth `redirectTo` · 토스 `successUrl` 은 `window.location.origin` 이라 Preview 마다 바꿀 필요 없다 |
-| `PUBLIC_TOSS_CLIENT_KEY` | 필수 — Production `live_gck_…`(실판매 직전) · Preview `test_gck_…` | — | — | 결제위젯 연동 키 클라이언트 키. `TOSS_SECRET_KEY` 와 **짝**(gck ↔ gsk) — §5.3 |
-| `PUBLIC_TOSS_WIDGET_VARIANT` | 선택 | — | — | 상점관리자에서 확인한 결제수단 UI 변형 이름 · 비우면 `DEFAULT-2` |
+| `PUBLIC_TOSS_CLIENT_KEY` | 필수 — Production `live_gck_…`(실판매 직전) · Preview `test_gck_…` | **필수(4단계 샘플 결제 · 2026-09-21 PR-B 부터)** — shop 과 **같은 값**(같은 상점 · Production/Preview 짝 동일) | — | 결제위젯 연동 키 클라이언트 키. `TOSS_SECRET_KEY` 와 **짝**(gck ↔ gsk) — §5.3. 빌드 시 인라인이라 값 변경은 Redeploy |
+| `PUBLIC_TOSS_WIDGET_VARIANT` | 선택 | 선택(shop 과 같은 값) | — | 상점관리자에서 확인한 결제수단 UI 변형 이름 · 비우면 `DEFAULT-2` |
 | `PUBLIC_DEV_LOGIN` | Preview 선택(`1`) | — | — | 개발용 이메일 로그인 폼 — dev 또는 `VERCEL_ENV=preview` 에서만 렌더, Production 은 값이 있어도 안 뜬다 |
 | `PUBLIC_DEMO` | — | 선택(`1` 이면 `(demo)` 그룹 노출) | `1`(예약 — 지금 코드는 읽지 않는다) | `monorepo-migration.md` 결정 8 · C · §1.2 |
 | `SUPABASE_SERVICE_ROLE_KEY` | **비밀** | **비밀**(Production + Preview) | — | RLS 우회 — `$lib/server/env.ts` → `configureDb()` 에서만 읽는다 |
-| `TOSS_SECRET_KEY` | **비밀** | — | — | 〃 → `configurePayments()` |
+| `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | — | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
 | `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503 |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] 한 줄(이메일·핸들 없이) |
 
@@ -317,7 +317,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 
 | 스크립트 | 용도 | 예 |
 |---|---|---|
-| `packages/db/scripts/partner-admin.mjs` | 인플루언서 운영(관리자 화면 없음) — `list [--inactive]` · `suspend <seller> ["사유"]` · `reactivate` · `link <seller> <user_id>` · `invite <email> --link <seller>`(초대 메일 → `${PUBLIC_SITE_URL}/influencer/auth/confirm?next=/influencer/password/new`) · `channels [--pending]` · `verify-channel <ch>` · `unverify-channel`. production 허용 | `node packages/db/scripts/partner-admin.mjs channels --pending` |
+| `packages/db/scripts/partner-admin.mjs` | 인플루언서 운영(관리자 화면 없음) — `list [--inactive]` · `suspend <seller> ["사유"]` · `reactivate` · `link <seller> <user_id>` · `invite <email> --link <seller>`(초대 메일 → `${PUBLIC_SITE_URL}/influencer/auth/confirm?next=/influencer/password/new`) · `channels [--pending]` · `verify-channel <ch>` · `unverify-channel` · **4단계** `payments [--pending] [--seller s7]`(결제 표 · 운영 큐) · `refund-sample <payment id | slrp_ orderId> ["사유"]`(브랜드 발송 전 취소 — 토스 전액 취소 → `app_partner_payment_refund`: 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED, 두 번 실행해도 원장 1행 · `TOSS_SECRET_KEY` 필요). production 허용 | `node packages/db/scripts/partner-admin.mjs payments --pending` |
 | `packages/db/scripts/dev-seller.mjs` | 개발용 인플루언서 계정(확인 완료) + 시드 `sellers` 행 연결. **production 거부** | `node packages/db/scripts/dev-seller.mjs --email dev-seller@sellery.test --seller s1` |
 | `packages/db/scripts/dev-user.mjs` | 개발용 고객 이메일/비밀번호 계정(`PUBLIC_DEV_LOGIN=1` 폼용) | `node --env-file=.env.local packages/db/scripts/dev-user.mjs <email> <password>` |
 | `packages/db/scripts/gen-types.mjs` | Supabase 타입 → `packages/db/src/database.types.ts`(UTF-8 · LF). `supabase link` 전제(§6.1) | `npm run gen:types` |
@@ -326,7 +326,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 
 | 잡 | 방법 | 주기 |
 |---|---|---|
-| reconcile — CONFIRMING 고착 · `FAILED(CANCEL_PENDING)` 종결(`app-plan.md §7.5`) | `curl -X POST https://sellery.life/api/cron/reconcile -H "Authorization: Bearer $CRON_SECRET"` | 결제 테스트 뒤 · 하루 1회 |
+| reconcile — CONFIRMING 고착 · `FAILED(CANCEL_PENDING)` 종결(`app-plan.md §7.5`) + **파트너 샘플 결제**(0012 `app_partner_payments_expire` · `app_partner_payments_stale` → 재조회 종결 · 응답 `partner:{expired,checked,results}`) | `curl -X POST https://sellery.life/api/cron/reconcile -H "Authorization: Bearer $CRON_SECRET"` | 결제 테스트 뒤 · 하루 1회 |
 | 세션 만료 — PENDING · payment_key 없는 CONFIRMING → EXPIRED | `npx supabase db query --linked "select expire_checkout_sessions()"` | 하루 1회 |
 | PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
 | 운영 큐 확인(부분취소 · 정산 완료 뒤 취소 등) | `select id, source, result, received_at from payment_events where handled = false order by received_at desc` | 매일 |

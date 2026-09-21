@@ -6,13 +6,15 @@
  * 배송지 폼 입력을 검증한다(`parseShippingInput` — 0011 `app_request_free_sample` 과 같은 조건·상한). 상태 칩은 `@sellery/core/constants` 의
  * `ST`(라벨·색·차례) 를 그대로 쓰고 색 이름만 콘솔 칩 톤으로 매핑한다.
  *
- * 3단계에서는 [샘플 구매] 버튼을 **비활성(4단계 예고)** 으로 그린다 — 결제 화면(`/pay/*`, 4단계 PR-B) 이 붙으면 `SAMPLE_BUY_ENABLED` 만 true 로.
+ * 4단계 PR-B 부터 [샘플 구매 ₩N] 은 활성 링크 — `samplePayHref(code)` = `/influencer/pay/new?product=<code>`(결제 화면). `SAMPLE_BUY_ENABLED` 는
+ * 결제 화면을 잠시 닫아야 할 때(토스 장애 등) false 로 돌리는 스위치로 남긴다(버튼 비활성 + `BUY_COMING_SOON` 안내).
  * 4단계 PR-A(0012 partner_payments) 의 순수 규칙은 파일 끝 "샘플 결제" 절 — `PartnerPaymentView` · `isPayable` · `payLine` · `partnerPaymentStatusLabel` ·
  * RPC 결과 파서(`parseBeginSampleResult` · `parseConfirmSampleResult` · `parseSimplePaymentResult`) · `PARTNER_PAY_FAIL_MESSAGES`.
  */
 import { FLOW, FLOW_L, ST } from "@sellery/core/constants";
 import type { Status } from "@sellery/core/types";
 import { fmtNum } from "../campaign";
+import { consolePath } from "../console-paths";
 import type { StatusTone } from "../order-status";
 import { cleanText, normalizePhone } from "../text";
 import type { Shipping } from "../types";
@@ -119,8 +121,13 @@ export function parseSampleQuote(json: unknown): SampleQuote | null {
 /** `SAMPLE_CEL_WON`(@sellery/core/constants) 과 같은 값 — quote 의 cel_won 이 비었을 때만 */
 export const SAMPLE_CEL_WON_DEFAULT = 20000;
 
-/** 4단계(결제) 전까지 false — [샘플 구매 ₩N] 은 비활성 + "4단계 예고" 안내 */
-export const SAMPLE_BUY_ENABLED = false;
+/** 결제 화면(`/pay/*`) 열림 — false 면 [샘플 구매 ₩N] 비활성 + `BUY_COMING_SOON` 안내 (4단계 PR-B 부터 true) */
+export const SAMPLE_BUY_ENABLED = true;
+
+/** [샘플 구매 ₩N] 링크 — `/influencer/pay/new?product=<code>` (docs/inf-console-plan.md §6 `/products/[code]` → `/pay/new?product=`) */
+export function samplePayHref(productCode: string): string {
+  return `${consolePath("seller", "/pay/new")}?product=${encodeURIComponent(productCode)}`;
+}
 
 /* ---------------- 버튼 · 안내 문구 (프로토타입 sampleBtn · sampleLine · reqSample 토스트 원문) ---------------- */
 
@@ -142,7 +149,7 @@ export const BUY_REASON_TITLES: Record<Exclude<SampleReason, "EXCLUSIVE_LOCKED" 
   QUOTA_EXHAUSTED: "이달 무상 한도 소진",
 };
 
-export const BUY_COMING_SOON = "샘플 구매는 곧 열립니다 (결제 준비 중)";
+export const BUY_COMING_SOON = "샘플 구매는 잠시 닫혀 있어요 (결제 준비 중)";
 
 /** quote → 버튼. 분기 순서는 DB 가 이미 정했다(locked → active → free → buy); 여기서는 문구만. */
 export function sampleButton(q: SampleQuote | null): SampleButton {
@@ -693,4 +700,26 @@ export const PARTNER_PAY_FAIL_MESSAGES: Record<string, string> = {
 
 export function partnerPayFailMessage(code: string | null | undefined, fallback?: string | null): string {
   return (code && PARTNER_PAY_FAIL_MESSAGES[code]) || fallback || "결제를 완료하지 못했어요 — 잠시 후 다시 시도해주세요";
+}
+
+/* ---------------- /pay/fail — 토스 failUrl 쿼리(code · message) 반사 규칙 (@sellery/payments checkout-rules failPageReason 과 같은 가드) ---------------- */
+
+const FAIL_CODE_RE = /^[A-Z][A-Z0-9_]{1,79}$/;
+const FAIL_MESSAGE_MAX = 120;
+/** 공개 URL 파라미터를 화면에 비추므로 링크·전화번호 꼴은 버린다 */
+const SPOOF_RE = /https?:\/\/|www\.|\d{2,4}[-.\s]?\d{3,4}[-.\s]?\d{4}/i;
+
+/** failUrl 의 code 를 형식 검사해 돌려준다 — 어긋나면 PAY_PROCESS_ABORTED */
+export function partnerFailCode(code: string | null | undefined): string {
+  const c = (code ?? "").trim();
+  return FAIL_CODE_RE.test(c) ? c : "PAY_PROCESS_ABORTED";
+}
+
+/** code 가 우리 어휘면 그 문구, 아니면 토스 message(정제 · 스푸핑 패턴 제외) + 코드, 그것도 없으면 기본 문구 */
+export function partnerFailPageReason(code: string | null | undefined, message: string | null | undefined): string {
+  const c = partnerFailCode(code);
+  if (PARTNER_PAY_FAIL_MESSAGES[c]) return PARTNER_PAY_FAIL_MESSAGES[c];
+  const m = cleanText(message ?? "").slice(0, FAIL_MESSAGE_MAX);
+  if (m && !SPOOF_RE.test(m)) return `${m} (코드 ${c})`;
+  return `${partnerPayFailMessage(null)} (코드 ${c})`;
 }

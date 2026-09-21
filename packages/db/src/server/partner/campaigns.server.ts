@@ -6,6 +6,7 @@
  *   listSellerCampaigns(sellerId)          본인 캠페인 전부(최신순) + 상품·브랜드 요약 + 상태 칩
  *   getSellerCampaign(sellerId, code)      캠페인 1건 + 배송지 + 스레드(campaign_events 시간순). 본인 것이 아니면 null
  *   receiveSample(sellerId, campaignCode)  `app_receive_sample` RPC — SAMPLE_SHIPPED → TESTING · test_due = 오늘+14 · 멱등
+ *   getSellerCampaignCode(sellerId, campaignId)  결제 행의 campaign_id → code (4단계 결제 완료 화면 링크) · 본인 것만
  * 상태 칩·스테퍼는 순수 모듈 `../../partner/sample-rules.ts` (campaignChip · stepIndex).
  */
 import type { Shipping } from "../../types";
@@ -210,6 +211,16 @@ export async function getSellerCampaign(sellerId: string, code: string, admin: A
   }));
 
   return { campaign, sample_shipping: parseStoredShipping(data.sample_shipping), events };
+}
+
+/** 결제 행의 campaign_id → 캠페인 code (본인 것만 — 결제 완료 화면의 "캠페인 보기" 링크). 없거나 남의 것이면 null. */
+export async function getSellerCampaignCode(sellerId: string, campaignId: string, admin: Admin = createAdminClient()): Promise<string | null> {
+  const { data, error } = await admin.from("campaigns").select("code").eq("id", campaignId).eq("seller_id", sellerId).maybeSingle();
+  if (error) {
+    console.error("[campaigns] code read failed:", error.message);
+    return null;
+  }
+  return data?.code ?? null;
 }
 
 export type ReceiveSampleResult =

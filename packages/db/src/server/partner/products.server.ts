@@ -6,6 +6,8 @@
  *   listProductsForSeller(sellerId)   listed 상품 + 브랜드 요약 + 상품별 견적(`app_sample_quotes` 1회) + 카테고리 목록
  *   getProductForSeller(sellerId, code)   상품 1건 + 견적 + 익명 실적(캠페인 수 · 판매 수량 합 — PII 없음). 없으면 null → 라우트 404
  *   requestFreeSample(sellerId, productCode, shipping)   `app_request_free_sample` RPC → {ok, campaignCode} | {ok:false, code}
+ *   quoteSample(sellerId, productId, useCel)   `app_sample_quote` 1건 — 결제 화면의 🥬 사용/미사용 분할 표시 (4단계)
+ *   getProductBrief(productId)   결제 행(partner_payments.product_id) 의 표시용 상품 조각 (4단계)
  * 버튼 문구·배송지 검증은 순수 모듈 `../../partner/sample-rules.ts`.
  */
 import type { Shipping } from "../../types";
@@ -134,6 +136,45 @@ async function quotesFor(admin: Admin, sellerId: string, productIds: string[]): 
     }
   }
   return out;
+}
+
+/**
+ * 견적 1건 — `app_sample_quote(seller, product, use_cel)`. 결제 화면(`/pay/new`) 이 🥬 사용 여부별 분할(cel · cash)을 보여줄 때 쓴다
+ * (선점 RPC 가 같은 함수로 다시 계산하므로 표시 = 청구, §5.3). RPC 오류·계약 위반이면 null.
+ */
+export async function quoteSample(sellerId: string, productId: string, useCel: boolean, admin: Admin = createAdminClient()): Promise<SampleQuote | null> {
+  const { data, error } = await admin.rpc("app_sample_quote", { p_seller_id: sellerId, p_product_id: productId, p_use_cel: useCel });
+  if (error) {
+    console.error("[products] app_sample_quote failed:", error.message);
+    return null;
+  }
+  return parseSampleQuote(data);
+}
+
+/** 결제 화면 요약용 상품 조각 — id 로 (partner_payments.product_id). 삭제·미상장이어도 이름은 보여준다(결제 행의 표시). 없으면 null. */
+export type ProductBrief = { id: string; code: string | null; name: string; emoji: string; thumb_url: string | null; brand_name: string | null; sample_refund: boolean };
+
+export async function getProductBrief(productId: string, admin: Admin = createAdminClient()): Promise<ProductBrief | null> {
+  const { data, error } = await admin
+    .from("products")
+    .select("id,code,name,emoji,thumb_url,sample_refund,brand:brands!products_brand_id_fkey(name)")
+    .eq("id", productId)
+    .maybeSingle()
+    .overrideTypes<{ id: string; code: string | null; name: string; emoji: string; thumb_url: string | null; sample_refund: boolean | null; brand: { name: string } | null } | null, { merge: false }>();
+  if (error) {
+    console.error("[products] brief read failed:", error.message);
+    return null;
+  }
+  if (!data) return null;
+  return {
+    id: data.id,
+    code: data.code,
+    name: data.name,
+    emoji: data.emoji || "📦",
+    thumb_url: data.thumb_url,
+    brand_name: data.brand?.name ?? null,
+    sample_refund: data.sample_refund === true,
+  };
 }
 
 /**

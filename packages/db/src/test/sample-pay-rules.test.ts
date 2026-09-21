@@ -57,8 +57,8 @@ const BRIEF = {
 };
 
 describe("SAMPLE_BUY_ENABLED", () => {
-  it("PR-A 에서는 아직 false (화면·라우트는 PR-B)", () => {
-    expect(SAMPLE_BUY_ENABLED).toBe(false);
+  it("PR-B 부터 true — 결제 화면(/pay/*) 이 붙었다", () => {
+    expect(SAMPLE_BUY_ENABLED).toBe(true);
   });
 });
 

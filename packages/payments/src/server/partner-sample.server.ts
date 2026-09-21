@@ -12,6 +12,7 @@
  *                                                                   successUrl 뒤 1회: 금액 대조 → (현금) confirming 선점 → 토스 confirm → app_partner_payment_confirm
  *                                                                   → RPC 거부면 토스 전액 취소 → FAILED(code) / (🥬 전액) RPC 바로
  *   cancelSamplePurchase(sellerId, paymentId, reason)               결제 전 그만둠 — PENDING · payment_key 없는 CONFIRMING 만
+ *   recordSampleWidgetFailure(sellerId, {orderId|paymentId}, {code,message})   /pay/fail — 사용자 취소는 PENDING 유지, 그 외는 FAILED(code) + payment_events
  *   getSamplePayment(sellerId, paymentId) · getSamplePaymentByOrderId(sellerId, orderId)   seller_id 필터 — 남의 id 는 null (라우트 404)
  *   refundSamplePurchase(paymentId, reason)                         운영 스크립트(cancel-sample.mjs): 토스 현금분 전액 취소 → app_partner_payment_refund
  *   findPartnerPaymentForWebhook(admin, {orderId, paymentKey})     웹훅 매칭 — orderId 가 slrp_ 이거나 paymentKey 가 partner_payments 에
@@ -434,6 +435,50 @@ export async function cancelSamplePurchase(sellerId: string, paymentId: string, 
   }
   const r = parseSimplePaymentResult(data);
   return r.ok ? { ok: true, already: r.already, status: r.status } : { ok: false, code: r.code, message: partnerPayFailMessage(r.code, r.message) };
+}
+
+/** 토스 failUrl code 중 "사용자가 결제창을 닫음" — 돈이 잡히지 않았고 같은 PENDING 행으로 다시 시도할 수 있다 */
+export const WIDGET_USER_ABORT_CODES: ReadonlySet<string> = new Set(["PAY_PROCESS_CANCELED", "PAY_PROCESS_ABORTED", "USER_CANCEL"]);
+
+export type WidgetFailureOutcome = {
+  /** seller_id 필터를 통과한 결제 행(갱신 뒤 재조회) — 없으면 null */
+  payment: PartnerPaymentView | null;
+  /** PENDING 을 유지했다(사용자 취소) → /pay/<id> 로 재시도 가능 */
+  kept: boolean;
+};
+
+/**
+ * `/pay/fail` 랜딩 — 위젯 단계 실패는 토스에 승인 기록이 없다(§5.7 첫 줄). 사용자 취소(`WIDGET_USER_ABORT_CODES`)면 PENDING 을 그대로 두고
+ * (같은 행으로 재시도 — 다음 begin 이 SUPERSEDED · 크론이 EXPIRED 로 정리), 카드사 거절 등 그 외 code 는 FAILED(code, 토스 message) 로 종결한다.
+ * 어느 쪽이든 payment_events(source 'confirm', event_type 'widget_fail', handled=true) 1행. PENDING 이 아닌 행(이미 종결·확정)은 건드리지 않는다.
+ * orderId(토스가 failUrl 에 붙임) 우선, 없으면 paymentId(우리 failUrl 쿼리) — 둘 다 seller_id 필터.
+ */
+export async function recordSampleWidgetFailure(
+  sellerId: string,
+  key: { orderId?: string | null; paymentId?: string | null },
+  failure: { code: string; message?: string | null },
+  admin: Admin = createAdminClient(),
+): Promise<WidgetFailureOutcome> {
+  const p =
+    (key.orderId ? await getSamplePaymentByOrderId(sellerId, key.orderId, admin) : null) ??
+    (key.paymentId ? await getSamplePayment(sellerId, key.paymentId, admin) : null);
+  if (!p) return { payment: null, kept: false };
+  if (p.status !== "PENDING") return { payment: p, kept: false };
+
+  const code = failure.code.slice(0, 80) || "PAY_PROCESS_ABORTED";
+  const userAbort = WIDGET_USER_ABORT_CODES.has(code);
+  if (!userAbort) await failPayment(admin, p.id, code, failure.message ?? null, { widget: true, code, message: failure.message ?? null });
+  await logPaymentEvent(admin, {
+    source: "confirm",
+    event_type: "widget_fail",
+    toss_order_id: p.toss_order_id,
+    payment_key: null,
+    payload: { partner_payment_id: p.id, code, message: failure.message ?? null, kept: userAbort },
+    handled: true,
+    result: userAbort ? "noop" : `failed: ${code}`.slice(0, 200),
+  });
+  const fresh = userAbort ? p : ((await readPayment(admin, p.id)) ?? p);
+  return { payment: fresh, kept: userAbort };
 }
 
 export type RefundSampleOutcome =
