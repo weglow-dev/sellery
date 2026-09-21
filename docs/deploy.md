@@ -242,6 +242,41 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 - 로컬·Preview 확인(실제 메일 없이): `auth.admin.generateLink({ type:'signup'|'magiclink'|'recovery', email })` 의 `hashed_token` 으로 `GET /influencer/auth/confirm?token_hash=…&type=…&next=/influencer/home` 을 열면 같은 경로를 탄다. 시드 연결은 `node packages/db/scripts/dev-seller.mjs --email … --seller s1`(production 거부), 실제 계약자 초대는 `node packages/db/scripts/partner-admin.mjs invite <email> --link s2`(§8.1).
 - 운영 절차(관리자 화면 없음): 가입 완료·채널 [인증 확인] 은 Slack 한 줄(`SLACK_WEBHOOK_URL`, 선택 — 이메일·핸들 없이) → `partner-admin.mjs channels --pending` → 인플루언서 프로필 bio 또는 `@sellery.official` DM 수신함에서 코드 `SLRY-XXXX` 확인 → `verify-channel <ch>`. 정지·복귀는 `suspend`/`reactivate`, 목록은 `list`. **`@sellery.official` DM 수신함 확인 담당자**를 정한다(`inf-console-plan.md §7` 2단계).
 
+### 5.6 관리자 계정 (`profiles.role='admin'`)
+
+`profiles.role` 은 `customer|seller|brand|admin` 을 허용하지만(`0001_init.sql:51`) **`admin` 을 넣는 코드 경로가 없다** — 가입 트리거(`handle_new_user`)는 `customer`, 인플루언서는 `create_seller_from_signup` 이 `seller` 로 바꾼다. 관리자는 수동 생성뿐이다. `app_role()`(`0001_init.sql:87` · security definer · `authenticated` 에만 execute)이 이 값을 읽고, `apps/admin` 의 게이트가 그것으로 판정한다.
+
+| 계정 | 용도 | 비밀번호 | 생성 |
+|---|---|---|---|
+| `official@weglow.biz` | 공용 1개(운영 결정 2026-09-21). `/admin` 콘솔 | 팀 금고 보관 — 이 문서·코드·PR 에 쓰지 않는다 | ✅ 2026-09-21 |
+
+**생성 절차**(루트에서 · 실 운영 DB 작업이다 · 멱등하지 않으니 중복 생성 주의)
+
+```bash
+# 1) auth 계정 — email_confirm:true 라 확인 메일 없이 바로 로그인된다. 같은 이메일이 있으면 skip
+node --env-file=.env.local packages/db/scripts/dev-user.mjs <email> <password>
+
+# 2) role 승격 — profiles 행은 1) 직후 트리거가 role='customer' 로 만들어 둔다
+npx supabase db query --linked \
+  "update public.profiles set role='admin' where id = (select id from auth.users where email='<email>')"
+```
+
+CLI 링크가 아직 없으면 2)를 service role 키 + `@supabase/supabase-js` 로 대신할 수 있다(`profiles` 는 `revoke all from anon, authenticated` 라 service role 필요). Step 1 은 CLI 가 필요 없다.
+
+**검증** — 실제 세션에서 확인한다. 대시보드 SQL Editor 에서 `app_role()` 을 호출하면 `auth.uid()` 가 없어 `null` 이 나오는 것이 정상이다.
+
+```
+signInWithPassword(email, password) → rpc('app_role') === 'admin'
+대시보드: Authentication → Users 에서 Confirmed ✓ · SQL Editor 에서
+  select u.email, p.role from auth.users u join public.profiles p on p.id=u.id where u.email='<email>'
+```
+
+**주의**
+
+- 아이디가 공개돼 있다 — `official@weglow.biz` 는 전자상거래법상 모든 페이지 푸터·개인정보처리방침에 실리는 고객센터 주소다(`packages/db/src/company.ts`). 공격자에게 아이디는 주어진 값이므로 비밀번호는 서비스 이름이 들어가지 않은 랜덤 문자열이어야 한다. **`apps/admin` 에 실데이터 기능(인플루언서 정지 · 채널 인증 승인 · 정산 실행)을 붙이는 PR 에서 교체한다.**
+- `role='admin'` 은 게이트를 통과하는 유일한 조건이고, 관리자 화면은 service role 로 동작해 RLS 를 우회한다. 회수는 같은 방식으로 `role='customer'` 로 내리거나 Authentication → Users 에서 계정 삭제.
+- Basic Auth 이중 잠금(`ADMIN_PASSWORD`)은 `app_role()='admin'` **위에** 얹는 선택 항목이며 단독 인증이 아니다(`app-plan.md §3`). glo 의 `/admin` Basic Auth 블록은 복사하지 않는다 — 세션 갱신을 건너뛰는 구조다.
+
 ---
 
 ## 6. 데이터베이스
