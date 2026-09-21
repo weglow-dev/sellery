@@ -168,7 +168,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 | `www` | `A 76.76.21.21` 권장 (CNAME `cname.vercel-dns.com` 은 호스팅케이알이 존에 싣지 않았다 — 2026-09-18) | apex 로 308(Vercel Domains 에서 설정) | 2026-09-21 308 확인 |
 | `inf` | (미사용) | 호스트 모드 폐기(결정 11) — Vercel 도메인 2026-09-21 제거. 호스팅케이알의 `inf` A 레코드는 지워도 된다 | 해제 |
 | `brand` | (미사용 — 경로 모드 `sellery.life/brand`) | — | — |
-| (메일) | Resend 가 보여 주는 DKIM(TXT 또는 CNAME) · SPF(TXT) · DMARC(TXT) | `no-reply@sellery.life` 발신(§5.5) | §5.5 표에 기록 |
+| (메일) | Resend 가 보여 주는 DKIM(TXT 또는 CNAME) · SPF(TXT) · DMARC(TXT) | `noreply@sellery.life` 발신(§5.5) | §5.5 표에 기록 |
 
 ---
 
@@ -232,8 +232,8 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 |---|---|---|
 | Authentication → Providers → **Email** | Enable **ON** · **Confirm email ON** · Minimum password length **8** (앱 규칙은 영문+숫자 8자 이상 — `packages/db/src/partner/signup-rules.ts`, 클라이언트·서버가 따로 검사) · Secure email change ON(기본) | ☐ 미기록 |
 | Authentication → URL Configuration → **Redirect URLs** | §5.1 의 목록. 경로 모드라 `https://sellery.life/**` 하나로 콘솔 착지(`/influencer/auth/confirm?next=…`)까지 덮는다 — 없으면 `emailRedirectTo`/`redirectTo` 가 Site URL 로 떨어져 `next` 를 잃고 콘솔이 아니라 고객 홈에 착지한다 | ☐ |
-| Authentication → Emails → **SMTP Settings (Custom SMTP)** | **Resend**: Host `smtp.resend.com` · Port `465` · Username `resend` · Password = **Resend API key**(비밀 — 이 문서·코드·PR 어디에도 쓰지 않는다) · Sender email `no-reply@sellery.life` · Sender name `셀러리`. 기본 Supabase SMTP 는 시간당 소량·팀원 주소 위주라 외부 인플루언서에게 가지 않는다 | ☐ |
-| Resend 대시보드 → **Domains** | `sellery.life` 추가 → 호스팅케이알 "DNS 레코드 관리" 에 Resend 가 보여 주는 **DKIM(TXT 또는 CNAME) · SPF(TXT) · (권장) DMARC(TXT)** 를 그대로 추가 → Verified. 호스팅케이알은 반영에 20~40분(§3.8) | ☐ |
+| Authentication → Emails → **SMTP Settings (Custom SMTP)** | **Resend**: Host `smtp.resend.com` · Port `465` · Username `resend` · Password = **Resend API key**(비밀 — 이 문서·코드·PR 어디에도 쓰지 않는다) · Sender email `noreply@sellery.life` · Sender name `Sellery`. **Sender email 은 반드시 Resend 에서 Verified 된 도메인(`sellery.life`) 주소** — 다른 도메인이면 Auth Logs 에 `550 This API key is not authorized to send emails from <도메인>` 이 찍히고 가입 폼은 "가입 처리에 실패했어요" 만 보인다(2026-09-21 `noreply@weglow.biz` 로 실제 발생). 메일함이 있을 필요는 없다(도메인 소유 확인만). 기본 Supabase SMTP 는 시간당 소량·팀원 주소 위주라 외부 인플루언서에게 가지 않는다 | ☐ |
+| Resend 대시보드 → **Domains** | `sellery.life` 추가 → 호스팅케이알 "DNS 레코드 관리" 에 Resend 가 보여 주는 레코드를 그대로 추가 → Verified. 2026-09-21 확인된 레코드: `resend._domainkey` TXT(DKIM) · `send` CNAME `send.forge.rmta.net` · `rsend` CNAME `rsend-apne1.forge.rmta.net`(리전 ap-northeast-1). `_dmarc` TXT 는 아직 없음(권장). 호스팅케이알은 반영에 20~40분(§3.8) | ✅ 2026-09-21 |
 | Authentication → **Rate Limits** | 이메일 발송 한도(시간당) 확인 — Custom SMTP 를 켜야 상향할 수 있다. 앱의 [메일 다시 보내기] 는 60초 쿨다운 | ☐ |
 | Authentication → Emails → **Templates** | 3종(Confirm signup · Reset password · Invite user)의 링크를 **token_hash 방식**으로 바꾼다 — 본문·제목은 [`docs/emails/`](emails/README.md)(정본 · 그대로 붙여넣기). 문구는 역할 중립('셀러리 파트너') — 템플릿은 프로젝트당 1벌이라 브랜드 가입 메일과 공유한다 | ☐ |
 
