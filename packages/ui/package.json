@@ -21,7 +21,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@sellery/db": "*"
+    "@sellery/db": "*",
+    "@tosspayments/tosspayments-sdk": "^2.8.1"
   },
   "peerDependencies": {
     "svelte": "^5.0.0"

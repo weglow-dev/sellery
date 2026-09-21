@@ -6,7 +6,7 @@
 //   suspend <seller> ["<사유>"]             sellers.active=false — 다음 요청부터 requireSeller() 가 /suspended 로 보낸다. 사유는 stdout·Slack 한 줄만
 //   reactivate <seller>                     sellers.active=true
 //   link <seller> <user_id>                 create_seller_from_signup(p_link_id) 연결 경로 — 대상 행 user_id null · 그 user 로 만든 행 없음이 전제
-//   invite <email> --link <seller>          auth.admin.inviteUserByEmail + app_metadata.link_seller_id → 초대 메일 링크(type=invite) → /auth/confirm
+//   invite <email> --link <seller>          auth.admin.inviteUserByEmail + app_metadata.link_seller_id → 초대 메일 링크(type=invite) → /influencer/auth/confirm
 //                                           → 시드 행 연결 → /password/new. 시드 8명(*@sellery.demo)은 실제 메일을 못 받으므로 실제 계약자 메일로
 //   channels [--pending]                    seller_channels 표 — --pending = vcode_confirmed_at is not null and not verified ([인증 확인] 누른 채널)
 //   verify-channel <channel>                운영자가 프로필 bio / @sellery.official DM 에서 코드를 확인한 뒤 → verified=true, vcode=null
@@ -107,9 +107,10 @@ async function findChannel(ref) {
 
 /** 콘솔 오리진·경로 — 경로 모드만(PUBLIC_SITE_URL + /influencer, docs/monorepo-migration.md 결정 11·15). 호스트 모드(NEXT_PUBLIC_INF_HOST)는 폐기. */
 function consoleRedirectTo(path) {
-  // 초대 링크는 콘솔 전용 auth/confirm 으로 (결정 15 — `/influencer/auth/confirm`). web(Next) 이 아직 서비스 중이면 그쪽 `/auth/confirm` 도 같은 next 를 처리한다.
+  // 초대 링크는 콘솔 전용 `/influencer/auth/confirm` 으로 (결정 15 · §5.4) — apps/influencer 가 받는다(sellery.life 는 shop 의 rewrite 를 거쳐, Preview 는 자기 오리진).
+  // web(Next) 이 아직 `/influencer/*` 를 서비스하는 동안(S4~S5 사이)에는 그쪽 `/auth/confirm` 만 있으므로 PR-10(리라이트 교체) 뒤에 실행한다.
   const site = (process.env.PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:5176").replace(/\/$/, "");
-  return `${site}/auth/confirm?next=${encodeURIComponent(`/influencer${path}`)}`;
+  return `${site}/influencer/auth/confirm?next=${encodeURIComponent(`/influencer${path}`)}`;
 }
 
 function fmtDate(s) {
@@ -187,7 +188,7 @@ async function cmdInvite() {
   const { error: metaError } = await admin.auth.admin.updateUserById(uid, { app_metadata: { link_seller_id: s.id } });
   if (metaError) throw new Error(`updateUserById failed: ${metaError.message}`);
   console.log(`[partner-admin] 초대 메일 발송: ${email} → ${s.code ?? s.id} ${s.name} (user ${uid}) · redirectTo ${redirectTo}`);
-  console.log("  메일의 링크(type=invite) → /auth/confirm → 시드 행 연결 → /password/new 에서 비밀번호 설정.");
+  console.log("  메일의 링크(type=invite) → /influencer/auth/confirm → 시드 행 연결 → /influencer/password/new 에서 비밀번호 설정.");
 }
 
 async function cmdChannels() {

@@ -1,5 +1,5 @@
 /**
- * @sellery/ui/site — 고객 사이트(apps/shop) · 콘솔(apps/influencer, S5) 용 **props-only** 컴포넌트 (docs/monorepo-migration.md 결정 4 · §4.3 · PR-4).
+ * @sellery/ui/site — 고객 사이트(apps/shop) · 인플루언서 콘솔(apps/influencer, S5 `console/*`) 용 **props-only** 컴포넌트 (docs/monorepo-migration.md 결정 4 · §4.3 · PR-4).
  * 마크업·클래스명·문구는 web/src/components/*.tsx 와 동일 — css/site.css 가 그대로 먹는다.
  * 데이터는 전부 props(서버 load 결과) 또는 Svelte 컨텍스트(`setSiteEnv`) — `@sellery/core` 데모 상태(S · D_ · act)는 import 하지 않는다(scripts/check-boundaries.mjs (d)).
  * 데모 컴포넌트(`@sellery/ui` 루트 index.ts)와 이름이 겹치는 것은 `Site*` 접두로 내보낸다.
@@ -79,3 +79,12 @@ export { default as OrderSummary } from './checkout/OrderSummary.svelte';
 export { default as PayBar } from './checkout/PayBar.svelte';
 export { default as PayButton } from './checkout/PayButton.svelte';
 export type { PaySummary, PayButtonProps } from './checkout/PayButton.svelte';
+
+// 파트너 콘솔 셸 (S5 PR-8 — web (partner)/partner-shell.tsx · console-tabs.tsx · influencer/my/my-client.tsx)
+export { default as PartnerShell } from './console/PartnerShell.svelte';
+export { ROLE_LABEL as CONSOLE_ROLE_LABEL, TABS as CONSOLE_TABS } from './console/PartnerShell.svelte';
+export type { ShellMe } from './console/PartnerShell.svelte';
+export { default as ConsoleTabs } from './console/ConsoleTabs.svelte';
+export type { ConsoleTab, ConsoleTabIcon } from './console/ConsoleTabs.svelte';
+export { default as CopyButton } from './console/CopyButton.svelte';
+export { default as DeleteChannelForm } from './console/DeleteChannelForm.svelte';

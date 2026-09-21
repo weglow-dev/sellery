@@ -1,0 +1,21 @@
+<script lang="ts">
+	/**
+	 * 콘솔 셸 안의 오류 페이지 — web influencer/not-found.tsx 1:1 (docs/monorepo-migration.md §5.1 "콘솔 404").
+	 * `[...rest]/+page.server.ts` 의 error(404)(아직 없는 탭 /products · /campaigns · /sales 포함)와 page 의 error(404) 가 여기로 온다 —
+	 * 셸(상단 바 · 하단 탭) 안에서 렌더된다. 404 외 상태는 간단 문구. 제목 규칙: web `%s — 셀러리 파트너`.
+	 */
+	import { page } from '$app/state';
+	import { consolePath } from '@sellery/db/console-paths';
+	const notFound = $derived(page.status === 404);
+</script>
+
+<svelte:head>
+	<title>{notFound ? '페이지를 찾을 수 없습니다' : `오류 ${page.status}`} — 셀러리 파트너</title>
+</svelte:head>
+
+<div class="card static">
+	<div class="empty">{notFound ? '페이지를 찾을 수 없습니다' : `문제가 생겼어요 (${page.status})${page.error?.message ? ` — ${page.error.message}` : ''}`}</div>
+	<div style="text-align:center;padding-bottom:6px">
+		<a href={consolePath('seller', '/home')} class="btn ghost sm">← 콘솔 홈</a>
+	</div>
+</div>
