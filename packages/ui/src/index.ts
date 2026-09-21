@@ -1,4 +1,5 @@
 export { default as AppShell } from './components/AppShell.svelte';
+export { default as DemoBanner } from './components/DemoBanner.svelte';
 export { default as Wordmark } from './components/Wordmark.svelte';
 export { default as Toasts } from './components/Toasts.svelte';
 export { default as Modal } from './components/Modal.svelte';

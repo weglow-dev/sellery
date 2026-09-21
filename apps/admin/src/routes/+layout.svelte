@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { S, counts, act } from '@sellery/core';
-	import { AppShell } from '@sellery/ui';
+	import { AppShell, DemoBanner } from '@sellery/ui';
 	import type { Snippet } from 'svelte';
 	let { children }: { children: Snippet } = $props();
 	const n = $derived(counts().admin);
@@ -11,6 +11,8 @@
 	]);
 </script>
 
+<!-- 데모 띠 — S4 부터 sellery.life 경로에 노출되므로 항상 표시 (docs/monorepo-migration.md §6 · 결정 D) -->
+<DemoBanner />
 <AppShell {tabs}>
 	{#snippet persona()}
 		<div class="persona"><span class="chip">셀러리 운영팀</span>{#if S.session}<button class="sm ghost" onclick={() => { act.logout(); location.reload(); }}>로그아웃</button>{/if}</div>

@@ -4,6 +4,8 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>셀러리 관리자</title>
+		<!-- 데모 앱 — 검색 색인 제외 (docs/monorepo-migration.md §6 · 결정 D). ssr=false 라 <svelte:head> 는 JS 뒤에만 보이므로 정적 셸에 둔다. robots.txt 는 routes/robots.txt/+server.ts -->
+		<meta name="robots" content="noindex, nofollow" />
 		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@500;600;700;800;900&display=swap" />
 		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2/dist/galmuri.css" />
 		<link rel="icon" href="/assets/favicon.svg" />

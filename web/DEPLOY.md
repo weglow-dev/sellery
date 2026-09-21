@@ -1,5 +1,7 @@
 # 셀러리 앱 배포 (Vercel `sellery-app`)
 
+> **S4(도메인 전환) 이후 배포·운영의 정본은 [`docs/deploy.md`](../docs/deploy.md) 다.** 이 문서는 `sellery-app`(Next · S5 까지 `/influencer/*` 리라이트 대상)에 한해 참고하며, §3(외부 서비스) · §4(DB) 는 S5 PR-11 에서 `docs/deploy.md` 로 옮긴다.
+
 `web/` 의 Next.js 앱은 서버 기능(토스 결제 승인 · Supabase SSR · 웹훅)이 있어 정적 호스팅이 불가하다. **프로토타입과 Vercel 프로젝트를 분리**한다(`docs/app-plan.md §0-2`):
 
 | Vercel 프로젝트 | 내용 | Root Directory | 주소 |
