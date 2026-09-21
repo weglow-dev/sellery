@@ -9,24 +9,25 @@
 | 주소 | 화면 |
 |---|---|
 | `/` | 고객 판매 페이지 · 장바구니 · 카카오 로그인(데모) · 내 주문 (shop 앱 — 도메인 루트) |
-| `/influencer/` | 인플루언서 센터 (캠페인 · DM · 상품 갤러리 · 정산 · 랭킹·등급 · 셀러리 샵 · 추천) |
+| `/influencer/` | 인플루언서 콘솔 1~2단계 (가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증 — 실서비스). 프로토타입 화면(캠페인 · DM · 상품 갤러리 · 정산 · 랭킹 · 셀러리 샵 · 추천)은 dev 의 `(demo)` 그룹 `/influencer/demo` |
 | `/brand/` | 브랜드 센터 (상품 관리 · 주문·발주 · 고객 문의 · 인플루언서 갤러리 · 정산) |
 | `/admin/` | 관리자 (검수 · 매칭·자동 제안 · 매출·순수익 · 정산 실행 · 데이터 초기화) |
 | `/s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
-| `/influencer/login` · `/brand/login` | 파트너 로그인 데모 (계정 목록은 화면 안 · 비밀번호 8자 이상 아무거나) |
+| `/influencer/login` | 인플루언서 콘솔 로그인 (이메일/비밀번호 · Supabase Auth · 실계정) |
+| `/brand/login` | 브랜드 로그인 데모 (계정 목록은 화면 안 · 비밀번호 8자 이상 아무거나) |
 
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
 
-## 현재 서비스 상태 (2026-09-21 · S3 완료 · S4 도메인 전환 준비)
+## 현재 서비스 상태 (2026-09-21 · S5 완료 · 도메인 전환 완료)
 
-- <!-- S4 --> **S4 완료 전에는 정식 주소 https://sellery.life 를 `web/`(Next.js 16 · Vercel `sellery-app`) 가 서비스합니다** — 판매 링크·카카오 로그인·토스 결제·내 주문·약관/처리방침, 인플루언서 콘솔 1~2단계. 도메인을 `sellery-shop` 으로 옮기는 순간([docs/deploy.md](docs/deploy.md) §3) 이 문장을 지웁니다. <!-- /S4 -->
-- **S4 뒤 `sellery.life` 는 `apps/shop`(Vercel `sellery-shop`) 이 받습니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` 판매 링크 · 카카오 로그인 · 토스 결제 · 내 주문 · 약관/처리방침 · `/api/*`, `web/` 과 1:1). `/influencer/*` 는 S5(콘솔 이식)까지 `sellery-app`(Next 콘솔)으로, `/brand/*` `/admin/*` 는 데모 프로젝트로 리라이트되며 데모 화면에는 상단 **데모 띠**("데모 화면 · 데이터는 이 브라우저에만 저장됩니다")와 `noindex` 가 붙습니다. 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
-- `apps/influencer` · `apps/brand` · `apps/admin` 은 아직 localStorage 데모입니다. **다음 작업은 S5 — 인플루언서 콘솔을 `apps/influencer` 로 이식하고 `web/` 를 지우는 것**, 이어서 `apps/brand` → `apps/admin`. 그 전까지 `web/` 는 손대지 않습니다(버그 수정만).
+- **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` 판매 링크 · `/login` `/auth/*` 카카오 로그인 · `/checkout*` 토스 결제 · `/account/*` 내 주문 · `/api/*` · `/terms` `/privacy`). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐습니다.
+- `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~2단계**(가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증) 로 리라이트됩니다. `/brand/*` `/admin/*` 는 아직 localStorage 데모 앱(`apps/brand` · `apps/admin`) 으로 리라이트되며 상단 **데모 띠**("데모 화면 · 데이터는 이 브라우저에만 저장됩니다")와 `noindex` 가 붙습니다. Vercel 은 프로젝트 4개 + `sellery-app`(Next · **동결** — 빌드 안 함 · 롤백 전용 · 2026-09-28 경 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
+- **다음 작업은 인플루언서 콘솔 3~6단계**([docs/inf-console-plan.md](docs/inf-console-plan.md) §7 — 상품 갤러리 · 샘플 · 캠페인 · 결제 · 정산), 이어서 `apps/brand` → `apps/admin` 을 데모에서 실서비스로.
 - Supabase 스키마는 `supabase/migrations/0001~0010` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입). 새 변경은 새 번호로.
 
 ## 기술 스택
 
-**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래(shop 은 루트 `/`, 나머지는 `/influencer` `/brand` `/admin` 경로 — Vercel rewrite)로 배포되며, 같은 origin 이라 데모 데이터(localStorage)를 앱끼리 공유합니다 — 브랜드 센터에서 승인하면 인플루언서 센터에 바로 보입니다. 결제·실인증은 아직 없습니다 (Supabase 스키마는 설계·적용 완료 · 앱마다 `hooks.server.ts` 가 Supabase 세션 자리를 갖고 있고 화면 연동은 이후 단계).
+**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래(shop 은 루트 `/`, 나머지는 `/influencer` `/brand` `/admin` 경로 — Vercel rewrite)로 배포되며, 같은 origin 이라 데모 앱(brand · admin)의 localStorage 데이터를 앱끼리 공유합니다. shop 과 influencer 콘솔은 Supabase SSR(`hooks.server.ts`) · 토스페이먼츠 실결제 · 카카오/이메일 실인증이 붙어 있고, brand · admin 은 아직 localStorage 데모입니다.
 
 ## 로컬 개발
 
@@ -52,7 +53,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 
 **정본은 [docs/deploy.md](docs/deploy.md)** — Vercel 프로젝트 표 · 환경변수 이름 · 리라이트 표 · 도메인 전환 체크리스트 · 운영 스크립트.
 
-Vercel 프로젝트 5개 — `sellery-shop`(Root Directory `apps/shop`, 도메인 `sellery.life` 루트) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>`; "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel` · 리전 `icn1`) + `sellery-app`(Next `web/` — S5 까지만 남는 인플루언서 콘솔). 브라우저 오리진은 하나 — `apps/shop/vercel.json` 의 rewrites 가 `/influencer/*` · `/_next/*` 를 `sellery-app`(S4 임시, S5 에서 `sellery-influencer` 로 교체), `/brand/*` `/admin/*` 를 데모 프로젝트로 프록시하므로 세션 쿠키를 모든 앱이 공유합니다. `main` 병합 = 프로덕션, PR = 앱별 Preview URL. 정적 자산은 shop 만 서빙합니다(다른 앱의 Preview URL 에서는 이미지 대신 이모지). 단계는 [docs/monorepo-migration.md](docs/monorepo-migration.md) §7. <!-- S4 --> 도메인 전환(S4) 전까지는 `sellery.life` 를 `web/`(`sellery-app`) 이 계속 서비스합니다. <!-- /S4 -->
+Vercel 프로젝트 4개 — `sellery-shop`(Root Directory `apps/shop`, 도메인 `sellery.life` · `www`) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>`; "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel` · 리전 `icn1`) + `sellery-app`(옛 Next `web/` — 동결 · 롤백 전용 · 2026-09-28 경 삭제). 브라우저 오리진은 하나 — `apps/shop/vercel.json` 의 rewrites 가 `/influencer/*` 를 `sellery-influencer`(콘솔), `/brand/*` `/admin/*` 를 데모 프로젝트로 프록시하므로 세션 쿠키를 모든 앱이 공유합니다. `main` 병합 = 프로덕션, PR = 앱별 Preview URL. 정적 자산은 shop 만 서빙합니다(다른 앱의 Preview URL 에서는 이미지 대신 이모지). 단계 기록은 [docs/monorepo-migration.md](docs/monorepo-migration.md) §7(S1~S5 완료).
 
 ## 구현된 흐름
 

@@ -1,5 +1,7 @@
 # 인플루언서 콘솔 구현 계획 — inf.sellery.life (도메인 → 로그인 → 결제)
 
+> **상태(2026-09-21): §7 1~2단계는 `apps/influencer`(SvelteKit · 경로 모드 `sellery.life/influencer/*`) 로 이식 완료 · S1~S5 + 도메인 전환 완료 · `web/` 은 S5 PR-11 에서 삭제.** 호스트 모드(`inf.sellery.life`)는 폐기(monorepo-migration 결정 11). 다음 작업은 §7 3~6단계. 배포·운영·대시보드 설정은 [`deploy.md`](deploy.md)(§5.5 파트너 이메일 인증).
+>
 > 대상: `web/` 를 고치는 개발자 2명(인플루언서 담당 · 브랜드 담당)과 병렬 에이전트. 근거: `docs/app-plan.md`(슬라이스 1 · §4.2 파트너 스텁 · §12 로드맵), `docs/data-model.md`, `supabase/migrations/0001~0009`, 프로토타입 `js/20-seller.js`·`js/02-state.js`·`js/70-campaign.js`·`js/80-actions.js`·`login.html`, 앱 `web/src/{proxy.ts, lib/supabase/*, lib/auth.ts, lib/toss.ts, lib/checkout-sync.ts, app/api/payments/*}`. glo(`E:/위글로우/Glo/web`)의 `seller/_lib.ts getSellerGate()`·`0013_seller_applications.sql` 은 읽기 전용 참고.
 >
 > 범위: **인플루언서 쪽만**, 순서는 사용자 요청대로 **도메인 → 로그인 → 결제**. 브랜드 콘솔·관리자는 §9 에 "그대로 적용되는 것" 만 적는다. 이 문서는 세 설계안(같은 앱 호스트 리라이트 / 별도 앱 워크스페이스 / 같은 앱 카카오 단일)을 두 번 심사한 결과를 합친 최종안이다 — 심사 총점이 안 1 · 안 3 이 71:71 동점이라 **골격은 안 1(같은 앱 · 호스트 리라이트 — 단 Next 16 의 다중 root layout 규칙 때문에 고객 라우트는 `(customer)/` 로 옮긴다, 결정 2)**, **결제 규칙·화면 순서·모바일 경험은 안 3 접목**, 게이트·멱등·스크립트는 안 2 접목으로 정했다. 두 심사의 "반드시 수정" 항목은 전부 반영했고 본문에 `[mustFix]` 로 표시한다.

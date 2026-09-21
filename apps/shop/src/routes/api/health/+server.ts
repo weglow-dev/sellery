@@ -4,7 +4,7 @@ import { createAdminClient } from '$lib/server/db';
 import { isTossError, tossGetPayment } from '$lib/server/payments';
 
 /**
- * GET /api/health — 배포 뒤 서버 설정 점검 (web api/health/route.ts · web/DEPLOY.md §8).
+ * GET /api/health — 배포 뒤 서버 설정 점검 (web api/health/route.ts 의 이식 · docs/deploy.md §10).
  *
  * 로그인 없이 서버 비밀키 두 개가 "실제로 맞는 값"인지 확인한다. 데이터는 돌려주지 않는다.
  *   - supabaseAdmin: service_role 키로 checkout_sessions HEAD 조회 1회 → 키가 anon/틀림이면 RLS·권한 오류 → fail

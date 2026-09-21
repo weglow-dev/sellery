@@ -4,7 +4,7 @@
    site.css — 고객 사이트(apps/shop) · 인플루언서 콘솔(apps/influencer, S5) 전용 스타일.
    web/src/app/globals.css 를 그대로 옮긴 것 (docs/monorepo-migration.md 결정 12 · §7 S2 PR-4) — 폰트 변수 3줄만 다르다(아래).
    데모 앱(brand · admin)은 css/theme.css(legacy base+skin) 를 그대로 쓴다 — 두 파일을 합치지 않는다(토큰 값이 다르다).
-   web/ 가 살아 있는 동안 globals.css 를 고치면 이 파일도 같이 고친다.
+   web/ 는 S5 PR-11 에서 삭제됐다 — 이제 이 파일이 원본.
    ============================================================ */
 
 /* ============================================================

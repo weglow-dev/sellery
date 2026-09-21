@@ -14,7 +14,7 @@ import { createAdminClient, createSellerFromSignup, ensureCustomer, linkSellerId
  *
  * PKCE `?code=` 가 아니라 token_hash 를 쓰는 이유: code verifier 는 signUp 을 호출한 브라우저 쿠키에만 있어 데스크톱에서
  * 가입하고 휴대폰 메일 앱에서 링크를 열면 exchangeCodeForSession 이 실패한다. 이메일 템플릿의 링크를
- * `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup` 으로 바꿔야 이 라우트에 도달한다(web/DEPLOY.md §3.5).
+ * `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup` 으로 바꿔야 이 라우트에 도달한다(docs/deploy.md §5.5 · docs/emails/).
  * 콘솔 경로는 경로 모드 상대 경로(`/influencer/...`) 그대로 — web `loginUrlFor` 의 호스트 분기는 결정 11 로 삭제됐다.
  */
 const OTP_TYPES = ['signup', 'recovery', 'invite', 'email', 'magiclink', 'email_change'] as const;

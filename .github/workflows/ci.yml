@@ -6,7 +6,7 @@ name: CI
 # → 배포와 같은 빌드(@sveltejs/adapter-vercel → apps/*/.vercel/output).
 #
 # PUBLIC_* 는 $env/static/public(빌드 시 인라인)이라 check·build 때 이름이 있어야 한다 — 더미 값을 job env 로 준다.
-# web-ci.yml 과 같은 원칙: 빌드가 실제 키를 요구하면 설계 위반. 비밀키는 CI 에 넣지 않는다 (docs/monorepo-migration.md 결정 11 · §8.3).
+# 원칙: 빌드가 실제 키를 요구하면 설계 위반. 비밀키는 CI 에 넣지 않는다 (docs/monorepo-migration.md 결정 11 · §8.3). 유일한 required check (web-ci.yml 은 S5 PR-11 에서 삭제).
 
 on:
   pull_request:
