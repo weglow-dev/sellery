@@ -4,6 +4,7 @@
  * `$lib/server/` 는 SvelteKit 이 브라우저 도달 코드에서 import 하면 빌드를 실패시킨다 — `import "server-only"` 의 등가물.
  * 값이 비어 있어도 실패하지 않는다(키 없는 로컬 · CI 더미) — service role 이 필요한 호출 시점에만 throw(@sellery/db createAdminClient).
  * 토스 시크릿(`TOSS_SECRET_KEY`)은 4단계 샘플 결제부터 `configurePayments()` 로 주입 — 비어 있으면 호출 시점에 CONFIG_ERROR(@sellery/payments toss.server). Vercel `sellery-influencer` 에도 같은 이름이 필요하다(docs/deploy.md §1.2).
+ * 주민등록번호 암호화 키(`RRN_ENC_KEY`, 5단계 0013)는 `configureDb({ rrnEncKey })` 로만 흐른다 — 비어 있으면 `setSellerRrn` 이 RRN_KEY_MISSING(다른 화면은 영향 없음).
  */
 import { env } from '$env/dynamic/private';
 import { PUBLIC_SITE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
@@ -14,7 +15,8 @@ configureDb({
 	url: PUBLIC_SUPABASE_URL,
 	anonKey: PUBLIC_SUPABASE_ANON_KEY,
 	serviceKey: env.SUPABASE_SERVICE_ROLE_KEY,
-	slackWebhookUrl: env.SLACK_WEBHOOK_URL
+	slackWebhookUrl: env.SLACK_WEBHOOK_URL,
+	rrnEncKey: env.RRN_ENC_KEY
 });
 
 configurePayments({ secretKey: env.TOSS_SECRET_KEY });

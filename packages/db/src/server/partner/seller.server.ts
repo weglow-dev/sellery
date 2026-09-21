@@ -37,6 +37,10 @@ export type SellerSummary = {
   settle_type: string | null;
   /** 계좌 등록 여부만 (원문 bank_info 는 콘솔 응답에 싣지 않는다 — §4.9) */
   has_bank_info: boolean;
+  /** 세금계산서 정보(tax_info) 등록 여부 — settle_type='biz' 안내 (0013) */
+  has_tax_info: boolean;
+  /** 주민등록번호 등록 여부 — rrn_set_at 만 읽는다(암호문 bytea 는 읽지 않는다, 0013) */
+  has_rrn: boolean;
   sample_address: Json | null;
   ref_code: string | null;
   /** 최근 3개월 확정 매출 (등급 기준) — 홈 "내 자산" 다음 등급까지 남은 금액 */
@@ -57,7 +61,7 @@ export type SellerContext =
 export type SellerReady = Extract<SellerContext, { state: "ok" }>;
 
 const SELLER_COLS =
-  "id, code, name, handle, platform, grade, active, followers, settle_type, bank_info, sample_address, ref_code, m3_sales, sample_extra, created_at";
+  "id, code, name, handle, platform, grade, active, followers, settle_type, bank_info, tax_info, rrn_set_at, sample_address, ref_code, m3_sales, sample_extra, created_at";
 
 const MEMO_KEY = "seller_context";
 
@@ -90,6 +94,8 @@ export function getSellerContext(event: DbEvent, admin?: Admin): Promise<SellerC
       followers: row.followers,
       settle_type: row.settle_type,
       has_bank_info: row.bank_info !== null && typeof row.bank_info === "object",
+      has_tax_info: row.tax_info !== null && typeof row.tax_info === "object",
+      has_rrn: row.rrn_set_at !== null,
       sample_address: row.sample_address,
       ref_code: row.ref_code,
       m3_sales: Number(row.m3_sales) || 0,
