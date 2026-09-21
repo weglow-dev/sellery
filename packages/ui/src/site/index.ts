@@ -62,3 +62,20 @@ export { inlineParts, fmtEffective } from './legal/inline';
 export type { InlinePart } from './legal/inline';
 export { default as SiteCsModal } from './CsModal.svelte';
 export { default as CsModalButton } from './CsModalButton.svelte';
+
+// 내 주문 (S3 PR-5 — web components/orders/* · account/orders/[code]/refund-button.tsx)
+export { default as OrderRow } from './orders/OrderRow.svelte';
+export { default as ShipInfo } from './orders/ShipInfo.svelte';
+export { default as RefundButton } from './orders/RefundButton.svelte';
+export { default as RefundModal } from './orders/RefundModal.svelte';
+export type { OrderView, OrderSettings } from './orders/types';
+
+// 체크아웃 (S3 PR-6 — web components/checkout/*)
+export { default as Field } from './checkout/Field.svelte';
+export { default as AddressFields } from './checkout/AddressFields.svelte';
+export { default as PaymentWidget } from './checkout/PaymentWidget.svelte';
+export { PAYMENT_METHOD_SELECTOR, AGREEMENT_SELECTOR } from './checkout/PaymentWidget.svelte';
+export { default as OrderSummary } from './checkout/OrderSummary.svelte';
+export { default as PayBar } from './checkout/PayBar.svelte';
+export { default as PayButton } from './checkout/PayButton.svelte';
+export type { PaySummary, PayButtonProps } from './checkout/PayButton.svelte';

@@ -57,4 +57,11 @@ const linkCtx: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(supabase, linkCtx);
+/* `/api/*` 응답은 CDN·브라우저가 캐시하지 않는다 — /api/me · /api/health 는 라우트가 직접 no-store 를 붙이지만(web 과 동일), 나머지(결제·웹훅·reconcile)도 같은 규칙으로 통일한다. */
+const apiNoStore: Handle = async ({ event, resolve }) => {
+	const response = await resolve(event);
+	if (event.url.pathname.startsWith('/api/') && !response.headers.has('cache-control')) response.headers.set('cache-control', 'no-store');
+	return response;
+};
+
+export const handle = sequence(supabase, linkCtx, apiNoStore);
