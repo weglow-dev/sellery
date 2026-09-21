@@ -11,3 +11,4 @@ export { cronSecret } from './env';
 export * from '@sellery/payments/server/config';
 export * from '@sellery/payments/server/toss';
 export * from '@sellery/payments/server/checkout-sync';
+export * from '@sellery/payments/server/partner-sample';

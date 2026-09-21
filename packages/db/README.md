@@ -26,11 +26,13 @@ src/browser.ts           createBrowserSupabase(url, anonKey)
 src/auth.ts linkctx.ts campaign.ts console-paths.ts order-status.ts carriers.ts dates.ts text.ts types.ts legal.ts company.ts
 src/partner/signup-rules.ts   가입 폼·서버 공용 규칙 (순수)
 src/partner/sample-rules.ts   샘플 견적(app_sample_quote jsonb) → 버튼·안내 문구 · 배송지 폼 검증 · 캠페인 상태 칩/스테퍼 (순수)
+                              · 샘플 결제(0012 partner_payments): PartnerPaymentView · isPayable · payLine · partnerPaymentStatusLabel · RPC 결과 파서 · PARTNER_PAY_FAIL_MESSAGES
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
                                 · products(listProductsForSeller · getProductForSeller · requestFreeSample) · campaigns(listSellerCampaigns · getSellerCampaign · receiveSample)
                                 · home(getHomeWidgets) · my(saveSampleAddress) — 콘솔 3단계, 0011 RPC(app_sample_quote(s) · app_request_free_sample · app_receive_sample)
+                                · 샘플 결제(0012 app_partner_payment_*) 의 서버 함수는 토스 호출과 묶여야 하므로 @sellery/payments/server/partner-sample 에 있다
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
 scripts/*.mjs            gen-types · partner-admin · dev-seller · dev-user (Node · 루트 .env.local)
 ```
