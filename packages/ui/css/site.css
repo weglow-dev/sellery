@@ -1219,6 +1219,61 @@
     .console-sales-body { grid-template-columns: 1fr 1fr; }
   }
 
+  /* ---- 브랜드 콘솔 2단계 (docs/brand-console-plan.md §6 "2. 상품 · 캠페인 읽기 · 샘플 승인/거절/발송"): 상품 목록 행 · 상품 폼(이미지 미리보기 · 샘플 정책 카드) · 처리 대기 큐(승인·거절·발송 인라인) · 캠페인 필터 칩 · 상세 인플루언서 카드.
+     프로토타입 데모 products/+page.svelte 표 · ProductModal · 브랜드 홈 "승인·처리 대기" · CampaignDetail 브랜드 분기의 이식 — 색은 site 토큰. 375px 가로 스크롤 없음(행은 줄바꿈 · 폼은 1열). ---- */
+  .console-head .badge { position: static; display: inline-block; }
+  .console-accent { color: var(--color-accent); }
+  .console-danger { color: var(--color-danger); }
+  .console-mono { font-family: var(--font-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  .console-prodlist .rowitem > .grow, .console-reqs .rowitem > .grow { flex: 1 1 220px; min-width: 0; }
+  .console-prodlist .rowitem .nm a { text-decoration: none; color: inherit; }
+  .console-prodlist .rowitem .nm a:hover { text-decoration: underline; }
+  .console-prodmeta { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 12.5px; }
+  .console-prodmeta > span { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; white-space: nowrap; }
+  .console-prodmeta small { color: var(--color-mute); font-size: 11px; }
+  .console-prodmeta s { color: var(--color-mute); font-size: 11px; }
+  .console-prodmeta .gradebox { margin: 0 2px; }
+  .console-form .fld textarea { width: calc(100% - 6px); }
+  .console-form .fld.invalid textarea { box-shadow: 0 -2px 0 0 var(--color-danger), 0 2px 0 0 var(--color-danger), -2px 0 0 0 var(--color-danger), 2px 0 0 0 var(--color-danger); }
+  .console-form .fld input[type="file"] { width: calc(100% - 6px); font-size: 12px; padding: 8px; }
+  .console-form .fld .font-normal { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .console-form .fld .hint b { color: var(--color-ink); }
+  .console-subcard { padding: 14px 16px; margin: 4px 3px 14px; background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); }
+  .console-subcard.invalid { box-shadow: 0 0 0 2px var(--color-danger); }
+  .console-subcard .fld:last-child { margin-bottom: 0; }
+  .console-imgrow { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; margin: 2px 0 8px; }
+  .console-imgrow img { width: 64px; height: 64px; object-fit: contain; background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); display: block; }
+  .console-img { display: inline-flex; flex-direction: column; gap: 4px; align-items: center; }
+  .console-imgdel { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--color-mute); cursor: pointer; }
+  .console-form .console-imgdel input, .console-form .console-check input { width: auto; margin: 0; }
+  .console-reqs .rowitem { align-items: flex-start; }
+  .console-rows .chip.plat { font-size: 10.5px; line-height: 1.7; } /* `.console-rows .plat`(할 일 아이콘 18px) 과 이름이 겹친다 */
+  .console-req .console-req-prod { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .console-req .console-cell-prod { white-space: normal; }
+  .console-req .hintline { margin-top: 6px; }
+  .console-req .hintline .meta { color: var(--color-mute); font-size: 12px; }
+  .console-reject { position: relative; }
+  .console-reject summary { list-style: none; display: inline-block; }
+  .console-reject summary::-webkit-details-marker { display: none; }
+  .console-reject-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; min-width: 240px; }
+  .console-reject-form textarea { width: calc(100% - 6px); font-size: 12.5px; }
+  .console-reject-form button { align-self: flex-start; }
+  .console-shipform { align-items: center; }
+  .console-shipform .fld { margin: 0; flex: 1 1 140px; min-width: 0; }
+  .console-shipform .fld select, .console-shipform .fld input { width: calc(100% - 6px); margin: 3px; }
+  .console-filters { margin: 0 0 6px; }
+  .console-filters .catchip { text-decoration: none; }
+  .console-seller { display: flex; align-items: center; gap: 12px; }
+  .console-seller .grow { flex: 1 1 auto; min-width: 0; }
+  .console-seller .nm { font-weight: 700; font-size: 13.5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .console-seller .sub { font-size: 12px; color: var(--color-mute); font-weight: 400; }
+  .console-actions .notice { margin: 0 3px 14px; }
+  .console-actions .hint a { color: var(--color-ink); text-decoration: underline; text-underline-offset: 2px; }
+  @media (min-width: 560px) {
+    .console-reqs .rowacts { flex: 0 0 auto; max-width: 360px; }
+    .console-shipform { flex: 0 0 auto; max-width: 420px; }
+  }
+
   /* ---- 반응형 (ux-spec §1.3: 1100 / 900 / 640 / 600) ---- */
   @media (max-width: 1100px) {
     .custgrid { grid-template-columns: 1fr; }
