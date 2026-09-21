@@ -3,13 +3,17 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>셀러리</title>
-		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@500;600;700;800;900&display=swap" />
-		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2/dist/galmuri.css" />
-		<link rel="icon" href="/assets/favicon.svg" />
+		<meta name="theme-color" content="#eef3dc" />
+		<link rel="icon" href="/favicon.svg" />
+		<!-- 폰트 (docs/monorepo-migration.md 결정 G · web/src/app/fonts.ts 와 같은 패밀리·굵기): IBM Plex Sans KR 300–700(700 이 최대) · IBM Plex Mono 400/500/700 · Archivo 500–900(variable).
+		     Galmuri 픽셀 폰트는 적재하지 않는다(web 과 동일). 제목은 각 페이지의 <svelte:head> 가 정한다 — 여기 <title> 을 두면 두 개가 된다. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&family=Archivo:wght@500..900&display=swap" />
 		%sveltekit.head%
 	</head>
-	<body data-sveltekit-preload-data="hover" data-stage="studio">
+	<!-- body 에 폰트 스무딩 유틸을 붙이지 않는다 (Windows subpixel AA 유지 — CLAUDE.md 타이포 규칙) -->
+	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>
