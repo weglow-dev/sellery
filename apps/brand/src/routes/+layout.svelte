@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { S, D_, brand, celBal, dmUnreadN, brandPending, csOpen, CEL, act, go } from '@sellery/core';
-	import { AppShell } from '@sellery/ui';
+	import { AppShell, DemoBanner } from '@sellery/ui';
 	import { base } from '$app/paths';
 	import type { Snippet } from 'svelte';
 	let { children }: { children: Snippet } = $props();
@@ -14,6 +14,8 @@
 	const me = $derived(brand(S.actingBrand));
 </script>
 
+<!-- 데모 띠 — S4 부터 sellery.life 경로에 노출되므로 항상 표시 (docs/monorepo-migration.md §6 · 결정 D) -->
+<DemoBanner />
 <AppShell {tabs}>
 	{#snippet right()}
 		<button class="celery-bal" onclick={() => go.screen('shop')} title="셀러리 샵">{@html CEL} {celBal(S.actingBrand)}</button>

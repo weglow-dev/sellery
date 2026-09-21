@@ -2,8 +2,9 @@
 	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"regions": ["icn1"],
 	"rewrites": [
-		{ "source": "/influencer", "destination": "https://sellery-influencer.vercel.app/influencer" },
-		{ "source": "/influencer/:path*", "destination": "https://sellery-influencer.vercel.app/influencer/:path*" },
+		{ "source": "/influencer", "destination": "https://sellery-app.vercel.app/influencer" },
+		{ "source": "/influencer/:path*", "destination": "https://sellery-app.vercel.app/influencer/:path*" },
+		{ "source": "/_next/:path*", "destination": "https://sellery-app.vercel.app/_next/:path*" },
 		{ "source": "/brand", "destination": "https://sellery-brand.vercel.app/brand" },
 		{ "source": "/brand/:path*", "destination": "https://sellery-brand.vercel.app/brand/:path*" },
 		{ "source": "/admin", "destination": "https://sellery-admin.vercel.app/admin" },
