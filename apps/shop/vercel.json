@@ -6,19 +6,15 @@
 	"rewrites": [
 		{
 			"source": "/influencer",
-			"destination": "https://sellery-app.vercel.app/influencer"
+			"destination": "https://sellery-influencer.vercel.app/influencer"
 		},
 		{
 			"source": "/influencer/",
-			"destination": "https://sellery-app.vercel.app/influencer/"
+			"destination": "https://sellery-influencer.vercel.app/influencer/"
 		},
 		{
 			"source": "/influencer/:path*",
-			"destination": "https://sellery-app.vercel.app/influencer/:path*"
-		},
-		{
-			"source": "/_next/:path*",
-			"destination": "https://sellery-app.vercel.app/_next/:path*"
+			"destination": "https://sellery-influencer.vercel.app/influencer/:path*"
 		},
 		{
 			"source": "/brand",
