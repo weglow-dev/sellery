@@ -1,0 +1,30 @@
+{
+  "name": "@sellery/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./browser": "./src/browser.ts",
+    "./database.types": "./src/database.types.ts",
+    "./*": "./src/*.ts",
+    "./partner/*": "./src/partner/*.ts",
+    "./legal/*": "./src/legal/*.ts",
+    "./server/*": "./src/server/*.server.ts",
+    "./server/partner/*": "./src/server/partner/*.server.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --root ../.. packages/db",
+    "gen:types": "node scripts/gen-types.mjs"
+  },
+  "dependencies": {
+    "@sellery/core": "*",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}
