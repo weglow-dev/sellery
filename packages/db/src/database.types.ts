@@ -1714,9 +1714,13 @@ export type Database = {
           recent_likes: number[]
           ref_code: string | null
           referred_by: string | null
+          rrn_enc: string | null
+          rrn_mask: string | null
+          rrn_set_at: string | null
           sample_address: Json | null
           sample_extra: number
           settle_type: string | null
+          tax_info: Json | null
           terms_agreed_at: string | null
           updated_at: string
           user_id: string | null
@@ -1744,9 +1748,13 @@ export type Database = {
           recent_likes?: number[]
           ref_code?: string | null
           referred_by?: string | null
+          rrn_enc?: string | null
+          rrn_mask?: string | null
+          rrn_set_at?: string | null
           sample_address?: Json | null
           sample_extra?: number
           settle_type?: string | null
+          tax_info?: Json | null
           terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
@@ -1774,9 +1782,13 @@ export type Database = {
           recent_likes?: number[]
           ref_code?: string | null
           referred_by?: string | null
+          rrn_enc?: string | null
+          rrn_mask?: string | null
+          rrn_set_at?: string | null
           sample_address?: Json | null
           sample_extra?: number
           settle_type?: string | null
+          tax_info?: Json | null
           terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
@@ -1799,6 +1811,41 @@ export type Database = {
           {
             foreignKeyName: "sellers_referred_by_fkey"
             columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "sellers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sensitive_access_log: {
+        Row: {
+          actor: string
+          at: string
+          field: string
+          id: number
+          purpose: string
+          seller_id: string | null
+        }
+        Insert: {
+          actor: string
+          at?: string
+          field: string
+          id?: never
+          purpose: string
+          seller_id?: string | null
+        }
+        Update: {
+          actor?: string
+          at?: string
+          field?: string
+          id?: never
+          purpose?: string
+          seller_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sensitive_access_log_seller_id_fkey"
+            columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "sellers"
             referencedColumns: ["id"]
@@ -1840,6 +1887,7 @@ export type Database = {
           ref_reward_rate: number
           refund_count: number
           refunds: number
+          sample_cel_cover: number
           sample_net: number
           sample_refund_cash: number
           sample_refund_cel: number
@@ -1892,6 +1940,7 @@ export type Database = {
           ref_reward_rate?: number
           refund_count?: number
           refunds?: number
+          sample_cel_cover?: number
           sample_net?: number
           sample_refund_cash?: number
           sample_refund_cel?: number
@@ -1944,6 +1993,7 @@ export type Database = {
           ref_reward_rate?: number
           refund_count?: number
           refunds?: number
+          sample_cel_cover?: number
           sample_net?: number
           sample_refund_cash?: number
           sample_refund_cel?: number
@@ -2113,6 +2163,36 @@ export type Database = {
         }
         Returns: Json
       }
+      app_seller_rrn_decrypt: {
+        Args: {
+          p_actor: string
+          p_key: string
+          p_purpose: string
+          p_seller_id: string
+        }
+        Returns: Json
+      }
+      app_seller_sales: { Args: { p_seller_id: string }; Returns: Json }
+      app_seller_settle_info: { Args: { p_seller_id: string }; Returns: Json }
+      app_seller_settlements: { Args: { p_seller_id: string }; Returns: Json }
+      app_set_seller_rrn: {
+        Args: {
+          p_key: string
+          p_rrn: string
+          p_seller_id: string
+          p_skip_checksum?: boolean
+        }
+        Returns: Json
+      }
+      app_set_settle_info: {
+        Args: {
+          p_bank: Json
+          p_seller_id: string
+          p_settle_type: string
+          p_tax?: Json
+        }
+        Returns: Json
+      }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       campaign_card: { Args: { p_code: string }; Returns: Json }
@@ -2150,6 +2230,9 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: boolean
       }
+      partner_mask_account: { Args: { p_account: string }; Returns: string }
+      partner_mask_biz_no: { Args: { p_biz_no: string }; Returns: string }
+      partner_mask_name: { Args: { p_name: string }; Returns: string }
       partner_normalize_shipping: { Args: { p_shipping: Json }; Returns: Json }
       partner_payment_brief: {
         Args: { p: Database["public"]["Tables"]["partner_payments"]["Row"] }
@@ -2158,6 +2241,10 @@ export type Database = {
       partner_random_code: {
         Args: { p_len?: number; p_prefix?: string }
         Returns: string
+      }
+      partner_rrn_valid: {
+        Args: { p_rrn: string; p_skip_checksum?: boolean }
+        Returns: boolean
       }
       public_stats: { Args: never; Returns: Json }
       purge_checkout_pii: { Args: { p_older_than?: string }; Returns: number }
