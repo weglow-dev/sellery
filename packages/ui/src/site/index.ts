@@ -91,3 +91,5 @@ export { default as DeleteChannelForm } from './console/DeleteChannelForm.svelte
 // 콘솔 3단계 (docs/inf-console-plan.md §7 3. — 배송지 폼 · 스테퍼)
 export { default as ShippingFields } from './console/ShippingFields.svelte';
 export { default as CampaignStepper } from './console/CampaignStepper.svelte';
+// 콘솔 3단계 짝 · 브랜드 콘솔 3단계 (docs/brand-console-plan.md §5 `?/chat` — 두 콘솔 공용 스레드 답글 폼)
+export { default as ThreadComposer } from './console/ThreadComposer.svelte';
