@@ -9,9 +9,9 @@
 ## 현재 서비스 상태 (2026-09-21 · S5 완료 · 도메인 전환 완료)
 
 - **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` `/login` `/auth/*` `/checkout*` `/account/*` `/api/*` `/terms` `/privacy` · Supabase SSR · 토스페이먼츠). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐고(설계 문서의 `web/src/…` 경로는 역사 — 이식 위치는 docs/monorepo-migration.md §3~§5 표), Vercel `sellery-app` 은 2026-09-21 삭제됨(롤백은 `sellery-shop` 이전 배포 Promote — docs/deploy.md §3.6).
-- `apps/shop/vercel.json` 리라이트: `/influencer/*` → `sellery-influencer`(**`apps/influencer` 인플루언서 콘솔 1~2단계** — 가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증 · SSR · `(demo)` 그룹은 dev/`PUBLIC_DEMO=1` 만), `/brand/*` `/admin/*` → `sellery-brand` · `sellery-admin`(**localStorage 데모 — 데모 띠 `DemoBanner` · `noindex` · `/brand/robots.txt` `/admin/robots.txt` disallow**, 결정 D). 배포·운영 정본은 [docs/deploy.md](docs/deploy.md)(외부 서비스 대시보드 §5 · DB §6 · 운영 §8 포함). 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
-- **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료; 6단계 🥬 는 규제 게이트). 다음 = 브랜드 콘솔** — 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md)(`apps/brand` 데모 → `(console)`/`(demo)` · `create_brand_from_signup` · 0014~ · 6단계), 이어서 `apps/admin`.
-- Supabase 스키마는 `supabase/migrations/0001~0011` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011 샘플 견적/무상 요청/수령 확인 — 콘솔 3단계, 계획서의 "0011a"; 결제 테이블은 0012). 새 변경은 새 번호로.
+- `apps/shop/vercel.json` 리라이트: `/influencer/*` → `sellery-influencer`(**`apps/influencer` 인플루언서 콘솔 1~2단계** — 가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증 · SSR · `(demo)` 그룹은 dev/`PUBLIC_DEMO=1` 만), `/brand/*` → `sellery-brand`(**`apps/brand` 브랜드 콘솔 1단계** — 입점 신청(가입) · 이메일 인증 · 로그인 · 홈 최소판 · SSR · `requireBrand()` · 0014 `create_brand_from_signup`; 브랜드 데모는 `(demo)` 그룹 `/brand/demo` · `/brand/demo-*` 로 옮겨져 dev/`PUBLIC_DEMO=1` 만 — Production 은 2단계 병합까지 `PUBLIC_DEMO=1` 유지), `/admin/*` → `sellery-admin`(**localStorage 데모 — 데모 띠 `DemoBanner` · `noindex` · `/admin/robots.txt` disallow**, 결정 D). 배포·운영 정본은 [docs/deploy.md](docs/deploy.md)(외부 서비스 대시보드 §5 · DB §6 · 운영 §8 포함). 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
+- **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료; 6단계 🥬 는 규제 게이트). 브랜드 콘솔 1단계 완료(2026-09-21 — 골격 + 가입/로그인 · 0014 · `dev-brand.mjs` · `partner-admin.mjs brands/…-brand`). 다음 = 브랜드 콘솔 2단계**(상품 · 캠페인 읽기 · 샘플 승인/거절/발송 · 0015) — 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md) §6, 이어서 `apps/admin`.
+- Supabase 스키마는 `supabase/migrations/0001~0014` 가 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011 샘플 견적/무상 요청/수령 확인 · 0012 샘플 결제 · 0013 매출·정산 · 0014 브랜드 가입 `create_brand_from_signup`). 새 변경은 새 번호로.
 
 ## 스택 · 구조 (2026-09-18 SvelteKit 모노레포로 전환)
 
@@ -99,7 +99,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 셀러리 마크는 **위치 로고일 때만 왼쪽으로 -14° 기울입니다** (앱바 `Wordmark`, 허브, 로그인 워드마크).
 본문 안에 포인트로 들어가는 마크는 똑바로 세웁니다.
 
-## 데모 계정 (`/influencer/login` · `/brand/login`)
+## 데모 계정 (`/influencer/demo-login` · `/brand/demo-login` — (demo) 그룹 · dev/`PUBLIC_DEMO=1` 만; 실서비스 콘솔 로그인 `/influencer/login` · `/brand/login` 은 Supabase 계정 — 개발용은 `dev-seller.mjs` · `dev-brand.mjs`)
 
 인플루언서 8명: 지유 jiyu@ · 혜린 hyerin@ · 민지 minji@ · 서아 seoa@ · 로라 lola@ · 하늘 haneul@ · 소민 somin@ · 유나 yuna@ (`@sellery.demo`) · 브랜드: 바인허브 `partner@vyneherb.co` · 글로헬스 `official@weglow.biz` · 관리자 `admin@sellery.co.kr`.
 비밀번호는 **8자 이상이면 아무거나**(데모 버튼은 `sellery2026` 자동 입력). 로그인 탭(인플루언서/브랜드)과 계정 역할이 맞아야 하고, 관리자는 어느 탭에서든 됩니다. 구글 로그인은 데모 계정 선택 팝업(`GOOGLE_CLIENT_ID` 자리표시자).
