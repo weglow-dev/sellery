@@ -414,7 +414,7 @@ npx supabase db reset       # migrations 0001~ + seed.sql 적용 (sellers 8 · b
 |---|---|---|
 | reconcile — CONFIRMING 고착 · `FAILED(CANCEL_PENDING)` 종결(`app-plan.md §7.5`) + **파트너 샘플 결제**(0012 `app_partner_payments_expire` · `app_partner_payments_stale` → 재조회 종결 · 응답 `partner:{expired,checked,results}`) | `curl -X POST https://sellery.life/api/cron/reconcile -H "Authorization: Bearer $CRON_SECRET"` | 크론 10분 — 수동은 결제 테스트 직후 확인용 |
 | 세션 만료 — PENDING · payment_key 없는 CONFIRMING → EXPIRED | `npx supabase db query --linked "select expire_checkout_sessions()"` | 하루 1회 |
-| PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
+| PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 + **주문 없는 비회원 `customers` 행 삭제**(0021 · 반환값은 두 작업 행 수 합) | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
 | 운영 큐 확인(부분취소 · 정산 완료 뒤 취소 등) | `select id, source, result, received_at from payment_events where handled = false order by received_at desc` | 매일 |
 | 채널 인증 대기 | `partner-admin.mjs channels --pending` → bio / `@sellery.official` DM 에서 코드 확인 → `verify-channel` | 매일 |
 

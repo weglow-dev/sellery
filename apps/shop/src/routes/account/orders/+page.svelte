@@ -24,6 +24,7 @@
 		<div class="btnrow" style="justify-content:center;margin-top:14px">
 			<a href={LOGIN_HREF} class="btn sm kakao"><KakaoIcon /> 카카오 로그인</a>
 		</div>
+		<div class="meta" style="margin-top:12px">로그인 없이 구매했다면 <a href="/orders/lookup" class="underline underline-offset-2">비회원 주문 조회</a></div>
 	</div>
 {:else}
 	<h2 class="pg">내 주문 <small>{data.user.name}님 · {data.orders.length}건</small></h2>

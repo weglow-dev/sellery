@@ -38,10 +38,18 @@ export function parseCheckoutParams(sp: Record<string, string | string[] | undef
   return { code, optionIndex, qty };
 }
 
-/** `/checkout?c=&o=&q=` (BuyCta 의 checkoutUrl 과 같은 모양 — 서버에서도 쓰기 위해 별도 정의) */
-export function checkoutHref(code: string, optionIndex: number, qty: number): string {
-  return `/checkout?c=${encodeURIComponent(code)}&o=${optionIndex}&q=${qty}`;
+/** `/checkout?c=&o=&q=` (BuyCta 의 checkoutUrl 과 같은 모양 — 서버에서도 쓰기 위해 별도 정의). guest=true 면 `&g=1`(비회원 구매 모드, 0021) */
+export function checkoutHref(code: string, optionIndex: number, qty: number, guest = false): string {
+  return `/checkout?c=${encodeURIComponent(code)}&o=${optionIndex}&q=${qty}${guest ? "&g=1" : ""}`;
 }
+
+/** `?g=1` — 비회원 구매 모드 표식 (미로그인 + 이 값일 때만 비회원 폼 · 로그인 상태면 무시) */
+export function isGuestParam(sp: Record<string, string | string[] | undefined>): boolean {
+  return first(sp.g) === "1";
+}
+
+/** 토스 결제위젯 비회원 customerKey — `@tosspayments/tosspayments-sdk` 의 `ANONYMOUS` 상수와 같은 값(SDK 는 브라우저 동적 import 라 여기 복제) */
+export const TOSS_ANONYMOUS_CUSTOMER_KEY = "@@ANONYMOUS";
 
 /* ---------------- 배송지 폼 ---------------- */
 

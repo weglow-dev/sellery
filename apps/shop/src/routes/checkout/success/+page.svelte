@@ -13,6 +13,7 @@
 	import { page } from '$app/state';
 	import { DEFAULT_SETTINGS, won } from '@sellery/db/campaign';
 	import { COMPANY } from '@sellery/db/company';
+	import { guestOrderHref } from '@sellery/db/guest-order';
 	import { failText, parseCheckoutReturn, parseSuccessParams, RETURN_KEY, type CheckoutReturn, type FailText } from '@sellery/payments/checkout-rules';
 	import { ProductIcon } from '@sellery/ui/site';
 
@@ -31,11 +32,12 @@
 		storeUrl: string;
 		buyerName: string;
 	};
-	type ConfirmOk = { ok: true; orderCode: string; already?: boolean; card: ConfirmCard | null };
+	/** guest: 비회원 주문(0021) — 조회 토큰 쿠키가 심어졌으니 "주문 보기" 는 /orders/g/<code> */
+	type ConfirmOk = { ok: true; orderCode: string; already?: boolean; card: ConfirmCard | null; guest?: boolean };
 	type ConfirmFail = { ok: false; code: string; message?: string };
 	type State =
 		| { kind: 'loading' }
-		| { kind: 'ok'; orderCode: string; already: boolean; card: ConfirmCard | null; amount: number }
+		| { kind: 'ok'; orderCode: string; already: boolean; card: ConfirmCard | null; amount: number; guest: boolean }
 		| { kind: 'fail'; fail: FailText; code: string };
 
 	const RETRY_DELAY_MS = 1500;
@@ -88,7 +90,7 @@
 				}
 				const d = r.data;
 				if (r.status >= 200 && r.status < 300 && d && d.ok === true) {
-					view = { kind: 'ok', orderCode: d.orderCode, already: d.already === true, card: d.card ?? null, amount: body.amount };
+					view = { kind: 'ok', orderCode: d.orderCode, already: d.already === true, card: d.card ?? null, amount: body.amount, guest: d.guest === true };
 					return;
 				}
 				const code = d && d.ok === false && d.code ? d.code : r.status === 409 ? 'CONFIRMING' : 'UNKNOWN';
@@ -126,7 +128,7 @@
 			<div class="btnrow" style="justify-content:flex-end;margin-top:18px">
 				<a href={COMPANY.csUrl} class="btn" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>문의하기</a>
 				{#if pending}
-					<a href="/account/orders" class="btn pri">내 주문</a>
+					<a href={ret?.retry?.includes('&g=1') ? '/orders/lookup' : '/account/orders'} class="btn pri">{ret?.retry?.includes('&g=1') ? '주문 조회' : '내 주문'}</a>
 				{:else}
 					{#if ret?.retry && view.code !== 'NOT_LIVE' && view.code !== 'SOLD_OUT'}
 						<a href={ret.retry} class="btn">다시 시도</a>
@@ -164,12 +166,18 @@
 				</tbody>
 			</table>
 			<p style="font-size:12px;color:var(--color-mute);margin-top:10px">
-				{#if card?.buyerName}<b>{card.buyerName}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{:else}<b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{/if}
+				{#if view.guest}
+					비회원 주문입니다 — 주문번호 <b style="font-family:var(--font-mono)">{view.orderCode.toUpperCase()}</b>와 주문 시 입력한 <b>연락처</b>로 언제든 <a href="/orders/lookup" class="underline underline-offset-2">주문 조회</a>에서 배송·환불·문의를 할 수 있어요.
+				{:else if card?.buyerName}<b>{card.buyerName}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{:else}<b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{/if}
 				운송장은 카카오 알림톡으로 안내됩니다.
 			</p>
 			<div class="btnrow" style="justify-content:flex-end;margin-top:18px">
 				<a href={COMPANY.csUrl} class="btn" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>문의하기</a>
-				<a href="/account/orders" class="btn">내 주문</a>
+				{#if view.guest}
+					<a href={guestOrderHref(view.orderCode)} class="btn">주문 보기</a>
+				{:else}
+					<a href="/account/orders" class="btn">내 주문</a>
+				{/if}
 				<a href={storeHref} class="btn pri">확인</a>
 			</div>
 		</div>

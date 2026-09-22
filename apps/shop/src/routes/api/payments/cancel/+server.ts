@@ -2,8 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
 import type { Json } from '@sellery/db/database.types';
+import { guestTokenCookieName } from '@sellery/db/guest-order';
 import { cleanText } from '@sellery/db/text';
-import { createAdminClient } from '$lib/server/db';
+import { createAdminClient, verifyGuestOrder } from '$lib/server/db';
 import {
 	apiError,
 	isTossError,
@@ -23,7 +24,8 @@ import {
  * POST /api/payments/cancel — 고객 셀프 환불 (app-plan §6.2 · §7.4 · web api/payments/cancel/route.ts 1:1).
  *
  * 입력 { code(주문번호 o2001), reason? } — reason 은 선택지(단순 변심/상품 하자/오배송/기타)+자유 텍스트, cleanText 후 200자.
- * 순서(고정): ① 401 → ② user 클라이언트(RLS orders_select_own)로 본인 주문 조회, 없으면 404
+ * 순서(고정): ① 401(비회원(0021)은 HttpOnly 쿠키 `slry_guest_<code>` 의 조회 토큰을 app_guest_order_verify 로 검증 — 없거나 불일치면 401)
+ *   → ② user 클라이언트(RLS orders_select_own)로 본인 주문 조회(비회원은 검증된 order id 로 service 조회), 없으면 404
  *   → ③ app_refund_precheck(order.id, 'customer')(가드만: PAID·비샘플·비SETTLED·미발송)
  *   → ④ 토스 POST /v1/payments/{paymentKey}/cancel (Idempotency-Key: order.id) — 실패면 DB 는 PAID 그대로 + 500
  *   → ⑤ app_refund_record(order.id, 'customer', reason, cancels 합, payment) — 가드 없이 기록(토스가 확정한 취소는 DB 가 거부하지 않는다)
@@ -44,7 +46,7 @@ const ORDER_CODE_RE = /^[A-Za-z0-9_-]{1,32}$/;
 
 type Body = { code?: unknown; reason?: unknown };
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 	// ⓪ 같은 오리진·JSON 본문만 (CSRF — Supabase 쿠키 SameSite 에만 기대지 않는다)
 	const cross = rejectCrossSite(request);
 	if (cross) return cross;
@@ -59,25 +61,43 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!ORDER_CODE_RE.test(codeRaw)) return apiError(400, 'BAD_REQUEST', '주문번호가 올바르지 않습니다');
 	const reason = (typeof body.reason === 'string' ? cleanText(body.reason).slice(0, 200) : '') || '고객 요청';
 
-	// ① 로그인
-	const { user } = await locals.safeGetSession();
-	if (!user || !locals.supabase) return apiError(401, 'UNAUTHORIZED');
+	const admin = createAdminClient();
 
-	// ② 본인 주문 (RLS orders_select_own — 타인 주문은 보이지 않는다 → 404). 화면은 대문자로 보여 주므로 소문자도 같이 찾는다.
-	const codes = Array.from(new Set([codeRaw, codeRaw.toLowerCase()]));
-	const { data: order, error: orderError } = await locals.supabase
-		.from('orders')
-		.select('id, code, status, campaign_id, tracking_no')
-		.in('code', codes)
-		.limit(1)
-		.maybeSingle();
-	if (orderError) {
-		console.error('[cancel] order lookup failed:', orderError.message);
-		return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+	// ① 로그인 — 또는 비회원 조회 토큰 쿠키 (0021)
+	const { user } = await locals.safeGetSession();
+	type OrderLite = { id: string; code: string; status: string; campaign_id: string; tracking_no: string | null };
+	let order: OrderLite | null = null;
+	if (user && locals.supabase) {
+		// ② 본인 주문 (RLS orders_select_own — 타인 주문은 보이지 않는다 → 404). 화면은 대문자로 보여 주므로 소문자도 같이 찾는다.
+		const codes = Array.from(new Set([codeRaw, codeRaw.toLowerCase()]));
+		const { data, error: orderError } = await locals.supabase
+			.from('orders')
+			.select('id, code, status, campaign_id, tracking_no')
+			.in('code', codes)
+			.limit(1)
+			.maybeSingle();
+		if (orderError) {
+			console.error('[cancel] order lookup failed:', orderError.message);
+			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+		}
+		order = data;
+	} else {
+		let orderId: string | null = null;
+		try {
+			orderId = await verifyGuestOrder(codeRaw.toLowerCase(), cookies.get(guestTokenCookieName(codeRaw)), admin);
+		} catch (e) {
+			console.error('[cancel] guest verify failed:', e instanceof Error ? e.message : e);
+			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+		}
+		if (!orderId) return apiError(401, 'UNAUTHORIZED');
+		const { data, error: orderError } = await admin.from('orders').select('id, code, status, campaign_id, tracking_no').eq('id', orderId).maybeSingle();
+		if (orderError) {
+			console.error('[cancel] guest order read failed:', orderError.message);
+			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+		}
+		order = data;
 	}
 	if (!order) return apiError(404, 'NOT_FOUND', '주문을 찾을 수 없습니다');
-
-	const admin = createAdminClient();
 
 	// ③ 가드 (토스 호출 전에만)
 	const { data: preJson, error: preError } = await admin.rpc('app_refund_precheck', {
