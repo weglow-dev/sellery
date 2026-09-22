@@ -603,6 +603,64 @@
   .why .card { padding: 16px 18px; }
   .why-i { font-size: 24px; margin-bottom: 6px; }
 
+  /* ---- 셀러리 소개 /about — 에디토리얼 스프레드 (skin.css 514–562 "셀러리 소개" 블록을 site 토큰으로) ---- */
+  .about .spread { display: grid; grid-template-columns: 1fr 1fr; background: var(--color-surface); box-shadow: var(--shadow-frame), var(--shadow-lift-2); margin: 3px 6px 22px 3px; }
+  .about .sp-l { padding: 34px 32px; background: var(--color-surface-2); display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .about .sp-r { padding: 34px 36px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  .about .tag { display: inline-block; align-self: flex-start; background: var(--color-bar); color: var(--color-bar-fg); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em; padding: 3px 9px; margin-bottom: 14px; }
+  .about h2 { font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1.25; margin: 0 0 14px; letter-spacing: -0.01em; }
+  .about .sp-r p { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.9; color: var(--color-ink); margin: 0 0 12px; }
+  .about .sp-r p b { color: var(--color-accent); }
+  .about .hand { font-family: var(--font-sans); font-style: italic; font-weight: 600; color: var(--color-accent); font-size: 14px; margin-bottom: 14px; letter-spacing: -0.01em; }
+  .about .cap { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-mute); text-align: center; margin-top: 12px; letter-spacing: 0.04em; }
+  .about .wordart { font-family: var(--font-display); font-weight: 800; font-size: 44px; line-height: 0.95; letter-spacing: 0.04em; color: var(--color-ink); }
+  .about .wordart span { color: var(--color-accent); }
+  .about .origin { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; font-family: var(--font-display); font-weight: 800; letter-spacing: 0.08em; font-size: 13px; color: var(--color-mute); }
+  .about .origin span { background: var(--color-surface); box-shadow: var(--shadow-frame-soft); padding: 5px 10px; }
+  .about .origin span.em { background: var(--color-bar); color: var(--color-bar-fg); box-shadow: none; }
+  .about .origin i { font-style: normal; color: var(--color-accent); }
+  .about .stack .box { display: flex; gap: 16px; align-items: center; padding: 14px 18px; margin-bottom: 12px; border: 2px solid var(--color-bar); box-shadow: 4px 4px 0 var(--color-bar); background: var(--color-accent-soft); }
+  .about .stack .box b { font-family: var(--font-display); font-size: 17px; letter-spacing: 0.04em; min-width: 96px; }
+  .about .stack .box div { display: flex; flex-direction: column; gap: 2px; font-family: var(--font-mono); font-size: 11px; color: var(--color-ink); min-width: 0; }
+  .about .stack .box div em { font-style: normal; font-weight: 700; font-size: 12.5px; }
+  .about .stack .box.b2 { background: var(--color-lime); }
+  .about .stack .box.b3 { background: var(--color-accent); color: #fff; }
+  .about .stack .box.b3 div { color: #fff; }
+  .about .stack .box.all { background: var(--color-bar); color: var(--color-bar-fg); border-color: var(--color-bar); }
+  .about .stack .box.all div { color: var(--color-bar-fg); }
+  .about .stack .arrow { text-align: center; color: var(--color-accent); font-size: 22px; margin: -4px 0 8px; }
+  .about .tl { display: flex; flex-direction: column; gap: 0; }
+  .about .tl-step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 10px 0 12px 16px; border-left: 2px solid var(--color-bar); margin-left: 14px; position: relative; }
+  .about .tl-step i { position: absolute; left: -16px; top: 8px; width: 28px; height: 28px; background: var(--color-surface); border: 2px solid var(--color-bar); font: 700 12px var(--font-display); display: flex; align-items: center; justify-content: center; font-style: normal; }
+  .about .tl-step b { grid-column: 2; font-size: 14px; }
+  .about .tl-step span { grid-column: 2; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-mute); }
+  .about .tl-step.hi b { color: var(--color-accent); }
+  .about .tl-step.hi i { background: var(--color-lime); }
+  .about .store-trust { flex-wrap: wrap; }
+  .about .faq { border-bottom: 1.5px solid var(--color-soft-line); }
+  .about .faq:last-child { border-bottom: none; }
+  .about .faq.on { background: var(--color-surface-2); }
+  .about .faq-q { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 12px 18px; margin: 0; background: none; border: 0; box-shadow: none; text-align: left; font-family: var(--font-sans); font-weight: 700; font-size: 13.5px; color: var(--color-ink); cursor: pointer; line-height: 1.5; }
+  .about .faq-q:hover { transform: none; }
+  .about .faq-q .acc-arrow { color: var(--color-mute); font-size: 11px; flex-shrink: 0; }
+  .about .faq-a { font-size: 13px; color: var(--color-mute); line-height: 1.7; padding: 0 18px 14px; }
+  .about .card.cta { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .about .card.cta > div { min-width: 0; flex: 1 1 220px; }
+
+  /* ---- 인플루언서 목록 /influencers (프로토타입 vCustInfluencers 카드) ---- */
+  .infl-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .infl-id { min-width: 0; }
+  .infl-nm { font-size: 15px; }
+  .infl-sub { font-size: 12px; color: var(--color-mute); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
+  .infl-chips { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .catchip.sm { font-size: 11px; padding: 4px 10px; }
+  .infl-live { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .infl-live-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; text-decoration: none; color: var(--color-ink); min-width: 0; }
+  .infl-live-row .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .infl-live-row .n { color: var(--color-mute); white-space: nowrap; }
+  .infl-live-row .st { margin: 0; padding: 1px 6px 1px 4px; font-size: 9px; line-height: 1.6; }
+  .infl-live-row:hover .nm { text-decoration: underline; }
+
   /* ---- 판매 카드 .prod (base 194–206 → skin 118–121·298–303·566–590) ---- */
   .prod { display: flex; flex-direction: column; gap: 9px; }
   .prod .ph {
@@ -1470,6 +1528,8 @@
   @media (max-width: 900px) {
     .g4, .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .why, .cstats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .about .spread { grid-template-columns: 1fr; }
+    .about .wordart { font-size: 36px; }
     .cartgrid { grid-template-columns: 1fr; }
     .buyrow { flex-direction: column; }
     .buyrow .ghost.buy { flex: 1; }
@@ -1495,6 +1555,12 @@
     .hero-band .tagline { font-size: 15px; line-height: 1.5; }
     .hero-band .sub { line-height: 2; }
     .why { grid-template-columns: 1fr; }
+    .about .spread { margin: 3px 4px 18px 3px; }
+    .about .sp-l, .about .sp-r { padding: 24px 16px; }
+    .about h2 { font-size: 22px; }
+    .about .wordart { font-size: 32px; }
+    .about .stack .box { gap: 10px; padding: 12px 14px; }
+    .about .stack .box b { min-width: 72px; font-size: 15px; }
     .custgrid .grid.g2 { grid-template-columns: 1fr; }
     .hb-row { grid-template-columns: 110px 1fr 78px; }
     .hb-nm { font-size: 11px; }

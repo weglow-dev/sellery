@@ -10,6 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 import { CAMPAIGN_CODE_RE, parseCampaignCard, type CampaignCard, type HomeCard } from "../campaign";
+import type { SellerProfile } from "../sellers";
 import type { CampaignStatus } from "../types";
 import { createAnonClient } from "./admin.server";
 import { memoized, type DbEvent } from "./event.server";
@@ -199,6 +200,45 @@ export async function fetchPublicSellers(event: DbEvent): Promise<PublicSeller[]
     }));
   } catch (e) {
     console.error("[campaign] public sellers threw", e);
+    return [];
+  }
+}
+
+/* ---------------- 공개 인플루언서 프로필 (/influencers) ---------------- */
+
+/**
+ * `/influencers` 목록 — sellers 공개 grant 컬럼(0001: followers · category · intro 포함) + **인증된 메인 채널이 있는** 인플루언서만.
+ * `seller_channels!inner` 에 `is_primary=true` 를 걸면 RLS(`verified and seller_is_public(seller_id)`)가 미인증 채널을 걸러
+ * 조인이 비므로 행이 빠진다 — hidden 은 sellers RLS(`seller_is_public`)가 이미 뺀다. anon 으로 충분(서비스 롤 불필요).
+ * 정렬 팔로워 내림차순. 오류·클라이언트 없음 → 빈 배열.
+ */
+export async function fetchPublicSellerProfiles(event: DbEvent): Promise<SellerProfile[]> {
+  const supabase = event.locals.supabase;
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("sellers")
+      .select("id, code, name, handle, platform, avatar_url, followers, category, intro, grade, channels:seller_channels!inner(id)")
+      .eq("channels.is_primary", true)
+      .order("followers", { ascending: false });
+    if (error) {
+      console.error("[campaign] public seller profiles failed", error.message);
+      return [];
+    }
+    return (data ?? []).map((s) => ({
+      id: s.id,
+      code: s.code,
+      name: s.name,
+      handle: s.handle,
+      platform: s.platform,
+      avatar_url: s.avatar_url,
+      followers: s.followers,
+      category: s.category,
+      intro: s.intro,
+      grade: s.grade,
+    }));
+  } catch (e) {
+    console.error("[campaign] public seller profiles threw", e);
     return [];
   }
 }
