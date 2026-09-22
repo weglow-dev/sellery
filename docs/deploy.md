@@ -71,8 +71,8 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `PUBLIC_DEV_LOGIN` | Preview 선택(`1`) | — | — | 개발용 이메일 로그인 폼 — dev 또는 `VERCEL_ENV=preview` 에서만 렌더, Production 은 값이 있어도 안 뜬다 |
 | `PUBLIC_DEMO` | — | 선택(`1` 이면 `(demo)` 그룹 노출) | **brand: `1` 을 Production 에 둔다(2단계 병합까지 — 그 전엔 데모가 브랜드에게 보여줄 유일한 화면, brand-console-plan §6) · 없으면 `/brand/demo` 등 데모 경로 404** · admin: 예약 | `monorepo-migration.md` 결정 8 · C · §1.2 · brand-console-plan §2.1 |
 | `SUPABASE_SERVICE_ROLE_KEY` | **비밀** | **비밀**(Production + Preview) | **brand: 비밀(Production + Preview) — 브랜드 콘솔 1단계부터 `requireBrand()` · `create_brand_from_signup` 이 쓴다** · admin: — | RLS 우회 — `$lib/server/env.ts` → `configureDb()` 에서만 읽는다 |
-| `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | — | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
-| `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503 |
+| `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | **brand: 비밀(브랜드 콘솔 4단계 브랜드 환불 = 토스 취소 · shop 과 같은 값 · Production + Preview)** · admin: — | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
+| `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` · `/api/cron/campaign-tick` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503. **Vercel Cron 은 이 이름의 env 가 있으면 `Authorization: Bearer <값>` 을 자동으로 붙인다**(§8.2) |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | brand: 선택 · admin: — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] · 브랜드 가입·정지 한 줄(이메일·핸들·사업자번호 없이) |
 | `RRN_ENC_KEY` | — | **비밀(5단계 0013 · Production + Preview 는 서로 다른 값)** | — | 주민등록번호 `pgp_sym_encrypt` 키 → `configureDb({ rrnEncKey })`. **DB·코드·마이그레이션에 없다.** 없으면 `/settle` 의 주민번호 저장만 `RRN_KEY_MISSING`(다른 화면 정상). 생성·회전·백업은 §6.4 |
 
@@ -303,9 +303,9 @@ npm run check                                            # 타입 깨짐 확인 
 
 `data-model.md §8.4`(anon 가시성) · `§10.4`(0008 함수 · grant) 의 쿼리를 `npx supabase db query --linked` 로 문장별 실행. 요지: anon 은 `campaign_card('c1')` 을 읽고 `checkout_sessions` · `app_*` 함수는 permission denied, service_role 은 전부 가능.
 
-### 6.3 수동 운영 잡
+### 6.3 크론 · 수동 운영 잡
 
-크론 없음(슬라이스 1) — reconcile · 세션 만료 · PII 파기 · 운영 큐는 §8.2 표대로 손으로 돌린다. 슬라이스 4 에서 캠페인 스케줄러와 함께 Vercel Cron(`apps/shop/vercel.json` `crons`) 으로 옮긴다(`app-plan.md §12`).
+**Vercel Cron(2026-09-22 · 브랜드 콘솔 4단계 PR-A)** — `apps/shop/vercel.json` `crons`: `/api/cron/campaign-tick` 매시 5분(UTC · 0018 `app_campaign_tick` — KST 자정 직후 첫 실행에서 SCHEDULE_CONFIRMED→LIVE · LIVE→CLEARING) · `/api/cron/reconcile` 10분마다. Production 배포에만 등록되고 Vercel 이 GET + `Authorization: Bearer $CRON_SECRET` 으로 부른다(§8.2). 세션 만료 · PII 파기 · 운영 큐는 §8.2 표대로 손으로.
 
 ### 6.4 주민등록번호 암호화 키 `RRN_ENC_KEY` (0013 · 인플루언서 콘솔 5단계)
 
@@ -367,16 +367,25 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 |---|---|---|
 | `packages/db/scripts/partner-admin.mjs` | 인플루언서 운영(관리자 화면 없음) — `list [--inactive]` · `suspend <seller> ["사유"]` · `reactivate` · `link <seller> <user_id>` · `invite <email> --link <seller>`(초대 메일 → `${PUBLIC_SITE_URL}/influencer/auth/confirm?next=/influencer/password/new`) · `channels [--pending]` · `verify-channel <ch>` · `unverify-channel` · **4단계** `payments [--pending] [--seller s7]`(결제 표 · 운영 큐) · `refund-sample <payment id | slrp_ orderId> ["사유"]`(브랜드 발송 전 취소 — 토스 전액 취소 → `app_partner_payment_refund`: 🥬 복구 · 캠페인 DECLINED · 주문 CANCELED, 두 번 실행해도 원장 1행 · `TOSS_SECRET_KEY` 필요). production 허용 | `node packages/db/scripts/partner-admin.mjs payments --pending` |
 | `packages/db/scripts/dev-seller.mjs` | 개발용 인플루언서 계정(확인 완료) + 시드 `sellers` 행 연결. **production 거부** | `node packages/db/scripts/dev-seller.mjs --email dev-seller@sellery.test --seller s1` |
-| `packages/db/scripts/partner-admin.mjs` (브랜드) | 브랜드 운영(브랜드 콘솔 1단계 · 0014) — `brands [--inactive]` · `suspend-brand <b> ["사유"]`(listed 상품은 자동으로 내리지 않고 경고) · `reactivate-brand <b>` · `link-brand <b> <user_id>` · `invite-brand <email> --link <b>`(초대 메일 → `${PUBLIC_SITE_URL}/brand/auth/confirm?next=/brand/password/new`). 시드 b1·b2 는 `*.example` 이라 실제 담당자 메일로 | `node packages/db/scripts/partner-admin.mjs brands` |
+| `packages/db/scripts/partner-admin.mjs` (브랜드) | 브랜드 운영(브랜드 콘솔 1단계 · 0014) — `brands [--inactive]` · `suspend-brand <b> ["사유"]`(listed 상품은 자동으로 내리지 않고 경고) · `reactivate-brand <b>` · `link-brand <b> <user_id>` · `invite-brand <email> --link <b>`(초대 메일 → `${PUBLIC_SITE_URL}/brand/auth/confirm?next=/brand/password/new`). 시드 b1·b2 는 `*.example` 이라 실제 담당자 메일로. 2단계 `products` · `review-product` · 3단계 `campaign <c>` · **4단계(0018)** `tick`(스케줄러 전체 · 크론 대신 수동) · `tick-campaign <c>` · `orders --campaign <c>\|--brand <b> [--unshipped]` · `cs [--open] [--brand <b>]` | `node packages/db/scripts/partner-admin.mjs brands` |
 | `packages/db/scripts/dev-brand.mjs` | 개발용 브랜드 계정(확인 완료) + 시드 `brands` 행 연결(`create_brand_from_signup(p_link_id)`). **production 거부**. 표준 테스트 계정 `dev-brand@sellery.test ← b1 바인허브` | `node packages/db/scripts/dev-brand.mjs --email dev-brand@sellery.test --brand b1` |
 | `packages/db/scripts/dev-user.mjs` | 개발용 고객 이메일/비밀번호 계정(`PUBLIC_DEV_LOGIN=1` 폼용) | `node --env-file=.env.local packages/db/scripts/dev-user.mjs <email> <password>` |
 | `packages/db/scripts/gen-types.mjs` | Supabase 타입 → `packages/db/src/database.types.ts`(UTF-8 · LF). `supabase link` 전제(§6.1) | `npm run gen:types` |
 
-### 8.2 수동 잡 (슬라이스 1 — 크론 없음)
+### 8.2 크론 · 수동 잡
+
+**Vercel Cron(`apps/shop/vercel.json` `crons` · Production 만)** — 스케줄은 UTC. Vercel 이 각 `path` 를 GET 으로 호출하고, 프로젝트 env 에 **`CRON_SECRET`** 이 있으면 `Authorization: Bearer <CRON_SECRET>` 을 자동으로 붙인다 — 라우트(`$lib/server/cron` rejectCron)가 이 헤더(또는 `x-cron-secret`)를 상수 시간 비교로 검사하고, env 가 없으면 503(실행 안 함). Hobby 플랜은 크론이 하루 1회로 제한되므로 팀 `weglow-team` 이 Pro 인지 확인(대시보드 → sellery-shop → Settings → Cron Jobs 에 두 잡이 보이고 마지막 실행 로그가 200 이면 정상).
+
+| 크론 | 경로 · 스케줄 | 하는 일 |
+|---|---|---|
+| 캠페인 스케줄러 | `/api/cron/campaign-tick` · `5 * * * *`(매시 5분 UTC = KST 매시 5분) | 0018 `app_campaign_tick()` — SCHEDULE_CONFIRMED · `start_date ≤ 오늘(KST)` → LIVE(`went_live`) · LIVE · `end_date < 오늘` → CLEARING(`ended{due_on}`). 멱등. 정산(→ SETTLED)은 관리자. 수동: `curl https://sellery.life/api/cron/campaign-tick -H "Authorization: Bearer $CRON_SECRET"` 또는 `partner-admin.mjs tick` |
+| reconcile | `/api/cron/reconcile` · `*/10 * * * *` | 아래 표의 reconcile 행과 동일(고객 세션 + 파트너 샘플 결제) |
+
+수동 잡:
 
 | 잡 | 방법 | 주기 |
 |---|---|---|
-| reconcile — CONFIRMING 고착 · `FAILED(CANCEL_PENDING)` 종결(`app-plan.md §7.5`) + **파트너 샘플 결제**(0012 `app_partner_payments_expire` · `app_partner_payments_stale` → 재조회 종결 · 응답 `partner:{expired,checked,results}`) | `curl -X POST https://sellery.life/api/cron/reconcile -H "Authorization: Bearer $CRON_SECRET"` | 결제 테스트 뒤 · 하루 1회 |
+| reconcile — CONFIRMING 고착 · `FAILED(CANCEL_PENDING)` 종결(`app-plan.md §7.5`) + **파트너 샘플 결제**(0012 `app_partner_payments_expire` · `app_partner_payments_stale` → 재조회 종결 · 응답 `partner:{expired,checked,results}`) | `curl -X POST https://sellery.life/api/cron/reconcile -H "Authorization: Bearer $CRON_SECRET"` | 크론 10분 — 수동은 결제 테스트 직후 확인용 |
 | 세션 만료 — PENDING · payment_key 없는 CONFIRMING → EXPIRED | `npx supabase db query --linked "select expire_checkout_sessions()"` | 하루 1회 |
 | PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
 | 운영 큐 확인(부분취소 · 정산 완료 뒤 취소 등) | `select id, source, result, received_at from payment_events where handled = false order by received_at desc` | 매일 |

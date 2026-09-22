@@ -600,7 +600,7 @@ due_on              = campaigns.end_date + clear_days(21)
 | 🥬 잔액 검사(차감 전 `celery_balances.balance >= 금액`), 획득분(`earned`) 적재, 충전(`topup`+`won`) | `celSpend` L1483, `celEarned` L1452 | glo 0009 `use_points` 패턴의 RPC/트랜잭션 |
 | **정산 계산**(§4) — 결과만 `settlements` 스냅샷 | `calc` L1634, `runSettle` L4253 | 요율·등급·추천 횟수가 시점 의존. DB 는 스냅샷 보관과 1회 실행 유니크만 |
 | 브랜드 등급 재계산(`brand_grade_for_gmv(brand_gmv(id))`) | L1529-1536 | 주문 합계 의존 → 주문/정산 시 서버가 갱신(시드는 마지막 update) |
-| 스케줄러 전이 `SCHEDULE_CONFIRMED → LIVE`(start ≤ today), `LIVE → CLEARING`(end < today), 자동 발주 메일 | `autoTick` L1422-1429 | 크론/Edge Function (**추정**) |
+| 스케줄러 전이 `SCHEDULE_CONFIRMED → LIVE`(start ≤ today), `LIVE → CLEARING`(end < today), 자동 발주 메일 | `autoTick` L1422-1429 | **0018 `app_campaign_tick()`**(KST 달력일 · 이벤트 went_live / ended) — Vercel Cron `/api/cron/campaign-tick` 매시(§5.2.1). 자동 발주 메일은 아직 없음 |
 | **링크 진입 보호**(`custVisible` L3255-3260): 판매 링크로 들어온 방문자에게 같은 상품·같은 카테고리의 타 인플루언서 캠페인을 숨김. 종료 후 7일 해제 | `slry-linkctx` L1566-1578 | 방문 컨텍스트(브라우저)에 달린 규칙이라 **행 가시성으로 표현 불가**. 쿠키를 읽는 서버 필터. DB 는 "공개 캠페인 전체 읽기 가능"까지만 |
 | 마스킹·게이트: 비공개 인플루언서 `○○○`, 데이터 확인권 없으면 지표 제거, 상대 파트너의 이메일/계좌 제거, 인플루언서 화면의 구매자명 `김*은`, `platform_fee/platform_net` 는 admin 만, 타 인플루언서는 익명 집계만 | access-model §2, §4.3 | 같은 행을 상대·상태에 따라 다르게 보여주는 규칙 — 컬럼 권한으로 표현 불가 |
 | 연락처/외부 메신저 감지 → `leak_flag` | L1662-1664 | insert 시 서버 정규식 |
@@ -609,7 +609,7 @@ due_on              = campaigns.end_date + clear_days(21)
 
 #### 5.2.1 위 규칙 중 RPC(security definer · service role) 로 이관된 것 — 0010~0016
 
-"앱이 강제" 로 시작했던 규칙 가운데 파트너 콘솔 단계에서 **DB 함수 안으로** 옮긴 것. 함수는 전부 `{ok, code}` 를 돌려주고 라우트가 문구로 바꾼다(`packages/db/src/{partner,brand}/*-rules.ts`). 나머지 행(기간제 · 정산 계산 · 스케줄러 · 링크 보호 · 마스킹)은 그대로 앱/크론.
+"앱이 강제" 로 시작했던 규칙 가운데 파트너 콘솔 단계에서 **DB 함수 안으로** 옮긴 것. 함수는 전부 `{ok, code}` 를 돌려주고 라우트가 문구로 바꾼다(`packages/db/src/{partner,brand,cs}/*-rules.ts`). 나머지 행(정산 계산 · 링크 보호 · 마스킹)은 그대로 앱/크론.
 
 | 규칙(위 표) | 마이그레이션 · 함수 | 비고 |
 |---|---|---|
@@ -626,6 +626,10 @@ due_on              = campaigns.end_date + clear_days(21)
 | 재고 배정 `qty <= stock − allocated` (제안·승인 시) | 0016 `app_propose_schedule(p_seller_id, p_campaign_id, p_start, p_end, p_qty)` → `QTY_EXCEEDS_STOCK{left}` · `app_brand_confirm_schedule` → `STOCK_SHORT{left}` — `products for update` 로 직렬화 | `price_locked/rate_locked` 스냅샷(0003 컬럼)은 확정 시 `products.sale_price/commission_rate` 를 기록 — "추정" 이었던 설계가 확정됨 |
 | 상태 전이 T10(패스) · T11(제안) · T12(확정) · T13(반려) · T2(초대) · T2'(수락/거절) | 0016 `app_pass_campaign` · `app_propose_schedule` · `app_brand_confirm_schedule` · `app_brand_reject_schedule(…, p_reason)` · `app_brand_invite_seller(p_brand_id, p_seller_id, p_product_id, p_message, p_actor_user_id)` · `app_accept_invite(…, p_shipping)` · `app_decline_invite(…, p_reason)` — NOT_FOUND · WRONG_STATUS{status} · NOT_LISTED · EXCLUSIVE_LOCKED · ALREADY_ACTIVE · PRIORITY_INVITE_GATED{grade, cost_cel} · SELLER_HIDDEN · BAD_SHIPPING{field} · already | 초대 후보 `app_brand_invite_candidates`(골드 이하 · 공개 · 인증 채널 · 진행 중 쌍 없음) · 인플루언서 폼 컨텍스트 `app_seller_schedule_context`(stock_left · holders · len_choices) |
 | 연락처/외부 메신저 감지 → `leak_flag` | 0016 `app_campaign_chat(p_actor_role, p_actor_id, p_actor_user_id, p_campaign_id, p_body)` — `campaign_leak_detected(text)`(데모 정규식) → 행 `leak_flag=true` + 시스템 행 `leak_warned` · 당사자 확인 · 1~1000자 | 두 콘솔 공용. "insert 시 서버 정규식" 이 DB 함수로 이동 |
+| **스케줄러 전이** `SCHEDULE_CONFIRMED → LIVE`(start ≤ 오늘) · `LIVE → CLEARING`(end < 오늘) | 0018 `app_campaign_tick()` → `{went_live, ended, *_codes}` · `app_campaign_tick_one(p_campaign_id)` — 오늘 = Asia/Seoul 달력일 · `for update` · 이벤트 `went_live{start_date,end_date}` / `ended{end_date, due_on = end + platform_clear_days()}` · 멱등 | 브랜드 4단계. shop `/api/cron/campaign-tick`(Vercel Cron 매시 · `CRON_SECRET`) · `partner-admin.mjs tick`. 정산(→ SETTLED)은 관리자 |
+| 브랜드 주문 표 · 운송장 · 발주서 (수취인 열람 = 발송 목적 · 샘플 주문 제외) | 0018 `app_brand_orders(p_brand_id, p_filter all\|unshipped\|shipped\|refunded, p_campaign_id, p_limit)`(`brand_order_json` — buyer_email 마스킹 · shipping 원문 · totals) · `app_brand_ship_order(…, p_courier, p_tracking_no)` — NOT_FOUND · SAMPLE · NOT_PAID{status} · BAD_COURIER · BAD_TRACKING · already · replaced(정정 덮어쓰기) · `app_brand_ship_orders(p_brand_id, p_rows jsonb)`(≤ 500 · 행별 결과 · 부분 성공) · `app_brand_po_rows(p_brand_id, p_campaign_id\|null)` → PAID 주문 + 수취인 · `campaigns.po_exported_at`(첫 내보내기에 이벤트 `po_sent` 1회) | 발송 판정은 여전히 0004 규칙(PAID && tracking_no) — 상태 전이 없음 |
+| 브랜드 환불 가드 — **발송 전만**(발송 후는 교환·반품 CS) | 0018 `app_brand_refund_precheck(p_brand_id, p_order_id)` → 소유(NOT_FOUND) · SAMPLE · SHIPPED 뒤 0008 `app_refund_precheck(order, 'brand')` 위임. 기록은 앱(`@sellery/payments` `refundOrderAsBrand`: 토스 취소 → 0008 `app_refund_record(actor 'brand')`) | 계획서 §4 "발송 후도 브랜드는 가능" 대신 `isRefundable` SHIPPED 와 같은 정책으로(brand-console-plan §8) |
+| 고객 문의는 브랜드로 직행 · `order_code` 원문 + 같은 캠페인 범위 해석 · 비회원 `client_token` | 0018 `app_cs_open(p_campaign_id, p_customer_id, p_user_id, p_buyer_name, p_type, p_body, p_order_code)` — LIVE·CLEARING·SETTLED 만(WRONG_STATUS) · BAD_TYPE · BAD_BODY{max 2000} · 이벤트 `cs_received` · `app_cs_thread(code, token\|user)` · `app_cs_customer_reply`(ANSWERED → OPEN · CLOSED 거부) · `app_cs_list_for_user` · `app_brand_cs_list(p_brand_id, p_status)` · `app_brand_cs_thread` · `app_brand_cs_reply(…, p_actor_user_id, p_body)`(→ ANSWERED · `replied_at` · 이벤트 `cs_replied`) · `app_brand_cs_close`(→ CLOSED · already) · 헬퍼 `cs_conversation_json` · `cs_thread_json` · `cs_normalize_body` | 0005 테이블 그대로(RLS 정책 없음 · 서비스 롤). 레이트리밋은 앱 |
 
 ---
 
