@@ -41,6 +41,18 @@
 //   orders [--campaign <campaign>] [--brand <brand>] [--unshipped|--shipped|--refunded] [--limit N]   브랜드 주문 표(app_brand_orders · 샘플 제외 · 수취인은 이름만) — --brand 없으면 캠페인의 브랜드
 //   cs [--open] [--brand <brand>] [--limit N]   고객 문의 표(cs_conversations 최신순 50) — --open = OPEN 만 · --brand 로 한 브랜드만. 답변·종료는 브랜드 콘솔에서
 //
+//   ── 관리자 콘솔 "정산 · 돈" PR-A (0020 — docs/admin-console-plan.md · settlement-policy §8 · 화면(PR-B) 전까지 여기서) ──
+//   settle-preview <campaign>               app_admin_settle_preview — calc() 전체 라인 · 보류 예고 · 실행 가능 여부 (LIVE/CLEARING 실시간 · SETTLED 스냅샷)
+//   settle-run <campaign> [--force]         app_admin_settle_run — CLEARING · 기준일(D+21) 도래분만. --force 는 기준일 전 강제(운영 예외). 한 트랜잭션 · SETTLED 면 already
+//   settle-due                              app_admin_settle_run_due — 기준일 도래 CLEARING 전부 (runSettleAll · 크론 후보)
+//   settlements [--status pending|held|paid] [--limit N]   app_admin_settlements — 대기 큐(CLEARING) + 스냅샷 표 + 카운트
+//   payouts [--status pending|held|paid|all]               지급 표(payouts · 계좌는 마스킹 스냅샷) — 이체 파일은 payouts-export
+//   payouts-export [--status pending] --purpose "지급 배치 2026-10" [--out 파일.csv]   app_admin_payout_export — 계좌 **원문** CSV(BOM+CRLF). 건마다 sensitive_access_log. actor = ADMIN_ACTOR env 또는 OS 사용자
+//   payout-paid <payout id> ["메모"]        app_admin_payout_mark_paid — 이체 후 지급 완료(pending → paid · 양측 paid 면 정산 paid)
+//   payout-hold <payout id> ["사유"] · payout-release <payout id>   운영자 보류 / 해제(정보 완비 재검사 · STILL_INCOMPLETE 면 거부)
+//   payments-health                         app_admin_payments_health — 결제 정합성 카운트(만료 세션 · 미처리 이벤트 · 부분취소 · 정산 후 조정 큐 …)
+//   admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]   전 브랜드 주문 표
+//
 //   <seller> · <channel> · <brand> · <product> · <campaign> 는 code('s1' · 'ch1' · 'b1' · 'p1' · 'c3') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
@@ -98,6 +110,9 @@ function usage(code = 2) {
       "  products [--pending] [--brand <brand>] [--limit N] | review-product <product> approve|reject|pause [\"사유\"]",
       "  campaign <campaign>",
       "  tick | tick-campaign <campaign> | orders [--campaign c] [--brand b] [--unshipped|--shipped|--refunded] [--limit N] | cs [--open] [--brand b] [--limit N]",
+      "  settle-preview <campaign> | settle-run <campaign> [--force] | settle-due | settlements [--status pending|held|paid] [--limit N]",
+      "  payouts [--status pending|held|paid|all] | payouts-export [--status pending] --purpose \"…\" [--out file.csv] | payout-paid <id> [\"메모\"] | payout-hold <id> [\"사유\"] | payout-release <id>",
+      "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
     ].join("\n"),
   );
   process.exit(code);
@@ -689,10 +704,294 @@ async function cmdCs() {
   );
 }
 
+/* ------------------------------------------------------------ 관리자 콘솔 "정산 · 돈" PR-A (0020) ------------------------------------------------------------ */
+
+const won = (v) => (v === null || v === undefined ? "" : `₩${Number(v).toLocaleString("ko-KR")}`);
+const adminActor = () => process.env.ADMIN_ACTOR || process.env.USERNAME || process.env.USER || "partner-admin.mjs";
+
+async function campaignIdOf(ref) {
+  if (!ref) usage();
+  const q = UUID_RE.test(ref) ? admin.from("campaigns").select("id, code, status").eq("id", ref) : admin.from("campaigns").select("id, code, status").eq("code", ref);
+  const { data: c, error } = await q.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new Error(`캠페인을 찾을 수 없습니다: ${ref}`);
+  return c;
+}
+
+function holdText(h) {
+  return h ? `${h.code} (${h.label})` : "";
+}
+
+function printPreview(k) {
+  console.log(`[partner-admin] ${k.campaign_code} · ${k.campaign_status} · ${k.source} · ${k.title ?? ""}`);
+  if (k.source === "none") {
+    console.log("  스냅샷 없는 SETTLED (이관 데이터) — 금액 없음");
+    return;
+  }
+  console.table([
+    { 항목: "확정 매출 net", 값: won(k.net), 비고: `gross ${won(k.gross)} − refunds ${won(k.refunds)} · 샘플분 ${won(k.sample_net)} · 결제 ${k.paid_count} / 환불 ${k.refund_count}` },
+    { 항목: "PG", 값: won(k.pg_fee), 비고: `${k.pg_rate}` },
+    { 항목: "인플루언서 기본 sf", 값: won(k.seller_fee), 비고: `${k.seller_rate} · ${k.seller_grade ?? ""} +${k.seller_bonus_pp}%p` },
+    { 항목: "등급 보너스", 값: won(k.seller_bonus), 비고: "플랫폼 부담" },
+    { 항목: "추천 부스트 / 추천인 보상", 값: `${won(k.ref_boost)} / ${won(k.ref_reward)}`, 비고: k.ref_boost_applied ? "적용" : "미적용" },
+    { 항목: "브랜드 추천 할인 / 보상", 값: `${won(k.brand_ref_boost)} / ${won(k.brand_ref_reward)}`, 비고: k.brand_ref_applied ? "적용" : "미적용" },
+    { 항목: "브랜드 등급 할인", 값: won(k.brand_discount), 비고: `${k.brand_grade ?? ""} ${k.brand_discount_rate}` },
+    { 항목: "플랫폼 10% / costs / pf", 값: `${won(k.platform_fee_gross)} / ${won(k.costs)} / ${won(k.platform_fee)}`, 비고: `vat ${won(k.vat)} · 순수익 ${won(k.platform_net)}` },
+    { 항목: "인플루언서 세전 / 원천징수 / 실수령", 값: `${won(k.seller_fee_total)} / ${won(k.seller_wht)} / ${won(k.seller_payout)}`, 비고: `wht ${k.wht_rate} · 샘플 환급 🥬${k.sample_refund_cel} + ${won(k.sample_refund_cash)}` },
+    { 항목: "브랜드 정산액", 값: won(k.brand_payout), 비고: `🥬 보전 ${won(k.sample_cel_cover)}` },
+    { 항목: "보류 예고", 값: [k.hold_seller ? `인플 ${holdText(k.holds?.seller)}` : "", k.hold_brand ? `브랜드 ${holdText(k.holds?.brand)}` : ""].filter(Boolean).join(" · ") || "없음", 비고: "" },
+    { 항목: "기준일 · 실행 가능", 값: `${k.due_on ?? "-"} · ${k.eligible ? "가능" : `불가 (${k.reason ?? ""})`}`, 비고: k.settlement ? `정산 ${k.settlement.status} · ${fmtDate(k.settlement.settled_at)}` : "" },
+  ]);
+  if (k.payouts?.seller || k.payouts?.brand) {
+    console.table(
+      [k.payouts.seller, k.payouts.brand].filter(Boolean).map((p) => ({
+        id: p.id,
+        대상: p.payee_type,
+        상태: p.status,
+        금액: won(p.amount),
+        원천징수: won(p.wht),
+        보류: p.hold_code ? `${p.hold_code} · ${p.hold_reason ?? ""}` : "",
+        계좌: p.bank_snapshot ? `${p.bank_snapshot.bank ?? ""} ${p.bank_snapshot.account_masked ?? ""} ${p.bank_snapshot.holder ?? ""}` : "",
+        지급일: fmtDate(p.paid_at),
+      })),
+    );
+  }
+}
+
+async function cmdSettlePreview() {
+  const c = await campaignIdOf(positional[0]);
+  const { data, error } = await admin.rpc("app_admin_settle_preview", { p_campaign_id: c.id });
+  if (error) throw new Error(`app_admin_settle_preview failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`미리보기 실패: ${data?.code ?? "BAD_RESULT"}${data?.status ? ` (${data.status})` : ""}`);
+  printPreview(data);
+}
+
+function printRun(r) {
+  if (!r.ok) {
+    console.error(`[partner-admin] 정산 실행 거부: ${r.code}${r.status ? ` (${r.status})` : ""}${r.due_on ? ` (기준일 ${r.due_on} · 오늘 ${r.today})` : ""}`);
+    return false;
+  }
+  if (r.already) {
+    console.log(`[partner-admin] ${r.campaign_code}: 이미 정산 완료 (settlement ${r.settlement_id ?? "없음"})`);
+    return true;
+  }
+  const holds = [r.holds?.seller ? `인플 보류 ${holdText(r.holds.seller)}` : "", r.holds?.brand ? `브랜드 보류 ${holdText(r.holds.brand)}` : ""].filter(Boolean).join(" · ");
+  console.log(
+    `[partner-admin] ${r.campaign_code}: 정산 완료 — 확정 ${won(r.net)} → 브랜드 ${won(r.brand_payout)} · 인플루언서 ${won(r.seller_payout)} (세전 ${won(r.seller_fee_total)} − 원천징수 ${won(r.seller_wht)})` +
+      ` · 플랫폼 ${won(r.platform_fee)}${holds ? ` · ${holds}` : ""}${r.forced ? " · 기준일 전 강제" : ""}`,
+  );
+  console.log(
+    `  🥬 획득 인플 ${r.celery?.seller_earned ?? 0} / 브랜드 ${r.celery?.brand_earned ?? 0} · 샘플 환급 🥬${r.celery?.sample_refund_cel ?? 0} + ${won(r.celery?.sample_refund_cash ?? 0)}` +
+      ` · 추천 보상 ${won(r.referral?.seller_reward ?? 0)} / 브랜드 ${won(r.referral?.brand_reward ?? 0)}` +
+      ` · 등급 인플 ${r.grades?.seller?.previous_grade ?? "-"}→${r.grades?.seller?.grade ?? "-"} (m3 ${won(r.grades?.seller?.m3_sales)}) · 브랜드 ${r.grades?.brand?.previous ?? "-"}→${r.grades?.brand?.grade ?? "-"}`,
+  );
+  console.log(`  payouts: seller ${r.payouts?.seller?.id} (${r.payouts?.seller?.status}) · brand ${r.payouts?.brand?.id} (${r.payouts?.brand?.status}) · settlement ${r.settlement_id}`);
+  return true;
+}
+
+async function cmdSettleRun() {
+  const c = await campaignIdOf(positional[0]);
+  const { data, error } = await admin.rpc("app_admin_settle_run", { p_campaign_id: c.id, p_force: !!flags.force });
+  if (error) throw new Error(`app_admin_settle_run failed: ${error.message}`);
+  if (!printRun(data)) process.exit(1);
+  if (data?.ok && !data.already) await notifySlack(`[셀러리] 정산 실행 · ${data.campaign_code} · 브랜드 ${won(data.brand_payout)} · 인플루언서 ${won(data.seller_payout)}${data.holds?.seller || data.holds?.brand ? " · 지급 보류 있음" : ""}`);
+}
+
+async function cmdSettleDue() {
+  const { data, error } = await admin.rpc("app_admin_settle_run_due", {});
+  if (error) throw new Error(`app_admin_settle_run_due failed: ${error.message}`);
+  console.log(`[partner-admin] 정산 실행(도래분) 오늘 ${data?.today} — 대상 ${data?.count ?? 0}건 · 완료 ${data?.settled ?? 0} · 실패 ${data?.failed ?? 0}`);
+  for (const r of data?.results ?? []) printRun(r);
+  if ((data?.settled ?? 0) > 0) await notifySlack(`[셀러리] 정산 실행(도래분) ${data.settled}건 완료 (${data.today})`);
+}
+
+async function cmdSettlements() {
+  const limit = Math.min(Number(flags.limit) || 50, 1000);
+  const { data, error } = await admin.rpc("app_admin_settlements", { p_status: flags.status ? String(flags.status) : undefined, p_limit: limit });
+  if (error) throw new Error(`app_admin_settlements failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`조회 실패: ${data?.code ?? "BAD_RESULT"}`);
+  const c = data.counts ?? {};
+  console.log(`[partner-admin] 오늘 ${data.today} — 기준일 도래 ${c.due_now} / CLEARING ${c.clearing} · 정산 pending ${c.pending} · held ${c.held} · paid ${c.paid} · 지급 대기 ${c.payouts_pending}건 ${won(c.payouts_pending_amount)} · 보류 ${c.payouts_held}`);
+  console.log("대기 큐 (CLEARING):");
+  console.table(
+    (data.queue ?? []).map((q) => ({
+      code: q.campaign_code,
+      제목: q.title,
+      인플루언서: `${q.seller?.code ?? ""} ${q.seller?.grade ?? ""}`,
+      브랜드: q.brand?.code ?? "",
+      종료: q.end_date,
+      기준일: q.due_on,
+      실행: q.eligible ? "가능" : (q.reason ?? ""),
+      확정: won(q.net),
+      브랜드정산: won(q.brand_payout),
+      인플실수령: won(q.seller_payout),
+      보류예고: [q.hold_seller ? "인플" : "", q.hold_brand ? "브랜드" : ""].filter(Boolean).join("·"),
+    })),
+  );
+  console.log("정산 완료 (스냅샷):");
+  console.table(
+    (data.rows ?? []).map((r) => ({
+      code: r.campaign_code,
+      정산일: fmtDate(r.settlement?.settled_at),
+      상태: r.settlement?.status,
+      확정: won(r.net),
+      브랜드: `${won(r.brand_payout)} ${r.payouts?.brand?.status ?? ""}`,
+      인플루언서: `${won(r.seller_payout)} ${r.payouts?.seller?.status ?? ""}`,
+      플랫폼: won(r.platform_fee),
+      보류: [r.hold_seller ? "인플" : "", r.hold_brand ? "브랜드" : ""].filter(Boolean).join("·"),
+      지급일: fmtDate(r.settlement?.paid_at),
+    })),
+  );
+}
+
+async function cmdPayouts() {
+  const status = flags.status ? String(flags.status) : "pending";
+  let q = admin
+    .from("payouts")
+    .select("id, settlement_id, payee_type, status, amount, wht, hold_code, hold_reason, bank_snapshot, paid_at, memo, created_at, settlements(campaign_id, title, due_on, settled_at, campaigns(code))")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Number(flags.limit) || 100, 1000));
+  if (status !== "all") q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error) throw new Error(`payouts read failed: ${error.message}`);
+  console.table(
+    (data ?? []).map((p) => ({
+      id: p.id,
+      캠페인: p.settlements?.campaigns?.code ?? "",
+      제목: p.settlements?.title ?? "",
+      대상: p.payee_type,
+      상태: p.status,
+      금액: won(p.amount),
+      원천징수: won(p.wht),
+      보류: p.hold_code ? `${p.hold_code}` : "",
+      계좌: p.bank_snapshot ? `${p.bank_snapshot.bank ?? ""} ${p.bank_snapshot.account_masked ?? ""}` : "",
+      기준일: p.settlements?.due_on ?? "",
+      정산일: fmtDate(p.settlements?.settled_at),
+      지급일: fmtDate(p.paid_at),
+    })),
+  );
+}
+
+async function cmdPayoutsExport() {
+  const status = flags.status ? String(flags.status) : "pending";
+  const purpose = flags.purpose && flags.purpose !== true ? String(flags.purpose) : "";
+  if (!purpose) {
+    console.error("[partner-admin] --purpose \"지급 배치 2026-10\" 가 필요합니다 (열람 로그에 남습니다).");
+    process.exit(2);
+  }
+  const { data, error } = await admin.rpc("app_admin_payout_export", { p_status: status, p_actor: adminActor(), p_purpose: purpose });
+  if (error) throw new Error(`app_admin_payout_export failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`이체 파일 실패: ${data?.code ?? "BAD_RESULT"}`);
+  const header = ["지급ID", "정산ID", "캠페인", "제목", "대상", "코드", "이름", "정산유형", "은행", "계좌번호", "예금주", "사업자번호", "지급액", "원천징수", "상태", "보류사유", "기준일", "정산일", "지급일", "메모"];
+  const cell = (v) => (v === null || v === undefined ? "" : /[",\r\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const rows = (data.rows ?? []).map((r) => [
+    r.payout_id, r.settlement_id, r.campaign_code, r.title, r.payee_type === "seller" ? "인플루언서" : "브랜드", r.payee_code, r.payee_name,
+    r.settle_type === "biz" ? "사업자" : r.settle_type === "personal" ? "개인" : "", r.bank, r.account ? `="${r.account}"` : "", r.holder, r.biz_no,
+    r.amount, r.wht, r.status, r.hold_code ?? "", r.due_on, fmtDate(r.settled_at), fmtDate(r.paid_at), r.memo,
+  ]);
+  const csv = "﻿" + [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+  const out = flags.out && flags.out !== true ? String(flags.out) : `payouts-${status}-${new Date().toISOString().slice(0, 10)}.csv`;
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(out, csv, { encoding: "utf8" });
+  console.log(`[partner-admin] 이체 파일 ${out} — ${data.count}건 · 열람 로그 ${data.logged}행 (actor ${adminActor()} · ${purpose}). 계좌 원문이 들어 있으니 전송 후 파일을 지우세요.`);
+}
+
+async function cmdPayoutPaid() {
+  const id = positional[0];
+  if (!id || !UUID_RE.test(id)) usage();
+  const { data, error } = await admin.rpc("app_admin_payout_mark_paid", { p_payout_id: id, p_memo: positional[1] ?? undefined });
+  if (error) throw new Error(`app_admin_payout_mark_paid failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`지급 완료 실패: ${data?.code ?? "BAD_RESULT"}${data?.hold_code ? ` (${data.hold_code})` : ""}`);
+  console.log(`[partner-admin] payout ${id}: ${data.already ? "이미 지급 완료" : `지급 완료 · ${won(data.payout?.amount)}`} · 정산 상태 ${data.settlement_status}`);
+}
+
+async function cmdPayoutHold(release) {
+  const id = positional[0];
+  if (!id || !UUID_RE.test(id)) usage();
+  const { data, error } = release
+    ? await admin.rpc("app_admin_payout_release", { p_payout_id: id })
+    : await admin.rpc("app_admin_payout_hold", { p_payout_id: id, p_reason: positional[1] ?? undefined });
+  if (error) throw new Error(`${release ? "app_admin_payout_release" : "app_admin_payout_hold"} failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`${release ? "해제" : "보류"} 실패: ${data?.code ?? "BAD_RESULT"}${data?.hold_code ? ` (${data.hold_code} · ${data.label ?? ""})` : ""}`);
+  console.log(`[partner-admin] payout ${id}: ${data.already ? "변화 없음" : release ? "보류 해제 → pending" : `보류 → held (${data.payout?.hold_reason ?? ""})`} · 정산 상태 ${data.settlement_status}`);
+}
+
+async function cmdPaymentsHealth() {
+  const { data, error } = await admin.rpc("app_admin_payments_health");
+  if (error) throw new Error(`app_admin_payments_health failed: ${error.message}`);
+  const flat = [];
+  for (const [group, vals] of Object.entries(data ?? {})) {
+    if (vals && typeof vals === "object") for (const [k, v] of Object.entries(vals)) flat.push({ 구분: group, 항목: k, 값: v ?? "" });
+  }
+  console.table(flat);
+}
+
+async function cmdAdminOrders() {
+  const { data, error } = await admin.rpc("app_admin_orders", {
+    p_filter: flags.filter ? String(flags.filter) : "all",
+    p_q: flags.q && flags.q !== true ? String(flags.q) : undefined,
+    p_limit: Math.min(Number(flags.limit) || 50, 2000),
+  });
+  if (error) throw new Error(`app_admin_orders failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`주문 조회 실패: ${data?.code ?? "BAD_RESULT"}`);
+  const t = data.totals ?? {};
+  console.log(`[partner-admin] 전체 주문 ${t.count}건 — 결제 ${t.paid} · 미발송 ${t.unshipped} · 발송 ${t.shipped} · 환불·취소 ${t.refunded} · 샘플 ${t.sample} · 결제키 없음 ${t.manual} · 부분취소 ${t.partial} · 결제 ${won(t.paid_amount)} · 환불 ${won(t.refund_amount)} (필터 ${data.filter} · 표시 ${(data.rows ?? []).length})`);
+  console.table(
+    (data.rows ?? []).map((o) => ({
+      code: o.code,
+      브랜드: o.brand?.code ?? "",
+      캠페인: o.campaign?.code ?? "",
+      상품: o.campaign?.product?.name ?? "",
+      인플루언서: o.campaign?.seller?.handle ?? "",
+      구매자: o.buyer_name,
+      금액: won(o.amount),
+      상태: o.status,
+      결제키: o.has_payment_key ? "있음" : "없음",
+      샘플: o.is_sample ? "샘플" : "",
+      운송장: o.tracking_no ? `${o.courier ?? ""} ${o.tracking_no}` : "",
+      주문일: fmtDate(o.paid_at),
+      환불: o.refunded_at ? `${o.refund_actor ?? ""} ${won(o.refund_amount ?? o.amount)}` : o.refund_amount ? `부분 ${won(o.refund_amount)}` : "",
+    })),
+  );
+}
+
 try {
   switch (cmd) {
     case "list":
       await cmdList();
+      break;
+    case "settle-preview":
+      await cmdSettlePreview();
+      break;
+    case "settle-run":
+      await cmdSettleRun();
+      break;
+    case "settle-due":
+      await cmdSettleDue();
+      break;
+    case "settlements":
+      await cmdSettlements();
+      break;
+    case "payouts":
+      await cmdPayouts();
+      break;
+    case "payouts-export":
+      await cmdPayoutsExport();
+      break;
+    case "payout-paid":
+      await cmdPayoutPaid();
+      break;
+    case "payout-hold":
+      await cmdPayoutHold(false);
+      break;
+    case "payout-release":
+      await cmdPayoutHold(true);
+      break;
+    case "payments-health":
+      await cmdPaymentsHealth();
+      break;
+    case "admin-orders":
+      await cmdAdminOrders();
       break;
     case "payments":
       await cmdPayments();
