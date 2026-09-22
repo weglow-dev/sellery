@@ -43,7 +43,7 @@
 		// 소유: 인플루언서·브랜드·상품 = 파트너 관리 담당 / 정산 = 정산·돈 담당. **탭을 활성화할 때만 이 표를 고친다.**
 		admin: [
 			{ href: '/home', label: '홈', icon: 'home' },
-			{ href: '/sellers', label: '인플루언서', icon: 'user', disabled: true, title: '준비 중 — 파트너 관리' },
+			{ href: '/sellers', label: '인플루언서', icon: 'user' },
 			{ href: '/brands', label: '브랜드', icon: 'flag', disabled: true, title: '준비 중 — 파트너 관리' },
 			{ href: '/products', label: '상품', icon: 'box', disabled: true, title: '준비 중 — 상품 검수' },
 			{ href: '/settle', label: '정산', icon: 'chart', disabled: true, title: '준비 중 — 정산' }
