@@ -237,6 +237,7 @@ export type Database = {
           home_featured_at: string | null
           id: string
           invited: boolean
+          po_exported_at: string | null
           price_locked: number | null
           product_id: string
           proposed_end: string | null
@@ -276,6 +277,7 @@ export type Database = {
           home_featured_at?: string | null
           id?: string
           invited?: boolean
+          po_exported_at?: string | null
           price_locked?: number | null
           product_id: string
           proposed_end?: string | null
@@ -315,6 +317,7 @@ export type Database = {
           home_featured_at?: string | null
           id?: string
           invited?: boolean
+          po_exported_at?: string | null
           price_locked?: number | null
           product_id?: string
           proposed_end?: string | null
@@ -2085,6 +2088,27 @@ export type Database = {
         Args: { p_brand_id: string; p_campaign_id: string }
         Returns: Json
       }
+      app_brand_cs_close: {
+        Args: { p_brand_id: string; p_conversation_id: string }
+        Returns: Json
+      }
+      app_brand_cs_list: {
+        Args: { p_brand_id: string; p_status?: string }
+        Returns: Json
+      }
+      app_brand_cs_reply: {
+        Args: {
+          p_actor_user_id: string
+          p_body: string
+          p_brand_id: string
+          p_conversation_id: string
+        }
+        Returns: Json
+      }
+      app_brand_cs_thread: {
+        Args: { p_brand_id: string; p_conversation_id: string }
+        Returns: Json
+      }
       app_brand_delete_product: {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: Json
@@ -2103,6 +2127,23 @@ export type Database = {
         }
         Returns: Json
       }
+      app_brand_orders: {
+        Args: {
+          p_brand_id: string
+          p_campaign_id?: string
+          p_filter?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      app_brand_po_rows: {
+        Args: { p_brand_id: string; p_campaign_id?: string }
+        Returns: Json
+      }
+      app_brand_refund_precheck: {
+        Args: { p_brand_id: string; p_order_id: string }
+        Returns: Json
+      }
       app_brand_reject_sample: {
         Args: { p_brand_id: string; p_campaign_id: string; p_reason?: string }
         Returns: Json
@@ -2117,6 +2158,19 @@ export type Database = {
       }
       app_brand_set_listing: {
         Args: { p_brand_id: string; p_listed: boolean; p_product_id: string }
+        Returns: Json
+      }
+      app_brand_ship_order: {
+        Args: {
+          p_brand_id: string
+          p_courier: string
+          p_order_id: string
+          p_tracking_no: string
+        }
+        Returns: Json
+      }
+      app_brand_ship_orders: {
+        Args: { p_brand_id: string; p_rows: Json }
         Returns: Json
       }
       app_brand_ship_sample: {
@@ -2142,6 +2196,8 @@ export type Database = {
         }
         Returns: Json
       }
+      app_campaign_tick: { Args: never; Returns: Json }
+      app_campaign_tick_one: { Args: { p_campaign_id: string }; Returns: Json }
       app_checkout_reserved: {
         Args: { p_campaign_id: string }
         Returns: number
@@ -2160,6 +2216,36 @@ export type Database = {
           p_payment_key: string
           p_recover?: boolean
           p_session_id: string
+        }
+        Returns: Json
+      }
+      app_cs_customer_reply: {
+        Args: {
+          p_body: string
+          p_client_token: string
+          p_conversation_code: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      app_cs_list_for_user: { Args: { p_user_id: string }; Returns: Json }
+      app_cs_open: {
+        Args: {
+          p_body: string
+          p_buyer_name: string
+          p_campaign_id: string
+          p_customer_id: string
+          p_order_code?: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      app_cs_thread: {
+        Args: {
+          p_client_token?: string
+          p_conversation_code: string
+          p_user_id?: string
         }
         Returns: Json
       }
@@ -2311,6 +2397,10 @@ export type Database = {
       }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
+      brand_order_json: {
+        Args: { o: Database["public"]["Tables"]["orders"]["Row"] }
+        Returns: Json
+      }
       campaign_card: { Args: { p_code: string }; Returns: Json }
       campaign_event_json: {
         Args: { e: Database["public"]["Tables"]["campaign_events"]["Row"] }
@@ -2388,6 +2478,52 @@ export type Database = {
         }
         Returns: Json
       }
+      cs_conversation_json: {
+        Args: { x: Database["public"]["Tables"]["cs_conversations"]["Row"] }
+        Returns: Json
+      }
+      cs_find_for_customer: {
+        Args: {
+          p_client_token: string
+          p_conversation_code: string
+          p_user_id: string
+        }
+        Returns: {
+          brand_id: string
+          buyer_name: string
+          campaign_id: string
+          client_token: string
+          closed_at: string | null
+          code: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          last_message_at: string
+          last_preview: string | null
+          order_code: string | null
+          order_id: string | null
+          replied_at: string | null
+          status: string
+          type: string
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cs_conversations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cs_message_json: {
+        Args: { m: Database["public"]["Tables"]["cs_messages"]["Row"] }
+        Returns: Json
+      }
+      cs_normalize_body: { Args: { p_body: string }; Returns: string }
+      cs_thread_json: {
+        Args: { x: Database["public"]["Tables"]["cs_conversations"]["Row"] }
+        Returns: Json
+      }
       expire_checkout_sessions: { Args: { p_grace?: string }; Returns: number }
       grade_for_sales: { Args: { p_m3_sales: number }; Returns: string }
       partner_identity_confirmed: {
@@ -2411,6 +2547,7 @@ export type Database = {
         Returns: boolean
       }
       period_len_max: { Args: never; Returns: number }
+      platform_clear_days: { Args: never; Returns: number }
       product_allocated: {
         Args: { p_except_campaign_id?: string; p_product_id: string }
         Returns: number
