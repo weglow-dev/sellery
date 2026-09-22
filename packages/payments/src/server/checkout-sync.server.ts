@@ -11,6 +11,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@sellery/db/database.types";
+import { notifyOrderPaid, notifyOrderRefunded } from "@sellery/db/server/mail-events";
 import {
   isTossError,
   tossCancel,
@@ -518,6 +519,9 @@ export async function confirmDone(
   }
 
   if (parsed.ok) {
+    // 주문 확인 메일(고객 + 브랜드) — 새 주문일 때 정확히 여기서 한 번. confirm 라우트 · 웹훅 · reconcile 이 전부 이 함수를 지나고,
+    // already(멱등 재호출)는 보내지 않는다. 절대 throw 하지 않으며 실패해도 응답에 영향 없음.
+    if (!parsed.already) await notifyOrderPaid(admin, { orderId: parsed.order_id });
     return { ok: true, already: parsed.already, recovered, orderId: parsed.order_id, orderCode: parsed.order_code };
   }
 
@@ -621,6 +625,7 @@ export async function recordRefundFromToss(
     if (!r.ok) return { result: `error: refund record ${r.code}`, handled: false };
     if (r.already) return { result: "noop", handled: true };
     if (r.partial) return { result: "partial_cancel_manual", handled: false };
+    await afterRefundRecorded(admin, order.id, r);
     if (r.adjust) return { result: "needs_manual_adjust", handled: false };
     return { result: "refunded", handled: true };
   } catch (e) {
@@ -628,6 +633,15 @@ export async function recordRefundFromToss(
     console.error("[checkout-sync] app_refund_record threw:", msg);
     return { result: `error: refund record ${msg}`.slice(0, 200), handled: false };
   }
+}
+
+/**
+ * app_refund_record 가 **새로** REFUNDED/CANCELED 로 바꿨을 때 환불 완료 메일(고객) — 고객 셀프(/api/payments/cancel) · 브랜드 · 관리자 · 토스 콘솔 취소(recordRefundFromToss)
+ * 전부 기록 직후 이 함수를 부른다. already(이미 환불) · partial(부분취소 — 주문 PAID 유지 · 운영 큐)은 보내지 않는다. 절대 throw 하지 않는다.
+ */
+export async function afterRefundRecorded(admin: Admin, orderId: string, rec: RefundRecordResult): Promise<void> {
+  if (!rec.ok || rec.already || rec.partial) return;
+  await notifyOrderRefunded(admin, { orderId });
 }
 
 /** CONFIRMED 세션의 주문 raw_payment/payment_method 최신화 — 상태 불변 (§7.3 'noop') */

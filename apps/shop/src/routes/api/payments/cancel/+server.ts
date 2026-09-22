@@ -6,6 +6,7 @@ import { guestTokenCookieName } from '@sellery/db/guest-order';
 import { cleanText } from '@sellery/db/text';
 import { createAdminClient, verifyGuestOrder } from '$lib/server/db';
 import {
+	afterRefundRecorded,
 	apiError,
 	isTossError,
 	isUncertain,
@@ -213,6 +214,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 		});
 		return apiError(500, 'RECORD_FAILED', '환불은 처리됐지만 주문 기록 갱신에 실패했어요 — 고객센터로 문의해주세요');
 	}
+
+	// ⑤′ 환불 완료 메일(고객 · 새 기록일 때만 · 실패해도 응답 영향 없음)
+	await afterRefundRecorded(admin, order.id, rec);
 
 	// ⑥ 감사 로그
 	const result = rec.already ? 'noop' : rec.adjust ? 'needs_manual_adjust' : 'refunded';
