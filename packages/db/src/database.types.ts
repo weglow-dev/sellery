@@ -85,6 +85,7 @@ export type Database = {
           category: string
           code: string | null
           created_at: string
+          description: string | null
           email: string | null
           free_ref_used: Json
           gmv_base: number
@@ -99,6 +100,7 @@ export type Database = {
           po_enabled: boolean
           ref_code: string | null
           referred_by: string | null
+          tax_info: Json | null
           terms_agreed_at: string | null
           updated_at: string
           user_id: string | null
@@ -112,6 +114,7 @@ export type Database = {
           category?: string
           code?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           free_ref_used?: Json
           gmv_base?: number
@@ -126,6 +129,7 @@ export type Database = {
           po_enabled?: boolean
           ref_code?: string | null
           referred_by?: string | null
+          tax_info?: Json | null
           terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
@@ -139,6 +143,7 @@ export type Database = {
           category?: string
           code?: string | null
           created_at?: string
+          description?: string | null
           email?: string | null
           free_ref_used?: Json
           gmv_base?: number
@@ -153,6 +158,7 @@ export type Database = {
           po_enabled?: boolean
           ref_code?: string | null
           referred_by?: string | null
+          tax_info?: Json | null
           terms_agreed_at?: string | null
           updated_at?: string
           user_id?: string | null
@@ -2113,6 +2119,8 @@ export type Database = {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: Json
       }
+      app_brand_grade_card: { Args: { p_brand_id: string }; Returns: Json }
+      app_brand_grade_recalc: { Args: { p_brand_id: string }; Returns: Json }
       app_brand_invite_candidates: {
         Args: { p_brand_id: string; p_product_id: string }
         Returns: Json
@@ -2140,6 +2148,7 @@ export type Database = {
         Args: { p_brand_id: string; p_campaign_id?: string }
         Returns: Json
       }
+      app_brand_profile: { Args: { p_brand_id: string }; Returns: Json }
       app_brand_refund_precheck: {
         Args: { p_brand_id: string; p_order_id: string }
         Returns: Json
@@ -2156,10 +2165,13 @@ export type Database = {
         Args: { p_brand_id: string; p_statuses?: string[] }
         Returns: Json
       }
+      app_brand_sales: { Args: { p_brand_id: string }; Returns: Json }
       app_brand_set_listing: {
         Args: { p_brand_id: string; p_listed: boolean; p_product_id: string }
         Returns: Json
       }
+      app_brand_settle_info: { Args: { p_brand_id: string }; Returns: Json }
+      app_brand_settlements: { Args: { p_brand_id: string }; Returns: Json }
       app_brand_ship_order: {
         Args: {
           p_brand_id: string
@@ -2373,6 +2385,14 @@ export type Database = {
       }
       app_seller_settle_info: { Args: { p_seller_id: string }; Returns: Json }
       app_seller_settlements: { Args: { p_seller_id: string }; Returns: Json }
+      app_set_brand_profile: {
+        Args: { p_brand_id: string; p_input: Json }
+        Returns: Json
+      }
+      app_set_brand_settle_info: {
+        Args: { p_bank: Json; p_brand_id: string; p_tax?: Json }
+        Returns: Json
+      }
       app_set_seller_rrn: {
         Args: {
           p_key: string
@@ -2397,9 +2417,14 @@ export type Database = {
       }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
+      brand_normalize_phone: { Args: { p_raw: string }; Returns: string }
       brand_order_json: {
         Args: { o: Database["public"]["Tables"]["orders"]["Row"] }
         Returns: Json
+      }
+      brand_settle_info_complete: {
+        Args: { b: Database["public"]["Tables"]["brands"]["Row"] }
+        Returns: boolean
       }
       campaign_card: { Args: { p_code: string }; Returns: Json }
       campaign_event_json: {
