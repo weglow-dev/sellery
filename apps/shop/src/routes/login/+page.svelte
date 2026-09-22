@@ -73,6 +73,9 @@
 		<p class="mt-2 text-center text-[11.5px] leading-normal text-mute">
 			로그인하면 <a href="/terms" class="underline underline-offset-2">이용약관</a>과 <a href="/privacy" class="underline underline-offset-2">개인정보처리방침</a>에 동의한 것으로 봅니다
 		</p>
+		<p class="mt-3 border-t border-dashed border-line pt-3 text-center text-[12px] leading-normal text-mute">
+			로그인 없이 구매하신 분은 → <a href="/orders/lookup" class="font-bold underline underline-offset-2">비회원 주문 조회</a>
+		</p>
 	</section>
 
 	{#if data.devLogin}

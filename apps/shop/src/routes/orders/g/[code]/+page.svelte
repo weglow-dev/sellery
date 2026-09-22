@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * 회원 주문 상세 — 본문은 $lib/components/OrderDetail (비회원 /orders/g/[code] 와 공용, 0021). 환불 성공 → `invalidateAll()` (router.refresh 대체).
+	 * 비회원 주문 상세 (0021) — 본문은 $lib/components/OrderDetail (회원 /account/orders/[code] 와 공용). 환불 성공 → `invalidateAll()`.
 	 */
 	import { invalidateAll } from '$app/navigation';
 	import OrderDetail from '$lib/components/OrderDetail.svelte';
@@ -16,4 +16,4 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<OrderDetail order={data.order} settings={data.settings} back={{ href: '/account/orders', label: '← 내 주문' }} onRefreshed={refresh} />
+<OrderDetail order={data.order} settings={data.settings} back={{ href: '/orders/lookup', label: '← 주문 조회' }} guest onRefreshed={refresh} />

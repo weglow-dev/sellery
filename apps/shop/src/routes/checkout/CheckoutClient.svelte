@@ -9,6 +9,8 @@
 	 * 금액은 서버가 계산한다 — 클라이언트 합계는 표시용, 결제되는 값은 응답의 amount (reuse-map §4-4).
 	 * 진입 시 sessionStorage[RETURN_KEY] = { store, retry } — successUrl 은 쿼리 없이 고정이라 성공 페이지가 복귀 링크에 쓴다.
 	 * 401 → 세션 만료: /login?next=<retry> · NOT_LIVE/SOLD_OUT/NOT_FOUND → 위젯 대신 안내.
+	 * 비회원(guest, 0021): 맨 위 "주문자 정보" 카드(이름·연락처·이메일(선택)·개인정보 동의 /privacy#guest) → 본문 `guest:{…}` 로 전송 · 받는 분/연락처가 비어 있으면 주문자 값으로 채움
+	 *   · customerKey 는 토스 ANONYMOUS · "기본 배송지로 저장" 없음 · failUrl 에 &g=1 (다시 시도가 비회원 모드로).
 	 */
 	import { onMount } from 'svelte';
 	import { PUBLIC_TOSS_CLIENT_KEY } from '$env/static/public';
@@ -16,6 +18,7 @@
 	import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 	import { won, type CampaignCard } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
+	import { EMPTY_GUEST_DRAFT, GUEST_CONSENT_TEXT, GUEST_EMAIL_MAX, GUEST_NAME_MAX, PRIVACY_GUEST_HREF, validateGuestBuyer, type GuestBuyerDraft, type GuestBuyerField } from '@sellery/db/guest-order';
 	import {
 		checkoutHref,
 		mediatorText,
@@ -26,7 +29,7 @@
 		type ShippingDraft,
 		type ShippingField
 	} from '@sellery/payments/checkout-rules';
-	import { AddressFields, OrderSummary, PayBar, PaymentWidget, PlatIcon, ProductIcon, showToast } from '@sellery/ui/site';
+	import { AddressFields, Field, OrderSummary, PayBar, PaymentWidget, PlatIcon, ProductIcon, showToast } from '@sellery/ui/site';
 
 	type CheckoutApiOk = { ok: true; sessionId: string; orderId: string; amount: number; orderName: string; customerKey: string; phone: string; email: string | null };
 	type CheckoutApiFail = { ok: false; code: string; message: string };
@@ -35,6 +38,7 @@
 		card,
 		optionIndex,
 		qty,
+		guest = false,
 		customerKey,
 		email,
 		defaults,
@@ -43,7 +47,9 @@
 		card: CampaignCard;
 		optionIndex: number;
 		qty: number;
-		/** 토스 customerKey = user.id */
+		/** 비회원 구매 모드 (0021) */
+		guest?: boolean;
+		/** 토스 customerKey = user.id (비회원은 ANONYMOUS) */
 		customerKey: string;
 		email: string | null;
 		defaults: ShippingDraft;
@@ -79,6 +85,14 @@
 		if (invalid[f]) invalid = { ...invalid, [f]: false };
 	};
 
+	// 비회원 주문자 정보 (guest 일 때만 렌더·검증)
+	let gdraft = $state<GuestBuyerDraft>({ ...EMPTY_GUEST_DRAFT });
+	let ginvalid = $state<Partial<Record<GuestBuyerField, boolean>>>({});
+	const setGuest = (f: 'name' | 'phone' | 'email') => (v: string) => {
+		gdraft = { ...gdraft, [f]: v };
+		if (ginvalid[f]) ginvalid = { ...ginvalid, [f]: false };
+	};
+
 	const onReady = (w: TossPaymentsWidgets) => {
 		widgets = w;
 		ready = true;
@@ -87,7 +101,7 @@
 	const onAgreementChange = (v: boolean) => (agreedRequired = v);
 
 	// 결제창 진입 뒤 성공 페이지가 "판매 페이지로"·"다시 시도" 링크에 쓸 복귀 정보 (successUrl 은 쿼리 없이 고정 — rules.RETURN_KEY)
-	const retryHref = $derived(checkoutHref(campaign.code, optionIndex, qty));
+	const retryHref = $derived(checkoutHref(campaign.code, optionIndex, qty, guest));
 	onMount(() => {
 		try {
 			window.sessionStorage.setItem(RETURN_KEY, JSON.stringify({ store: storeUrl, retry: retryHref }));
@@ -98,6 +112,22 @@
 
 	async function handlePay() {
 		if (!widgets || submitting || blocked) return;
+
+		let guestBody: { name: string; phone: string; email: string | null; consent: true } | null = null;
+		if (guest) {
+			const g = validateGuestBuyer(gdraft);
+			if (!g.ok) {
+				ginvalid = { [g.field]: true };
+				showToast(g.message);
+				document.getElementById(`ck-g-${g.field}`)?.focus();
+				return;
+			}
+			guestBody = { ...g.buyer, consent: true };
+			// 받는 분·연락처가 비어 있으면 주문자 값으로 (본인 수령이 대부분)
+			if (!draft.recipient.trim() || !draft.phone.trim()) {
+				draft = { ...draft, recipient: draft.recipient.trim() || g.buyer.name, phone: draft.phone.trim() || g.buyer.phone };
+			}
+		}
 
 		const v = validateShipping(draft);
 		if (!v.ok) {
@@ -127,7 +157,8 @@
 					address1: v.shipping.address1,
 					address2: v.shipping.address2 ?? '',
 					memo: v.shipping.memo ?? '',
-					saveAddress
+					saveAddress: guest ? false : saveAddress,
+					guest: guestBody
 				})
 			});
 			const data = (await res.json().catch(() => null)) as CheckoutApiOk | CheckoutApiFail | null;
@@ -151,13 +182,13 @@
 			await widgets.setAmount({ currency: 'KRW', value: data.amount });
 
 			const origin = window.location.origin;
-			const failQs = `c=${encodeURIComponent(campaign.code)}&o=${optionIndex}&q=${qty}`;
+			const failQs = `c=${encodeURIComponent(campaign.code)}&o=${optionIndex}&q=${qty}${guest ? '&g=1' : ''}`;
 			await widgets.requestPayment({
 				orderId: data.orderId,
 				orderName: data.orderName,
 				successUrl: `${origin}/checkout/success`,
 				failUrl: `${origin}/checkout/fail?${failQs}`,
-				customerName: v.shipping.recipient.slice(0, 100),
+				customerName: (guestBody?.name ?? v.shipping.recipient).slice(0, 100),
 				customerEmail: data.email || email || undefined,
 				customerMobilePhone: data.phone || undefined
 			});
@@ -178,6 +209,20 @@
 
 	<div class="cartgrid">
 		<div>
+			{#if guest}
+				<!-- 비회원 주문자 정보 (0021) -->
+				<div class="card static">
+					<h4>주문자 정보 <small style="font-weight:400;color:var(--color-mute);font-size:11.5px">비회원 · 주문 조회에 씁니다</small></h4>
+					<div class="notice" style="margin:0 0 10px;font-size:12.5px">주문 완료 후 <b>주문번호 + 연락처</b>로 <a href="/orders/lookup" class="underline underline-offset-2" target="_blank" rel="noopener">주문 조회</a>·환불·문의를 할 수 있어요. 연락처를 정확히 입력해주세요.</div>
+					<Field id="ck-g-name" label="주문자 이름" value={gdraft.name} onChange={setGuest('name')} invalid={!!ginvalid.name} maxlength={GUEST_NAME_MAX} autocomplete="name" disabled={submitting} />
+					<Field id="ck-g-phone" label="주문자 연락처" value={gdraft.phone} onChange={setGuest('phone')} invalid={!!ginvalid.phone} type="tel" inputmode="numeric" placeholder="01012345678" autocomplete="tel" disabled={submitting} hint="주문 조회 시 이 번호를 입력합니다" />
+					<Field id="ck-g-email" label="이메일" optional value={gdraft.email} onChange={setGuest('email')} invalid={!!ginvalid.email} type="email" maxlength={GUEST_EMAIL_MAX} autocomplete="email" disabled={submitting} />
+					<label for="ck-g-consent" style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;line-height:1.55;cursor:pointer;margin-top:4px">
+						<input id="ck-g-consent" type="checkbox" bind:checked={gdraft.consent} disabled={submitting} style="margin-top:3px" aria-invalid={ginvalid.consent || undefined} />
+						<span>{GUEST_CONSENT_TEXT} (<a href={PRIVACY_GUEST_HREF} target="_blank" rel="noopener noreferrer" class="underline underline-offset-2">자세히</a>)</span>
+					</label>
+				</div>
+			{/if}
 			<!-- 주문 상품 -->
 			<div class="card static">
 				<h4>주문 상품</h4>
@@ -196,10 +241,14 @@
 			<div class="card static">
 				<h4>배송 정보</h4>
 				<AddressFields value={draft} onChange={patchDraft} {invalid} {clearInvalid} disabled={submitting} />
-				<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer">
-					<input type="checkbox" bind:checked={saveAddress} disabled={submitting} />
-					기본 배송지로 저장
-				</label>
+				{#if guest}
+					<div class="meta">받는 분·연락처를 비워 두면 주문자 정보로 채워요</div>
+				{:else}
+					<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer">
+						<input type="checkbox" bind:checked={saveAddress} disabled={submitting} />
+						기본 배송지로 저장
+					</label>
+				{/if}
 			</div>
 
 			<!-- 결제 수단 · 약관 동의 (토스 위젯) -->

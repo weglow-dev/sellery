@@ -1,9 +1,11 @@
-import { json } from '@sveltejs/kit';
+import { json, type Cookies } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
 import type { Json } from '@sellery/db/database.types';
 import { normalizeHandle } from '@sellery/db/campaign';
-import { createAdminClient, type Admin } from '$lib/server/db';
+import { GUEST_CHECKOUT_COOKIE, GUEST_TOKEN_COOKIE_MAX_AGE, guestTokenCookieName } from '@sellery/db/guest-order';
+import { createAdminClient, issueGuestToken, type Admin } from '$lib/server/db';
 import {
 	apiError,
 	cancelAndFail,
@@ -30,7 +32,8 @@ import {
 /**
  * POST /api/payments/confirm — 토스 승인 (app-plan §6.2 · §7.1 · §7.2 · web api/payments/confirm/route.ts 1:1).
  *
- * 검증 순서(고정): 입력 형식 → 같은 오리진(403) → getUser()(401) → 세션 존재·소유자 일치(둘 다 404 NOT_FOUND — orderId 존재 여부 미노출)
+ * 검증 순서(고정): 입력 형식 → 같은 오리진(403) → getUser()(401 — **비회원(0021)은 HttpOnly 쿠키 `slry_gck`(체크아웃이 발급한 세션 id) 가 대신**)
+ *   → 세션 존재·소유자 일치(회원 user_id = user.id · 비회원 user_id null 이고 세션 id = 쿠키 — 둘 다 404 NOT_FOUND — orderId 존재 여부 미노출)
  *   → app_claim_checkout 선점(멱등 CONFIRMED / PENDING→CONFIRMING + payment_key / 20초 지난 CONFIRMING 재선점)
  *   → [재선점이면 GET 재조회 **먼저** — DONE 이면 사전검사 없이 곧바로 app_confirm_checkout: 앞 요청이 토스 승인까지 마쳤을 수 있다]
  *   → amount === session.amount(AMOUNT_MISMATCH, 토스 미호출) → 캠페인 LIVE·today·재고 사전 확인(잠금 없음, 토스 미승인이 확실할 때만)
@@ -42,7 +45,8 @@ import {
  *   재조회로 흡수한다. glo 의 `!tossRes.ok → failed` 는 복사하지 않는다.
  * DONE 을 확인한 뒤 주문을 만들지 못한 모든 경우는 confirmDone 안에서 토스 취소로 종결된다(§0 결정 5-1).
  *
- * 응답: 성공 { ok:true, orderCode, already?, card } · 실패 400 { ok:false, code, message } · 진행 중 409 { code:'CONFIRMING' }
+ * 응답: 성공 { ok:true, orderCode, already?, card, guest?:true } · 실패 400 { ok:false, code, message } · 진행 중 409 { code:'CONFIRMING' }
+ *   비회원 성공 시 조회 토큰(app_guest_token_issue · 회전)을 HttpOnly 쿠키 `slry_guest_<주문번호>`(90일)로 심고 `slry_gck` 는 지운다 — 성공 페이지의 "주문 보기" 가 곧바로 열린다.
  *   · 불명 500 { code:'CONFIRMING' | 'CANCEL_PENDING' }.
  *
  * 시간 예산(maxDuration 60s): 재선점 최악 체인 = 재조회 8s + confirm 10s + 재조회 8s + confirm 재시도 10s + 취소 10s ≈ 46s + DB.
@@ -165,7 +169,21 @@ async function rejectAndFail(admin: Admin, session: SessionLite, paymentKey: str
 	return apiError(400, err.code, err.message);
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+/** 비회원 세션 확정 뒤: 조회 토큰 발급 → 쿠키. 실패해도 응답을 막지 않는다(주문 조회 화면에서 다시 발급 가능). */
+async function finishGuest(cookies: Cookies, orderCode: string): Promise<boolean> {
+	try {
+		const token = await issueGuestToken(orderCode);
+		if (!token) return false;
+		cookies.set(guestTokenCookieName(orderCode), token, { httpOnly: true, sameSite: 'lax', secure: !dev, path: '/', maxAge: GUEST_TOKEN_COOKIE_MAX_AGE });
+		cookies.delete(GUEST_CHECKOUT_COOKIE, { path: '/' });
+		return true;
+	} catch (e) {
+		console.error('[confirm] guest token issue failed:', e instanceof Error ? e.message : e);
+		return false;
+	}
+}
+
+export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 	// 0-a) 같은 오리진·JSON 본문만 (CSRF — Supabase 쿠키 SameSite 에만 기대지 않는다)
 	const cross = rejectCrossSite(request);
 	if (cross) return cross;
@@ -188,20 +206,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 	const reqAmount = amount as number;
 
-	// 1) 로그인 (401)
+	// 1) 로그인 (401) — 비회원은 체크아웃이 발급한 세션 쿠키 slry_gck (0021)
 	const { user } = await locals.safeGetSession();
-	if (!user) return apiError(401, 'UNAUTHORIZED');
+	const gck = user ? null : (cookies.get(GUEST_CHECKOUT_COOKIE) ?? '');
+	if (!user && !/^[0-9a-f-]{36}$/.test(gck ?? '')) return apiError(401, 'UNAUTHORIZED');
+	const owns = (s: { id: string; user_id: string | null }) => (user ? s.user_id === user.id : s.user_id === null && s.id === gck);
 
 	const admin = createAdminClient();
 
 	// 2) 세션 존재 + 소유자 일치 — 없는 세션과 타인 세션을 같은 404 로 (toss_order_id 존재 여부를 오라클처럼 확인하지 못하게).
 	//    선점 전에 읽어 타인 세션의 상태를 노출하지 않는다. pre.status 는 재선점 판정(§7.2 CONFIRMING 고착)에도 쓴다.
-	const { data: pre, error: preError } = await admin.from('checkout_sessions').select('user_id, status').eq('toss_order_id', orderId).maybeSingle();
+	const { data: pre, error: preError } = await admin.from('checkout_sessions').select('id, user_id, status').eq('toss_order_id', orderId).maybeSingle();
 	if (preError) {
 		console.error('[confirm] session pre-read failed:', preError.message);
 		return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
 	}
-	if (!pre || pre.user_id !== user.id) return apiError(404, 'NOT_FOUND');
+	if (!pre || !owns(pre)) return apiError(404, 'NOT_FOUND');
 	const wasConfirming = pre.status === 'CONFIRMING';
 
 	// 3) 선점 — app_claim_checkout 반환 매핑:
@@ -239,7 +259,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const session = claim.session;
-	if (session.user_id !== user.id) return apiError(404, 'NOT_FOUND'); // 방어적 재확인 (2 와 같은 응답)
+	if (!owns(session)) return apiError(404, 'NOT_FOUND'); // 방어적 재확인 (2 와 같은 응답)
 
 	// 4) 멱등: 이미 CONFIRMED → app_confirm_checkout 이 { ok:true, already:true, order_code } 를 돌려준다 (payment 는 보지 않음)
 	if (!claim.claimed) {
@@ -250,7 +270,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 		if (!r.ok) return apiError(r.dbError ? 500 : 400, r.code, r.message);
 		const card = await buildSuccessCard(admin, session);
-		return json({ ok: true, orderCode: r.orderCode, already: true, card });
+		const guestOk = user ? false : await finishGuest(cookies, r.orderCode);
+		return json({ ok: true, orderCode: r.orderCode, already: true, card, guest: guestOk || undefined });
 	}
 
 	let payment: TossPayment | null = null;
@@ -405,5 +426,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	});
 
 	const card = await buildSuccessCard(admin, session);
-	return json({ ok: true, orderCode: r.orderCode, already: r.already || undefined, card });
+	const guestOk = user ? false : await finishGuest(cookies, r.orderCode);
+	return json({ ok: true, orderCode: r.orderCode, already: r.already || undefined, card, guest: guestOk || undefined });
 };

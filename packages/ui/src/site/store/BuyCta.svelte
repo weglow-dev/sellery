@@ -13,7 +13,7 @@
 	 *   예정:   [🔔 {md(start)} 오픈 알림 받기 (pri buy)] → 토스트 (저장 없음)
 	 *   종료:   [판매가 종료되었습니다 (disabled)] · .meta: 교환·환불은 종료 후 {clear_days}일까지 셀러리 고객센터에서 처리됩니다
 	 * 🛒 장바구니 버튼은 슬라이스 1 에서 숨김 (구매하기 full width).
-	 * 클릭(buyNow): LIVE 아니면 토스트 · left < q 면 토스트 · 미로그인 → /login?next=/checkout?c&o&q · 로그인 → /checkout?c&o&q (전체 이동 — S3 화면)
+	 * 클릭(buyNow): LIVE 아니면 토스트 · left < q 면 토스트 · /checkout?c&o&q 로 전체 이동 (S3 화면). 미로그인도 곧바로 /checkout — 거기서 [카카오로 로그인하고 구매]/[비회원으로 구매] 를 고른다(비회원 구매 2026-09-22 · 0021). `signedIn` 은 호환용 prop(사용 안 함).
 	 */
 	import { fmtNum, isBuyable, isEnded, stockLeft, type CampaignCard } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
@@ -35,7 +35,9 @@
 			return;
 		}
 		const next = checkoutUrl(c.code, optionIndex, qty);
-		window.location.assign(signedIn ? next : `/login?next=${encodeURIComponent(next)}`);
+		// 미로그인도 /checkout 으로 — 로그인/비회원 선택은 체크아웃 화면이 한다 (0021)
+		void signedIn;
+		window.location.assign(next);
 	}
 </script>
 
