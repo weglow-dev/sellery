@@ -20,13 +20,13 @@
    ├─ /auth/{callback,confirm,signout}  /api/{checkout,payments/*,cron/reconcile,health,me}  │
    ├─ /assets/*  /email/celery.png  /favicon.svg  /robots.txt                  (static/)   │
    └─ apps/shop/vercel.json rewrites (프록시 — 브라우저 오리진은 sellery.life 그대로)          │
-        /influencer, /influencer/, /influencer/:path*  ─→ sellery-influencer.vercel.app  (콘솔 SSR · 1~2단계)
-        /brand, /brand/, /brand/:path*                 ─→ sellery-brand.vercel.app       (데모 · 데모 띠 · noindex)
+        /influencer, /influencer/, /influencer/:path*  ─→ sellery-influencer.vercel.app  (콘솔 SSR · 1~5단계)
+        /brand, /brand/, /brand/:path*                 ─→ sellery-brand.vercel.app       (콘솔 SSR · 1~5단계 · 데모는 (demo) 그룹 PUBLIC_DEMO=1)
         /admin, /admin/, /admin/:path*                 ─→ sellery-admin.vercel.app       (데모 · 데모 띠 · noindex)
 
    sellery-influencer (Root apps/influencer · /influencer) ── 콘솔 SSR(가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증)
                                                              + (demo) 그룹(dev 또는 PUBLIC_DEMO=1) · 자기 /influencer/auth/{confirm,signout}
-   sellery-brand      (Root apps/brand · /brand)           ── 데모 SPA(ssr=false) + hooks(세션만)
+   sellery-brand      (Root apps/brand · /brand)           ── 콘솔 SSR(가입 · 로그인 · 홈 · 상품 · 캠페인 · 주문 · CS · 매출 · 정산 · 내 정보 — 2026-09-22 5단계) + (demo) 그룹 · 자기 /brand/auth/{confirm,signout}
    sellery-admin      (Root apps/admin · /admin)           ── 데모 SPA(ssr=false) + hooks(세션만)
    (sellery-app · Next 16 · Root web)                     ── 2026-09-21 삭제됨 — 도메인 전환 당일 정리(§1.1 · §3.6)
 

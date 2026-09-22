@@ -18,12 +18,12 @@
 
 **제안서에 인쇄된 옛 데모** → https://junho763-dotcom.github.io/sellery-prototype/ (PDF 링크용으로 유지)
 
-## 현재 서비스 상태 (2026-09-21 · S5 완료 · 도메인 전환 완료)
+## 현재 서비스 상태 (2026-09-22 · S5 완료 · 도메인 전환 완료 · 파트너 콘솔 1~5단계)
 
 - **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` 판매 링크 · `/login` `/auth/*` 카카오 로그인 · `/checkout*` 토스 결제 · `/account/*` 내 주문 · `/api/*` · `/terms` `/privacy`). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐습니다.
-- `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~2단계**(가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증) 로 리라이트됩니다. `/brand/*` `/admin/*` 는 아직 localStorage 데모 앱(`apps/brand` · `apps/admin`) 으로 리라이트되며 상단 **데모 띠**("데모 화면 · 데이터는 이 브라우저에만 저장됩니다")와 `noindex` 가 붙습니다. Vercel 은 프로젝트 4개(옛 Next `sellery-app` 은 2026-09-21 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
-- **다음 작업은 인플루언서 콘솔 3~6단계**([docs/inf-console-plan.md](docs/inf-console-plan.md) §7 — 상품 갤러리 · 샘플 · 캠페인 · 결제 · 정산), 이어서 `apps/brand` → `apps/admin` 을 데모에서 실서비스로.
-- Supabase 스키마는 `supabase/migrations/0001~0010` 이 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입). 새 변경은 새 번호로.
+- `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~5단계**(가입 · 로그인 · 홈 · 내 정보 · 채널 인증 · 상품 갤러리 · 샘플 · 캠페인 · 매출 · 정산) 로, `/brand/*` 는 `apps/brand`(Vercel `sellery-brand`) 의 **브랜드 콘솔 1~5단계**(가입 · 로그인 · 홈 · 상품 · 처리 대기 · 캠페인 · 주문/발주 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급) 로 리라이트됩니다. `/admin/*` 는 아직 localStorage 데모 앱(`apps/admin`) 이며 상단 **데모 띠**("데모 화면 · 데이터는 이 브라우저에만 저장됩니다")와 `noindex` 가 붙습니다(두 콘솔의 남은 데모 화면은 `(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 만). Vercel 은 프로젝트 4개(옛 Next `sellery-app` 은 2026-09-21 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
+- **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료) · 브랜드 콘솔 1~5단계 완료(2026-09-22, 0014~0019 — 가입/로그인 · 상품 · 샘플 승인/발송 · 일정 확정 · 스레드 · 초대 · 주문/발주/운송장 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급).** 남은 것 = 두 콘솔의 6단계(🥬 · 데이터 열람 · 셀러리 샵 — 규제 검토 뒤, inf §5.8 · brand §6) · **관리자 콘솔**(`apps/admin` 데모 → 실서비스: 상품 검수 · 정산 실행 · 채널 인증 큐 · 정지/복구 — 지금은 `packages/db/scripts/partner-admin.mjs` 스크립트) · Preview/Production 의 `PUBLIC_DEMO` 정리. 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md).
+- Supabase 스키마는 `supabase/migrations/0001~0019` 가 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011~0013 인플루언서 샘플/결제/정산 · 0014~0019 브랜드 콘솔). 새 변경은 새 번호로.
 
 ## 기술 스택
 
