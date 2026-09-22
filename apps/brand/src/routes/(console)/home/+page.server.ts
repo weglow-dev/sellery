@@ -8,7 +8,7 @@ import { brandPath, listBrandCampaigns, listBrandCs, listBrandOrders, listBrandP
 /**
  * 브랜드 콘솔 홈 — 2단계 위젯 (docs/brand-console-plan.md §5 `/brand/home` "승인·처리 대기 · 진행 중·확정 판매 카드 · 상품 현황" · 프로토타입 js/40-brand.js vBrandHome).
  * `requireBrand()` 컨텍스트 + 읽기 3회(`listBrandProducts` · `listBrandRequests` · `listBrandCampaigns`) 로 "지금 할 일"(샘플 요청 · 발송 대기 · 일정 승인(3단계) · 검수 대기/반려 · 재고 소진 · 정산 정보)
- * · 진행 중(LIVE) · 확정(SCHEDULE_CONFIRMED) 캠페인 · 상품 현황 카운트 · 브랜드 카드를 만든다. 4단계: 미발송 주문(`listBrandOrders(unshipped)` totals) · 답변 대기 문의(`listBrandCs(OPEN)`) 할 일. 장부 4 KPI · 등급 카드 · 인플루언서 찾기는 5·6단계.
+ * · 진행 중(LIVE) · 확정(SCHEDULE_CONFIRMED) 캠페인 · 상품 현황 카운트 · 브랜드 카드를 만든다. 4단계: 미발송 주문(`listBrandOrders(unshipped)` totals) · 답변 대기 문의(`listBrandCs(OPEN)`) 할 일. 5단계: LIVE 카드 → `/sales` · 정산 정보 미등록 할 일 → `/settle` · 브랜드 카드 → `/my`. 장부 KPI 는 `/sales` 가 맡고, 인플루언서 찾기는 6단계.
  * ok 가 아니면 location 으로 redirect(anon → /login · foreign → /login?switch=1 · guest → /apply · suspended → /suspended).
  */
 export type HomeTodo = { kind: string; icon: string; title: string; desc: string; href: string; action: string | null; n: number };
@@ -26,6 +26,8 @@ export const load: PageServerLoad = async (event) => {
 	const settlePath = brandPath('/settle');
 	const ordersPath = brandPath('/orders');
 	const csPath = brandPath('/cs');
+	const salesPath = brandPath('/sales');
+	const myPath = brandPath('/my');
 	const nUnshipped = orders.totals.unshipped;
 	const nCs = csOpen.length;
 	const by = (st: string) => requests.filter((c) => c.status === st).length;
@@ -45,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 	if (pc('pending')) todos.push({ kind: 'product_pending', icon: '🔍', title: `검수 대기 상품 ${pc('pending')}건`, desc: '운영팀 검수(영업일 1~2일) 뒤 인플루언서에게 노출돼요', href: productsPath, action: null, n: pc('pending') });
 	if (soldOut.length) todos.push({ kind: 'stock_out', icon: '📉', title: `재고 소진 상품 ${soldOut.length}건`, desc: `${soldOut.map((p) => p.name).slice(0, 2).join(' · ')}${soldOut.length > 2 ? ' 외' : ''} — 재고를 늘리거나 노출을 중단해주세요`, href: productsPath, action: '재고', n: soldOut.length });
 	if (!products.length) todos.push({ kind: 'first_product', icon: '🛍', title: '첫 상품 등록', desc: '등록한 상품은 운영팀 검수(pending) 뒤 인플루언서에게 공개돼요', href: brandPath('/products/new'), action: '등록', n: 1 });
-	if (!brand.has_bank_info) todos.push({ kind: 'bank_info', icon: '🏦', title: '정산 계좌 등록', desc: '계좌 · 사업자번호 · 통신판매업 신고번호 — 판매 종료 D+21 지급 (5단계에서 열립니다)', href: settlePath, action: null, n: 1 });
+	if (!brand.has_bank_info) todos.push({ kind: 'bank_info', icon: '🏦', title: '정산 정보 등록', desc: '정산 계좌 · 사업자등록증 · 세금계산서 수신 정보 — 등록해야 판매 종료 D+21 지급이 실행돼요', href: settlePath, action: '등록', n: 1 });
 
 	const live = campaigns
 		.filter((c) => c.status === 'LIVE')
@@ -60,6 +62,7 @@ export const load: PageServerLoad = async (event) => {
 			seller: { name: c.seller.name, handle: c.seller.handle, platform: c.seller.platform },
 			href: brandPath(`/campaigns/${encodeURIComponent(c.code)}`),
 			ordersHref: `${ordersPath}?campaign=${encodeURIComponent(c.code)}`,
+			salesHref: salesPath,
 			storeUrl: `${SITE_URL}${storeUrl(c.seller.handle, c.code)}`
 		}));
 	const soon = campaigns
@@ -93,6 +96,9 @@ export const load: PageServerLoad = async (event) => {
 		campaignsPath,
 		ordersPath,
 		csPath,
+		salesPath,
+		settlePath,
+		myPath,
 		liveListPath: `${campaignsPath}?f=live`
 	};
 };
