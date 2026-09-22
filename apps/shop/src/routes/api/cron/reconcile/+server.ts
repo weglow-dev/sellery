@@ -2,8 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
 import { createAdminClient, type Admin } from '$lib/server/db';
+import { rejectCron } from '$lib/server/cron';
 import {
-	cronSecret,
 	expirePartnerPayments,
 	failSession,
 	isTossError,
@@ -22,8 +22,8 @@ import {
 /**
  * GET|POST /api/cron/reconcile — CONFIRMING 고착·CANCEL_PENDING 종결 (app-plan §7.5 · web api/cron/reconcile/route.ts 1:1).
  *
- * 인증: `Authorization: Bearer ${CRON_SECRET}` (Vercel Cron 규약) 또는 `x-cron-secret` 헤더. CRON_SECRET 미설정이면 503(실행 안 함).
- * 슬라이스 1 은 수동 호출(curl / 로컬 스크립트); 슬라이스 4 에서 Vercel Cron 에 올린다(§12). `CRON_SECRET` 은 `$lib/server/env` 가 `$env/dynamic/private` 에서 읽는다.
+ * 인증: `Authorization: Bearer ${CRON_SECRET}` (Vercel Cron 규약) 또는 `x-cron-secret` 헤더 — `$lib/server/cron` rejectCron. CRON_SECRET 미설정이면 503(실행 안 함).
+ * 스케줄: `apps/shop/vercel.json` crons — 10분마다(브랜드 콘솔 4단계 PR-A 에서 `/api/cron/campaign-tick` 과 함께 등록). 수동 호출(curl)도 그대로.
  *
  * 순서:
  *   1. expire_checkout_sessions() — PENDING(+ payment_key 없는 CONFIRMING) 만 EXPIRED (?expire=0 으로 생략)
@@ -46,25 +46,6 @@ export const config: Config = { maxDuration: 60 };
 
 const STALE_AGE = '2 minutes';
 const BATCH = 50;
-
-/** 상수 시간 비교 — 길이가 달라도 같은 시간에 끝난다 (node:crypto timingSafeEqual 대체 · @types/node 불필요) */
-function safeEqual(a: string, b: string): boolean {
-	const enc = new TextEncoder();
-	const x = enc.encode(a);
-	const y = enc.encode(b);
-	let diff = x.length ^ y.length;
-	const n = Math.max(x.length, y.length);
-	for (let i = 0; i < n; i++) diff |= (x[i % x.length] ?? 0) ^ (y[i % y.length] ?? 0);
-	return diff === 0 && x.length === y.length;
-}
-
-function authorized(request: Request): boolean | null {
-	const secret = cronSecret();
-	if (!secret) return null;
-	const bearer = request.headers.get('authorization') ?? '';
-	const given = bearer.startsWith('Bearer ') ? bearer.slice(7) : (request.headers.get('x-cron-secret') ?? '');
-	return safeEqual(given, secret);
-}
 
 type Outcome = { id: string; toss_order_id: string; status: string; fail_code: string | null; result: string };
 
@@ -119,11 +100,8 @@ async function reconcileOne(admin: Admin, stale: SessionLite): Promise<string> {
 }
 
 async function run(request: Request, url: URL): Promise<Response> {
-	const auth = authorized(request);
-	if (auth === null) {
-		return json({ ok: false, code: 'NOT_CONFIGURED', message: 'CRON_SECRET is not set' }, { status: 503 });
-	}
-	if (!auth) return json({ ok: false, code: 'UNAUTHORIZED' }, { status: 401 });
+	const rejected = rejectCron(request);
+	if (rejected) return rejected;
 
 	const doExpire = url.searchParams.get('expire') !== '0';
 	const admin = createAdminClient();
