@@ -2,7 +2,7 @@
 	/**
 	 * 내 주문 목록 행 `.rowitem.cart-row` (프로토타입 js/60-customer.js vCustOrders L315-317 · ux-spec §3.6 · web components/orders/order-row.tsx).
 	 *   pIcon 44 · .nm {product.name} <sub>· {option_name} × {qty}</sub> · .sub {CODE} · {md(paid_at)} 주문 · {brand} 직배송{ · ship}
-	 *   · .st 칩 · .cart-sum ₩{amount} · [문의] [환불 신청(PAID·비SETTLED·미발송·비샘플만)]
+	 *   · .st 칩 · .cart-sum ₩{amount} · [문의](모달 → 4단계 `/cs/new?campaign=&order=` 판매자 문의) [환불 신청(PAID·비SETTLED·미발송·비샘플만)]
 	 */
 	import { md } from '@sellery/db/dates';
 	import { isRefundable, orderStatusLabel, shipLabel, won } from '@sellery/db/order-status';
@@ -30,7 +30,7 @@
 	<StatusChip tone={st.tone}>{st.label}</StatusChip>
 	<div class="cart-sum">{won(order.amount)}</div>
 	<div class="rowacts">
-		<CsModalButton class="sm" productName={order.product.name} thumbUrl={order.product.thumb_url} emoji={order.product.emoji} brandName={order.brand.name} orderCode={order.code}>문의</CsModalButton>
+		<CsModalButton class="sm" productName={order.product.name} thumbUrl={order.product.thumb_url} emoji={order.product.emoji} brandName={order.brand.name} orderCode={order.code} csHref={`/cs/new?campaign=${encodeURIComponent(order.campaign.code)}&order=${encodeURIComponent(order.code)}`}>문의</CsModalButton>
 		{#if refundable}
 			<RefundButton class="sm ghost" code={order.code} productName={order.product.name} optionName={order.option_name} qty={order.qty} amount={order.amount} {onRefreshed} />
 		{/if}

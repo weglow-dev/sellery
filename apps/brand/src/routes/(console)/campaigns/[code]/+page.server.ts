@@ -60,6 +60,7 @@ export const load: PageServerLoad = async (event) => {
 		testDays: TEST_DAYS,
 		listPath: brandPath('/campaigns'),
 		requestsPath: brandPath('/requests'),
+		ordersHref: `${brandPath('/orders')}?campaign=${encodeURIComponent(c.code)}`,
 		productHref: c.product.code ? brandPath(`/products/${encodeURIComponent(c.product.code)}`) : null,
 		inviteHref: c.product.code ? brandPath(`/products/${encodeURIComponent(c.product.code)}/invite`) : null
 	};

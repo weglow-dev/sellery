@@ -253,8 +253,10 @@ data-contract 추천안(A안)을 채택했다. 0008 은 **미적용** 상태로 
 | `/checkout` | 서버 → `CheckoutClient` | `?c={code}&o={optIdx}&q={qty}` | user `getUser()`(없으면 `/login?next=`), anon `campaign_card`, user `customers`(기본 배송지 프리필) | 파라미터 결측/범위 밖 → 판매 페이지로 redirect; `isBuyable(card, qty)` 실패(LIVE 아님·`today` 범위 밖·재고 부족) → `.notice`(danger) + 돌아가기, 위젯 렌더 안 함 |
 | `/checkout/success` | client + Suspense | `?paymentKey&orderId&amount` | `POST /api/payments/confirm` **정확히 1회**(`useRef`) | 셋 중 하나라도 없거나 `amount` 가 `^\d+$` 가 아니면 즉시 실패 뷰(`Number()` 파싱 금지 — `'1e4'`·소수 통과); confirm 실패 응답의 `code` 로 사유 문구 매핑(§6.3 표) |
 | `/checkout/fail` | 서버 | `?code&message&orderId&c&o&q` | 없음 | `PAY_PROCESS_CANCELED` → "결제를 취소했어요…", 그 외 메시지 + 코드. "다시 시도" → `/checkout?c&o&q` |
-| `/account/orders` | 서버 | 쿠키 세션 | 미로그인 → 로그인 카드. 로그인 → service `fetchMyOrders(user.id)`: `orders → campaigns(status, code, end_date) → products(name, thumb_url, emoji) → sellers(name, handle) → brands(name)`, `is_sample=false`, `paid_at desc` | — |
+| `/account/orders` | 서버 | 쿠키 세션 | 미로그인 → 로그인 카드. 로그인 → service `fetchMyOrders(user.id)`: `orders → campaigns(status, code, end_date) → products(name, thumb_url, emoji) → sellers(name, handle) → brands(name)`, `is_sample=false`, `paid_at desc` · **문의 내역** `listCsForUser(user.id)`(0018) 행 → `/cs/<code>` · 주문 행 [문의] 모달 → `/cs/new?campaign=&order=` | — |
 | `/account/orders/[code]` | 서버 | `params.code` | service `fetchMyOrder(user.id, code)` — user_id 불일치면 `notFound()` | 미로그인 → `/login?next=` |
+| `/cs/new` (4단계 shop 짝 · brand-console-plan §6 행 4) | 서버 + form action `?campaign=&/open` | `?campaign=<code>`, `?order=<주문번호?>`, 쿠키 세션(선택) | anon `campaign_card(code)` 머리 · `openCs()`(0018 `app_cs_open`) · `rateLimit` IP 30분 5건(+회원 5건) · 응답 `client_token` 은 HttpOnly 쿠키 `slry_cs_<code>`(90일 · Lax · prod Secure)로만 | 캠페인 없음 → 404(`cs/+error.svelte`) · LIVE/CLEARING/SETTLED 아님 → 안내만 · 검증 실패 `fail(400)` 값 유지 · 성공 → 303 `/cs/<code>?opened=1` |
+| `/cs/[code]` | 서버 + form action `?/reply` | `params.code`, 쿠키 `slry_cs_<code>` 또는 세션 user | `getCsThread(code, {clientToken, userId})`(0018 `app_cs_thread`) · `customerReplyCs()` — CLOSED 면 폼 대신 새 문의 링크 | 토큰·회원 어느 쪽도 안 맞으면 404(구분 안 함) · `cache-control: private, no-store` · robots noindex + `robots.txt` Disallow `/cs` |
 
 ### 6.2 API
 

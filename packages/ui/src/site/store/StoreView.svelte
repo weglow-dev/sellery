@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * 판매 링크 페이지 본문 (프로토타입 vStore · ux-spec §3.1 · web s/[handle]/[code]/page.tsx + store-client.tsx). 8 블록 순서 동일:
-	 *   1 상단 행 · 2 인증 띠 · 3 상품 카드(가격 행 · 옵션 · 수량 · 총 결제 금액 · CTA) · 4 상세 정보 · 5 배송·교환·환불 · 6 판매자 정보 · 7 다른 판매 · 8 .store-foot
+	 *   1 상단 행 · 2 인증 띠 · 3 상품 카드(가격 행 · 옵션 · 수량 · 총 결제 금액 · CTA) · 4 상세 정보 · 5 배송·교환·환불 (+ 5-1 판매자에게 문의 링크 · 4단계) · 6 판매자 정보 · 7 다른 판매 · 8 .store-foot
 	 * 데이터는 전부 props(서버 load 결과) — `card`(campaign_card) · `others`(같은 인플루언서의 다른 판매) · `signedIn`.
 	 * 초기값 옵션 0 · 수량 1 (URL 로 복원하지 않는다). 합계 = options[oi].price × q, 배송비 없음. 결제는 S3(/checkout) — CTA 는 링크만 만든다.
 	 */
@@ -110,6 +110,12 @@
 
 	<!-- 5. 배송 · 교환 · 환불 -->
 	<ShippingPolicyCard {card} />
+
+	<!-- 5-1. 판매자에게 문의 (4단계 · docs/brand-console-plan.md §8 "판매 페이지 하단 링크") — 접수는 shop `/cs/new` -->
+	<div class="card static store-cs">
+		<span class="meta">상품 · 배송 · 교환 문의는 공급 브랜드 <b>{brand.name}</b> 가 직접 답해요 — 인플루언서 DM 이 아닌 셀러리로.</span>
+		<a href={`/cs/new?campaign=${encodeURIComponent(campaign.code)}`} class="btn ghost sm">💬 판매자에게 문의</a>
+	</div>
 
 	<!-- 6. 판매자 정보 (신규 §3.1.7) -->
 	<SellerInfoCard {card} />

@@ -6,7 +6,7 @@
 		class: cls = '',
 		children,
 		...rest
-	}: { class?: string; children?: Snippet; productName: string; thumbUrl: string | null; emoji: string; brandName: string; orderCode?: string | null } = $props();
+	}: { class?: string; children?: Snippet; productName: string; thumbUrl: string | null; emoji: string; brandName: string; orderCode?: string | null; csHref?: string | null } = $props();
 	let open = $state(false);
 </script>
 

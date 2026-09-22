@@ -68,7 +68,7 @@
 		</div>
 		<div class="btnrow" style="margin-top:14px">
 			<a href={storeHref} class="btn sm ghost">판매 페이지 보기</a>
-			<CsModalButton class="sm" productName={order.product.name} thumbUrl={order.product.thumb_url} emoji={order.product.emoji} brandName={order.brand.name} orderCode={order.code}>💬 문의하기</CsModalButton>
+			<CsModalButton class="sm" productName={order.product.name} thumbUrl={order.product.thumb_url} emoji={order.product.emoji} brandName={order.brand.name} orderCode={order.code} csHref={`/cs/new?campaign=${encodeURIComponent(order.campaign.code)}&order=${encodeURIComponent(order.code)}`}>💬 문의하기</CsModalButton>
 			{#if refund.ok}
 				<RefundButton class="sm ghost" code={order.code} productName={order.product.name} optionName={order.option_name} qty={order.qty} amount={order.amount} onRefreshed={refresh} />
 			{/if}

@@ -8,13 +8,11 @@
 /**
  * 접두(`/brand`) 없는 데모 경로. 콘솔과 겹치는 이름(`/` `/login` `/products` `/orders` `/cs` `/sales` `/settle` `/my`)은 `/demo-*` 로 옮겼다 —
  * 콘솔이 그 화면을 실제로 만드는 단계(2·4·5)에서 해당 `/demo-*` 항목을 지운다(인플루언서 5단계가 `/sales` `/settle` 을 뺀 것과 같은 규칙).
- * 2단계에서 `/demo-products` 를 뺐다(실제 `(console)/products` — 데모의 `go.screen('products')` 는 콘솔 상품 화면에 닿는다).
+ * 2단계에서 `/demo-products` 를, 4단계에서 `/demo-orders` `/demo-cs` 를 뺐다(실제 `(console)/orders` `/cs` — 데모의 `go.screen('orders'|'cs')` 는 콘솔 화면에 닿는다).
  */
 export const DEMO_PATHS = [
 	'/demo',
 	'/demo-login',
-	'/demo-orders',
-	'/demo-cs',
 	'/demo-sales',
 	'/demo-settle',
 	'/demo-my',
@@ -30,8 +28,6 @@ export const DEMO_PATHS = [
 const DEMO_RENAMES: Record<string, string> = {
 	'/': '/demo',
 	'/login': '/demo-login',
-	'/orders': '/demo-orders',
-	'/cs': '/demo-cs',
 	'/sales': '/demo-sales',
 	'/settle': '/demo-settle',
 	'/my': '/demo-my'
