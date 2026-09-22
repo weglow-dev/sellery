@@ -6,9 +6,9 @@
 
 | import | 어디서 |
 |---|---|
-| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/brand/{signup-rules,product-rules,campaign-rules}` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
+| `@sellery/db` · `@sellery/db/{auth,campaign,linkctx,order-status,dates,text,carriers,types,legal,company,console-paths}` · `@sellery/db/partner/{signup-rules,sample-rules,settle-rules}` · `@sellery/db/brand/{signup-rules,product-rules,campaign-rules,invite-rules,order-rules,settle-rules}` · `@sellery/db/cs/cs-rules` · `@sellery/db/legal/{terms,privacy}` | **순수** — 브라우저·서버·vitest 어디서나. Supabase 클라이언트를 만들지 않는다 |
 | `@sellery/db/browser` (`createBrowserSupabase(url, anonKey)`) | 브라우저 도달 코드(로그인·인증 확인)만. `+*.server.ts` 금지 |
-| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` · `@sellery/db/server/brand/{brand,signup,products,campaigns}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
+| `@sellery/db/server/{config,admin,auth,linkctx,customers,campaign,orders}` · `@sellery/db/server/partner/{seller,signup,slack,products,campaigns,home,my,sales,settle}` · `@sellery/db/server/brand/{brand,signup,products,campaigns,schedule,invite,orders,cs,sales,settle,profile}` | **서버 전용** — 앱의 `src/lib/server/*.ts` 배럴을 통해서만 (`$lib/server/` 는 SvelteKit 이 브라우저 번들에서 막는다). `.svelte` · `+page.ts` · `+layout.ts` 에서 import 하면 `scripts/check-boundaries.mjs` 가 CI 를 실패시킨다 |
 
 서버 함수의 관례(§2.4 · §3.4):
 
@@ -44,6 +44,10 @@ src/brand/order-rules.ts      브랜드 주문 · 운송장 · 발주서 규칙 
 src/cs/cs-rules.ts            고객 문의(CS) 규칙 (순수 · shop 접수 + 브랜드 /cs · 0018 app_cs_* / app_brand_cs_*): CS_TYPES(코어) · CS_BODY_MAX(2000) · normalizeCsBody(0018 cs_normalize_body 와 동일)
                               · parseCsOpenInput(type · body · buyer_name · order_code) · parseCsReplyInput · parseCsConversation(s)/parseCsThread · parseCsOpenResult · parseCsActionResult
                               · csStatusChip(답변 대기·완료·종료) · sortCsConversations · countCsOpen · csSenderLabel · CS_FAIL_MESSAGES · CS_DONE_MESSAGES · csTokenCookieName(비회원 client_token 쿠키)
+src/brand/settle-rules.ts     브랜드 매출·정산·등급·브랜드 정보 규칙 (순수 · 브랜드 콘솔 5단계 · 0019): calcBrandPay(calc 의 브랜드 라인 — pg · sf · pfGross · bBoost · bDisc · platformPg(= pfGross − bBoost − bDisc + pg) · brandPay)
+                              · brandGradeFor/nextBrandGrade/brandDiscRateOf(BGRADES · BG_DISC) · isBrandRefBoostAt · parseBrandSettleInfoInput(/brand/settle 폼) · parseBrandProfileInput(/brand/my 폼)
+                              · RPC 파서 parseBrandSettleInfo · parseSetBrandSettleInfoResult · parseBrandProfile · parseSetBrandProfileResult · parseBrandSales · parseBrandSettlements · parseBrandGradeCard · parseBrandGradeRecalcResult
+                              · 문구 BRAND_SETTLE_FAIL_MESSAGES · BRAND_PROFILE_FIELD_MESSAGES · brandSettlementStatusLabel · brandRateLine · platformPgLine · brandGradeLine · brandDiscountLine · freeRefLine · brandPayoutLine (BANKS · maskAccount · maskBizNo · settleDue 재수출)
 src/brand/invite-rules.ts     브랜드 직접 제안(초대) 규칙 (순수 · 브랜드 콘솔 3단계 · 0016 app_brand_invite_candidates / app_brand_invite_seller): INVITE_MAX_GRADE('골드') · INVITE_GATED_GRADES · isInvitableGrade
                               · parseInviteInput(seller_id · product_id · message ≤ 500) · parseInviteCandidates · matchesCandidateQuery · parseInviteResult · INVITE_FAIL_MESSAGES · inviteFailMessage · inviteDoneMessage
 src/partner/schedule-rules.ts 판매 일정 제안 · 초대 응답 · 인플루언서 차례 (순수 · 0016 app_propose_schedule / app_pass_campaign / app_accept_invite / app_decline_invite / app_seller_schedule_context):
@@ -66,6 +70,8 @@ src/server/brand/*.server.ts    brand(getBrandContext · requireBrand — 상태
                                 · campaigns(listBrandRequests · listBrandCampaigns · getBrandCampaign · approveSample · rejectSample · shipSample) — 브랜드 콘솔 2단계, 0015 app_brand_* RPC
                                 · schedule(confirmSchedule · rejectSchedule — 0016 app_brand_confirm_schedule / app_brand_reject_schedule) · invite(listInviteCandidates · inviteSeller — 0016 app_brand_invite_*) — 브랜드 콘솔 3단계
                                 · orders(listBrandOrders · shipOrder · shipOrdersBulk · poRows · unshippedOrderCodes · brandRefundPrecheck — 0018 app_brand_orders / app_brand_ship_order(s) / app_brand_po_rows / app_brand_refund_precheck)
+                                · sales(getBrandSales — 0019 app_brand_sales) · settle(getBrandSettleInfo · saveBrandSettleInfo · listBrandSettlements · uploadBrandBizDoc(partner-docs brands/<id>/biz-doc.<ext>) · getBrandBizDocSignedUrl)
+                                · profile(getBrandProfile · saveBrandProfile · setBrandLogoUrl · uploadBrandLogo(public-assets brands/<id>/logo-<uuid>.<ext>) · getBrandGradeCard · recalcBrandGrade(운영 · 정산 실행 전용)) — 브랜드 콘솔 5단계, 0019. 정산 실행은 없다(관리자)
                                 · cs(listBrandCs · getBrandCsThread · replyCs · closeCs — 0018 app_brand_cs_*) — 브랜드 콘솔 4단계. 토스 취소를 포함한 브랜드 환불은 @sellery/payments/server/brand-refund refundOrderAsBrand
 src/server/partner/{schedule,chat}.server.ts   브랜드 3단계의 인플루언서 짝(0016): schedule(getScheduleContext · proposeSchedule · passCampaign · acceptInvite · declineInvite) · chat(sendCampaignChat(role 'seller'|'brand', actorId, userId, code, body) — 두 콘솔 공용, 감지 시 leak_flag + leak_warned 행)
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
