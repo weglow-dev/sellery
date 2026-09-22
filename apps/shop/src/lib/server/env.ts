@@ -8,6 +8,7 @@
 import { env } from '$env/dynamic/private';
 import { PUBLIC_SITE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { configureDb } from '@sellery/db/server/config';
+import { configureMail } from '@sellery/db/server/mail';
 import { configurePayments } from '@sellery/payments/server/config';
 
 configureDb({
@@ -38,3 +39,7 @@ export const SITE_URL: string = (() => {
 export function absoluteUrl(path: string): string {
 	return new URL(path, SITE_URL).toString();
 }
+
+// 거래 메일(주문 확인 · 환불 완료 — 결제 확정 · 환불 라우트가 이 앱에 있다). `RESEND_API_KEY` 가 없으면 발송 비활성(프로세스당 1회 안내) — docs/deploy.md §1.2 · §5.7.
+// `RESEND_API_URL` 은 로컬 목 서버 검증용(기본 https://api.resend.com). 링크는 SITE_URL 오리진.
+configureMail({ apiKey: env.RESEND_API_KEY, apiUrl: env.RESEND_API_URL, siteUrl: SITE_URL });

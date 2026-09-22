@@ -169,7 +169,7 @@
 				{#if view.guest}
 					비회원 주문입니다 — 주문번호 <b style="font-family:var(--font-mono)">{view.orderCode.toUpperCase()}</b>와 주문 시 입력한 <b>연락처</b>로 언제든 <a href="/orders/lookup" class="underline underline-offset-2">주문 조회</a>에서 배송·환불·문의를 할 수 있어요.
 				{:else if card?.buyerName}<b>{card.buyerName}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{:else}<b>내 주문</b>에서 배송·환불을 관리할 수 있어요.{/if}
-				운송장은 카카오 알림톡으로 안내됩니다.
+				주문 확인·발송·환불 안내는 이메일로 보내드려요(이메일을 남긴 경우).
 			</p>
 			<div class="btnrow" style="justify-content:flex-end;margin-top:18px">
 				<a href={COMPANY.csUrl} class="btn" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>문의하기</a>

@@ -9,6 +9,7 @@
 import { env } from '$env/dynamic/private';
 import { PUBLIC_SITE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { configureDb } from '@sellery/db/server/config';
+import { configureMail } from '@sellery/db/server/mail';
 
 configureDb({
 	url: PUBLIC_SUPABASE_URL,
@@ -25,3 +26,6 @@ export const SITE_URL: string = (() => {
 		return 'http://localhost:5176';
 	}
 })();
+
+// 거래 메일(관리자 환불 → 고객 환불 완료). `RESEND_API_KEY` 는 선택 — 없으면 비활성(프로세스당 1회 안내) · docs/deploy.md §1.2 · §5.7.
+configureMail({ apiKey: env.RESEND_API_KEY, apiUrl: env.RESEND_API_URL, siteUrl: SITE_URL });

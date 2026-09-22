@@ -16,7 +16,7 @@ import type { Json } from "@sellery/db/database.types";
 import { createAdminClient, type Admin } from "@sellery/db/server/admin";
 import { orderIdOf } from "@sellery/db/server/admin/orders";
 import { cleanText } from "@sellery/db/text";
-import { logPaymentEvent, parsePrecheckResult, parseRefundRecordResult, recordRefundFromToss } from "./checkout-sync.server";
+import { afterRefundRecorded, logPaymentEvent, parsePrecheckResult, parseRefundRecordResult, recordRefundFromToss } from "./checkout-sync.server";
 import { isTossError, isUncertain, tossCancel, tossCanceledTotal, tossConfirm, tossGetPayment, type TossApi, type TossPayment } from "./toss.server";
 
 export type AdminRefundResult =
@@ -97,6 +97,7 @@ export async function refundOrderAsAdmin(orderRef: string, reason: string, opts:
     }
     const rec = parseRefundRecordResult(recJson);
     if (!rec.ok) return { ok: false, code: "RECORD_FAILED" };
+    await afterRefundRecorded(admin, order.id, rec);
     return { ok: true, orderCode: rec.order_code, amount: rec.amount ?? amount, recordOnly: true, ...(rec.already ? { already: true as const } : {}), ...(rec.adjust ? { adjust: true as const } : {}) };
   }
   if (!paymentKey) return { ok: false, code: "NO_PAYMENT_KEY" };
@@ -173,6 +174,9 @@ export async function refundOrderAsAdmin(orderRef: string, reason: string, opts:
     });
     return { ok: false, code: "RECORD_FAILED" };
   }
+
+  // ③′ 환불 완료 메일(고객 · 새 기록일 때만)
+  await afterRefundRecorded(admin, order.id, rec);
 
   // ④ 감사 로그
   await logPaymentEvent(admin, {

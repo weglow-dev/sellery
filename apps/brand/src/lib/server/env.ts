@@ -10,6 +10,7 @@
 import { env } from '$env/dynamic/private';
 import { PUBLIC_SITE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { configureDb } from '@sellery/db/server/config';
+import { configureMail } from '@sellery/db/server/mail';
 import { configurePayments } from '@sellery/payments/server/config';
 
 configureDb({
@@ -29,3 +30,6 @@ export const SITE_URL: string = (() => {
 		return 'http://localhost:5176';
 	}
 })();
+
+// 거래 메일(배송 시작 · 브랜드 환불 → 환불 완료 · 문의 답변 — 이 앱의 폼 액션이 보낸다). `RESEND_API_KEY` 없으면 비활성 — docs/deploy.md §1.2 · §5.7. 링크는 SITE_URL 오리진.
+configureMail({ apiKey: env.RESEND_API_KEY, apiUrl: env.RESEND_API_URL, siteUrl: SITE_URL });
