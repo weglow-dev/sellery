@@ -16,7 +16,8 @@
 	const n = $derived(counts().admin);
 	const tabs = $derived([
 		{ href: '/demo', label: '대시보드', badge: n }, { href: '/products', label: '상품' }, { href: '/influencers', label: '인플루언서' }, { href: '/brands', label: '브랜드' },
-		{ href: '/orders', label: '주문·CS' }, { href: '/match', label: '매칭·자동 제안' }, { href: '/revenue', label: '매출·순수익' }, { href: '/settle', label: '정산 실행' }
+		{ href: '/match', label: '매칭·자동 제안' }, { href: '/revenue', label: '매출·순수익' }
+		// 주문·CS · 정산 실행 데모는 "정산·돈" PR-B 에서 뺐다 — 실서비스 `/admin/orders` `/admin/settle` `/admin/cs` 가 그 자리 ($lib/demo.ts DEMO_PATHS 와 같이 고친다)
 	]);
 	// AppShell 이 init 에서 등록한 goto(base + p) 를 덮어쓴다 — 데모 홈('/') 만 '/demo' 로 (실서비스 루트와 충돌 방지).
 	// 상품 누끼 무대(body[data-stage=studio], theme.css)는 이전 app.html 의 body 속성이었다 — 콘솔 셸에는 없으므로 여기서 붙인다.
