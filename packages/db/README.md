@@ -38,6 +38,12 @@ src/brand/campaign-rules.ts   브랜드 시점 캠페인 규칙 (순수 · 0015)
                               · BRAND_TURN_STATUSES · matchesBrandCampaignFilter · parseShipInput(택배사 + 송장 6~30) · parseRejectInput · parseSampleActionResult · SAMPLE_ACTION_FAIL_MESSAGES · shippingLine
                               · 3단계(0016) parseScheduleActionResult · SCHEDULE_ACTION_FAIL_MESSAGES · scheduleActionFailMessage · SCHEDULE_ACTION_DONE_MESSAGES · periodLine
                               · 칩·스테퍼·택배사는 partner/sample-rules · carriers 재수출
+src/brand/order-rules.ts      브랜드 주문 · 운송장 · 발주서 규칙 (순수 · 브랜드 콘솔 4단계 · 0018): ORDER_FILTERS · parseBrandOrders · orderShipState/orderRowLabel · parseShipOrderInput(주문번호 + 택배사 + 송장)
+                              · parseBulkShipCsv(주문번호,택배사,운송장 — BOM · CRLF · 따옴표 · 헤더 · 2열 옛 양식) · bulkShipTemplateCsv · parseShipOrderResult/parseBulkShipResult · SHIP_ORDER_FAIL_MESSAGES · bulkShipSummary
+                              · parsePoRows · poCsv(BOM + CRLF · PO_COLUMNS 17열) · poFileName · toCsv/splitCsvLine/csvEscape · BRAND_REFUND_FAIL_MESSAGES · brandRefundFailMessage
+src/cs/cs-rules.ts            고객 문의(CS) 규칙 (순수 · shop 접수 + 브랜드 /cs · 0018 app_cs_* / app_brand_cs_*): CS_TYPES(코어) · CS_BODY_MAX(2000) · normalizeCsBody(0018 cs_normalize_body 와 동일)
+                              · parseCsOpenInput(type · body · buyer_name · order_code) · parseCsReplyInput · parseCsConversation(s)/parseCsThread · parseCsOpenResult · parseCsActionResult
+                              · csStatusChip(답변 대기·완료·종료) · sortCsConversations · countCsOpen · csSenderLabel · CS_FAIL_MESSAGES · CS_DONE_MESSAGES · csTokenCookieName(비회원 client_token 쿠키)
 src/brand/invite-rules.ts     브랜드 직접 제안(초대) 규칙 (순수 · 브랜드 콘솔 3단계 · 0016 app_brand_invite_candidates / app_brand_invite_seller): INVITE_MAX_GRADE('골드') · INVITE_GATED_GRADES · isInvitableGrade
                               · parseInviteInput(seller_id · product_id · message ≤ 500) · parseInviteCandidates · matchesCandidateQuery · parseInviteResult · INVITE_FAIL_MESSAGES · inviteFailMessage · inviteDoneMessage
 src/partner/schedule-rules.ts 판매 일정 제안 · 초대 응답 · 인플루언서 차례 (순수 · 0016 app_propose_schedule / app_pass_campaign / app_accept_invite / app_decline_invite / app_seller_schedule_context):
@@ -48,6 +54,7 @@ src/partner/chat-rules.ts     캠페인 스레드 채팅 (순수 · 두 콘솔 �
                               · normalizeChatBody · parseChatInput · parseChatEvent · parseChatResult · CHAT_FAIL_MESSAGES · chatFailMessage · senderLabel · isMine
 src/legal/{terms,privacy}.ts  약관·처리방침 본문 — 비개발자 편집 대상
 src/server/*.server.ts        event.server(DbEvent · memoized) · config · admin · auth · linkctx · customers · campaign · orders
+                                · cs(openCs · getCsThread · customerReplyCs · listCsForUser — 고객 측 0018 app_cs_*) · campaign-tick(runCampaignTick · tickCampaign — 0018 app_campaign_tick · shop /api/cron/campaign-tick)
 src/server/partner/*.server.ts  seller(getSellerContext · requireSeller · rateLimit) · signup(createSellerFromSignup) · slack
                                 · products(listProductsForSeller · getProductForSeller · requestFreeSample) · campaigns(listSellerCampaigns · getSellerCampaign · receiveSample)
                                 · home(getHomeWidgets) · my(saveSampleAddress) — 콘솔 3단계, 0011 RPC(app_sample_quote(s) · app_request_free_sample · app_receive_sample)
@@ -58,9 +65,11 @@ src/server/brand/*.server.ts    brand(getBrandContext · requireBrand — 상태
                                 · products(listBrandProducts · getBrandProduct · listCategories · upsertBrandProduct · setBrandListing · deleteBrandProduct · uploadProductImage(Storage public-assets products/<brand>/<uuid>.<ext> → 공개 URL))
                                 · campaigns(listBrandRequests · listBrandCampaigns · getBrandCampaign · approveSample · rejectSample · shipSample) — 브랜드 콘솔 2단계, 0015 app_brand_* RPC
                                 · schedule(confirmSchedule · rejectSchedule — 0016 app_brand_confirm_schedule / app_brand_reject_schedule) · invite(listInviteCandidates · inviteSeller — 0016 app_brand_invite_*) — 브랜드 콘솔 3단계
+                                · orders(listBrandOrders · shipOrder · shipOrdersBulk · poRows · unshippedOrderCodes · brandRefundPrecheck — 0018 app_brand_orders / app_brand_ship_order(s) / app_brand_po_rows / app_brand_refund_precheck)
+                                · cs(listBrandCs · getBrandCsThread · replyCs · closeCs — 0018 app_brand_cs_*) — 브랜드 콘솔 4단계. 토스 취소를 포함한 브랜드 환불은 @sellery/payments/server/brand-refund refundOrderAsBrand
 src/server/partner/{schedule,chat}.server.ts   브랜드 3단계의 인플루언서 짝(0016): schedule(getScheduleContext · proposeSchedule · passCampaign · acceptInvite · declineInvite) · chat(sendCampaignChat(role 'seller'|'brand', actorId, userId, code, body) — 두 콘솔 공용, 감지 시 leak_flag + leak_warned 행)
 src/test/*.test.ts       vitest — 순수 규칙만 (루트 `npm test`)
-scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund · 브랜드 brands/suspend-brand/reactivate-brand/link-brand/invite-brand · 2단계 products/review-product = 0015 app_admin_review_product · 3단계 campaign <code> = 상태·일정·스레드 조회) · dev-seller · dev-brand · dev-user (Node · 루트 .env.local)
+scripts/*.mjs            gen-types · partner-admin(list/suspend/…/channels · 4단계 payments · refund-sample = 토스 취소 + app_partner_payment_refund · 브랜드 brands/suspend-brand/reactivate-brand/link-brand/invite-brand · 2단계 products/review-product = 0015 app_admin_review_product · 3단계 campaign <code> = 상태·일정·스레드 조회 · 4단계 tick / tick-campaign <code> = 0018 app_campaign_tick(_one) · orders --campaign|--brand [--unshipped] · cs [--open] [--brand]) · dev-seller · dev-brand · dev-user (Node · 루트 .env.local)
 ```
 
 ## gen:types

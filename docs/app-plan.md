@@ -389,7 +389,7 @@ confirm 검증 순서(고정): **입력 형식(정수·양수·키 형식) → `
 | FAILED(CANCEL_PENDING) | `DONE` | 토스 전액 취소 재시도(같은 `Idempotency-Key: session.id`) → 성공 시 `fail_code = fail_message(원래 code)` |
 | FAILED(CANCEL_PENDING) | `CANCELED` | 이미 취소됨 → `fail_code = 원래 code` |
 
-구현 위치: 슬라이스 1 에서는 `/api/cron/reconcile`(`CRON_SECRET`, `vercel.json` 크론 없이 수동 호출·로컬 스크립트)로 두고, 슬라이스 4 에서 캠페인 스케줄러와 함께 Vercel Cron 에 올린다(§12). 고객 새로고침(§7.2 재선점)과 웹훅이 대부분을 먼저 처리하므로 잡은 잔여분만 본다. 실행 결과는 `payment_events(source='confirm' | 'cancel', result=…)` 에 남긴다.
+구현 위치: 슬라이스 1 에서는 `/api/cron/reconcile`(`CRON_SECRET`, `vercel.json` 크론 없이 수동 호출·로컬 스크립트)로 두고, 슬라이스 4 에서 캠페인 스케줄러와 함께 Vercel Cron 에 올린다(§12). **적용(2026-09-22 · 브랜드 콘솔 4단계 PR-A)**: `apps/shop/vercel.json` `crons` — reconcile 10분 · `/api/cron/campaign-tick`(0018 `app_campaign_tick`) 매시 — `docs/deploy.md §8.2`. 고객 새로고침(§7.2 재선점)과 웹훅이 대부분을 먼저 처리하므로 잡은 잔여분만 본다. 실행 결과는 `payment_events(source='confirm' | 'cancel', result=…)` 에 남긴다.
 
 ---
 
@@ -600,7 +600,7 @@ Shipping 타입(`{ recipient, phone, postcode, address1, address2?, memo? }`)은
 |---|---|---|---|
 | 2 | **브랜드 센터** | `js/40-brand.js` → `/brand/{dashboard, products, campaigns, orders, settlements, profile}`, `js/70-campaign.js`(스레드) → `/brand/campaigns/[code]` | 주문 탭·발주 CSV(BOM+CRLF)·송장 업로드(`courier/tracking_no/shipped_at`)·브랜드 환불(`app_refund_precheck` → 토스 → `app_refund_record(actor='brand')`). 게이트 `getBrandContext()`(세션 → `brands.user_id`). |
 | 3 | **인플루언서 센터** | `js/20-seller.js` → `/influencer/{home, products, campaigns, sales, settle, profile}`, `js/30-shared.js`(공용 위젯) → `components/partner/*` | 판매 링크 카드(`NEXT_PUBLIC_SITE_URL + canonicalStoreUrl(card)` 복사 — `@` 없는 핸들), 샘플·일정 제안 흐름(상태 머신 14 상태 — 서버 액션 + `campaign_events`), `maskName`. |
-| 4 | **관리자** | `js/50-admin.js` → `/admin/{campaigns, settle, sellers, brands, orders, settings}` | 정산 실행 `calc()` 이관(0004 헤더 수식·독립 반올림 + **`CANCELED` 주문·`PAID & refund_amount>0` 부분취소를 조정 항목으로**), 스케줄러 `api/cron/campaign-tick`(`CRON_SECRET`) + `expire_checkout_sessions` + reconcile(§7.5) + `purge_checkout_pii`(§5.1) 를 Vercel Cron 에. `payment_events handled=false` 큐 화면. Basic Auth(`ADMIN_PASSWORD`)는 `app_role()='admin'` 게이트 **위의** 이중 잠금이며 단독 인증이 아니다(§3). |
+| 4 | **관리자** | `js/50-admin.js` → `/admin/{campaigns, settle, sellers, brands, orders, settings}` | 정산 실행 `calc()` 이관(0004 헤더 수식·독립 반올림 + **`CANCELED` 주문·`PAID & refund_amount>0` 부분취소를 조정 항목으로**), 스케줄러 `api/cron/campaign-tick`(`CRON_SECRET`) + `expire_checkout_sessions` + reconcile(§7.5) + `purge_checkout_pii`(§5.1) 를 Vercel Cron 에(스케줄러 · reconcile 크론은 브랜드 콘솔 4단계 PR-A 에서 먼저 올렸다 — 0018 `app_campaign_tick` · `deploy.md §8.2`; `purge_checkout_pii` 는 아직 수동). `payment_events handled=false` 큐 화면. Basic Auth(`ADMIN_PASSWORD`)는 `app_role()='admin'` 게이트 **위의** 이중 잠금이며 단독 인증이 아니다(§3). |
 | 5 | **고객 확장** | `js/60-customer.js` 나머지 → `/cart`(`checkout_items` 자식 테이블 + 다건 승인), `/influencers`, `/about`, 오픈 알림(`campaign_alerts`), 문의(`/api/cs` → `cs_conversations`), 알림톡(SOLAPI) | 장바구니는 세션 1 : 주문 N 으로 `orders_checkout_session_uidx` 해제. |
 
 공통 인프라: 라우트 그룹 `(customer)/(partner)/(admin)` 분리 + 그룹별 `layout.tsx`(서브내비 = 프로토타입 `SCREENS[role]`), `proxy.ts` 에서 `/brand`·`/influencer`·`/admin` 은 세션 + `app_role()` 게이트, 쓰기는 전부 `/api/partner/*` 또는 서버 액션(service role, "클라이언트가 보낸 id 를 믿지 않고 세션에서 재확인"). 파트너 읽기는 서버 경유(access-model §4.1).

@@ -35,6 +35,12 @@
 //   ── 브랜드 콘솔 3단계 (0016 — 조회만 · 전이는 두 콘솔이 RPC 로) ──
 //   campaign <campaign>                     캠페인 1건: 상태 · 인플루언서 · 상품 · 제안/확정 일정 · 잠금 가격 · 잔여 재고 · 스레드(campaign_events 시간순, chat 은 leak 표시)
 //
+//   ── 브랜드 콘솔 4단계 (0018 — 스케줄러 · 주문 · CS · docs/brand-console-plan.md §4 "0018") ──
+//   tick                                    app_campaign_tick() — SCHEDULE_CONFIRMED→LIVE(시작일 도래) · LIVE→CLEARING(종료일 경과) 전체 · 멱등 (프로덕션은 shop /api/cron/campaign-tick 이 매시 실행)
+//   tick-campaign <campaign>                app_campaign_tick_one — 1건만
+//   orders [--campaign <campaign>] [--brand <brand>] [--unshipped|--shipped|--refunded] [--limit N]   브랜드 주문 표(app_brand_orders · 샘플 제외 · 수취인은 이름만) — --brand 없으면 캠페인의 브랜드
+//   cs [--open] [--brand <brand>] [--limit N]   고객 문의 표(cs_conversations 최신순 50) — --open = OPEN 만 · --brand 로 한 브랜드만. 답변·종료는 브랜드 콘솔에서
+//
 //   <seller> · <channel> · <brand> · <product> · <campaign> 는 code('s1' · 'ch1' · 'b1' · 'p1' · 'c3') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
@@ -91,6 +97,7 @@ function usage(code = 2) {
       "  brands [--inactive] | suspend-brand <brand> [reason] | reactivate-brand <brand> | link-brand <brand> <user_id> | invite-brand <email> --link <brand>",
       "  products [--pending] [--brand <brand>] [--limit N] | review-product <product> approve|reject|pause [\"사유\"]",
       "  campaign <campaign>",
+      "  tick | tick-campaign <campaign> | orders [--campaign c] [--brand b] [--unshipped|--shipped|--refunded] [--limit N] | cs [--open] [--brand b] [--limit N]",
     ].join("\n"),
   );
   process.exit(code);
@@ -593,6 +600,95 @@ async function cmdRefundSample() {
   await notifySlack(`[셀러리] 샘플 결제 환불 · ${p.toss_order_id} · 🥬${p.amount_cel} + ₩${p.amount_cash}`);
 }
 
+/* ------------------------------------------------------------ 브랜드 콘솔 4단계 (0018) ------------------------------------------------------------ */
+
+async function cmdTick() {
+  const { data, error } = await admin.rpc("app_campaign_tick");
+  if (error) throw new Error(`app_campaign_tick failed: ${error.message}`);
+  console.log(`[partner-admin] 스케줄러 틱 (오늘 ${data?.today}) — LIVE ${data?.went_live ?? 0}건 ${JSON.stringify(data?.went_live_codes ?? [])} · CLEARING ${data?.ended ?? 0}건 ${JSON.stringify(data?.ended_codes ?? [])}`);
+}
+
+async function cmdTickCampaign() {
+  const ref = positional[0];
+  if (!ref) usage();
+  const q = UUID_RE.test(ref) ? admin.from("campaigns").select("id, code, status").eq("id", ref) : admin.from("campaigns").select("id, code, status").eq("code", ref);
+  const { data: c, error } = await q.maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!c) throw new Error(`캠페인을 찾을 수 없습니다: ${ref}`);
+  const { data, error: e2 } = await admin.rpc("app_campaign_tick_one", { p_campaign_id: c.id });
+  if (e2) throw new Error(`app_campaign_tick_one failed: ${e2.message}`);
+  if (!data?.ok) throw new Error(`틱 실패: ${data?.code ?? "BAD_RESULT"}`);
+  console.log(`[partner-admin] ${data.campaign_code}: ${data.from} → ${data.to}${data.from === data.to ? " (변화 없음)" : ""} · 오늘 ${data.today}`);
+}
+
+async function cmdOrders() {
+  const limit = Math.min(Number(flags.limit) || 50, 2000);
+  const filter = flags.unshipped ? "unshipped" : flags.shipped ? "shipped" : flags.refunded ? "refunded" : "all";
+  let campaignId = null;
+  let brandId = null;
+  if (flags.campaign) {
+    const ref = String(flags.campaign);
+    const q = UUID_RE.test(ref) ? admin.from("campaigns").select("id, brand_id").eq("id", ref) : admin.from("campaigns").select("id, brand_id").eq("code", ref);
+    const { data: c, error } = await q.maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!c) throw new Error(`캠페인을 찾을 수 없습니다: ${ref}`);
+    campaignId = c.id;
+    brandId = c.brand_id;
+  }
+  if (flags.brand) brandId = (await findBrand(String(flags.brand))).id;
+  if (!brandId) {
+    console.error("[partner-admin] --campaign 또는 --brand 가 필요합니다.");
+    process.exit(2);
+  }
+  const { data, error } = await admin.rpc("app_brand_orders", { p_brand_id: brandId, p_filter: filter, p_campaign_id: campaignId ?? undefined, p_limit: limit });
+  if (error) throw new Error(`app_brand_orders failed: ${error.message}`);
+  if (!data?.ok) throw new Error(`주문 조회 실패: ${data?.code ?? "BAD_RESULT"}`);
+  const t = data.totals ?? {};
+  console.log(`[partner-admin] 주문 ${t.count ?? 0}건 — 미발송 ${t.unshipped ?? 0} · 발송 ${t.shipped ?? 0} · 환불 ${t.refunded ?? 0} · 결제 ₩${t.paid_amount ?? 0} · 환불 ₩${t.refund_amount ?? 0} (필터 ${filter} · 표시 ${(data.rows ?? []).length})`);
+  console.table(
+    (data.rows ?? []).map((o) => ({
+      code: o.code,
+      캠페인: o.campaign?.code ?? "",
+      상품: o.campaign?.product?.name ?? "",
+      인플루언서: o.campaign?.seller?.handle ?? "",
+      구매자: o.buyer_name,
+      수량: o.qty,
+      금액: o.amount,
+      상태: o.status,
+      운송장: o.tracking_no ? `${o.courier ?? ""} ${o.tracking_no}` : "",
+      주문일: fmtDate(o.paid_at),
+      환불: o.refunded_at ? `${o.refund_actor ?? ""} ₩${o.refund_amount ?? o.amount}` : "",
+    })),
+  );
+}
+
+async function cmdCs() {
+  const limit = Math.min(Number(flags.limit) || 50, 500);
+  let q = admin
+    .from("cs_conversations")
+    .select("id, code, status, type, buyer_name, order_code, order_id, last_preview, last_message_at, replied_at, created_at, brands(code, name), campaigns(code)")
+    .order("last_message_at", { ascending: false })
+    .limit(limit);
+  if (flags.open) q = q.eq("status", "OPEN");
+  if (flags.brand) q = q.eq("brand_id", (await findBrand(String(flags.brand))).id);
+  const { data, error } = await q;
+  if (error) throw new Error(`cs_conversations read failed: ${error.message}`);
+  console.table(
+    (data ?? []).map((x) => ({
+      code: x.code,
+      상태: x.status,
+      유형: x.type,
+      브랜드: x.brands ? `${x.brands.code ?? ""} ${x.brands.name}`.trim() : "",
+      캠페인: x.campaigns?.code ?? "",
+      고객: x.buyer_name,
+      주문번호: x.order_code ? `${x.order_code}${x.order_id ? "" : " (미해석)"}` : "",
+      "최근 메시지": (x.last_preview ?? "").replace(/[\r\n]+/g, " ").slice(0, 40),
+      시각: fmtDate(x.last_message_at),
+      답변: x.replied_at ? fmtDate(x.replied_at) : "",
+    })),
+  );
+}
+
 try {
   switch (cmd) {
     case "list":
@@ -648,6 +744,18 @@ try {
       break;
     case "campaign":
       await cmdCampaign();
+      break;
+    case "tick":
+      await cmdTick();
+      break;
+    case "tick-campaign":
+      await cmdTickCampaign();
+      break;
+    case "orders":
+      await cmdOrders();
+      break;
+    case "cs":
+      await cmdCs();
       break;
     default:
       usage();

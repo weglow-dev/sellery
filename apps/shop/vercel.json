@@ -40,5 +40,15 @@
 			"source": "/admin/:path*",
 			"destination": "https://sellery-admin.vercel.app/admin/:path*"
 		}
+	],
+	"crons": [
+		{
+			"path": "/api/cron/campaign-tick",
+			"schedule": "5 * * * *"
+		},
+		{
+			"path": "/api/cron/reconcile",
+			"schedule": "*/10 * * * *"
+		}
 	]
 }
