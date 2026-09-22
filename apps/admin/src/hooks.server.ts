@@ -1,16 +1,18 @@
 import type { Handle } from '@sveltejs/kit';
 import { createServerClient } from '@supabase/ssr';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import type { Database } from '@sellery/db/database.types';
+import '$lib/server/env'; // configureDb() 1회 — $env/dynamic/private 는 여기(서버 배럴)에서만 읽는다 (결정 11)
 
-/* Supabase SSR 세션 — 4 앱 공통 골격 (docs/monorepo-migration.md §2.1). 관리자는 데모(ssr=false)라 지금은 세션만 회전한다.
+/* Supabase SSR 세션 — 4 앱 공통 골격 (docs/monorepo-migration.md §2.1). 세션 게이트는 다음 PR — 지금은 각 page 의 requireAdmin() 이 판정한다(결정 6).
    요청마다 createServerClient 1회 → locals.supabase · locals.safeGetSession(). cookieOptions 는 지정하지 않는다 — host-only (결정 I).
-   PUBLIC_SUPABASE_URL · PUBLIC_SUPABASE_ANON_KEY 가 비어 있으면(키 없는 로컬 · 데모) Supabase 없이 통과 — locals.supabase = null. */
+   PUBLIC_SUPABASE_URL · PUBLIC_SUPABASE_ANON_KEY 가 비어 있으면(키 없는 로컬 · 데모) Supabase 없이 통과 — locals.supabase = null → requireAdmin 은 anon 으로 본다. */
 const supabase: Handle = async ({ event, resolve }) => {
 	let authHeaders: Record<string, string> = {};
 	event.locals.memo = new Map();
 	event.locals.supabase =
 		PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY
-			? createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+			? createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 					cookies: {
 						getAll: () => event.cookies.getAll(),
 						setAll: (cookiesToSet, headers) => {
