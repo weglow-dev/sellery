@@ -13,8 +13,11 @@
  *   accountLinkLabel — `user_id` 연결 여부 문구
  *   channelPendingSince · isChannelPending — "인증 확인" 누른 채널 판정(verified=false and vcode_confirmed_at is not null)
  *   sellerSearchHit — 검색(활동명 · 핸들 · code · 이메일) 클라이언트측 판정. 서버는 같은 조건을 `or()` 로 건다
+ *   channelCountChip — 목록의 `n/m 인증` 칩(대기 건이 있으면 빨강)
+ *   gradeChips — 등급 필터 칩(GRADES 순서 · 인원 있는 등급만)
  *   HIDDEN_LABELS · SELLER_ACTION_MESSAGES — 토글·액션 결과 문구
  */
+import { GRADES } from "@sellery/core/constants";
 import type { StatusTone } from "../order-status";
 
 /** 목록 상단 필터 — 스크립트의 `--inactive` 를 넓힌 것. `all` 은 정지·비공개까지 전부 */
@@ -86,10 +89,29 @@ export const SELLER_ACTION_MESSAGES: Record<string, string> = {
   shown: "공개로 전환했습니다.",
   channel_verified: "채널을 인증 완료로 바꿨습니다.",
   channel_unverified: "채널 인증을 해제했습니다. 메인 채널 설정은 그대로입니다.",
+  celery_granted: "🥬 를 지급했습니다.",
   err_not_found: "대상을 찾지 못했습니다.",
   err_input: "입력값을 확인해주세요.",
   err: "처리에 실패했습니다. 잠시 후 다시 시도해주세요.",
 };
+
+/**
+ * 채널 인증 집계 칩 — 데모의 `{ver}/{ch.length} 인증`(전부 인증이면 green, 아니면 amber).
+ * 채널이 없으면 null — 화면은 `—` 를 그린다.
+ */
+export function channelCountChip(
+  c: { channels_total: number; channels_verified: number; channels_pending: number },
+): { label: string; tone: StatusTone } | null {
+  if (c.channels_total === 0) return null;
+  const label = `${c.channels_verified}/${c.channels_total} 인증`;
+  if (c.channels_pending > 0) return { label: `${label} · 대기 ${c.channels_pending}`, tone: "red" };
+  return { label, tone: c.channels_verified === c.channels_total ? "green" : "amber" };
+}
+
+/** 등급 필터 칩 목록 — `GRADES` 순서(높은 등급부터)로, 인원이 있는 등급만. 서버가 준 `grades` 카운트를 그대로 쓴다. */
+export function gradeChips(grades: Record<string, number>): { key: string; label: string; count: number }[] {
+  return GRADES.map((t) => ({ key: t.g, label: t.g, count: grades[t.g] ?? 0 })).filter((x) => x.count > 0);
+}
 
 /**
  * 검색 판정 — 활동명 · 핸들 · code · 이메일. 서버는 같은 컬럼에 `ilike` `or()` 를 건다(`sellers.server.ts` `SEARCH_COLUMNS`).
