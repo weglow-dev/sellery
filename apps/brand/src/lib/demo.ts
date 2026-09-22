@@ -8,14 +8,11 @@
 /**
  * 접두(`/brand`) 없는 데모 경로. 콘솔과 겹치는 이름(`/` `/login` `/products` `/orders` `/cs` `/sales` `/settle` `/my`)은 `/demo-*` 로 옮겼다 —
  * 콘솔이 그 화면을 실제로 만드는 단계(2·4·5)에서 해당 `/demo-*` 항목을 지운다(인플루언서 5단계가 `/sales` `/settle` 을 뺀 것과 같은 규칙).
- * 2단계에서 `/demo-products` 를, 4단계에서 `/demo-orders` `/demo-cs` 를 뺐다(실제 `(console)/orders` `/cs` — 데모의 `go.screen('orders'|'cs')` 는 콘솔 화면에 닿는다).
+ * 2단계에서 `/demo-products` 를, 4단계에서 `/demo-orders` `/demo-cs` 를, 5단계에서 `/demo-sales` `/demo-settle` `/demo-my` 를 뺐다(실제 `(console)/orders` `/cs` `/sales` `/settle` `/my` — 데모의 `go.screen('orders'|'cs'|'sales'|'settle'|'my')` 는 콘솔 화면에 닿는다).
  */
 export const DEMO_PATHS = [
 	'/demo',
 	'/demo-login',
-	'/demo-sales',
-	'/demo-settle',
-	'/demo-my',
 	'/camps',
 	'/dm',
 	'/gallery',
@@ -27,10 +24,7 @@ export const DEMO_PATHS = [
 /** core 의 `go.screen(k)` 가 말하는 화면 경로(`/products` …) → 데모 그룹의 실제 경로. 겹치지 않는 경로는 그대로. */
 const DEMO_RENAMES: Record<string, string> = {
 	'/': '/demo',
-	'/login': '/demo-login',
-	'/sales': '/demo-sales',
-	'/settle': '/demo-settle',
-	'/my': '/demo-my'
+	'/login': '/demo-login'
 };
 
 export function demoPathOf(corePath: string): string {
