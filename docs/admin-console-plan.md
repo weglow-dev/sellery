@@ -1,9 +1,15 @@
 # 관리자 콘솔 구현 계획 — `apps/admin` 데모 → 실서비스 (sellery.life/admin/*)
 
 > **상태(2026-09-22): 두 작업자가 나눠 만든다.** 셸 · 인증 · **파트너 관리**(인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수)는 Soyunnlee 가
-> `apps/admin/src/routes/(console)/{login,home,auth}` · `apps/admin/src/lib/server/{env,db,admin}.ts` · `packages/db/src/server/admin.server.ts`(`getAdminContext` · `requireAdmin` · `adminPath` · `adminNextOf`, PR #28 #29 #38 #40)
+> `apps/admin/src/routes/(console)/{login,home,auth}` · `apps/admin/src/lib/server/{env,db,admin}.ts`(`getAdminContext` · `requireAdmin` · `adminPath` · `adminNextOf` — PR #38 #40) ·
+> 관리자 셸(`packages/db/src/console-paths.ts` `ConsoleRole='admin'` · `packages/ui/src/site/console/PartnerShell.svelte` `TABS.admin` — PR #49)
 > 로 만들고, 그 문서는 이 파일의 다른 절(작업자가 채운다)이다. 이 절("정산 · 돈")은 **돈이 움직이는 쪽만** 다룬다 — 정산 실행 · 지급 처리 · 이체 파일 · 원천징수 자료 ·
-> 주문/환불/결제 정합성/문의 열람. 마이그레이션 번호는 **0020 이 이 절**, 0021 부터 파트너 관리. 두 쪽은 서로의 파일을 고치지 않는다(아래 파일 표).
+> 주문/환불/결제 정합성/문의 열람. 마이그레이션 번호는 **0020 · 0021(비회원 구매) 이 이 절**, 0022 부터 파트너 관리. 두 쪽은 서로의 파일을 고치지 않는다(아래 파일 표).
+>
+> **어느 쪽 소유도 아닌 공용 파일**(4 앱이 같이 쓴다 · append-only, 고칠 일이 생기면 서로 알린다):
+> `packages/db/src/server/admin.server.ts`(`createAdminClient` · `createAnonClient` — 관리자 게이트가 아니라 service role 클라이언트 팩토리) ·
+> `packages/db/package.json` exports · `apps/admin/src/routes/(console)/+layout.*`(셸 적용 지점) ·
+> `apps/admin/src/routes/(console)/home/+page.*`(양쪽이 카드를 올린다 — 추가 전에 알린다).
 >
 > 근거: 브랜드 콘솔 계획서 골격(`docs/brand-console-plan.md`) · `docs/settlement-policy.md` §3 · §5 · §7 · §8 · §9 · §11.4 · `docs/data-model.md` §4 · §5.2 · `docs/points-policy.md` ·
 > `docs/inf-console-plan.md` §5.9 · `packages/core/src/{helpers,actions}.ts` `calc` · `runSettle` · `runSettleAll` · 0004 · 0005 · 0013 · 0018 · 0019.
