@@ -7,16 +7,19 @@
  * 순수 모듈 — 환경변수를 읽지 않는다(절대 URL 이 필요하면 호출자가 `PUBLIC_SITE_URL` 을 넘긴다).
  */
 
-export type ConsoleRole = "seller" | "brand";
-export type ConsolePrefix = "/influencer" | "/brand";
+export type ConsoleRole = "seller" | "brand" | "admin";
+export type ConsolePrefix = "/influencer" | "/brand" | "/admin";
 
 /** 역할 → 라우트 접두 (각 앱의 `paths.base` 와 같다) */
 export const PREFIX_OF: Record<ConsoleRole, ConsolePrefix> = {
   seller: "/influencer",
   brand: "/brand",
+  admin: "/admin",
 };
 
-/** 콘솔 안에서 세션 없이 열리는 경로(접두 제외 형태). influencer `hooks.server.ts` 세션 게이트의 예외(§2.2). */
+/** 콘솔 안에서 세션 없이 열리는 경로(접두 제외 형태). influencer `hooks.server.ts` 세션 게이트의 예외(§2.2).
+ *  **파트너(seller · brand) 전용 목록이다** — 관리자 콘솔은 가입·비밀번호 재설정이 없고 `/login` 하나뿐이라
+ *  `apps/admin/src/lib/server/admin.ts` 의 `ADMIN_PUBLIC_PATHS` 를 쓴다(계정은 수동 승격 — docs/deploy.md §5.6). */
 export const CONSOLE_PUBLIC_PATHS = ["/login", "/signup", "/verify-sent", "/password", "/password/new"] as const;
 
 /** 접두 없는 콘솔 경로가 공개 경로인가 (정확 일치 또는 그 하위) */
