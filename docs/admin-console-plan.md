@@ -10,7 +10,7 @@
 
 ---
 
-## 정산 · 돈 (PR-A 적용 2026-09-22 · PR-B 화면은 다음)
+## 정산 · 돈 (PR-A 서버 계층 2026-09-22 · PR-B 화면 2026-09-22 — §6)
 
 ### 0. 결정 요약
 
@@ -99,3 +99,22 @@ PR-B 가 만드는 화면(이 절의 몫): `apps/admin/src/routes/(console)/sett
 4. 자동 정산(크론)은 `app_admin_settle_run_due` 로 준비만 — 켜는 시점·Slack 알림은 운영 결정.
 5. 브랜드 `brand_payout` 이 음수가 되는 요율 조합은 `payouts.amount ≥ 0` 제약 때문에 0 으로 저장된다(스냅샷 `brand_payout` 은 음수 그대로) — 실제로는 요율 상한(총 요율 ≤ 100%) 이 막는다.
 6. `sellers.m3_sales` 를 갱신하는 다른 경로가 생기면(운영 스크립트) `app_seller_grade_recalc` 를 거쳐야 base 와 어긋나지 않는다.
+
+### 6. PR-B 화면 (2026-09-22 적용) — `apps/admin/src/routes/(console)/(money)/*`
+
+전부 `requireAdmin()` 뒤 `$lib/server/money.ts` 배럴만 호출한다. 셸(`(console)/+layout.svelte` · 다른 작업자)은 손대지 않았다 — 아직 탭 배열이 없어서 돈 화면만의 내비를 `$lib/money-nav.ts`(정산 · 지급 · 주문 · 결제 · 문의) + `(money)/+layout.svelte`(상단 바 + 칩) 로 그린다. 셸에 탭이 생기면 그 표를 한 줄로 옮긴다. 스타일은 `packages/ui/css/site.css` "관리자 정산" 블록(`.admin-*` · 공용 표 `.admin-table` 은 640px 아래 카드 모드 · 375px 가로 스크롤 없음).
+
+| 화면 | 하는 일 | 서버 |
+|---|---|---|
+| `/settle` | 상단 띠(기준일 도래 · 지급 보류 · 미지급 합계 · 명세 건수) · [도래분 일괄 실행] `?/runDue`(confirm · 건별 `settleRunSummary` 를 ActionData 로) · 대기 큐(CLEARING 실시간 예상 · `dueLabel` · 보류 예고 · [미리보기]) · 정산 명세 표 `?status=pending\|held\|paid` | `listAdminSettlements` · `runDueSettlements` |
+| `/settle/[code]` | calc() 전 라인 명세표(매출 → 취소/환불 → 순매출 → PG → 인플루언서 수수료(+보너스·부스트) → 플랫폼 수수료 총액 → 플랫폼 부담 → 수익/부가세/순수익 → 브랜드 지급 → 원천징수 → 인플루언서 지급 → 샘플 환급) · 보류 예고 · [정산 실행] `?/run`(기준일 전은 `force` 체크 + confirm · 결과 ActionData) · 실행 뒤 지급 카드 2장(마스킹 계좌 · [지급 완료] 메모 `?/paid` · [보류] 사유 `?/hold` · [보류 해제] `?/release`) · 이벤트(`listSettleEvents` — ended · settled · payout_held · payout_paid · ref_reward · brand_ref_reward · sample_refunded · refunded · refund_needs_adjust) | `previewSettlement` · `runSettlement` · `markPayoutPaid` · `holdPayout` · `releasePayout` · `listSettleEvents`(PR-B 에서 settle.server.ts 에 추가) |
+| `/settle/payouts` | 스냅샷 행을 지급 건으로 펼쳐 `?status=pending(기본)\|held\|paid\|all` · 행별 완료/보류/해제 · [이체 파일 CSV] `GET /settle/payouts/export.csv?status=&purpose=`(purpose 필수 · 계좌 원문 · `Cache-Control: no-store` · 건마다 `sensitive_access_log`) · [원천징수 자료 CSV] `GET /settle/rrn.csv?ids=&purpose=`(표에서 인플루언서 건 체크 · `RRN_ENC_KEY` 없으면 400 문구) | `listAdminSettlements` · `exportPayouts` → `payoutCsv` · `exportRrn` → `rrnCsv` |
+| `/orders` · `/orders/[code]` | 검색 `?q=` · 필터 `?f=`(ADMIN_ORDER_FILTERS) · 합계 띠 · 표 → 상세(주문 kv · 수취인 원문 · 토스 세션 · payment_events · campaign_events · 문의) · [환불] `?/refund`(REFUND_REASONS + 메모 · confirm · SETTLED 면 "정산 조정으로 기록" 안내 · 결제키 없는 시드·수기 주문은 폼 대신 안내, 액션도 `NO_PAYMENT_KEY` 문구 · `recordOnly` 는 콘솔에 없음) | `listAdminOrders` · `getAdminOrder` · `refundOrderAsAdmin` |
+| `/payments` | 운영 큐 카드(`paymentsHealthIssues` · 0 이 아닌 것만 · 처리 자리 링크) + 영역별 카운트(세션 · 이벤트 · 샘플 결제 · 주문 · 정산) · 마지막 reconcile · 크론 실행법(deploy §8.2) — 버튼 없음 | `getPaymentsHealth` |
+| `/cs` · `/cs/[code]` | 전 브랜드 문의 목록 `?status=` · 스레드 **읽기 전용**(답변·종료 폼 없음 — 브랜드 콘솔) · 주문 상세/정산 상세 링크 | `listAdminCs` · `getAdminCsThread` |
+
+데모 정리: `(demo)/settle` `(demo)/orders` 삭제 · `$lib/demo.ts` DEMO_PATHS 에서 `/settle` `/orders` 제거 · 데모 탭에서 "주문·CS" "정산 실행" 제거(브랜드 4·5단계와 같은 규칙 — 데모의 `go.screen('settle'|'orders')` 는 콘솔 화면에 닿는다). `parseAdminOrderRow` 에 `is_sample` 추가(0018 brand_order_json 에 있던 값).
+
+**검증(2026-09-22 · 클라우드 `sellery` · dev 서버 5177 · dev 관리자 계정)** — `/settle` 큐 c5·c1·c12(2,493,188 / 9,334,661 = PR-A 스모크와 동일) · `/settle/c5` 명세 전 라인 · 보류 예고 RRN_MISSING · 기준일 전 강제 체크. 일회성 픽스처 c9901(s7 × p3 · PAID 3건 · 종료 D−10)에서 강제 실행 → 스냅샷(net 74,700 · 인플 13,219 held BANK_MISSING · 브랜드 52,738 pending) → 브랜드 보류(MANUAL) → 해제 → 지급 완료(메모 · 이벤트 payout_paid) → 인플루언서 해제 `STILL_INCOMPLETE(정산 계좌 미등록)` → 이체 파일 CSV 200(BOM EF BB BF · CRLF · `x-sellery-logged` 2 · purpose 없으면 400 ACTOR_REQUIRED) → 원천징수 CSV 200(NO_RRN 행 · ids 없으면 400) → `/orders?q=c9901` · o101 상세(결제키 없음 안내) · `?/refund` POST → `NO_PAYMENT_KEY` 문구로 303 · `/payments` 카드 · `/cs` cs105 읽기 전용 · 375px 6화면 `scrollWidth === innerWidth`. 정리: 픽스처 campaigns 1 · orders 3 · campaign_events 3 · settlements 1 · payouts 2 · sensitive_access_log 4 삭제 · s7/b1 등급 재계산(변화 없음). 시드 c5·c106·s101·b2 는 손대지 않았다.
+
+**미룬 것** — 홈 카드("정산 기준일 도래 n건 · 지급 보류 n건 · 미처리 결제 이벤트 n건")는 홈이 셸 담당자 파일이라 넣지 않았다(`getPaymentsHealth` 한 줄로 붙일 수 있다) · 이체 파일은 브라우저 다운로드만(배치 기록 없음 · "지급 완료" 는 행별) · 정산 후 환불 조정(`refund_needs_adjust`) 처리 화면 없음(주문 상세 안내 + 정합성 카드까지) · 자동 정산 크론 미연결(M3) · 관리자 계정 교체(deploy §5.6 주의).

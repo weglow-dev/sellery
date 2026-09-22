@@ -190,3 +190,35 @@ export async function recalcBrandGrade(brandId: string, admin: Admin = createAdm
   if (!o || o.ok !== true) return { ok: false, code: typeof o?.code === "string" ? o.code : "DB_ERROR" };
   return { ok: true, previous: typeof o.previous === "string" ? o.previous : null, grade: typeof o.grade === "string" ? o.grade : null, changed: o.changed === true, gmv: Number(o.gmv) || 0 };
 }
+
+/* ---------------- 정산 이벤트 (화면 PR-B — /admin/settle/[code] "이벤트") ---------------- */
+
+/** 정산·지급이 남기는 campaign_events 종류 (0020 헤더 표 · 0008 refund_needs_adjust · 0018 ended) — 오래된 것부터 */
+export const SETTLE_EVENT_TYPES = ["ended", "settled", "payout_held", "payout_paid", "ref_reward", "brand_ref_reward", "sample_refunded", "refunded", "refund_needs_adjust"] as const;
+
+export type SettleEvent = { id: string; event_type: string | null; body: string; payload: Record<string, unknown>; created_at: string | null };
+
+/** 캠페인의 정산 관련 시스템 이벤트 — campaignRef 는 code 또는 uuid. 실패·없음이면 [] (화면은 "이벤트 없음"). */
+export async function listSettleEvents(campaignRef: string, admin: Admin = createAdminClient()): Promise<SettleEvent[]> {
+  const id = await campaignIdOf(admin, campaignRef);
+  if (!id || id === "error") return [];
+  const { data, error } = await admin
+    .from("campaign_events")
+    .select("id, event_type, body, payload, created_at")
+    .eq("campaign_id", id)
+    .eq("kind", "system")
+    .in("event_type", [...SETTLE_EVENT_TYPES])
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (error) {
+    console.error("[admin/settle] campaign_events read failed:", error.message);
+    return [];
+  }
+  return (data ?? []).map((e) => ({
+    id: e.id,
+    event_type: e.event_type,
+    body: e.body,
+    payload: e.payload && typeof e.payload === "object" && !Array.isArray(e.payload) ? (e.payload as Record<string, unknown>) : {},
+    created_at: e.created_at,
+  }));
+}

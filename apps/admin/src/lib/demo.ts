@@ -9,8 +9,9 @@
  * 접두(`/admin`) 없는 데모 경로. 데모 대시보드만 `/demo` 로 옮겼고(콘솔 루트 `/` 는 `/home` 리다이렉트) 나머지는 원래 이름 그대로다 —
  * 콘솔(`/login` `/home` `/auth/*`)과 아직 겹치지 않는다. 콘솔이 같은 이름의 실제 화면을 만드는 단계에서 해당 데모 경로를
  * `/demo-*` 로 옮기고 이 표를 고친다(인플루언서 5단계가 `/sales` `/settle` 을, 브랜드 2단계가 `/demo-products` 를 뺀 것과 같은 규칙).
+ * "정산·돈" PR-B 에서 `/settle` `/orders` 를 뺐다 — 실제 `(console)/(money)/settle` `/orders` 가 그 이름을 쓴다(데모의 `go.screen('settle'|'orders')` 는 콘솔 화면에 닿는다 · 브랜드 4·5단계와 같은 규칙).
  */
-export const DEMO_PATHS = ['/demo', '/products', '/influencers', '/brands', '/orders', '/match', '/revenue', '/settle', '/c', '/s'] as const;
+export const DEMO_PATHS = ['/demo', '/products', '/influencers', '/brands', '/match', '/revenue', '/c', '/s'] as const;
 
 export function isDemoPath(relPath: string): boolean {
 	return DEMO_PATHS.some((p) => relPath === p || relPath.startsWith(`${p}/`));
