@@ -1237,6 +1237,7 @@ export type Database = {
           bank_snapshot: Json | null
           brand_id: string | null
           created_at: string
+          hold_code: string | null
           hold_reason: string | null
           id: string
           memo: string | null
@@ -1253,6 +1254,7 @@ export type Database = {
           bank_snapshot?: Json | null
           brand_id?: string | null
           created_at?: string
+          hold_code?: string | null
           hold_reason?: string | null
           id?: string
           memo?: string | null
@@ -1269,6 +1271,7 @@ export type Database = {
           bank_snapshot?: Json | null
           brand_id?: string | null
           created_at?: string
+          hold_code?: string | null
           hold_reason?: string | null
           id?: string
           memo?: string | null
@@ -1730,6 +1733,7 @@ export type Database = {
           intro: string | null
           likes_avg: number
           m3_sales: number
+          m3_sales_base: number
           name: string
           platform: string
           recent_likes: number[]
@@ -1764,6 +1768,7 @@ export type Database = {
           intro?: string | null
           likes_avg?: number
           m3_sales?: number
+          m3_sales_base?: number
           name: string
           platform?: string
           recent_likes?: number[]
@@ -1798,6 +1803,7 @@ export type Database = {
           intro?: string | null
           likes_avg?: number
           m3_sales?: number
+          m3_sales_base?: number
           name?: string
           platform?: string
           recent_likes?: number[]
@@ -1842,6 +1848,7 @@ export type Database = {
         Row: {
           actor: string
           at: string
+          brand_id: string | null
           field: string
           id: number
           purpose: string
@@ -1850,6 +1857,7 @@ export type Database = {
         Insert: {
           actor: string
           at?: string
+          brand_id?: string | null
           field: string
           id?: never
           purpose: string
@@ -1858,12 +1866,20 @@ export type Database = {
         Update: {
           actor?: string
           at?: string
+          brand_id?: string | null
           field?: string
           id?: never
           purpose?: string
           seller_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sensitive_access_log_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sensitive_access_log_seller_id_fkey"
             columns: ["seller_id"]
@@ -2073,12 +2089,90 @@ export type Database = {
       }
     }
     Functions: {
+      admin_bank_snapshot: { Args: { p_bank_info: Json }; Returns: Json }
+      admin_hold_label: { Args: { p_code: string }; Returns: string }
+      admin_order_json: {
+        Args: { o: Database["public"]["Tables"]["orders"]["Row"] }
+        Returns: Json
+      }
+      admin_payout_hold_reason: {
+        Args: { p_brand_id: string; p_payee_type: string; p_seller_id: string }
+        Returns: string
+      }
+      admin_payout_json: {
+        Args: { po: Database["public"]["Tables"]["payouts"]["Row"] }
+        Returns: Json
+      }
+      admin_settlement_json: {
+        Args: { st: Database["public"]["Tables"]["settlements"]["Row"] }
+        Returns: Json
+      }
+      admin_settlement_sync_status: {
+        Args: { p_settlement_id: string }
+        Returns: string
+      }
       app_accept_invite: {
         Args: { p_campaign_id: string; p_seller_id: string; p_shipping?: Json }
         Returns: Json
       }
+      app_admin_cs_list: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: Json
+      }
+      app_admin_cs_thread: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      app_admin_order: { Args: { p_order_id: string }; Returns: Json }
+      app_admin_orders: {
+        Args: { p_filter?: string; p_limit?: number; p_q?: string }
+        Returns: Json
+      }
+      app_admin_payments_health: { Args: never; Returns: Json }
+      app_admin_payout_export: {
+        Args: { p_actor?: string; p_purpose?: string; p_status?: string }
+        Returns: Json
+      }
+      app_admin_payout_hold: {
+        Args: { p_payout_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_admin_payout_mark_paid: {
+        Args: { p_actor_user_id?: string; p_memo?: string; p_payout_id: string }
+        Returns: Json
+      }
+      app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_admin_rrn_export: {
+        Args: {
+          p_actor: string
+          p_key: string
+          p_purpose?: string
+          p_settlement_ids: string[]
+        }
+        Returns: Json
+      }
+      app_admin_settle_preview: {
+        Args: { p_campaign_id: string }
+        Returns: Json
+      }
+      app_admin_settle_run: {
+        Args: {
+          p_actor_user_id?: string
+          p_campaign_id: string
+          p_force?: boolean
+        }
+        Returns: Json
+      }
+      app_admin_settle_run_due: {
+        Args: { p_actor_user_id?: string }
+        Returns: Json
+      }
+      app_admin_settlements: {
+        Args: { p_limit?: number; p_status?: string }
         Returns: Json
       }
       app_brand_approve_sample: {
@@ -2369,6 +2463,7 @@ export type Database = {
         }
         Returns: Json
       }
+      app_seller_grade_recalc: { Args: { p_seller_id: string }; Returns: Json }
       app_seller_rrn_decrypt: {
         Args: {
           p_actor: string
@@ -2587,6 +2682,10 @@ export type Database = {
       resolve_product_options: {
         Args: { p_options: Json; p_sale_price: number }
         Returns: Json
+      }
+      seller_confirmed_sales: {
+        Args: { p_seller_id: string; p_since?: string }
+        Returns: number
       }
       seller_invite_gated: { Args: { p_seller_id: string }; Returns: boolean }
       seller_is_priority: { Args: { p_seller_id: string }; Returns: boolean }

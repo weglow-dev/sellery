@@ -1,6 +1,6 @@
 # 셀러리 수수료·정산 정책
 
-> 최종 수정: 2026-09-15 · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
+> 최종 수정: 2026-09-22(0020 적용 기록 추가) · 근거: 코드 상수(js/00-core.js, js/02-state.js 등) + 브랜드/인플루언서 제안서(2026.09) · 상태: 프로토타입 기준(실서비스 전 확정 필요)
 
 이 문서는 프로토타입 코드가 실제로 계산하는 규칙을 그대로 옮긴 것입니다. 제안서와 코드가 다른 곳은 **코드 값을 기준**으로 쓰고 `제안서 표기:` 로 병기했습니다. 제안서에만 있고 코드에 없는 항목은 `미정(코드 미구현)` 으로 표시합니다.
 
@@ -192,6 +192,8 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 4. `settlements` 에 기록: `{at, cid, title, net, brandPay, sellerPay: sfTotal×(1−wht)+refundCash, platFee: pf, pfNet, holdS, holdB}`.
 5. 추천 보상이 있으면 `refEarnings` / `brandRefEarnings` 에 기록하고 스레드에 시스템 메시지.
 6. 스레드에 "정산 완료 · 브랜드 ₩… · 인플루언서 ₩… → 원천징수 3.3% 공제 후 ₩… / 사업자 정산(세금계산서) ₩… · 명세 발행".
+
+**적용 기록(2026-09-22 · 0020 관리자 콘솔 PR-A)**: 위 1~6 은 `supabase/migrations/0020_admin_settlement.sql` `app_admin_settle_run`(한 트랜잭션 · CLEARING · D+21 도래분 · `p_force` 예외) 이 그대로 한다 — `settlements` 스냅샷(0013/0019 pending 행과 같은 식 · 라인 독립 반올림) · `payouts` 2행 · 🥬 `earned` 차분 · `referral_earnings` · `sellers.m3_sales`(롤링 3개월 + 이관 기저) · `brands.grade` · `campaign_events`(settled · payout_held · ref_reward · brand_ref_reward · sample_refunded). 2 의 "시드 id ≥ 100 만 누적" 은 재현하지 않는다. TS 는 `@sellery/db` `admin/settle-rules` `calcSettlement` · 운영은 `partner-admin.mjs settle-*`. 지급 보류(8.3)는 계좌 외에 **개인 주민번호 미등록 · 사업자 세금계산서 정보 미등록 · 브랜드 정산 정보 4개 미완비**도 사유다(inf-console-plan §5.9) — 해제는 `app_admin_payout_release`(완비 재검사). 상세 docs/admin-console-plan.md.
 
 ### 8.3 지급 보류 조건
 
