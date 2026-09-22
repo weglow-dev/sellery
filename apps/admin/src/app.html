@@ -3,15 +3,18 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>셀러리 관리자</title>
-		<!-- 데모 앱 — 검색 색인 제외 (docs/monorepo-migration.md §6 · 결정 D). ssr=false 라 <svelte:head> 는 JS 뒤에만 보이므로 정적 셸에 둔다. robots.txt 는 routes/robots.txt/+server.ts -->
+		<!-- 관리자 앱 전체 비색인 (docs/monorepo-migration.md §6 · 결정 D) — routes/robots.txt/+server.ts(disallow /) 와 이중. (demo) 그룹도 같은 셸 안이라 그대로 적용된다. -->
 		<meta name="robots" content="noindex, nofollow" />
-		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@500;600;700;800;900&display=swap" />
-		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2/dist/galmuri.css" />
 		<link rel="icon" href="/assets/favicon.svg" />
+		<!-- 폰트 (docs/monorepo-migration.md 결정 G · apps/brand/src/app.html 과 동일): IBM Plex Sans KR 300–700 · IBM Plex Mono 400/500/700 · Archivo 500–900.
+		     콘솔은 Galmuri 를 적재하지 않는다 — (demo) 그룹 레이아웃이 자기 CSS(theme.css)와 Galmuri 를 따로 가져온다. 제목은 각 페이지의 <svelte:head> 가 정한다. -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&family=Archivo:wght@500..900&display=swap" />
 		%sveltekit.head%
 	</head>
-	<body data-sveltekit-preload-data="hover" data-stage="studio">
+	<!-- data-stage="studio"(데모 상품 누끼 무대)는 (demo)/+layout.svelte 가 마운트 때 붙인다 — 콘솔 화면에는 필요 없다 -->
+	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
 	</body>
 </html>
