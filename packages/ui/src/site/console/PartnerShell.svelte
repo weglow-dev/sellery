@@ -16,7 +16,8 @@
 
 	export const ROLE_LABEL: Record<ConsoleRole, string> = {
 		seller: '인플루언서 콘솔',
-		brand: '브랜드 콘솔'
+		brand: '브랜드 콘솔',
+		admin: '관리자 콘솔'
 	};
 
 	/* 탭 href 는 접두 없는 콘솔 경로 — 셸이 consolePath 로 접두를 붙인다. */
@@ -36,6 +37,16 @@
 			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
 			{ href: '/orders', label: '주문', icon: 'truck' },
 			{ href: '/my', label: '내 정보', icon: 'user' }
+		],
+		// 관리자 = 홈 · 인플루언서 · 브랜드 · 상품 · 정산. 지금까지 `packages/db/scripts/partner-admin.mjs` 로 하던 운영을 화면으로 옮긴다.
+		// 화면이 생기기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) — 브랜드 콘솔 2단계와 같은 방식.
+		// 소유: 인플루언서·브랜드·상품 = 파트너 관리 담당 / 정산 = 정산·돈 담당. **탭을 활성화할 때만 이 표를 고친다.**
+		admin: [
+			{ href: '/home', label: '홈', icon: 'home' },
+			{ href: '/sellers', label: '인플루언서', icon: 'user', disabled: true, title: '준비 중 — 파트너 관리' },
+			{ href: '/brands', label: '브랜드', icon: 'flag', disabled: true, title: '준비 중 — 파트너 관리' },
+			{ href: '/products', label: '상품', icon: 'box', disabled: true, title: '준비 중 — 상품 검수' },
+			{ href: '/settle', label: '정산', icon: 'chart', disabled: true, title: '준비 중 — 정산' }
 		]
 	};
 </script>
