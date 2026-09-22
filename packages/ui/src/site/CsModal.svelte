@@ -3,6 +3,7 @@
 	 * 문의하기 모달 (프로토타입 js/40-brand.js csModal · ux-spec §4.2 · web cs-modal.tsx CsModal).
 	 * 슬라이스 1 은 `/api/cs`(cs_conversations 저장)가 없다 — 문의 유형·내용 입력 대신 주문번호(복사)·문의 유형 안내와 고객센터 채널 링크(COMPANY.csUrl, mailto)만.
 	 * 원문 유지: 제목 `문의하기 — {pIcon} {product.name}` · .notice "이 문의는 {brand}(공급 브랜드)에 바로 전달됩니다 …" · CS_TYPES.
+	 * 4단계(0018): `csHref`(`/cs/new?campaign=&order=`) 를 주면 [판매자에게 문의] 링크가 1순위 — 접수는 그 화면(폼)에서, 고객센터 메일은 보조.
 	 * 기존 `modals/CSModal.svelte`(데모) 와 이름이 겹쳐 site/index.ts 는 `SiteCsModal` 로 내보낸다.
 	 */
 	import { COMPANY } from '@sellery/db/company';
@@ -18,8 +19,9 @@
 		thumbUrl,
 		emoji,
 		brandName,
-		orderCode = null
-	}: { open: boolean; onClose: () => void; productName: string; thumbUrl: string | null; emoji: string; brandName: string; orderCode?: string | null } = $props();
+		orderCode = null,
+		csHref = null
+	}: { open: boolean; onClose: () => void; productName: string; thumbUrl: string | null; emoji: string; brandName: string; orderCode?: string | null; csHref?: string | null } = $props();
 
 	const code = $derived(orderCode ? orderCode.toUpperCase() : '');
 	const external = /^https?:\/\//.test(COMPANY.csUrl);
@@ -52,11 +54,22 @@
 		<label>문의 유형</label>
 		<div style="font-size:13px">{CS_TYPES.join(' / ')}</div>
 	</div>
-	<p style="font-size:12.5px">
-		문의 접수는 셀러리 고객센터(이메일)에서 받고 있어요 — 인플루언서 DM이 아닌 셀러리로 접수해주세요. 메일: <a href="mailto:{COMPANY.email}" style="text-decoration:underline">{COMPANY.email}</a>
-	</p>
+	{#if csHref}
+		<p style="font-size:12.5px">
+			[판매자에게 문의]를 누르면 브랜드에 바로 접수되고, 답변은 문의 화면에서 확인해요 — 인플루언서 DM이 아닌 셀러리로 접수해주세요. 결제·정산 문제는 고객센터 메일 <a href="mailto:{COMPANY.email}" style="text-decoration:underline">{COMPANY.email}</a> 로도 받아요.
+		</p>
+	{:else}
+		<p style="font-size:12.5px">
+			문의 접수는 셀러리 고객센터(이메일)에서 받고 있어요 — 인플루언서 DM이 아닌 셀러리로 접수해주세요. 메일: <a href="mailto:{COMPANY.email}" style="text-decoration:underline">{COMPANY.email}</a>
+		</p>
+	{/if}
 	{#snippet footer()}
 		<button type="button" onclick={onClose}>닫기</button>
-		<a href={COMPANY.csUrl} class="btn pri" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>✉️ {COMPANY.csLabel}</a>
+		{#if csHref}
+			<a href={COMPANY.csUrl} class="btn ghost" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>✉️ {COMPANY.csLabel}</a>
+			<a href={csHref} class="btn pri">💬 판매자에게 문의</a>
+		{:else}
+			<a href={COMPANY.csUrl} class="btn pri" target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}>✉️ {COMPANY.csLabel}</a>
+		{/if}
 	{/snippet}
 </Modal>
