@@ -1328,6 +1328,87 @@
     .console-proposal { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
 
+  /* ---- 브랜드 콘솔 4단계 (docs/brand-console-plan.md §6 "4. 주문 · 발주 · 운송장 · CS"): 주문 표(필터 · 캠페인 셀렉트 · 합계 · 발주 CSV · 운송장 일괄 details · 행 인라인 송장/환불 · 640px 아래 카드 모드)
+     · 문의함 행 · 문의 스레드(customer 말풍선) · shop 고객 문의 접수 폼/스레드(`/cs/new` `/cs/[code]`). 프로토타입 데모 demo-orders/demo-cs · csModal 의 이식 — 색은 site 토큰. 375px: 표는 카드 · 폼은 1열 · 가로 스크롤 없음. ---- */
+  .console-orders-totals .ms-s { font-family: var(--font-body); font-size: 10.5px; color: var(--color-mute); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .console-orders-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .console-orders-tools .meta { flex: 1 0 100%; margin: 0; font-size: 12px; }
+  .console-orders-pick { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; margin: 0; }
+  .console-orders-pick .lbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-mute); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+  .console-orders-pick select { flex: 1 1 auto; min-width: 0; margin: 0; }
+  .console-bulk { margin-bottom: 14px; }
+  .console-bulk > summary { cursor: pointer; font-weight: 700; font-size: 13.5px; list-style: none; }
+  .console-bulk > summary::-webkit-details-marker { display: none; }
+  .console-bulk > summary .meta { font-weight: 400; font-size: 12px; }
+  .console-bulk .console-form { margin-top: 12px; }
+  .console-bulk .notice { margin: 8px 0 0; }
+  .console-bulk-results { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; font-size: 12.5px; }
+  .console-bulk-results li { display: flex; gap: 8px; align-items: baseline; padding: 4px 10px; background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); margin: 2px 3px; }
+  .console-bulk-results li.bad { box-shadow: inset 3px 0 0 var(--color-danger), var(--shadow-frame-soft); }
+  .console-bulk-results li.ok { box-shadow: inset 3px 0 0 var(--color-accent), var(--shadow-frame-soft); }
+  .console-orders table { min-width: 960px; }
+  .console-orders td { font-size: 12.5px; vertical-align: top; }
+  .console-orders td small { display: block; font-size: 11px; color: var(--color-mute); font-weight: 400; margin-top: 2px; white-space: normal; }
+  .console-orders td a.console-mono { color: var(--color-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .console-orders tr.row-unshipped td:first-child { box-shadow: inset 3px 0 0 #e3b93c; }
+  .console-orders tr.row-refunded td { color: var(--color-mute); }
+  .console-orders .console-cell-prod { white-space: normal; }
+  .console-orders-addr { min-width: 200px; }
+  .console-orders-ship { min-width: 220px; }
+  .console-orders-ship .console-shipform { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .console-orders-ship .console-shipform .fld { flex: 1 1 96px; }
+  .console-orders-ship .console-shipform .fld select, .console-orders-ship .console-shipform .fld input { font-size: 12px; padding: 7px 8px; }
+  .console-orders-ship .console-shipform button { flex: 0 0 auto; }
+  .console-orders-ship .console-shipform .console-err { flex: 1 0 100%; }
+  .console-orders-ship > .console-mono { display: block; margin-bottom: 4px; }
+  .console-orders-ship .btn { margin-right: 4px; }
+  .console-orders-edit { display: inline-block; }
+  .console-orders-edit .console-shipform { margin-top: 6px; }
+  .console-orders-refund { min-width: 90px; }
+  .console-orders-refund .console-reject-form select { width: calc(100% - 6px); font-size: 12px; }
+  .console-orders-refund .meta { font-size: 11px; display: block; }
+  .console-cs .rowitem { align-items: flex-start; text-decoration: none; color: inherit; }
+  .console-cs .rowitem > .grow { flex: 1 1 220px; min-width: 0; }
+  .console-cs .rowitem .sub { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+  .console-cs-preview { margin-top: 7px; font-size: 13px; color: var(--color-ink); background: var(--color-surface-2); box-shadow: var(--shadow-frame-soft); padding: 8px 11px; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cs-thread .msg { white-space: pre-wrap; }
+  .cs-thread .msg.customer { align-self: flex-start; background: var(--color-seller-bg); }
+  .cs-thread .msg.customer .who { color: var(--color-seller); }
+  .cs-thread .msg.mine { align-self: flex-end; background: var(--color-brand-bg); }
+  .cs-thread .msg.mine .who { color: var(--color-brand); }
+  .cs-page { max-width: 720px; margin: 0 auto; }
+  .cs-page .cs-head { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .cs-page .cs-head .grow { flex: 1 1 200px; min-width: 0; }
+  .cs-page .cs-head .nm { font-weight: 700; font-size: 14px; }
+  .cs-page .cs-head .meta { font-size: 12px; margin: 2px 0 0; }
+  .cs-page .console-thread { margin-top: 14px; }
+  .cs-page .cs-form textarea { width: calc(100% - 6px); min-height: 120px; }
+  .cs-page .cs-form .hint { font-size: 11.5px; color: var(--color-mute); margin-top: 4px; line-height: 1.5; }
+  .cs-page .cs-form .fld.invalid input, .cs-page .cs-form .fld.invalid select, .cs-page .cs-form .fld.invalid textarea { box-shadow: 0 -2px 0 0 var(--color-danger), 0 2px 0 0 var(--color-danger), -2px 0 0 0 var(--color-danger), 2px 0 0 0 var(--color-danger); }
+  .cs-list .rowitem { text-decoration: none; color: inherit; }
+  .cs-list .rowitem .sub { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+  .store-cs { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12.5px; }
+  .store-cs .meta { margin: 0; }
+  @media (max-width: 640px) {
+    .console-orders { overflow-x: visible; }
+    .console-orders table { min-width: 0; width: 100%; display: block; }
+    .console-orders thead { display: none; }
+    .console-orders tbody { display: block; }
+    .console-orders tr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 12px 14px; border-bottom: 1px solid var(--color-soft-line); }
+    .console-orders tr:last-child { border-bottom: 0; }
+    .console-orders td { display: block; padding: 0; border: 0; text-align: left; min-width: 0; }
+    .console-orders td.num { text-align: left; }
+    .console-orders td::before { content: attr(data-l); display: block; font-family: var(--font-mono); font-size: 9.5px; color: var(--color-mute); letter-spacing: 0.05em; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+    .console-orders td:not([data-l])::before { content: none; }
+    .console-orders td.empty::before { content: none; }
+    .console-orders td.empty { grid-column: 1 / -1; }
+    .console-orders tr.row-unshipped td:first-child { box-shadow: none; }
+    .console-orders tr.row-unshipped { box-shadow: inset 3px 0 0 #e3b93c; }
+    .console-orders-addr, .console-orders-ship, .console-orders-refund { grid-column: 1 / -1; min-width: 0; }
+    .console-orders-ship .console-shipform .fld { flex: 1 1 120px; }
+    .console-orders-tools .btnrow { flex: 1 0 100%; }
+  }
+
   /* ---- 반응형 (ux-spec §1.3: 1100 / 900 / 640 / 600) ---- */
   @media (max-width: 1100px) {
     .custgrid { grid-template-columns: 1fr; }

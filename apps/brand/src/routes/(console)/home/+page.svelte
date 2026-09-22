@@ -69,7 +69,7 @@
 					<a href={c.href} class="btn ghost sm">스레드</a>
 					<a href={c.storeUrl} class="btn ghost sm" target="_blank" rel="noopener">구매 페이지</a>
 					<CopyButton text={c.storeUrl} label="링크 복사" />
-					<span class="btn ghost sm" aria-disabled="true" title="4단계에서 열립니다">발주서 · 매출 (4단계)</span>
+					<a href={c.ordersHref} class="btn ghost sm">주문 · 발주</a>
 				</div>
 			</div>
 		{/each}
@@ -122,6 +122,6 @@
 			<div><span class="ms-l">정산 정보</span><span class="ms-v">{brand.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">{brand.has_biz_doc ? '사업자등록증 있음' : '사업자등록증 없음'} · 5단계</span></div>
 			<div><span class="ms-l">추천 코드</span><span class="ms-v">{brand.ref_code ?? '—'}</span><span class="ms-s">추천 브랜드 첫 3회 판매 1%</span></div>
 		</div>
-		<p class="meta" style="margin:0">{brand.category} · 담당 {brand.manager_name ?? '—'} · 주문·발주·고객 문의(4단계) → 정산·등급·내 정보(5단계) 순서로 열립니다.</p>
+		<p class="meta" style="margin:0">{brand.category} · 담당 {brand.manager_name ?? '—'} · <a href={data.ordersPath}>주문 · 발주</a> · <a href={data.csPath}>고객 문의</a> 는 열렸고, 정산·등급·내 정보는 5단계에서 열립니다.</p>
 	</div>
 </div>

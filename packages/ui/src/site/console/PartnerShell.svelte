@@ -6,7 +6,7 @@
 	 * href 는 전부 `consolePath(role, …)`(경로 모드 고정 — `/influencer/home`). 호스트 모드(`host` prop)는 결정 11 로 폐기됐다.
 	 * 우측 자리(`me`)는 앱 레이아웃이 `getSellerContext()`(DB 게이트 아님 — 표시용) 로 채운다. 세션·행이 없으면 비워 둔다(공개 페이지).
 	 * 정지 계정은 이름만(grade · balance null). 로그아웃은 콘솔 전용 `POST /influencer/auth/signout?next=/influencer/login`(결정 15).
-	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` · `requireBrand()` 다(결정 6). 인플루언서 탭 5개는 전부 활성(상품·캠페인 3단계 · 매출 5단계), 브랜드는 홈·상품·캠페인 활성(2단계) — 주문·내 정보는 `disabled` 예고(brand-console-plan §6).
+	 * 게이트는 셸이 아니라 각 page 의 `requireSeller()` · `requireBrand()` 다(결정 6). 인플루언서 탭 5개는 전부 활성(상품·캠페인 3단계 · 매출 5단계), 브랜드는 홈·상품·캠페인(2단계)·주문(4단계) 활성 — 내 정보는 `disabled` 예고(brand-console-plan §6).
 	 */
 	import type { ConsoleRole } from '@sellery/db/console-paths';
 	import type { ConsoleTab } from './ConsoleTabs.svelte';
@@ -29,12 +29,12 @@
 			{ href: '/my', label: '내 정보', icon: 'user' }
 		],
 		// 브랜드 = 홈 · 상품 · 캠페인 · 주문 · 내 정보 (docs/brand-console-plan.md 결정 6 — 매일 할 일은 발송·CS; /sales /settle /cs 는 홈·주문·내 정보 안의 링크).
-		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) — 상품·캠페인은 2단계에서 열렸고, 주문 4단계 · 내 정보 5단계에서 각각 푼다.
+		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) — 상품·캠페인은 2단계, 주문은 4단계에서 열렸고, 내 정보는 5단계에서 푼다.
 		brand: [
 			{ href: '/home', label: '홈', icon: 'home' },
 			{ href: '/products', label: '상품', icon: 'box' },
 			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
-			{ href: '/orders', label: '주문', icon: 'truck', disabled: true, title: '4단계에서 열립니다' },
+			{ href: '/orders', label: '주문', icon: 'truck' },
 			{ href: '/my', label: '내 정보', icon: 'user', disabled: true, title: '5단계에서 열립니다' }
 		]
 	};

@@ -5,7 +5,7 @@
 	 *   본문: 스레드(campaign_events — system 은 .sysline, `leak_warned` 는 경고 행, chat 은 .msg.{sender}, leak_flag 면 .leak 강조) + 답글 폼(ThreadComposer · 종료 상태는 안내) · 우측 브랜드 액션 패널 + 인플루언서 카드 + 요약
 	 *   액션: SAMPLE_REQUESTED → [승인] [거절](?/approve ?/reject) · SAMPLE_APPROVED/SAMPLE_PURCHASED → 택배사 + 송장 [발송 처리](?/ship) · TESTING → 테스트 중 D-n
 	 *         · SCHEDULE_PROPOSED → 제안 카드(기간 · 배정 · 잔여 재고 · 우선권 안내) + [일정 확정](?/confirm) [반려](?/rejectSchedule · 사유) · SCHEDULE_CONFIRMED → 확정 기간 + 잠긴 가격/요율
-	 *         · INVITED → 초대 수락 대기 · LIVE → 판매 링크 + "주문은 4단계" · 나머지는 안내 문구(원문).
+	 *         · INVITED → 초대 수락 대기 · LIVE → 판매 링크 + 주문 탭 링크(4단계) · 나머지는 안내 문구(원문).
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
@@ -205,7 +205,7 @@
 					<a href={data.storeUrl} class="btn pri" target="_blank" rel="noopener">판매 페이지 미리보기</a>
 					<CopyButton text={data.storeUrl} label="링크 복사" />
 				</div>
-				<p class="hint" style="margin:8px 0 0">주문 · 발주서 · 운송장은 <b>4단계</b>(주문 탭)에서 열립니다.</p>
+				<p class="hint" style="margin:8px 0 0">주문 · 발주서 · 운송장은 <a href={data.ordersHref}>주문 탭</a>에서 — 이 캠페인만 필터돼요.</p>
 			</div>
 		{:else if c.status === 'CLEARING'}
 			<div class="card static">
