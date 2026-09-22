@@ -74,6 +74,8 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `TOSS_SECRET_KEY` | **비밀** | **비밀(4단계 · shop 과 같은 값 · Production + Preview)** | **brand: 비밀(브랜드 콘솔 4단계 브랜드 환불 = 토스 취소 · shop 과 같은 값 · Production + Preview)** · **admin: 선택(관리자 환불 · 0020 PR-A · `$lib/server/money.ts` 가 주입 · 없으면 CANCEL_FAILED)** | 〃 → `configurePayments()` — influencer 는 `apps/influencer/src/lib/server/env.ts`. 없으면 `/pay/success` 확정이 CONFIG_ERROR 로 실패(돈은 잡히지 않음 — 위젯 승인 전) |
 | `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` · `/api/cron/campaign-tick` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503. **Vercel Cron 은 이 이름의 env 가 있으면 `Authorization: Bearer <값>` 을 자동으로 붙인다**(§8.2) |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | brand: 선택 · admin: — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] · 브랜드 가입·정지 한 줄(이메일·핸들·사업자번호 없이) |
+| `RESEND_API_KEY` | **필수(비밀)** — 주문 확인(고객+브랜드) · 고객 셀프 환불 · 토스 콘솔 취소 · 문의 접수 메일 | — | **brand: 필수(비밀)** — 배송 시작 · 브랜드 환불 · 문의 답변 · **admin: 선택** — 관리자 환불 | 거래 메일(2026-09-22 · `packages/db/src/mail` · docs/emails/README.md "거래 메일"). Resend → API Keys → Create → Permission **Sending access** · Domain `sellery.life`(§5.7). `$lib/server/env.ts` → `configureMail()`. **없으면 발송 비활성**(서버 로그 1회 안내 · 주문·환불 흐름은 정상) — Preview 는 비워 둔다(테스트 결제로 실제 고객 주소에 메일이 가지 않게) |
+| `RESEND_API_URL` | — | — | — | 로컬 검증용 목 서버 주소(기본 `https://api.resend.com`). Vercel 에는 넣지 않는다 |
 | `RRN_ENC_KEY` | — | **비밀(5단계 0013 · Production + Preview 는 서로 다른 값)** | brand: — · **admin: 선택(지급명세서 자료 `exportRrn` · 0020 · `money.ts` 가 주입 · 인플루언서 앱과 같은 값 · 없으면 RRN_KEY_MISSING)** | 주민등록번호 `pgp_sym_encrypt` 키 → `configureDb({ rrnEncKey })`. **DB·코드·마이그레이션에 없다.** 없으면 `/settle` 의 주민번호 저장만 `RRN_KEY_MISSING`(다른 화면 정상). 생성·회전·백업은 §6.4 |
 
 앱 환경변수가 **아닌** 것(대시보드에만 입력): 카카오 REST API 키 · Client Secret → Supabase Authentication → Providers → Kakao(§5.2). `NEXT_PUBLIC_INF_HOST` · `NEXT_PUBLIC_BRAND_HOST`(호스트 모드)는 폐기 — 경로 모드만(결정 11). 4 SvelteKit 앱은 `kit.env.dir: '../..'` 로 로컬에서 **루트 `.env.local` 하나**를 읽는다(§7). 비밀은 `$env/dynamic/private`(런타임)라 빌드·CI 에 불필요 — 빌드가 실제 키를 요구하면 설계 위반. `sellery-app` 의 환경변수는 동결 상태 그대로 두고 건드리지 않는다(롤백 시 그대로 쓰인다). 대시보드에서 저장이 실패할 때는 §8.3.
@@ -280,6 +282,22 @@ signInWithPassword(email, password) → rpc('app_role') === 'admin'
 - `role='admin'` 은 게이트를 통과하는 유일한 조건이고, 관리자 화면은 service role 로 동작해 RLS 를 우회한다. 회수는 같은 방식으로 `role='customer'` 로 내리거나 Authentication → Users 에서 계정 삭제.
 - Basic Auth 이중 잠금(`ADMIN_PASSWORD`)은 `app_role()='admin'` **위에** 얹는 선택 항목이며 단독 인증이 아니다(`app-plan.md §3`). glo 의 `/admin` Basic Auth 블록은 복사하지 않는다 — 세션 갱신을 건너뛰는 구조다.
 
+### 5.7 거래 메일 — Resend HTTP API (2026-09-22 · 대표 결정 "이메일 보내야지")
+
+주문 확인(고객 + 브랜드) · 배송 시작 · 환불 완료 · 문의 답변/접수 메일을 **앱 서버가 Resend `POST https://api.resend.com/emails` 로 직접** 보낸다(Supabase Auth 메일 §5.5 와 별개 · 같은 Resend 계정 · 같은 도메인). 템플릿·훅 위치·멱등 규칙은 [`docs/emails/README.md`](emails/README.md) "거래 메일", 코드는 `packages/db/src/mail/{layout,templates,resend}.ts` + `packages/db/src/server/{mail,mail-events}.server.ts`.
+
+| 항목 | 설정할 값 | 현재값(기록) |
+|---|---|---|
+| Resend → **Domains** | `sellery.life` Verified(§5.5 와 같은 항목 — 이미 완료). 발신은 `Sellery <noreply@sellery.life>` 고정(`MAIL_FROM_DEFAULT`) — 다른 도메인은 `403 not authorized to send` | ✅ 2026-09-21 |
+| Resend → **API Keys** → Create API key | Name `sellery-app` · Permission **Sending access**(Full access 불필요) · Domain **`sellery.life`** 로 제한 → 생성 직후 한 번만 보이는 값을 Vercel `sellery-shop` · `sellery-brand`(필수) · `sellery-admin`(선택) 의 `RESEND_API_KEY`(Sensitive · **Production 만**) 에 넣는다(§1.2 · 저장 실패 시 §8.3). §5.5 의 SMTP 비밀번호로 쓴 키와 같은 키를 써도 되지만, 분리하면 회전할 때 인증 메일이 끊기지 않는다 | ☐ |
+| Vercel Preview | `RESEND_API_KEY` 를 **비워 둔다** — 테스트 결제·시드 주문의 메일이 실제 주소(브랜드 `brands.email` · 개발자 계정)로 나가지 않게. 비어 있으면 서버 로그에 `[mail] RESEND_API_KEY 가 없어 거래 메일을 보내지 않습니다` 1회 | ☐ |
+| Resend → **Emails** (로그) | 발송 결과 확인 — tag `event`(`order_paid` · `order_paid_brand` · `order_shipped` · `order_refunded` · `cs_replied` · `cs_opened` · `cs_followup`) 로 필터. bounce/complaint 는 Resend 대시보드에서만 보인다(웹훅 미연동) | — |
+| 시드 `brands.email` | `*.example` 이라 Resend 가 반송한다 — 실판매 전 실제 담당자 주소로(launch-checklist §2). 비회원·카카오 고객은 이메일이 없을 수 있어 **조용히 건너뛴다**(메일은 보조 수단 — 주문 조회 화면이 정본) | ☐ |
+
+- 로컬 확인: `.env.local` 에 `RESEND_API_KEY` 를 두지 않으면 비활성 경로. 실제 요청을 보려면 가짜 키 + `RESEND_API_URL=http://127.0.0.1:<port>` 로 목 서버(요청을 받아 200 `{"id":"…"}` 을 돌려주는 node 스크립트)를 가리킨다 — 이벤트당 정확히 1 요청 · 받는 사람 · 제목 · `idempotency-key` 헤더를 확인.
+- 실패 정책: 메일은 **주문·환불·발송·문의 흐름을 절대 막지 않는다**(throw 없음 · `console.error` 만). 재발송 큐는 없다 — Resend 4xx/5xx 면 그 통은 유실되고 다음 같은 이벤트 훅(웹훅 재시도 등)이 다시 시도한다. 고객은 언제나 `/account/orders` · `/orders/lookup` 에서 같은 정보를 본다.
+- 개인정보: 브랜드 메일에는 주문자 이름만(배송지·연락처·이메일 없음 — 콘솔에서), 고객 메일에는 본인 배송지. Resend 는 이메일 주소·주문 내용을 처리하므로 개인정보처리방침 처리위탁 표에 **Resend 추가 필요**(launch-checklist §4 (a) 이미 후보) — 법률 검토.
+
 ---
 
 ## 6. 데이터베이스
@@ -417,6 +435,7 @@ npx supabase db reset       # migrations 0001~ + seed.sql 적용 (sellers 8 · b
 | PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 + **주문 없는 비회원 `customers` 행 삭제**(0021 · 반환값은 두 작업 행 수 합) | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
 | 운영 큐 확인(부분취소 · 정산 완료 뒤 취소 등) | `select id, source, result, received_at from payment_events where handled = false order by received_at desc` | 매일 |
 | 채널 인증 대기 | `partner-admin.mjs channels --pending` → bio / `@sellery.official` DM 에서 코드 확인 → `verify-channel` | 매일 |
+| 거래 메일 발송 확인 | Resend 대시보드 → Emails — bounce · 4xx(도메인 미인증 `403` · 키 만료 `401`) · Vercel 로그의 `[mail] resend responded …`. 재발송 큐는 없다(§5.7) — 유실분은 고객이 주문 조회 화면에서 보고, 필요하면 브랜드가 문의로 안내 | 매일(첫 주) → 주 1회 |
 
 ### 8.3 Vercel 환경변수 · 재배포 주의 (2026-09-21 실측)
 
