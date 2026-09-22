@@ -264,6 +264,8 @@ npx supabase db query --linked \
 
 CLI 링크가 아직 없으면 2)를 service role 키 + `@supabase/supabase-js` 로 대신할 수 있다(`profiles` 는 `revoke all from anon, authenticated` 라 service role 필요). Step 1 은 CLI 가 필요 없다.
 
+**로컬 개발용 관리자 계정은 스크립트로** — `node --env-file=.env.local packages/db/scripts/dev-admin.mjs --email admin@local.test --pending-channel`(§8.1). 계정 생성 + `role='admin'` 승격 + 채널 인증 대기 1건을 한 번에 하고 멱등하다. `npx supabase db reset` 뒤 같은 한 줄로 복구된다. **production 은 거부**하므로 운영 계정은 위 절차를 쓴다.
+
 **검증** — 실제 세션에서 확인한다. 대시보드 SQL Editor 에서 `app_role()` 을 호출하면 `auth.uid()` 가 없어 `null` 이 나오는 것이 정상이다.
 
 ```
@@ -353,6 +355,29 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 
 카카오 로그인은 Supabase Redirect URLs 에 `http://localhost:5176/**` 가 있어야 한다(§5.1). 결제는 테스트 키로 실제 토스 결제창이 뜬다(테스트 카드). 웹훅을 로컬에서 받으려면 터널(`npx cloudflared tunnel --url http://localhost:5176`) — `app-plan.md §11.4`. 시드 기준 오늘(KST) LIVE 캠페인이 있어야 결제까지 눌러볼 수 있다(`supabase/seed.sql` 상대 날짜 절). 콘솔 계정은 시드 8명이 실제 메일을 못 받으므로 로컬·Preview 는 `dev-seller.mjs`(§8.1).
 
+### 7.1 로컬 Supabase (권장 · 2026-09-22 부터)
+
+`.env.local` 에 **클라우드(운영) 키를 넣고 개발하면 로컬에서 누른 가입·정지·정산이 운영 DB 에 남고 실제 메일이 발송된다.** 관리자 콘솔이 인플루언서 정지·채널 인증 승인을 다루기 시작했으므로 **로컬 개발은 로컬 Supabase 를 쓴다.** 스테이징 프로젝트는 없다.
+
+```bash
+npx supabase start          # Docker 필요 · API :54321 · Studio :54323 · 메일함(Mailpit) :54324
+                            #   출력된 API URL · anon key · service_role key 를 루트 .env.local 에
+npx supabase db reset       # migrations 0001~ + seed.sql 적용 (sellers 8 · brands 2 · products 10 · campaigns 15)
+```
+
+로컬 키는 모든 Supabase 로컬 프로젝트가 공유하는 공개 데모 키다(`iss: supabase-demo`) — 비밀이 아니므로 `.env.example` 에 주석으로 적어 둔다. **인증 메일은 외부로 나가지 않고 Mailpit 에 잡힌다** — 가입·비밀번호 재설정 흐름을 실제 메일 없이 끝까지 눌러볼 수 있다(Custom SMTP 는 클라우드 전용 설정, §5.5).
+
+테스트 계정은 §8.1 의 `dev-{admin,seller,brand,user}.mjs`(모두 production 거부). `db reset` 으로 계정이 사라지면 같은 한 줄로 복구된다.
+
+**함정 세 가지.**
+
+1. **`.env.local` 을 바꾸면 dev 서버를 재시작한다.** `PUBLIC_*` 는 `$env/static/public` — 기동 시점에 번들에 인라인되므로 HMR 로 반영되지 않는다. 브라우저 탭도 하드 리로드(`Cmd+Shift+R`)가 필요하다. 로컬로 바꿨는데 로그인이 실패하면 거의 이것이다(요청이 옛 번들의 클라우드 주소로 간다 — Network 탭의 `token?grant_type=password` Request URL 로 확인).
+2. **쉘 `export` 를 쓰지 않는다.** Node 의 `--env-file` 은 **이미 설정된 변수를 덮어쓰지 않고**, Vite 의 `loadEnv` 도 `PUBLIC_` 접두가 붙은 `process.env` 를 파일보다 우선한다. 클라우드 값이 export 된 상태에서 `--env-file=.env.local` 로 스크립트를 돌리면 로컬인 줄 알고 **운영 DB 를 건드린다.** 값은 파일로만 준다(`printenv | grep SUPABASE` 로 확인).
+3. **운영 계정을 로컬에 만들지 않는다.** 로컬은 `*.test` · `*.local` 주소로 통일(`admin@local.test`). 실수로 운영 DB 를 보고 있을 때 로컬 비밀번호로는 로그인이 안 되므로 그 자체가 안전장치다.
+
+클라우드에 붙어야 할 때는 `.env.cloud` 를 따로 두고 파일을 교체한다(`vercel env pull .env.cloud`). Vite 는 `.env.[mode]` 만 읽으므로 파일만 두면 dev 에서는 무시되고, 필요하면 `npm run dev:admin -- --mode cloud`. 운영 DB 를 상대로 스크립트를 돌릴 때는 §5.6 절차를 따른다.
+
+
 > **Windows**: `npm run build` 는 adapter-vercel 이 `.vercel/output` 안에 심링크를 만들어 `EPERM` 으로 실패할 수 있다 — 설정 → 개발자 모드(개발자용 → "개발자 모드") 를 켜거나 관리자 터미널, 또는 WSL 에서 빌드. CI(ubuntu) · Vercel 은 영향 없고 `npm run check` · `npm test` · `npm run dev:*` 는 Windows 에서 그대로 된다. 줄바꿈은 `.gitattributes` 가 LF 로 강제.
 
 ---
@@ -369,6 +394,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 | `packages/db/scripts/dev-seller.mjs` | 개발용 인플루언서 계정(확인 완료) + 시드 `sellers` 행 연결. **production 거부** | `node packages/db/scripts/dev-seller.mjs --email dev-seller@sellery.test --seller s1` |
 | `packages/db/scripts/partner-admin.mjs` (브랜드) | 브랜드 운영(브랜드 콘솔 1단계 · 0014) — `brands [--inactive]` · `suspend-brand <b> ["사유"]`(listed 상품은 자동으로 내리지 않고 경고) · `reactivate-brand <b>` · `link-brand <b> <user_id>` · `invite-brand <email> --link <b>`(초대 메일 → `${PUBLIC_SITE_URL}/brand/auth/confirm?next=/brand/password/new`). 시드 b1·b2 는 `*.example` 이라 실제 담당자 메일로. 2단계 `products` · `review-product` · 3단계 `campaign <c>` · **4단계(0018)** `tick`(스케줄러 전체 · 크론 대신 수동) · `tick-campaign <c>` · `orders --campaign <c>\|--brand <b> [--unshipped]` · `cs [--open] [--brand <b>]` | `node packages/db/scripts/partner-admin.mjs brands` |
 | `packages/db/scripts/dev-brand.mjs` | 개발용 브랜드 계정(확인 완료) + 시드 `brands` 행 연결(`create_brand_from_signup(p_link_id)`). **production 거부**. 표준 테스트 계정 `dev-brand@sellery.test ← b1 바인허브` | `node packages/db/scripts/dev-brand.mjs --email dev-brand@sellery.test --brand b1` |
+| `packages/db/scripts/dev-admin.mjs` | 개발용 관리자 계정(확인 완료) + `profiles.role='admin'` 승격. `--pending-channel` 로 채널 인증 대기 1건 생성(시드에는 큐가 없다). **production 거부** · 로컬 Supabase 가 아니면 경고 후 3초 대기. 표준 로컬 계정 `admin@local.test` | `node --env-file=.env.local packages/db/scripts/dev-admin.mjs --email admin@local.test --pending-channel` |
 | `packages/db/scripts/dev-user.mjs` | 개발용 고객 이메일/비밀번호 계정(`PUBLIC_DEV_LOGIN=1` 폼용) | `node --env-file=.env.local packages/db/scripts/dev-user.mjs <email> <password>` |
 | `packages/db/scripts/gen-types.mjs` | Supabase 타입 → `packages/db/src/database.types.ts`(UTF-8 · LF). `supabase link` 전제(§6.1) | `npm run gen:types` |
 
