@@ -830,6 +830,8 @@ export function paymentsHealthIssues(h: PaymentsHealth): { key: string; label: s
 /** app_admin_orders — 브랜드 주문 행 + 브랜드 · 결제 키 */
 export type AdminOrderRow = BrandOrderRow & {
   brand: { id: string; code: string | null; name: string } | null;
+  /** 인플루언서 샘플 구매 주문 (0018 brand_order_json is_sample — 브랜드 표는 제외하지만 관리자 표는 포함) */
+  is_sample: boolean;
   has_payment_key: boolean;
   payment_key: string | null;
   checkout_session_id: string | null;
@@ -868,6 +870,7 @@ export function parseAdminOrderRow(json: unknown): AdminOrderRow | null {
   return {
     ...base,
     brand: b && typeof b.id === "string" ? { id: b.id, code: str(b.code), name: str(b.name) ?? "" } : null,
+    is_sample: bool(o.is_sample),
     has_payment_key: bool(o.has_payment_key),
     payment_key: str(o.payment_key),
     checkout_session_id: str(o.checkout_session_id),
