@@ -37,7 +37,7 @@
 | **A** Vercel 프로젝트 4개 이름 · `sellery-app` 삭제 시점 | `sellery-shop` `sellery-influencer` `sellery-brand` `sellery-admin`. `sellery-app` 삭제는 **S5 뒤 1주**(S4 뒤가 아니라 — 결정 10) | 이름은 §1.3 리라이트 대상 URL(`https://sellery-<app>.vercel.app`)에 박힌다. S4~S5 사이에는 `sellery-app` 이 `/influencer/*` 를 계속 받는다 | S1 착수 전 필요(프로젝트 생성은 사용자 몫, §7 S1) |
 | **B** shop 의 프로토타입 전용 화면(`cart` `influencers` `about`) | S2 에서 제거 | `web/` 에 없는 화면 — "동일 유지" 기준 밖. 장바구니 없이 `구매하기`(full width) 가 현행 | 가능(S1 은 손대지 않음) |
 | **C** influencer 데모 화면 | `(demo)` 라우트 그룹, dev 와 `PUBLIC_DEMO=1` 에서만 | 콘솔 3단계(상품 갤러리 · 캠페인)를 만들 때 원본 화면을 옆에 두고 옮길 수 있다 | 가능 |
-| **D** brand · admin 프로덕션 노출 시점 | S4 부터 `sellery.life/brand` `sellery.life/admin` — `noindex` + 상단 데모 띠("데모 데이터 · 이 브라우저에만 저장") | 프로토타입 데모 URL(제안서 PDF 의 옛 저장소 주소는 그대로 유지) 대체 | 가능(S4 리라이트 표에 넣을지만 결정) |
+| **D** brand · admin 프로덕션 노출 시점 | **번복(2026-09-22)** — S4 에서는 `sellery.life/brand` `sellery.life/admin` 을 `noindex` + 데모 띠로 공개했으나, 두 콘솔이 실서비스가 되면서 **데모는 dev · `PUBLIC_DEMO=1` 에서만** 열리도록 막았다(brand 1단계 #33 · admin 게이트 PR). 어느 Vercel 프로젝트에도 `PUBLIC_DEMO` 를 두지 않으므로 프로덕션에서는 `(demo)` 전체가 404 이고, 루트는 각 콘솔(`/brand/login` · `/admin/home`)이 받는다 | 관리자·브랜드 화면이 익명에게 열려 있으면 실서비스 콘솔과 혼동된다(시드 브랜드명·인플루언서 핸들이 그대로 보인다). 제안서 PDF 의 옛 저장소 데모 주소는 그대로 유지되므로 쇼케이스 용도는 그쪽이 대신한다 | 완료 |
 | **E** 테스트 | vitest, 순수 규칙만 | 결제·세션은 실키 없이 검증 불가 — 사람 시나리오(§8.2) | 가능 |
 | **F** Node | 22 | CI 가 이미 22, Vite 8 · TS 6 · svelte-check 4.7 모두 22 지원 | 가능 |
 | **G** 폰트 | `app.html` Google Fonts `<link>` 유지(IBM Plex Sans KR 300–700 · Plex Mono 400/500/700 · Archivo 500–900) | `next/font` 셀프호스트(`web/src/app/fonts.ts`)는 Next 전용. 시각 차이는 폰트 파일 출처뿐 | 가능 |
