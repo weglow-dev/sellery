@@ -29,6 +29,7 @@ import {
   type ShipOrderResult,
 } from "../../brand/order-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyOrderShipped } from "../mail-events.server";
 
 export type { BrandOrders, BrandOrderRow, BrandOrderTotals, BulkShipResult, BulkShipRow, BulkShipRowResult, OrderFilter, PoRows, PoRow, ShipOrderResult } from "../../brand/order-rules";
 
@@ -92,7 +93,10 @@ export async function shipOrder(brandId: string, orderCode: string, courier: Cou
     console.error("[brand/orders] app_brand_ship_order failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseShipOrderResult(data);
+  const res = parseShipOrderResult(data);
+  // 배송 시작 메일(고객) — 새 등록·정정(replaced)만, 같은 값(already)은 보내지 않는다. 절대 throw 하지 않는다.
+  if (res.ok && !res.already) await notifyOrderShipped(admin, { orderId: res.orderId });
+  return res;
 }
 
 /** 일괄 운송장 — parseBulkShipCsv 의 rows 를 그대로. 행별 결과는 results (CSV 형식 오류 행은 여기 오기 전에 errors 로 빠진다). */
@@ -104,7 +108,15 @@ export async function shipOrdersBulk(brandId: string, rows: readonly Pick<BulkSh
     console.error("[brand/orders] app_brand_ship_orders failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseBulkShipResult(data);
+  const res = parseBulkShipResult(data);
+  // 배송 시작 메일 — 새로 적용된 행마다 한 통(already 제외). 주문번호로 조회 · 10건씩 병렬 · 실패해도 결과에 영향 없음.
+  if (res.ok) {
+    const codes = res.results.filter((r) => r.ok && !r.already).map((r) => r.order_code);
+    for (let i = 0; i < codes.length; i += 10) {
+      await Promise.all(codes.slice(i, i + 10).map((orderCode) => notifyOrderShipped(admin, { orderCode })));
+    }
+  }
+  return res;
 }
 
 /** 발주서 행 — campaignCode 없으면 브랜드 전체. 남의 캠페인·없는 코드는 null(라우트 404). 부수 효과: 첫 내보내기 기록. */

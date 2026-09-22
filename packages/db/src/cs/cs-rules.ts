@@ -296,8 +296,9 @@ export function csFailMessage(r: { code: string }): string {
 
 /** 데모 submitCS · saveCSReply · csClose 의 toast 원문 */
 export const CS_DONE_MESSAGES = {
-  opened: (brandName: string | null) => `문의가 ${brandName ?? "브랜드"}에 접수되었습니다 — 답변은 알림톡으로 안내됩니다`,
-  replied: "답변 전송 — 고객에게 알림톡으로 안내됩니다",
+  // 알림 채널은 이메일(2026-09-22 · packages/db/src/mail) — 이메일이 없는 고객(비회원 미입력 · 카카오)은 화면에서만 확인한다
+  opened: (brandName: string | null) => `문의가 ${brandName ?? "브랜드"}에 접수되었습니다 — 답변이 달리면 이메일로 안내됩니다`,
+  replied: "답변 전송 — 고객에게 이메일로 안내됩니다(이메일이 있는 경우)",
   closed: "처리 종료로 변경했습니다",
   customerReplied: "추가 문의를 보냈어요 — 브랜드가 확인하면 답변이 달립니다",
 } as const;

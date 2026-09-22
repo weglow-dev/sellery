@@ -11,6 +11,7 @@
  */
 import { parseCsActionResult, parseCsConversations, parseCsThread, type CsActionResult, type CsConversation, type CsStatus, type CsThread, isCsStatus } from "../../cs/cs-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCsReplied } from "../mail-events.server";
 
 export type { CsActionResult, CsConversation, CsMessage, CsStatus, CsThread } from "../../cs/cs-rules";
 
@@ -65,7 +66,10 @@ export async function replyCs(brandId: string, code: string, userId: string | nu
     console.error("[brand/cs] app_brand_cs_reply failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseCsActionResult(data);
+  const res = parseCsActionResult(data);
+  // 문의 답변 메일(고객) — 답변 메시지 1건당 한 통(멱등 키 = 메시지 id). 절대 throw 하지 않는다.
+  if (res.ok && res.message) await notifyCsReplied(admin, res.conversationId, { messageId: res.message.id, body: res.message.body });
+  return res;
 }
 
 /** 처리 종료 — 멱등(already). */

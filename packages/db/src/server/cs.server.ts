@@ -14,6 +14,7 @@
 import { CAMPAIGN_CODE_RE } from "../campaign";
 import { parseCsActionResult, parseCsConversations, parseCsOpenResult, parseCsThread, type CsActionResult, type CsConversation, type CsOpenResult, type CsThread, type CsType } from "../cs/cs-rules";
 import { createAdminClient, type Admin } from "./admin.server";
+import { notifyCsOpened } from "./mail-events.server";
 
 export type { CsActionResult, CsConversation, CsMessage, CsOpenResult, CsThread } from "../cs/cs-rules";
 
@@ -56,7 +57,10 @@ export async function openCs(campaignCode: string, input: CsOpenInput, who: CsOp
     console.error("[cs] app_cs_open failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseCsOpenResult(data);
+  const res = parseCsOpenResult(data);
+  // 새 문의 메일(브랜드) — 접수 1건당 한 통(멱등 키 = 대화 id · 첫 메시지 id 는 응답에 없다). 절대 throw 하지 않는다.
+  if (res.ok) await notifyCsOpened(admin, res.conversationId, { messageId: res.conversationId, body: input.body, followUp: false });
+  return res;
 }
 
 function keyArgs(key: CsCustomerKey): { p_client_token?: string; p_user_id?: string } | null {
@@ -89,7 +93,10 @@ export async function customerReplyCs(conversationCode: string, key: CsCustomerK
     console.error("[cs] app_cs_customer_reply failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseCsActionResult(data);
+  const res = parseCsActionResult(data);
+  // 추가 문의 메일(브랜드) — 메시지 1건당 한 통(멱등 키 = 메시지 id)
+  if (res.ok && res.message) await notifyCsOpened(admin, res.conversationId, { messageId: res.message.id, body: res.message.body, followUp: true });
+  return res;
 }
 
 /** 회원의 문의 목록 — 최신순 ≤ 100. 호출자는 세션 user.id 를 넘긴다. */
