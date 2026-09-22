@@ -23,3 +23,5 @@ export * from '@sellery/db/server/admin/orders';
 export * from '@sellery/db/server/admin/payments';
 export * from '@sellery/db/server/admin/cs';
 export * from '@sellery/payments/server/admin-refund';
+// 폼 액션 레이트리밋 — 인플루언서·브랜드 콘솔과 같은 유틸(프로세스 메모리 · 30분 20건). 게이트(`./admin` requireAdmin) 뒤에서만.
+export { rateLimit, RATE_LIMIT_MESSAGE } from '@sellery/db/server/partner/seller';
