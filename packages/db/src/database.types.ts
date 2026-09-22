@@ -770,9 +770,13 @@ export type Database = {
           address: Json | null
           created_at: string
           email: string | null
+          guest: boolean
           id: string
+          lookup_token_hash: string | null
+          lookup_token_issued_at: string | null
           name: string | null
           phone: string | null
+          phone_norm: string | null
           updated_at: string
           user_id: string | null
         }
@@ -780,9 +784,13 @@ export type Database = {
           address?: Json | null
           created_at?: string
           email?: string | null
+          guest?: boolean
           id?: string
+          lookup_token_hash?: string | null
+          lookup_token_issued_at?: string | null
           name?: string | null
           phone?: string | null
+          phone_norm?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -790,9 +798,13 @@ export type Database = {
           address?: Json | null
           created_at?: string
           email?: string | null
+          guest?: boolean
           id?: string
+          lookup_token_hash?: string | null
+          lookup_token_issued_at?: string | null
           name?: string | null
           phone?: string | null
+          phone_norm?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -2359,6 +2371,19 @@ export type Database = {
         Args: { p_campaign_id: string; p_reason?: string; p_seller_id: string }
         Returns: Json
       }
+      app_guest_customer_upsert: {
+        Args: { p_email?: string; p_name: string; p_phone: string }
+        Returns: string
+      }
+      app_guest_order_lookup: {
+        Args: { p_order_code: string; p_phone: string }
+        Returns: Json
+      }
+      app_guest_order_verify: {
+        Args: { p_order_code: string; p_token: string }
+        Returns: string
+      }
+      app_guest_token_issue: { Args: { p_order_code: string }; Returns: string }
       app_partner_payment_cancel: {
         Args: { p_payment_id: string; p_reason?: string; p_seller_id?: string }
         Returns: Json
@@ -2646,6 +2671,7 @@ export type Database = {
       }
       expire_checkout_sessions: { Args: { p_grace?: string }; Returns: number }
       grade_for_sales: { Args: { p_m3_sales: number }; Returns: string }
+      guest_token_rotate: { Args: { p_customer_id: string }; Returns: string }
       partner_identity_confirmed: {
         Args: { p_user_id: string }
         Returns: boolean

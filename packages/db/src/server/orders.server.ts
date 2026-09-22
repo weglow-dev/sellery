@@ -154,6 +154,19 @@ export async function fetchMyOrder(userId: string, code: string, admin: Admin = 
   return data ? toMyOrder(data) : null;
 }
 
+/** 주문 id 로 상세 — 비회원 주문(0021 app_guest_order_verify 통과 뒤)·운영 용. 소유 확인은 호출자 책임. 조인 결함·낯선 상태 → null. */
+export async function fetchOrderById(orderId: string, admin: Admin = createAdminClient()): Promise<MyOrder | null> {
+  const { data, error } = await admin
+    .from("orders")
+    .select(SELECT)
+    .eq("id", orderId)
+    .eq("is_sample", false)
+    .maybeSingle()
+    .overrideTypes<RawOrder | null, { merge: false }>();
+  if (error) throw new Error(`fetchOrderById failed: ${error.message}`);
+  return data ? toMyOrder(data) : null;
+}
+
 /** 내 주문 화면이 쓰는 정책 상수 — platform_settings(service 전용) 에서 1회 읽고, 못 읽으면 기본값 */
 export async function fetchOrderSettings(admin?: Admin): Promise<{ clear_days: number }> {
   try {
