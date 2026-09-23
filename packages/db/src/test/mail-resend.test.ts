@@ -111,7 +111,7 @@ describe("전송", () => {
 
   it("isEmailAddress", () => {
     expect(isEmailAddress("a@b.co")).toBe(true);
-    expect(isEmailAddress("partner@vyneherb.example")).toBe(true);
+    expect(isEmailAddress("partner@vyneherb.example")).toBe(false); // 예약 도메인 — 아래 describe
     expect(isEmailAddress("a@b")).toBe(false);
     expect(isEmailAddress(null)).toBe(false);
   });
