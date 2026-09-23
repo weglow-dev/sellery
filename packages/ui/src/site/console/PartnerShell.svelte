@@ -46,7 +46,7 @@
 			{ href: '/sellers', label: '인플루언서', icon: 'user' },
 			{ href: '/brands', label: '브랜드', icon: 'flag', disabled: true, title: '준비 중 — 파트너 관리' },
 			{ href: '/products', label: '상품', icon: 'box', disabled: true, title: '준비 중 — 상품 검수' },
-			{ href: '/settle', label: '정산', icon: 'chart', disabled: true, title: '준비 중 — 정산' }
+			{ href: '/settle', label: '정산', icon: 'chart' }
 		]
 	};
 </script>
