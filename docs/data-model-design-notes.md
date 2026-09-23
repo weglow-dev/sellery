@@ -122,7 +122,7 @@ channels[]: `id 'ch1'`→`code`, `platform`, `handle`, `url`, `followers`, `veri
 |---|---|---|
 | (맵 키) cid | `campaign_id` | |
 | type `'sys'` | `kind='system'`, `sender='system'` | HTML(`<b>`) 포함 문자열 → `body`(평문) + `event_type`(슬러그) + `payload jsonb`(파라미터). 렌더 시 앱이 조립 (DM §8-3 결정). 수령 이벤트는 `sample_received` 1행 + `payload.test_due` (L4192-4193 — 시드의 c3 sys 2행도 이렇게 합침) |
-| type `'chat'`, role seller/brand | `kind='chat'`, `sender` check(seller,brand,admin,system) = **표시 역할** | + `actor_role`(실제 발신 역할, chat 이면 필수) + `actor_user_id`. 관리자 대행 발신(L4467 — 관리자는 브랜드로 발신, 사용자 결정)은 `sender='brand', actor_role='admin'` 으로 저장해 화면은 브랜드명(L3564)으로 나오고 감사 이력은 남는다. `sender='admin'` 은 운영팀 명의 발신('셀러리 운영팀')용 |
+| type `'chat'`, role seller/brand | `kind='chat'`, `sender` check(seller,brand,admin,system) = **표시 역할** | + `actor_role`(실제 발신 역할, chat 이면 필수) + `actor_user_id`. 관리자 대행 발신은 **`sender='admin'`**(표시 "셀러리 관리자" + ✓ 셀러리 인증 배지)으로 저장한다 — 운영 결정 2026-09-23 으로 **번복**. 이전 결정은 `sender='brand', actor_role='admin'`(프로토타입 L4467 과 같이 브랜드명으로 표시하고 감사 이력만 남김)이었으나, 브랜드 콘솔에서 브랜드가 자기가 쓰지 않은 메시지를 자기 이름으로 보게 되어 분쟁 소지가 있다. `actor_role`·`actor_user_id` 는 그대로 쓴다(상태 전이 대행은 `admin_proxy_action` 이벤트로 기록) |
 | type `'warn'` (별도 행) | `leak_flag=true` (감지된 chat 행에) | 경고 문구는 앱 렌더. 별도 행이 아니므로 **이탈** — 원문 보존은 동일(정규식 감지는 서버 insert 시) |
 | txt / at | `body` / `created_at` | |
 | (derived) 안 읽음 | **derived** | 마지막 chat 의 sender ≠ 내 역할. 읽음 상태 컬럼은 프로토타입에도 없음 |
@@ -167,7 +167,7 @@ channels[]: `id 'ch1'`→`code`, `platform`, `handle`, `url`, `followers`, `veri
 | orderId (고객 타이핑 원문, 불일치여도 저장 L4379/L4383) | `order_code text` + `order_id → orders`(nullable) | 서버가 `orders.code` 를 대소문자 무시·같은 캠페인 범위로 해석해 `order_id` 를 채우고, 못 찾으면 null 로 둔다 (원문은 `order_code` 에 그대로) |
 | (derived) csBrandId | `brand_id` | 파생값을 저장(브랜드 문의함 조회 인덱스) |
 | msg | `cs_messages(sender='customer')` 1행 | |
-| reply / repliedAt | `cs_messages(sender='brand')` + `cs_conversations.replied_at` | glo 0015 구조로 일반화 — 답변 수정·추가 대화 가능. `cs_messages` 도 `sender`(표시)/`actor_role`(실제, 필수)/`actor_user_id` 분리 — 관리자 대행 답변은 `sender='brand', actor_role='admin'` |
+| reply / repliedAt | `cs_messages(sender='brand')` + `cs_conversations.replied_at` | glo 0015 구조로 일반화 — 답변 수정·추가 대화 가능. `cs_messages` 도 `sender`(표시)/`actor_role`(실제, 필수)/`actor_user_id` 분리 — 관리자 대행 답변은 `sender='brand', actor_role='admin'` (**CS 는 미구현 · 캠페인 스레드는 2026-09-23 결정으로 `sender='admin'` 으로 바뀌었다. CS 화면을 만들 때 같은 기준으로 맞출지 정한다**) |
 | (없음) | `customer_id`, `user_id`, `client_token`(비회원 식별, glo 0015), `last_preview`, `last_message_at`, `closed_at` | **추정** |
 
 ### 1.10 settlements → `settlements` (+ `payouts`)

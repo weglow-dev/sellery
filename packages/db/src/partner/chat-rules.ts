@@ -123,7 +123,14 @@ export function chatFailMessage(r: { code: string }): string {
   return isChatCode(r.code) ? CHAT_FAIL_MESSAGES[r.code] : CHAT_FAIL_MESSAGES.DB_ERROR;
 }
 
-/** 발신자 표시명 — 프로토타입 L3564: seller → 인플루언서 이름 · brand → 브랜드명 · admin → 셀러리 운영팀 · system → 시스템 */
+/**
+ * 발신자 표시명 — 프로토타입 L3564: seller → 인플루언서 이름 · brand → 브랜드명 · system → 시스템.
+ *
+ * `admin` 은 **"셀러리 관리자"**. 프로토타입은 관리자 발신을 브랜드 이름으로 위장했지만(`sendChat` 이
+ * `S.role !== 'seller'` 를 모두 `'brand'` 로 저장), 브랜드가 쓰지 않은 말이 브랜드 이름으로 남으면
+ * 브랜드 콘솔에서 분쟁이 된다. 운영 결정(2026-09-23)으로 **드러내고 인증 배지를 붙인다**.
+ * `isOfficialSender()` 가 배지를 달 자리를 알려준다.
+ */
 export function senderLabel(sender: string, names: { seller?: string | null; brand?: string | null } = {}): string {
   switch (sender) {
     case "seller":
@@ -131,10 +138,15 @@ export function senderLabel(sender: string, names: { seller?: string | null; bra
     case "brand":
       return names.brand || "브랜드";
     case "admin":
-      return "셀러리 운영팀";
+      return "셀러리 관리자";
     default:
       return "시스템";
   }
+}
+
+/** 셀러리 공식 발신인가 — true 면 화면이 인증 배지를 붙인다(관리자 대행 발신을 숨기지 않는다) */
+export function isOfficialSender(sender: string): boolean {
+  return sender === "admin";
 }
 
 /** 내가 보낸 말풍선인가 (오른쪽 정렬) */

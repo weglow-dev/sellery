@@ -7,7 +7,7 @@
 	import { enhance } from '$app/forms';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
-	import { senderLabel } from '@sellery/db/partner/chat-rules';
+	import { isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
 	import { adminCampaignAction, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
 	import { COURIERS } from '@sellery/db/brand/campaign-rules';
 	import { CampaignStepper, PlatformHandle, ProductIcon, StatusChip, ThreadComposer } from '@sellery/ui/site';
@@ -32,7 +32,7 @@
 		schedule_confirmed: { tone: 'ok', text: '판매 일정을 확정했습니다 — 판매 링크가 만들어집니다.' },
 		schedule_rejected: { tone: 'ok', text: '판매 일정을 거절했습니다.' },
 		schedule_already: { tone: 'ok', text: '이미 처리된 일정입니다.' },
-		sent: { tone: 'ok', text: '메시지를 보냈습니다 — 셀러리 운영팀으로 표시됩니다.' },
+		sent: { tone: 'ok', text: '메시지를 보냈습니다 — 양쪽 스레드에 셀러리 관리자로 표시됩니다.' },
 		sent_leak: { tone: 'danger', text: '메시지를 보냈지만 연락처·외부 메신저 공유로 감지되어 경고가 함께 남았습니다.' },
 		err_NOT_FOUND: { tone: 'danger', text: '대상을 찾을 수 없습니다.' },
 		err_WRONG_STATUS: { tone: 'danger', text: '현재 상태에서는 할 수 없는 동작입니다 — 화면을 새로 고쳐주세요.' },
@@ -122,7 +122,10 @@
 					{/if}
 				{:else}
 					<div class="msg {e.sender}" class:leak={e.leak_flag}>
-						<div class="who">{senderLabel(e.sender, names)}</div>
+						<div class="who">
+							{senderLabel(e.sender, names)}
+							{#if isOfficialSender(e.sender)}<span class="official" title="셀러리 관리자 공식 발신">✓ 셀러리 인증</span>{/if}
+						</div>
 						{e.body}
 						<div class="tm">
 							{md(e.created_at)}
@@ -137,7 +140,7 @@
 		</div>
 		<ThreadComposer
 			action="?/postChat"
-			as="셀러리 운영팀"
+			as="셀러리 관리자"
 			placeholder="메시지 입력… (승인·일정은 오른쪽 버튼으로)"
 			error={form?.chatError ?? null}
 		/>

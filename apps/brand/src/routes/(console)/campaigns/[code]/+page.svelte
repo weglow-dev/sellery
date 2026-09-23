@@ -10,7 +10,7 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
 	import { COURIERS, ENDED_STATUSES, periodLine, REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
-	import { LEAK_WARNING, senderLabel } from '@sellery/db/partner/chat-rules';
+	import { LEAK_WARNING, isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
 	import { CampaignStepper, CopyButton, GradeBox, PlatformHandle, ProductIcon, SellerAvatar, StatusChip, ThreadComposer } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
 
@@ -70,7 +70,10 @@
 					{/if}
 				{:else}
 					<div class="msg {e.sender}" class:leak={e.leak_flag}>
-						<div class="who">{who(e.sender)}</div>
+						<div class="who">
+							{who(e.sender)}
+							{#if isOfficialSender(e.sender)}<span class="official" title="셀러리 관리자 공식 발신">✓ 셀러리 인증</span>{/if}
+						</div>
 						{e.body}
 						<div class="tm">{md(e.created_at)}</div>
 					</div>
