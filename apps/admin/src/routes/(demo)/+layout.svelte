@@ -15,7 +15,7 @@
 	let { children }: { children: Snippet } = $props();
 	const n = $derived(counts().admin);
 	const tabs = $derived([
-		{ href: '/demo', label: '대시보드', badge: n }, { href: '/products', label: '상품' }, { href: '/influencers', label: '인플루언서' },
+		{ href: '/demo', label: '대시보드', badge: n }, { href: '/influencers', label: '인플루언서' },
 		{ href: '/match', label: '매칭·자동 제안' }, { href: '/revenue', label: '매출·순수익' }
 		// 주문·CS · 정산 실행 데모는 "정산·돈" PR-B 에서 뺐다 — 실서비스 `/admin/orders` `/admin/settle` `/admin/cs` 가 그 자리 ($lib/demo.ts DEMO_PATHS 와 같이 고친다)
 	]);
