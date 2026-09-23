@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GUARD_TTL_MS, createMailer, isEmailAddress, type MailMessage } from "../mail/resend";
 
-const MSG: MailMessage = { to: "buyer@example.com", subject: "제목", html: "<p>hi</p>", text: "hi", tag: "order_paid", idempotencyKey: "order_paid:customer:o1" };
+const MSG: MailMessage = { to: "buyer@sellery.life", subject: "제목", html: "<p>hi</p>", text: "hi", tag: "order_paid", idempotencyKey: "order_paid:customer:o1" };
 
 type Call = { url: string; init: RequestInit };
 
@@ -46,7 +46,7 @@ describe("전송", () => {
     expect(headers["idempotency-key"]).toBe("order_paid:customer:o1");
     const body = JSON.parse(String(calls[0].init.body));
     expect(body.from).toBe("Sellery <noreply@sellery.life>");
-    expect(body.to).toEqual(["buyer@example.com"]);
+    expect(body.to).toEqual(["buyer@sellery.life"]);
     expect(body.subject).toBe("제목");
     expect(body.html).toBe("<p>hi</p>");
     expect(body.text).toBe("hi");
@@ -124,7 +124,7 @@ describe("isEmailAddress — 예약 도메인 차단", () => {
     }
   });
   it("실제 주소는 true", () => {
-    for (const a of ["shingoonk@weglow.biz", "orangebear851011@gmail.com", "user@example-shop.co.kr"]) expect(isEmailAddress(a)).toBe(true);
+    for (const a of ["shingoonk@weglow.biz", "orangebear851011@gmail.com", "user@example-shop.co.kr", "buyer@sellery.life"]) expect(isEmailAddress(a)).toBe(true);
   });
 });
 
