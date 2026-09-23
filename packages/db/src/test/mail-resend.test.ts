@@ -116,3 +116,15 @@ describe("전송", () => {
     expect(isEmailAddress(null)).toBe(false);
   });
 });
+
+describe("isEmailAddress — 예약 도메인 차단", () => {
+  it("시드·예약 도메인은 형식이 맞아도 false", () => {
+    for (const a of ["official@glohealth.example", "partner@vyneherb.example", "a@b.test", "x@y.invalid", "q@localhost.localhost", "jiyu@sellery.demo", "z@example.com"]) {
+      expect(isEmailAddress(a)).toBe(false);
+    }
+  });
+  it("실제 주소는 true", () => {
+    for (const a of ["shingoonk@weglow.biz", "orangebear851011@gmail.com", "user@example-shop.co.kr"]) expect(isEmailAddress(a)).toBe(true);
+  });
+});
+
