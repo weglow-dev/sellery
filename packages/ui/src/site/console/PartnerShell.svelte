@@ -45,7 +45,7 @@
 			{ href: '/home', label: '홈', icon: 'home' },
 			{ href: '/sellers', label: '인플루언서', icon: 'user' },
 			{ href: '/brands', label: '브랜드', icon: 'flag' },
-			{ href: '/products', label: '상품', icon: 'box', disabled: true, title: '준비 중 — 상품 검수' },
+			{ href: '/products', label: '상품', icon: 'box' },
 			{ href: '/settle', label: '정산', icon: 'chart' }
 		]
 	};
