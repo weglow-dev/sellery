@@ -3,9 +3,12 @@
 	 * 판매 링크 페이지 본문 (프로토타입 vStore · ux-spec §3.1 · web s/[handle]/[code]/page.tsx + store-client.tsx). 8 블록 순서 동일:
 	 *   1 상단 행 · 2 인증 띠 · 3 상품 카드(가격 행 · 옵션 · 수량 · 총 결제 금액 · CTA) · 4 상세 정보 · 5 배송·교환·환불 (+ 5-1 판매자에게 문의 링크 · 4단계) · 6 판매자 정보 · 7 다른 판매 · 8 .store-foot
 	 * 데이터는 전부 props(서버 load 결과) — `card`(campaign_card) · `others`(같은 인플루언서의 다른 판매) · `signedIn`.
+	 *
+	 * `preview` — 관리자 콘솔의 **상세페이지 미리보기**(`/admin/products/[code]/preview`)에서만 true. 판매 링크가 발급되기 전
+	 * 레이아웃을 확인하는 용도라 구매 CTA 를 안내 문구로 바꾼다(합성 캠페인으로 체크아웃에 들어가지 못하게). 고객 화면(shop)은 기본값 false 로 영향이 없다.
 	 * 초기값 옵션 0 · 수량 1 (URL 로 복원하지 않는다). 합계 = options[oi].price × q, 배송비 없음. 결제는 S3(/checkout) — CTA 는 링크만 만든다.
 	 */
-	import { badgeTone, ddayLabel, discountPct, displayStoreUrl, imageSrc, won, type CampaignCard as Card, type HomeCard } from '@sellery/db/campaign';
+	import { badgeTone, ddayLabel, discountPct, displayStoreUrl, fmtNum, imageSrc, won, type CampaignCard as Card, type HomeCard } from '@sellery/db/campaign';
 	import { COMPANY } from '@sellery/db/company';
 	import Cel from '../icons/Cel.svelte';
 	import PlatIcon from '../icons/PlatIcon.svelte';
@@ -20,7 +23,12 @@
 	import QtyStepper from './QtyStepper.svelte';
 	import BuyCta from './BuyCta.svelte';
 
-	let { card, others = [], signedIn = false }: { card: Card; others?: HomeCard[]; signedIn?: boolean } = $props();
+	let {
+		card,
+		others = [],
+		signedIn = false,
+		preview = false
+	}: { card: Card; others?: HomeCard[]; signedIn?: boolean; preview?: boolean } = $props();
 
 	const { campaign, product, seller, brand } = $derived(card);
 	const today = $derived(campaign.today);
@@ -88,7 +96,14 @@
 					<div class="total-v">{won(o.price * q)}</div>
 				</div>
 			</div>
-			<BuyCta {card} optionIndex={oi} qty={q} {signedIn} />
+			{#if preview}
+				<div class="store-preview-cta">
+					<b>상세페이지 미리보기 — 판매 링크 발급 전</b>
+					<span class="meta">인플루언서 일정이 확정되면 이 레이아웃으로 판매 링크가 생성됩니다 · 재고 {fmtNum(campaign.qty ?? 0)}개</span>
+				</div>
+			{:else}
+				<BuyCta {card} optionIndex={oi} qty={q} {signedIn} />
+			{/if}
 		</div>
 	</div>
 
@@ -133,3 +148,17 @@
 		<Cel /> <b>SELLERY</b> · 셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드({brand.name})에 있습니다 · #광고 · 인플루언서는 판매 수수료를 받습니다
 	</div>
 </div>
+
+<style>
+	/* 관리자 상세페이지 미리보기 — 구매 CTA 자리 (BuyCta 와 같은 테두리·여백) */
+	.store-preview-cta {
+		display: block;
+		border: 2px solid var(--color-line);
+		padding: 14px 16px;
+		text-align: center;
+	}
+	.store-preview-cta .meta {
+		display: block;
+		margin-top: 4px;
+	}
+</style>

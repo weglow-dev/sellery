@@ -11,7 +11,7 @@
  *   listSellers · getSeller · listPendingChannels · countPendingChannels
  *   setSellerActive · setSellerHidden · setChannelVerified · grantCelery
  *   listBrands · getBrand · setBrandActive · setBrandAutoPropose · grantBrandCelery
- *   listAdminProducts · reviewProduct (0015 app_admin_review_product)
+ *   listAdminProducts · getAdminProduct · getProductPreviewCard · reviewProduct (0015 app_admin_review_product)
  * 순수 규칙(필터·칩·검색·문구)은 `.svelte` 에서 `@sellery/db/admin/{seller-rules,brand-rules,product-rules}` 를 직접 import 한다.
  */
 import './env';

@@ -9,14 +9,31 @@
 	 *      rejected → 사유 표시 + [승인으로 변경]
 	 *      listed   → [노출 중단]   ·   paused → [재개]
 	 *   되돌리기 비용이 있는 것(반려 · 노출 중단)에만 confirm 을 건다.
+	 *   **행 전체가 상세 링크** — 관리 칸의 버튼·폼과 브랜드 링크는 `closest()` 로 제외한다(sellers · brands 와 같은 규칙).
 	 */
 	import { CATEGORY_POLICY_NOTE, nextListingDecision, productStatusChip, totalFeeLine } from '@sellery/db/admin/product-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { GradeBox, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const money = (n: number) => `₩${fmtNum(n)}`;
+	const detail = (p: { code: string | null; id: string }) => `${data.self}/${encodeURIComponent(p.code ?? p.id)}`;
+	function rowClick(p: { code: string | null; id: string }) {
+		return (e: MouseEvent) => {
+			if ((e.target as HTMLElement).closest('a,button,form,input')) return;
+			goto(detail(p));
+		};
+	}
+	function rowKey(p: { code: string | null; id: string }) {
+		return (e: KeyboardEvent) => {
+			if (e.key !== 'Enter' && e.key !== ' ') return;
+			if ((e.target as HTMLElement).closest('a,button,form,input')) return;
+			e.preventDefault();
+			goto(detail(p));
+		};
+	}
 	const ask = (msg: string) => (e: SubmitEvent) => {
 		if (!confirm(msg)) e.preventDefault();
 	};
@@ -100,12 +117,12 @@
 					{@const chip = productStatusChip(p.status)}
 					{@const fee = totalFeeLine(p.commission_rate)}
 					{@const next = nextListingDecision(p.status)}
-					<tr>
+					<tr class="clickable" onclick={rowClick(p)} onkeydown={rowKey(p)} tabindex="0" role="link" aria-label="{p.name} 상세">
 						<td data-label="상품">
 							<span class="admin-prod-cell">
 								<ProductIcon emoji={p.emoji ?? '📦'} thumbUrl={p.thumb_url} size={24} />
 								<span>
-									<b>{p.name}</b>
+									<a href={detail(p)}><b>{p.name}</b></a>
 									{#if p.code}<span class="console-mono meta"> {p.code}</span>{/if}
 									<span class="meta admin-prod-sub">{p.description ?? '—'}</span>
 								</span>
@@ -173,6 +190,7 @@
 										<button type="submit" class="ghost sm">{next.label}</button>
 									</form>
 								{/if}
+								<a href="{detail(p)}/preview" class="btn ghost sm">상세페이지</a>
 							</div>
 						</td>
 					</tr>
@@ -201,5 +219,8 @@
 		display: flex;
 		gap: 6px;
 		flex-wrap: wrap;
+	}
+	tr.clickable {
+		cursor: pointer;
 	}
 </style>
