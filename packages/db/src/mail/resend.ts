@@ -50,8 +50,19 @@ const DEFAULT_TIMEOUT_MS = 8_000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TAG_RE = /^[A-Za-z0-9_-]+$/;
 
+/**
+ * 실제로 배달될 수 없는 예약 도메인(RFC 2606/6761 `.example` `.test` `.invalid` `.localhost` · `example.com/net/org`) 과 시드 전용 `@sellery.demo`.
+ * 시드 브랜드(`official@glohealth.example` 등)·데모 인플루언서에게 보내면 Resend 에서 반송(bounce)되고, 같은 Resend 계정을 쓰는
+ * 다른 프로젝트의 반송 웹훅(vyneherb CS 슬랙)까지 울린다 — 2026-09-23 실제 발생. 형식은 유효해도 보내지 않는다.
+ */
+const RESERVED_DOMAIN_RE = /(\.(example|test|invalid|localhost)|@(example\.(com|net|org)|sellery\.demo))$/i;
+
+export function isReservedAddress(v: string): boolean {
+  return RESERVED_DOMAIN_RE.test(v.trim());
+}
+
 export function isEmailAddress(v: string | null | undefined): v is string {
-  return typeof v === "string" && EMAIL_RE.test(v.trim()) && v.trim().length <= 254;
+  return typeof v === "string" && EMAIL_RE.test(v.trim()) && v.trim().length <= 254 && !isReservedAddress(v);
 }
 
 /**
