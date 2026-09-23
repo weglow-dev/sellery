@@ -204,7 +204,7 @@
 				>
 					<td class="nm" data-l="캠페인">
 						<span class="home-camp-cell">
-							<ProductIcon emoji="📦" thumbUrl={null} size={22} />
+							<ProductIcon emoji={c.product_emoji ?? '📦'} thumbUrl={c.product_thumb_url} size={22} />
 							<span>
 								<a href={href}><b>{c.product_name ?? '—'}</b></a>
 								<span class="home-camp-meta">

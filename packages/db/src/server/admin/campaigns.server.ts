@@ -49,7 +49,16 @@ export type AdminCampaignDetail = {
   invited: boolean;
   auto: boolean;
   created_at: string | null;
-  product: { id: string; code: string | null; name: string; sale_price: number | null; consumer_price: number | null; image_urls: string[] } | null;
+  product: {
+    id: string;
+    code: string | null;
+    name: string;
+    sale_price: number | null;
+    consumer_price: number | null;
+    emoji: string | null;
+    thumb_url: string | null;
+    image_urls: string[];
+  } | null;
   brand: { id: string; code: string | null; name: string; grade: string | null } | null;
   seller: { id: string; code: string | null; name: string; handle: string; platform: string | null; grade: string | null; followers: number | null } | null;
   events: AdminCampaignEvent[];
@@ -70,7 +79,17 @@ type Row = {
   auto_proposed: boolean | null;
   created_at: string | null;
   brand_id: string | null;
-  products: { id: string; code: string | null; name: string; sale_price: number | null; consumer_price: number | null; commission_rate: number | null; image_urls: unknown } | null;
+  products: {
+    id: string;
+    code: string | null;
+    name: string;
+    sale_price: number | null;
+    consumer_price: number | null;
+    commission_rate: number | null;
+    emoji: string | null;
+    thumb_url: string | null;
+    image_urls: unknown;
+  } | null;
   brands: { id: string; code: string | null; name: string; grade: string | null } | null;
   sellers: { id: string; code: string | null; name: string; handle: string; platform: string | null; grade: string | null; followers: number | null } | null;
 };
@@ -84,7 +103,7 @@ async function campaignRow(admin: Admin, ref: string): Promise<Row | null> {
   const sel = admin
     .from("campaigns")
     .select(
-      "id, code, status, start_date, end_date, qty, sold_qty, rate_locked, invited, auto_proposed, created_at, brand_id, products(id, code, name, sale_price, consumer_price, commission_rate, image_urls), brands(id, code, name, grade), sellers(id, code, name, handle, platform, grade, followers)"
+      "id, code, status, start_date, end_date, qty, sold_qty, rate_locked, invited, auto_proposed, created_at, brand_id, products(id, code, name, sale_price, consumer_price, commission_rate, emoji, thumb_url, image_urls), brands(id, code, name, grade), sellers(id, code, name, handle, platform, grade, followers)"
     );
   const { data, error } = await (UUID_RE.test(r) ? sel.eq("id", r) : sel.eq("code", r.toLowerCase())).maybeSingle();
   if (error) {
@@ -154,6 +173,8 @@ export async function getAdminCampaign(ref: string, admin: Admin = createAdminCl
           name: c.products.name,
           sale_price: c.products.sale_price,
           consumer_price: c.products.consumer_price,
+          emoji: c.products.emoji,
+          thumb_url: c.products.thumb_url,
           image_urls: Array.isArray(c.products.image_urls) ? (c.products.image_urls as string[]) : [],
         }
       : null,

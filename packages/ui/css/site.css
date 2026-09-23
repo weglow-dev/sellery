@@ -1337,7 +1337,7 @@
   .console-composer { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-body); font-size: 13px; color: var(--color-ink); }
   .console-composer .as { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-mute); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 700; }
   .console-composer .row { display: flex; gap: 8px; align-items: flex-end; }
-  .console-composer textarea { flex: 1; min-width: 0; width: auto; margin: 0; resize: vertical; font-size: 13.5px; line-height: 1.5; min-height: 44px; }
+  .console-composer textarea { flex: 1; min-width: 0; width: auto; margin: 0; resize: none; font-size: 13.5px; line-height: 1.5; min-height: 44px; }
   .console-composer button { flex: 0 0 auto; margin: 0; }
   .console-composer .note { font-size: 11px; color: var(--color-mute); line-height: 1.5; }
   .console-thread .msg.leak { box-shadow: 0 0 0 2px var(--color-danger); }

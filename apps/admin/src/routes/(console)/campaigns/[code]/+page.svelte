@@ -1,37 +1,27 @@
 <script lang="ts">
 	/**
-	 * 관리자 캠페인 상세 — 데모 캠페인 상세 화면과 같은 구성:
-	 *   1 상단: 상품 · 브랜드 × 인플루언서 · 판매가 · 수수료 · 상태 칩
-	 *   2 흐름 스테퍼 9단계
-	 *   3 스레드(시스템 이벤트 + 당사자 대화) + 관리자 발신 입력
-	 *   4 우측: 브랜드 대행 액션 · 정산 미리보기
-	 *
-	 * 데모와 다른 점: 발신이 **"셀러리 운영팀"** 으로 남는다(데모는 브랜드로 위장 발신).
-	 * 브랜드가 쓰지 않은 말이 브랜드 이름으로 남으면 분쟁이 되고, `campaign_post_chat` 이 sender·actor_role 을
-	 * 같은 값으로 넣으므로 위장 자체가 불가능하다. 화면에도 그 사실을 적는다.
+	 * 관리자 캠페인 상세 — 데모 CampaignDetail · 인플루언서/브랜드 콘솔과 같은 console-det 톤.
+	 *   머리 · 스테퍼 · 스레드(시스템/대화) · 우측 브랜드 대행 액션 · 정산 미리보기.
+	 * 발신은 "셀러리 운영팀" — 브랜드 위장 발신은 하지 않는다.
 	 */
 	import { enhance } from '$app/forms';
 	import { fmtNum } from '@sellery/db/campaign';
+	import { md } from '@sellery/db/dates';
 	import { senderLabel } from '@sellery/db/partner/chat-rules';
-	import { adminCampaignAction, campaignFlowSteps, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
+	import { adminCampaignAction, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
 	import { COURIERS } from '@sellery/db/brand/campaign-rules';
+	import { CampaignStepper, PlatformHandle, ProductIcon, StatusChip, ThreadComposer } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const c = $derived(data.campaign);
+	const p = $derived(c.product);
 	const chip = $derived(campaignStatusChip(c.status));
-	const steps = $derived(campaignFlowSteps(c.status));
 	const action = $derived(adminCampaignAction(c.status));
 	const names = $derived({ seller: c.seller?.name ?? null, brand: c.brand?.name ?? null });
-
 	const money = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `₩${fmtNum(n)}`);
-	const dt = (iso: string) => {
-		const d = new Date(iso);
-		const s = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-		const [, m, day] = s.split('-');
-		return `${Number(m)}/${Number(day)}`;
-	};
+	const pct = (r: number | null | undefined) => (r === null || r === undefined ? '—' : `${(r * 100).toFixed(0)}%`);
 
 	const MSG: Record<string, { tone: 'ok' | 'danger'; text: string }> = {
 		sample_approved: { tone: 'ok', text: '샘플 요청을 승인했습니다 — 배송지가 브랜드에 전달됩니다.' },
@@ -53,270 +43,257 @@
 </script>
 
 <svelte:head>
-	<title>{c.product?.name ?? c.code} 캠페인 — 셀러리 관리자</title>
+	<title>{p?.name ?? c.code} 캠페인 — 셀러리 관리자</title>
 </svelte:head>
 
-<div class="console-head">
-	<a href={data.paths.home} class="btn ghost sm">← 대시보드</a>
-	<h2>{c.product?.name ?? '—'}</h2>
-	<span class="console-mono meta">{c.code ?? ''}</span>
-	<span class="st {chip.tone}">{chip.label}</span>
-</div>
+<a href={data.paths.home} class="btn ghost sm camp-back">← 대시보드</a>
 
 {#if msg}
-	<p class="notice" class:danger={msg.tone === 'danger'} role="status">{msg.text}</p>
+	<p class={`notice ${msg.tone === 'danger' ? 'danger' : 'ok'}`} role="status">{msg.text}</p>
 {/if}
 
-<!-- 1. 개요 -->
-<section class="console-card">
-	<p class="meta">
-		{#if c.brand?.code}<a href="{data.paths.brands}/{encodeURIComponent(c.brand.code)}">{c.brand.name}</a>{:else}{c.brand?.name ?? '—'}{/if}
-		×
-		{#if c.seller?.code}<a href="{data.paths.sellers}/{encodeURIComponent(c.seller.code)}">{c.seller.name}</a>{:else}{c.seller?.name ?? '—'}{/if}
-		{#if c.seller?.handle}<span class="console-mono">{c.seller.handle}</span>{/if}
-		· 판매가 {money(c.product?.sale_price)}
-		{#if c.commission_rate !== null}· 수수료 {(c.commission_rate * 100).toFixed(0)}%{/if}
-		{#if c.auto}· 자동 제안{:else if c.invited}· 브랜드 제안{/if}
-	</p>
-	<p class="meta">
-		기간 {campaignPeriodLabel(c.start_date, c.end_date)}
-		{#if c.qty !== null}· 재고 {fmtNum(c.qty)}{/if}
-		{#if c.sold_qty}· 판매 {fmtNum(c.sold_qty)}{/if}
-		{#if c.product?.code}· <a href="{data.paths.products}/{encodeURIComponent(c.product.code)}">상품 상세</a>{/if}
-	</p>
-
-	<!-- 2. 흐름 스테퍼 -->
-	<ol class="admin-flow" aria-label="캠페인 진행 단계">
-		{#each steps as s (s.status)}
-			<li class={s.state} aria-current={s.state === 'current' ? 'step' : undefined}>{s.label}</li>
-		{/each}
-	</ol>
+<section class="card static console-det">
+	{#if p}
+		<ProductIcon thumbUrl={p.thumb_url} emoji={p.emoji ?? '📦'} size={52} />
+	{/if}
+	<div class="grow">
+		<div class="t">
+			{#if p?.code}
+				<a href="{data.paths.products}/{encodeURIComponent(p.code)}" class="camp-title-link">{p.name}</a>
+			{:else}
+				{p?.name ?? '—'}
+			{/if}
+			{#if c.code}<small>· {c.code.toUpperCase()}</small>{/if}
+		</div>
+		<div class="meta">
+			{#if c.brand}
+				<span class="chip brand">
+					{#if c.brand.code}
+						<a href="{data.paths.brands}/{encodeURIComponent(c.brand.code)}">{c.brand.name}</a>
+					{:else}
+						{c.brand.name}
+					{/if}
+				</span>
+			{/if}
+			×
+			{#if c.seller}
+				<span class="chip seller">
+					{#if c.seller.code}
+						<a href="{data.paths.sellers}/{encodeURIComponent(c.seller.code)}">
+							{#if c.seller.platform}
+								<PlatformHandle platform={c.seller.platform} handle={c.seller.handle} name={c.seller.name} />
+							{:else}
+								{c.seller.name} {c.seller.handle}
+							{/if}
+						</a>
+					{:else if c.seller.platform}
+						<PlatformHandle platform={c.seller.platform} handle={c.seller.handle} name={c.seller.name} />
+					{:else}
+						{c.seller.name} {c.seller.handle}
+					{/if}
+				</span>
+			{/if}
+			· 판매가 {money(p?.sale_price)}
+			{#if p?.consumer_price && p.sale_price !== null && p.consumer_price > p.sale_price}
+				<s class="camp-strike">{money(p.consumer_price)}</s>
+			{/if}
+			· 수수료 {pct(c.commission_rate)}
+			{#if c.start_date} · 기간 {campaignPeriodLabel(c.start_date, c.end_date)}{/if}
+			{#if c.auto} · 자동 제안{:else if c.invited} · 브랜드 제안{/if}
+			{#if c.qty !== null} · 재고 {fmtNum(c.qty)}{/if}
+			{#if c.sold_qty} · 판매 {fmtNum(c.sold_qty)}{/if}
+		</div>
+		<CampaignStepper status={c.status} />
+	</div>
+	<div class="admin-det-status">
+		<StatusChip tone={chip.tone}>{chip.label}</StatusChip>
+	</div>
 </section>
 
-<div class="admin-camp-2col">
-	<!-- 3. 스레드 -->
-	<section class="console-card">
-		<h4>스레드 <span class="meta">{c.events.length}건</span></h4>
-
-		{#if c.events.length === 0}
-			<p class="meta">아직 기록이 없습니다.</p>
-		{:else}
-			<ul class="admin-thread">
-				{#each c.events as e (e.id)}
-					{#if e.kind === 'system'}
-						<li class="sys"><span class="b">{e.body}</span> <span class="meta">{dt(e.created_at)}</span></li>
+<div class="console-det-body admin-det-body">
+	<section class="card static console-thread" aria-label="캠페인 스레드">
+		<div class="msgs">
+			{#each c.events as e (e.id)}
+				{#if e.kind === 'system'}
+					{#if e.leak_flag || e.event_type === 'leak_warned'}
+						<div class="warnline">⚠ {e.body} · {md(e.created_at)}</div>
 					{:else}
-						<li class="chat {e.sender}">
-							<span class="who">{senderLabel(e.sender, names)}</span>
-							<span class="b">{e.body}</span>
-							<span class="meta">
-								{dt(e.created_at)}
-								{#if e.leak_flag}· 연락처 공유 감지{/if}
-								{#if e.actor_role && e.actor_role !== e.sender}· 실제 발신 {e.actor_role}{/if}
-							</span>
-						</li>
+						<div class="sysline">{e.body} · {md(e.created_at)}</div>
 					{/if}
-				{/each}
-			</ul>
-		{/if}
-
-		<form method="POST" action="?/postChat" use:enhance class="admin-chat-form">
-			<label for="body" class="meta">셀러리 운영팀으로 발신 — 인플루언서·브랜드 모두에게 운영팀으로 표시됩니다</label>
-			<div class="row">
-				<input id="body" name="body" type="text" maxlength="1000" placeholder="메시지 입력… (승인·일정은 오른쪽 버튼으로)" required />
-				<button type="submit" class="pri sm">전송</button>
-			</div>
-			{#if form?.chatError}<p class="notice danger" role="alert">{form.chatError}</p>{/if}
-		</form>
+				{:else}
+					<div class="msg {e.sender}" class:leak={e.leak_flag}>
+						<div class="who">{senderLabel(e.sender, names)}</div>
+						{e.body}
+						<div class="tm">
+							{md(e.created_at)}
+							{#if e.leak_flag} · 연락처 공유 감지{/if}
+							{#if e.actor_role && e.actor_role !== e.sender} · 실제 발신 {e.actor_role}{/if}
+						</div>
+					</div>
+				{/if}
+			{:else}
+				<div class="sysline">대화가 없습니다</div>
+			{/each}
+		</div>
+		<ThreadComposer
+			action="?/postChat"
+			as="셀러리 운영팀"
+			placeholder="메시지 입력… (승인·일정은 오른쪽 버튼으로)"
+			error={form?.chatError ?? null}
+		/>
 	</section>
 
-	<div class="admin-camp-side">
-		<!-- 4. 브랜드 대행 액션 -->
+	<div class="console-actions">
 		{#if action.kind !== 'none'}
-			<section class="console-card">
-				<h4>{action.label} <span class="meta">브랜드 대행</span></h4>
-				<p class="meta">{action.hint}</p>
+			<div class="card static">
+				<h4>{action.label} <span class="chip brand">브랜드 대행</span></h4>
+				<p class="hint">{action.hint}</p>
 
 				{#if action.kind === 'approve_sample'}
 					{#if c.seller}
-						<p class="meta">
-							{c.seller.name} {c.seller.handle}
-							{#if c.seller.followers}· 팔로워 {fmtNum(c.seller.followers)}{/if}
-							{#if c.seller.grade}· 등급 {c.seller.grade}{/if}
+						<p class="hint">
+							{#if c.seller.platform}
+								<PlatformHandle platform={c.seller.platform} handle={c.seller.handle} name={c.seller.name} />
+							{:else}
+								{c.seller.name} {c.seller.handle}
+							{/if}
+							{#if c.seller.followers} · 팔로워 {fmtNum(c.seller.followers)}{/if}
+							{#if c.seller.grade} · 등급 {c.seller.grade}{/if}
 						</p>
 					{/if}
-					<div class="console-actions">
+					<div class="btnrow">
 						<form method="POST" action="?/approveSample" use:enhance>
 							<button type="submit" class="pri sm">승인</button>
 						</form>
-						<form method="POST" action="?/rejectSample" use:enhance class="admin-reason">
-							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" />
+						<form method="POST" action="?/rejectSample" use:enhance class="camp-reason">
+							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" aria-label="거절 사유" />
 							<button type="submit" class="ghost sm">거절</button>
 						</form>
 					</div>
 				{:else if action.kind === 'ship_sample'}
-					<form method="POST" action="?/shipSample" use:enhance class="admin-ship">
-						<label for="courier" class="meta">택배사</label>
+					<form method="POST" action="?/shipSample" use:enhance class="camp-ship console-form">
+						<label for="courier">택배사</label>
 						<select id="courier" name="courier" required>
 							{#each COURIERS as k (k)}<option value={k}>{k}</option>{/each}
 						</select>
-						<label for="tracking_no" class="meta">운송장 번호</label>
-						<input id="tracking_no" name="tracking_no" type="text" maxlength="30" required />
+						<label for="tracking_no">운송장 번호</label>
+						<input id="tracking_no" name="tracking_no" type="text" maxlength="30" required placeholder="예: 6890-1234-5678" />
 						<button type="submit" class="pri sm">발송 등록</button>
 					</form>
 					{#if form?.shipError}<p class="notice danger" role="alert">{form.shipError}</p>{/if}
 				{:else if action.kind === 'confirm_schedule'}
-					<p class="meta">제안된 기간 {campaignPeriodLabel(c.start_date, c.end_date)}{#if c.qty !== null} · 재고 {fmtNum(c.qty)}{/if}</p>
-					<div class="console-actions">
+					<p class="hint">
+						제안된 기간 <b>{campaignPeriodLabel(c.start_date, c.end_date)}</b>
+						{#if c.qty !== null} · 재고 {fmtNum(c.qty)}{/if}
+					</p>
+					<div class="btnrow">
 						<form method="POST" action="?/confirmSchedule" use:enhance>
 							<button type="submit" class="pri sm">일정 확정</button>
 						</form>
-						<form method="POST" action="?/rejectSchedule" use:enhance class="admin-reason">
-							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" />
+						<form method="POST" action="?/rejectSchedule" use:enhance class="camp-reason">
+							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" aria-label="거절 사유" />
 							<button type="submit" class="ghost sm">거절</button>
 						</form>
 					</div>
 				{/if}
-			</section>
+			</div>
+		{:else}
+			<div class="card static">
+				<h4>지금 할 일 없음</h4>
+				<p class="hint">
+					이 단계에서는 브랜드 대행 액션이 없습니다. 인플루언서 차례(수령·일정 제안)이거나 이미 끝난 단계입니다.
+				</p>
+			</div>
 		{/if}
 
-		<!-- 정산 미리보기 -->
-		<section class="console-card">
+		<div class="card static">
 			<h4>정산 미리보기</h4>
-			{#if !data.campaign.preview}
-				<p class="meta">판매가 시작되면 계산됩니다.</p>
+			{#if !c.preview}
+				<p class="hint">판매가 시작되면 계산됩니다.</p>
 			{:else}
-				{@const p = data.campaign.preview}
-				<table class="admin-settle-preview">
+				{@const prev = c.preview}
+				<table class="camp-stmt">
 					<tbody>
-						<tr><th>결제 {fmtNum(p.paid_count)}건</th><td class="num">{money(p.gross)}</td></tr>
-						<tr><th>환불 {fmtNum(p.refund_count)}건</th><td class="num">−{money(p.refunds)}</td></tr>
-						<tr class="sum"><th>확정 매출</th><td class="num">{money(p.net)}</td></tr>
-						<tr><th>PG {(p.pg_rate * 100).toFixed(1)}%</th><td class="num">−{money(p.pg_fee)}</td></tr>
-						<tr><th>인플루언서 {(p.seller_rate * 100).toFixed(0)}%</th><td class="num">−{money(p.seller_fee)}</td></tr>
-						<tr><th>플랫폼 {(p.platform_rate * 100).toFixed(0)}%</th><td class="num">−{money(p.platform_fee_gross)}</td></tr>
-						<tr class="sum"><th>브랜드 정산액</th><td class="num">{money(p.brand_payout)}</td></tr>
-						<tr><th>인플루언서 실수령</th><td class="num">{money(p.seller_payout)}</td></tr>
+						<tr><td>결제 {fmtNum(prev.paid_count)}건</td><td class="num">{money(prev.gross)}</td></tr>
+						<tr><td>환불 {fmtNum(prev.refund_count)}건</td><td class="num">−{money(prev.refunds)}</td></tr>
+						<tr class="tot"><td><b>확정 매출</b></td><td class="num"><b>{money(prev.net)}</b></td></tr>
+						<tr><td>PG {(prev.pg_rate * 100).toFixed(1)}%</td><td class="num">−{money(prev.pg_fee)}</td></tr>
+						<tr><td>인플루언서 {(prev.seller_rate * 100).toFixed(0)}%</td><td class="num">−{money(prev.seller_fee)}</td></tr>
+						<tr><td>플랫폼 {(prev.platform_rate * 100).toFixed(0)}%</td><td class="num">−{money(prev.platform_fee_gross)}</td></tr>
+						<tr class="tot"><td>브랜드 정산액</td><td class="num">{money(prev.brand_payout)}</td></tr>
+						<tr><td>인플루언서 실수령</td><td class="num">{money(prev.seller_payout)}</td></tr>
 					</tbody>
 				</table>
-				<p class="meta">
-					{#if p.due_on}지급 기준일 {p.due_on}{/if}
-					{#if p.eligible}· 정산 실행 가능{/if}
-					· <a href={data.paths.settle}>정산 화면</a>
+				<p class="hint" style="margin-top:10px">
+					{#if prev.due_on}지급 기준일 <b>{prev.due_on}</b>{/if}
+					{#if prev.eligible} · 정산 실행 가능{/if}
+					· <a href={data.paths.settle}>정산 화면 →</a>
 				</p>
 			{/if}
-		</section>
+		</div>
+
+		{#if p?.code}
+			<div class="card static">
+				<h4>상품</h4>
+				<p class="hint">검수·노출·판매 실적은 상품 상세에서 봅니다.</p>
+				<a href="{data.paths.products}/{encodeURIComponent(p.code)}" class="btn ghost sm">상품 상세 →</a>
+			</div>
+		{/if}
 	</div>
 </div>
 
 <style>
-	/* 흐름 스테퍼 — 데모 FLOW 띠 */
-	.admin-flow {
-		list-style: none;
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-		margin: 12px 0 0;
-		padding: 0;
+	.camp-back {
+		margin: 0 3px 12px;
 	}
-	.admin-flow li {
-		border: 1.5px solid var(--color-line);
-		padding: 3px 8px;
-		font-size: 0.78rem;
-		opacity: 0.45;
+	.camp-title-link {
+		text-decoration: none;
+		color: inherit;
 	}
-	.admin-flow li.done {
-		opacity: 1;
+	.camp-title-link:hover {
+		text-decoration: underline;
 	}
-	.admin-flow li.current {
-		opacity: 1;
-		font-weight: 700;
-		border-width: 2px;
+	.camp-strike {
+		opacity: 0.55;
+		margin: 0 2px;
 	}
-
-	.admin-camp-2col {
-		display: grid;
-		grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
-		gap: 10px;
-		margin-top: 10px;
+	.chip a {
+		color: inherit;
+		text-decoration: none;
 	}
-	@media (max-width: 860px) {
-		.admin-camp-2col {
-			grid-template-columns: 1fr;
-		}
+	.chip a:hover {
+		text-decoration: underline;
 	}
-	.admin-camp-side {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-	}
-
-	.admin-thread {
-		list-style: none;
-		margin: 0 0 12px;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.admin-thread .sys {
-		text-align: center;
-		font-size: 0.82rem;
-	}
-	.admin-thread .chat {
-		border: 1.5px solid var(--color-line);
-		padding: 8px 10px;
-	}
-	/* 운영팀 발신은 눈에 띄게 — 당사자 대화와 섞이면 누가 말했는지 헷갈린다 */
-	.admin-thread .chat.admin {
-		border-width: 2px;
-	}
-	.admin-thread .who {
-		display: block;
-		font-weight: 700;
-		font-size: 0.8rem;
-	}
-	.admin-thread .b {
-		display: block;
-	}
-
-	.admin-chat-form .row {
+	.camp-reason {
 		display: flex;
 		gap: 6px;
-		margin-top: 4px;
+		flex-wrap: wrap;
+		align-items: center;
+		margin: 0;
 	}
-	.admin-chat-form input {
-		flex: 1;
+	.camp-reason input {
+		flex: 1 1 140px;
 		min-width: 0;
 	}
-
-	.admin-reason {
-		display: flex;
+	.camp-ship {
+		display: grid;
 		gap: 6px;
 	}
-	.admin-ship {
-		display: grid;
-		gap: 4px;
-	}
-
-	.admin-settle-preview {
+	.camp-stmt {
 		width: 100%;
 		border-collapse: collapse;
+		font-size: 12.5px;
 	}
-	.admin-settle-preview th {
-		text-align: left;
-		font-weight: 400;
+	.camp-stmt td {
 		padding: 5px 0;
 	}
-	.admin-settle-preview td {
-		padding: 5px 0;
+	.camp-stmt tr + tr td {
+		border-top: 1px solid var(--color-soft-line);
 	}
-	.admin-settle-preview tr + tr th,
-	.admin-settle-preview tr + tr td {
-		border-top: 1px solid var(--color-line);
-	}
-	.admin-settle-preview .sum th,
-	.admin-settle-preview .sum td {
+	.camp-stmt .tot td {
 		font-weight: 700;
+	}
+	.console-actions form {
+		margin: 0;
 	}
 </style>
