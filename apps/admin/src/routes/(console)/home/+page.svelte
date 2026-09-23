@@ -23,6 +23,9 @@
 		const qs = p.toString();
 		return qs ? `${homePath}?${qs}` : homePath;
 	};
+	/** 캠페인 상세 — 데모가 행 클릭 시 열던 화면(스레드 · 브랜드 대행 액션 · 정산 미리보기) */
+	const campaignHref = (code: string | null) =>
+		code ? `${data.paths.campaigns}/${encodeURIComponent(code)}` : data.paths.products;
 	const productHref = (code: string | null) =>
 		code ? `${data.paths.products}/${encodeURIComponent(code)}` : data.paths.products;
 	const sellerHref = (code: string | null) =>
@@ -134,7 +137,7 @@
 		<div class="lbl-sm home-feed-hd">최근 활동</div>
 		{#each data.activity as x (x.id)}
 			<a
-				href={x.product_code ? productHref(x.product_code) : data.paths.products}
+				href={x.campaign_code ? campaignHref(x.campaign_code) : productHref(x.product_code)}
 				class="home-news-item"
 			>
 				<span class="home-nb">{md(x.created_at)}</span>
@@ -190,18 +193,18 @@
 		<tbody>
 			{#each data.campaigns as c (c.id)}
 				{@const chip = campaignStatusChip(c.status)}
-				{@const href = productHref(c.product_code)}
+				{@const href = campaignHref(c.code)}
 				<tr
 					class="clickable"
 					onclick={rowClick(href)}
 					onkeydown={rowKey(href)}
 					tabindex="0"
 					role="link"
-					aria-label="{c.product_name ?? c.code ?? '캠페인'} 상품 상세"
+					aria-label="{c.product_name ?? c.code ?? '캠페인'} 캠페인 상세"
 				>
 					<td class="nm" data-l="캠페인">
 						<span class="home-camp-cell">
-							<ProductIcon emoji="📦" thumbUrl={null} size={22} />
+							<ProductIcon emoji={c.product_emoji ?? '📦'} thumbUrl={c.product_thumb_url} size={22} />
 							<span>
 								<a href={href}><b>{c.product_name ?? '—'}</b></a>
 								<span class="home-camp-meta">

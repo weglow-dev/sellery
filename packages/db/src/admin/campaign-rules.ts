@@ -99,3 +99,71 @@ export function campaignPeriodLabel(start: string | null, end: string | null): s
   };
   return `${md(start)}–${md(end)}`;
 }
+
+/* ---------------------------------------------------------------- 흐름 스테퍼 ---------------------------------------------------------------- */
+
+/**
+ * 데모 `FLOW` · `FLOW_L`(`packages/core/src/constants.ts`) 이식 — 캠페인 상세 상단의 9단계 띠.
+ * 종결 상태(DECLINED · REJECTED · PASSED)는 흐름에서 벗어난 것이라 단계가 없다.
+ */
+export const CAMPAIGN_FLOW_STEPS = [
+  { status: "SAMPLE_REQUESTED", label: "샘플요청" },
+  { status: "SAMPLE_APPROVED", label: "샘플승인" },
+  { status: "SAMPLE_SHIPPED", label: "배송" },
+  { status: "TESTING", label: "테스트" },
+  { status: "SCHEDULE_PROPOSED", label: "일정제안" },
+  { status: "SCHEDULE_CONFIRMED", label: "일정확정" },
+  { status: "LIVE", label: "판매 LIVE" },
+  { status: "CLEARING", label: "환불기간" },
+  { status: "SETTLED", label: "정산" },
+] as const;
+
+/**
+ * 현재 상태를 흐름 위에 놓는다. `INVITED`(브랜드 제안)·`SAMPLE_PURCHASED`(샘플 구매)는 흐름 목록에 없지만
+ * 각각 샘플요청·샘플승인 자리에 해당하므로 그 단계로 접어 보여준다(데모 스테퍼와 같은 위치).
+ */
+export function campaignFlowSteps(status: string): { status: string; label: string; state: "done" | "current" | "todo" }[] {
+  const folded = status === "INVITED" ? "SAMPLE_REQUESTED" : status === "SAMPLE_PURCHASED" ? "SAMPLE_APPROVED" : status;
+  const at = CAMPAIGN_FLOW_STEPS.findIndex((s) => s.status === folded);
+  return CAMPAIGN_FLOW_STEPS.map((s, i) => ({
+    status: s.status,
+    label: s.label,
+    // 흐름을 벗어난 상태(거절·패스)는 at === -1 이라 전부 todo 로 둔다 — 진행한 척하지 않는다
+    state: at < 0 ? "todo" : i < at ? "done" : i === at ? "current" : "todo",
+  }));
+}
+
+/* ---------------------------------------------------------------- 관리자 대행 액션 ---------------------------------------------------------------- */
+
+export const REJECT_REASON_MAX = 200;
+
+export type AdminCampaignActionKind = "approve_sample" | "ship_sample" | "confirm_schedule" | "none";
+
+/**
+ * 관리자가 **브랜드를 대신해** 할 수 있는 일. 데모 캠페인 상세의 "브랜드 액션" 칸과 같은 분기다.
+ * 브랜드가 응답하지 않아 흐름이 멈출 때 운영이 대신 진행시키는 용도이고, 쓰기는 브랜드 RPC
+ * (`app_brand_*`)를 그대로 부른다 — 상태 전이·이벤트 문구를 두 번 구현하지 않는다.
+ *
+ * 인플루언서 차례(샘플 배송중 · 테스트 중)나 이미 끝난 단계에는 아무 것도 주지 않는다 —
+ * 관리자가 인플루언서를 대행하지는 않는다(샘플 수령·일정 제안은 본인만).
+ */
+export function adminCampaignAction(status: string): { kind: AdminCampaignActionKind; label: string; hint: string } {
+  switch (status) {
+    case "SAMPLE_REQUESTED":
+    case "INVITED":
+      return { kind: "approve_sample", label: "샘플 요청 검토", hint: "승인 시 배송지가 브랜드에 전달됩니다" };
+    case "SAMPLE_APPROVED":
+    case "SAMPLE_PURCHASED":
+      return { kind: "ship_sample", label: "샘플 발송 등록", hint: "택배사 · 운송장 번호를 넣으면 인플루언서에게 전달됩니다" };
+    case "SCHEDULE_PROPOSED":
+      return { kind: "confirm_schedule", label: "판매 일정 승인", hint: "확정하면 판매 링크가 만들어집니다" };
+    default:
+      return { kind: "none", label: "", hint: "" };
+  }
+}
+
+/** 반려·거절 사유 — 공백 정리 후 200자. 비면 null(브랜드 RPC 와 같은 규칙) */
+export function normalizeRejectReason(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").replace(/\s+/g, " ").trim().slice(0, REJECT_REASON_MAX);
+  return v === "" ? null : v;
+}

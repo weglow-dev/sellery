@@ -75,8 +75,11 @@ export type AdminDashboardCampaign = {
   code: string | null;
   status: string;
   product_name: string | null;
-  /** 상품 코드 — 화면이 상품 상세로 보낸다(관리자에 캠페인 상세 화면은 없다) */
+  /** 상품 코드 — 행 클릭·링크로 캠페인/상품 상세에 쓴다 */
   product_code: string | null;
+  /** 목록 아이콘 — 데모 PIcon 과 같이 썸네일·이모지 */
+  product_thumb_url: string | null;
+  product_emoji: string | null;
   seller_name: string | null;
   seller_handle: string | null;
   seller_code: string | null;
@@ -141,7 +144,13 @@ type CampRow = {
   invited: boolean | null;
   auto_proposed: boolean | null;
   created_at: string | null;
-  products: { code: string | null; name: string; brands: { code: string | null; name: string } | null } | null;
+  products: {
+    code: string | null;
+    name: string;
+    emoji: string | null;
+    thumb_url: string | null;
+    brands: { code: string | null; name: string } | null;
+  } | null;
   sellers: { code: string | null; name: string; handle: string; platform: string | null } | null;
 };
 
@@ -167,7 +176,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
     admin
       .from("campaigns")
       .select(
-        "id, code, status, start_date, end_date, invited, auto_proposed, created_at, products(code, name, brands(code, name)), sellers(code, name, handle, platform)"
+        "id, code, status, start_date, end_date, invited, auto_proposed, created_at, products(code, name, emoji, thumb_url, brands(code, name)), sellers(code, name, handle, platform)"
       )
       .order("created_at", { ascending: false }),
     count(admin.from("campaigns").select("id", head), "캠페인 수"),
@@ -206,6 +215,8 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       status: c.status,
       product_name: c.products?.name ?? null,
       product_code: c.products?.code ?? null,
+      product_thumb_url: c.products?.thumb_url ?? null,
+      product_emoji: c.products?.emoji ?? null,
       seller_name: c.sellers?.name ?? null,
       seller_handle: c.sellers?.handle ?? null,
       seller_code: c.sellers?.code ?? null,

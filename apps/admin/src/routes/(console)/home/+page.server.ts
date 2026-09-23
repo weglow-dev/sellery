@@ -49,7 +49,8 @@ export const load: PageServerLoad = async (event) => {
 			products: adminPath('/products'),
 			settle: adminPath('/settle'),
 			payments: adminPath('/payments'),
-			orders: adminPath('/orders')
+			orders: adminPath('/orders'),
+			campaigns: adminPath('/campaigns')
 		}
 	};
 };

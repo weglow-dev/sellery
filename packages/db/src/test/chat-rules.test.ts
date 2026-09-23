@@ -1,6 +1,6 @@
 // 캠페인 스레드 채팅 규칙 — packages/db/src/partner/chat-rules.ts (프로토타입 helpers.ts pushChat · 0016 app_campaign_chat / campaign_leak_detected)
 import { describe, expect, it } from "vitest";
-import { CHAT_MAX, LEAK_RE, chatFailMessage, detectLeak, isMine, normalizeChatBody, parseChatInput, parseChatResult, senderLabel } from "../partner/chat-rules";
+import { CHAT_MAX, LEAK_RE, chatFailMessage, detectLeak, isMine, isOfficialSender, normalizeChatBody, parseChatInput, parseChatResult, senderLabel } from "../partner/chat-rules";
 
 describe("LEAK_RE · detectLeak — 프로토타입 pushChat 정규식 그대로 (0016 campaign_leak_detected 와 같은 케이스)", () => {
   it.each([
@@ -82,8 +82,16 @@ describe("senderLabel · isMine (프로토타입 L3564)", () => {
     expect(senderLabel("seller", { seller: "지유" })).toBe("지유");
     expect(senderLabel("seller")).toBe("인플루언서");
     expect(senderLabel("brand", { brand: "바인허브" })).toBe("바인허브");
-    expect(senderLabel("admin")).toBe("셀러리 운영팀");
+    // 관리자 발신은 브랜드로 위장하지 않는다 — 운영 결정(2026-09-23)
+    expect(senderLabel("admin")).toBe("셀러리 관리자");
+    expect(senderLabel("admin", { brand: "바인허브" })).toBe("셀러리 관리자");
     expect(senderLabel("system")).toBe("시스템");
+  });
+  it("셀러리 공식 발신 — 인증 배지 자리", () => {
+    expect(isOfficialSender("admin")).toBe(true);
+    expect(isOfficialSender("brand")).toBe(false);
+    expect(isOfficialSender("seller")).toBe(false);
+    expect(isOfficialSender("system")).toBe(false);
   });
   it("내 말풍선", () => {
     expect(isMine("seller", "seller")).toBe(true);
