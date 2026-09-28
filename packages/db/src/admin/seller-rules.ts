@@ -8,7 +8,7 @@
  * 마이그레이션 없음 — 컬럼이 전부 있다: `sellers.active`(정지) · `sellers.hidden`(프로필 비공개, 0001) ·
  * `seller_channels.verified` · `vcode` · `vcode_confirmed_at`(0001 · 0010). 쓰기는 service role 의 `.update()`.
  *
- *   SELLER_FILTERS · parseSellerFilter — 목록 필터(전체 · 정지 · 비공개 · 인증 대기)
+ *   SELLER_FILTERS · parseSellerFilter — 목록 필터(전체 · 활동 중 · 정지 · 비공개 · 인증 대기 · 정산정보 미등록)
  *   sellerStatusChip · channelStatusChip — 상태 칩 문구·색
  *   accountLinkLabel — `user_id` 연결 여부 문구
  *   channelPendingSince · isChannelPending — "인증 확인" 누른 채널 판정(verified=false and vcode_confirmed_at is not null)
@@ -21,7 +21,7 @@ import { GRADES } from "@sellery/core/constants";
 import type { StatusTone } from "../order-status";
 
 /** 목록 상단 필터 — 스크립트의 `--inactive` 를 넓힌 것. `all` 은 정지·비공개까지 전부 */
-export const SELLER_FILTERS = ["all", "active", "suspended", "hidden", "pending_channel"] as const;
+export const SELLER_FILTERS = ["all", "active", "suspended", "hidden", "pending_channel", "no_settle_info"] as const;
 export type SellerFilter = (typeof SELLER_FILTERS)[number];
 
 export const SELLER_FILTER_LABELS: Record<SellerFilter, string> = {
@@ -30,6 +30,7 @@ export const SELLER_FILTER_LABELS: Record<SellerFilter, string> = {
   suspended: "정지",
   hidden: "비공개",
   pending_channel: "채널 인증 대기",
+  no_settle_info: "정산정보 미등록",
 };
 
 export function parseSellerFilter(raw: string | null | undefined): SellerFilter {

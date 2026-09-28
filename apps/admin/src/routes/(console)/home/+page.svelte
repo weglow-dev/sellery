@@ -58,24 +58,27 @@
 			href: data.paths.settle
 		},
 		{
-			n: data.todo.exclusivePending,
-			label: '독점권 신청 대기',
-			href: data.paths.products
-		},
-		{
 			n: data.todo.unshippedOrders,
 			label: '미발송 주문',
-			href: data.paths.orders
+			// 관리자는 발송을 대신하지 않는다(운송장은 브랜드가 넣는다) — 목록을 보고 독촉하는 용도라 필터까지 걸어 보낸다
+			href: `${data.paths.orders}?f=unshipped`
 		},
 		{
 			n: data.todo.channelsAwaitingApproval,
 			label: '채널 인증 대기',
 			href: `${data.paths.sellers}?filter=pending_channel`
 		},
+		// 계좌는 브랜드·인플루언서가 직접 넣는다(관리자 입력 경로 없음) — 정산 전에 독촉할 대상이다.
+		// 합치지 않고 나눈다: 링크는 한 곳으로만 갈 수 있어 합치면 도착해서 0건인 일이 생긴다
 		{
-			n: data.todo.noSettleInfoAccounts,
-			label: '정산정보 미등록 계정',
+			n: data.todo.noSettleInfoBrands,
+			label: '브랜드 정산정보 미등록 (독촉)',
 			href: `${data.paths.brands}?filter=no_settle_info`
+		},
+		{
+			n: data.todo.noSettleInfoSellers,
+			label: '인플루언서 정산정보 미등록 (독촉)',
+			href: `${data.paths.sellers}?filter=no_settle_info`
 		},
 		{
 			n: data.autoMatchCandidates,

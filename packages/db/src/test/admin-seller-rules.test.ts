@@ -30,6 +30,10 @@ describe("parseSellerFilter", () => {
   it("필터마다 라벨이 있다", () => {
     for (const f of SELLER_FILTERS) expect(SELLER_FILTER_LABELS[f]).toBeTruthy();
   });
+  it("정산정보 미등록 필터가 있다 — 홈 '오늘 할 일' 이 여기로 보낸다", () => {
+    expect(parseSellerFilter("no_settle_info")).toBe("no_settle_info");
+    expect(SELLER_FILTER_LABELS.no_settle_info).toBe("정산정보 미등록");
+  });
 });
 
 describe("sellerStatusChip — 정지가 비공개보다 우선", () => {

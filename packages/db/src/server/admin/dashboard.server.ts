@@ -121,14 +121,26 @@ export type AdminDashboard = {
   };
   todo: {
     pendingProducts: number;
+    /**
+     * 독점권 신청 대기(`exclusive_requests.status='PENDING'`) — **참고용 숫자다.**
+     * 승인은 브랜드가 한다(데모 `approveExcl` 은 브랜드 화면에서 호출된다). 게다가 실서비스에는
+     * 신청·승인 경로가 아직 없다 — 인플루언서·브랜드 콘솔은 오퍼(`products.exclusive_grade`·`exclusive_label`)만
+     * 보여주고 `exclusive_requests` 에 쓰는 코드가 어디에도 없다(지금 값은 시드 1건).
+     * 그래서 관리자 홈의 "오늘 할 일" 에는 넣지 않는다 — 관리자가 처리할 수 없는 일은 할 일이 아니다.
+     */
     exclusivePending: number;
     unshippedOrders: number;
     /** 인증 코드까지 넣고 승인만 기다리는 채널 — 실제로 관리자가 누를 것이 있는 건 */
     channelsAwaitingApproval: number;
     /** 아직 인증되지 않은 채널 전부(데모 "미인증 채널" 과 같은 기준 — 코드 입력 전도 포함) */
     channelsUnverified: number;
-    /** 정산 정보(계좌) 없는 계정 — 데모와 같이 브랜드 + 인플루언서 합 */
-    noSettleInfoAccounts: number;
+    /**
+     * 정산 정보(계좌) 없는 계정 — 데모는 브랜드 + 인플루언서를 **합해서** 한 줄로 보여줬다.
+     * 관리자 홈은 **나눠서** 보여준다 — 합치면 링크를 한 곳으로만 보낼 수 있고, 도착해서 0건인 일이 생긴다
+     * (로컬 시드가 실제로 그랬다: 5건 전부 인플루언서인데 브랜드 목록으로 보냈다).
+     */
+    noSettleInfoBrands: number;
+    noSettleInfoSellers: number;
   };
   campaigns: AdminDashboardCampaign[];
   /** 상태별 캠페인 수 — 0 인 상태는 넣지 않는다(데모 `stCounts` 와 같다) */
@@ -279,7 +291,8 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       unshippedOrders,
       channelsAwaitingApproval: awaitingApproval,
       channelsUnverified: unverified,
-      noSettleInfoAccounts: brandsNoBank + sellersNoBank,
+      noSettleInfoBrands: brandsNoBank,
+      noSettleInfoSellers: sellersNoBank,
     },
     campaigns,
     statusCounts: [...statusMap.entries()].map(([status, n]) => ({ status, n })),

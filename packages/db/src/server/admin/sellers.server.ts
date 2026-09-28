@@ -90,7 +90,7 @@ export type AdminPendingChannel = AdminChannelRow & {
 
 export type AdminSellerList = {
   rows: AdminSellerRow[];
-  counts: { all: number; suspended: number; hidden: number; pendingChannel: number };
+  counts: { all: number; suspended: number; hidden: number; pendingChannel: number; noSettleInfo: number };
   /** 등급명 → 명수 (등급 필터 칩) */
   grades: Record<string, number>;
 };
@@ -157,7 +157,7 @@ export async function listSellers(
   const { filter = "all", grade = null, q = null, limit = 500 } = opts;
   const empty: AdminSellerList = {
     rows: [],
-    counts: { all: 0, suspended: 0, hidden: 0, pendingChannel: 0 },
+    counts: { all: 0, suspended: 0, hidden: 0, pendingChannel: 0, noSettleInfo: 0 },
     grades: {},
   };
 
@@ -165,7 +165,8 @@ export async function listSellers(
     admin.from("seller_channels").select("seller_id, verified, vcode_confirmed_at"),
     admin.from("campaigns").select("seller_id, status"),
     celeryBalances(admin),
-    admin.from("sellers").select("grade, active, hidden"),
+    // `bank_info` 는 **원문을 쓰지 않는다** — null 여부만 본다(계좌 원문은 이체 파일 경로만 · 계획서 M6)
+    admin.from("sellers").select("grade, active, hidden, bank_info"),
   ]);
   if (channels.error || campaigns.error || allRows.error) {
     console.error(
@@ -200,6 +201,8 @@ export async function listSellers(
     suspended: (allRows.data ?? []).filter((r) => !r.active).length,
     hidden: (allRows.data ?? []).filter((r) => r.hidden).length,
     pendingChannel: pendingSellerIds.length,
+    // 계좌 미등록 — 정산 지급이 막히는 대상(`admin_payout_hold_reason` 과 같은 기준). 원문은 읽지 않고 유무만 본다
+    noSettleInfo: (allRows.data ?? []).filter((r) => r.bank_info === null).length,
   };
   const grades: Record<string, number> = {};
   for (const r of allRows.data ?? []) {
@@ -211,6 +214,9 @@ export async function listSellers(
   if (filter === "active") sel = sel.eq("active", true).eq("hidden", false);
   if (filter === "suspended") sel = sel.eq("active", false);
   if (filter === "hidden") sel = sel.eq("hidden", true);
+  if (filter === "no_settle_info") {
+    sel = sel.is("bank_info", null);
+  }
   if (filter === "pending_channel") {
     if (pendingSellerIds.length === 0) sel = sel.eq("id", "00000000-0000-0000-0000-000000000000");
     else sel = sel.in("id", pendingSellerIds);
