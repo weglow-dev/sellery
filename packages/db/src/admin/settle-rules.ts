@@ -127,6 +127,10 @@ export type Settlement = {
   wht: number;
   sampleRefundCel: number;
   sampleRefundCash: number;
+  /** 환급 재원 — 브랜드가 반환하는 몫 · 플랫폼이 포기하는 수수료 · 회수 불가(플랫폼 부담) 카드 수수료 (0023) */
+  sampleRefundBrand: number;
+  sampleRefundPlatform: number;
+  sampleRefundPg: number;
   sampleCelCover: number;
   brandPay: number;
   /** 인플루언서 실수령 = sfTotal − wht + 샘플 환급 현금 */
@@ -168,12 +172,29 @@ export function calcSettlement(input: SettlementInput): Settlement {
   const bDisc = net * brandDiscRate;
   const pfGross = net * platformRate;
   const costs = gBonus + boost + refReward + bBoost + bReward + bDisc;
-  const pf = pfGross - costs;
+  let pf = pfGross - costs;
+  let brandPay = net - pg - sf - pfGross + bBoost + bDisc;
+
+  /**
+   * 샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28).
+   * 인플루언서에게는 낸 현금 전액(`sampleRefundCash`)을 돌려주고, 그 재원은 **지급 전에** 브랜드 몫과
+   * 플랫폼 수수료에서 뺀다. 차감액은 환급액이 각자 몫에 기여한 만큼이다(위 식에 net 대신 환급액을 대입한 것).
+   * 카드 수수료(PG)와 추천인 보상(`bReward`)은 회수할 수 없어 플랫폼이 안는다.
+   * `payouts.amount >= 0`(0004)을 지키려고 브랜드 몫은 0 에서 멈춘다.
+   */
+  const refundPg = sampleRefundCash * pgRate;
+  const refundPlatform = sampleRefundCash * platformRate - (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) - sampleRefundCash * brandDiscRate;
+  const refundBrand =
+    sampleRefundCash - refundPg - sampleRefundCash * platformRate + (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) + sampleRefundCash * brandDiscRate;
+  if (sampleRefundCash > 0) {
+    brandPay = Math.max(brandPay - refundBrand, 0);
+    pf = pf - refundPlatform;
+  }
+
   const vat = pf > 0 ? pf - pf / 1.1 : 0;
   const pfNet = pf - vat;
   const sfTotal = sf + gBonus + boost;
   const wht = sfTotal * whtRate;
-  const brandPay = net - pg - sf - pfGross + bBoost + bDisc;
   const sellerPayout = sfTotal - wht + sampleRefundCash;
   const platformPg = pfGross - bBoost - bDisc + pg;
   const r = Math.round;
@@ -202,6 +223,9 @@ export function calcSettlement(input: SettlementInput): Settlement {
     sampleRefundCash: r(sampleRefundCash),
     sampleCelCover: Math.max(0, Math.round(n(input.sampleCel))) * sampleCelWon,
     brandPay: r(brandPay),
+    sampleRefundBrand: r(refundBrand),
+    sampleRefundPlatform: r(refundPlatform),
+    sampleRefundPg: r(refundPg),
     sellerPayout: r(sellerPayout),
     platformPg: r(platformPg),
   };
@@ -353,6 +377,10 @@ export type SettlePreview = {
   seller_wht: number;
   sample_refund_cel: number;
   sample_refund_cash: number;
+  /** 환급 재원 내역 (0023) — 브랜드 반환 · 플랫폼 포기 수수료 · 회수 불가 카드 수수료(플랫폼 부담) */
+  sample_refund_brand: number;
+  sample_refund_platform: number;
+  sample_refund_pg: number;
   sample_cel_cover: number;
   brand_payout: number;
   seller_payout: number;
@@ -448,6 +476,9 @@ export function parseSettlePreview(raw: unknown): SettlePreview | null {
     seller_wht: num(o.seller_wht),
     sample_refund_cel: num(o.sample_refund_cel),
     sample_refund_cash: num(o.sample_refund_cash),
+    sample_refund_brand: num(o.sample_refund_brand),
+    sample_refund_platform: num(o.sample_refund_platform),
+    sample_refund_pg: num(o.sample_refund_pg),
     sample_cel_cover: num(o.sample_cel_cover),
     brand_payout: num(o.brand_payout),
     seller_payout: num(o.seller_payout),

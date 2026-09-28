@@ -121,6 +121,7 @@
 							<tr class="tot"><td>브랜드 지급 <small>순매출 − PG − 인플루언서 수수료 − 플랫폼 수수료 + 할인</small></td><td class="num" style="color:var(--color-plat)">{money(p.brand_payout)}</td></tr>
 							<tr><td>원천징수 <small>{p.seller?.settle_type === 'biz' ? '사업자 · 세금계산서 (0%)' : `개인 ${pct(p.wht_rate)}`}</small></td><td class="num">−{money(p.seller_wht)}</td></tr>
 							{#if p.sample_refund_cash || p.sample_refund_cel}<tr><td>샘플 환급 <small>상품 환급 옵션 · 🥬{p.sample_refund_cel} 는 원장 복원 · 현금은 지급액 가산</small></td><td class="num">+{money(p.sample_refund_cash)}</td></tr>{/if}
+							{#if p.sample_refund_cash}<tr><td class="in">└ 환급 재원 <small>브랜드 몫·플랫폼 수수료에서 차감 · 카드 수수료와 추천인 보상은 플랫폼 부담 (0023)</small></td><td class="num">브랜드 −{money(p.sample_refund_brand)} · 플랫폼 −{money(p.sample_refund_platform)} · 카드 {money(p.sample_refund_pg)}</td></tr>{/if}
 							<tr class="tot"><td>인플루언서 지급 (실수령)</td><td class="num" style="color:var(--color-seller)">{money(p.seller_payout)}</td></tr>
 							{#if p.sample_cel_cover}<tr><td>🥬 결제분 브랜드 원화 보전 <small>플랫폼 비용</small></td><td class="num">{money(p.sample_cel_cover)}</td></tr>{/if}
 						</tbody>
