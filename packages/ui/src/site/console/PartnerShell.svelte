@@ -44,7 +44,8 @@
 		admin: [
 			// 캠페인 상세는 홈 대시보드의 전체 캠페인 표 · 최근 활동에서 들어온다(탭이 따로 없다)
 			{ href: '/home', label: '홈', icon: 'home', match: ['/campaigns'] },
-			{ href: '/sellers', label: '인플루언서', icon: 'user' },
+			// 매칭·자동 제안은 "어느 인플루언서에게 제안하나" 를 보는 화면이라 인플루언서 탭에 묶는다
+			{ href: '/sellers', label: '인플루언서', icon: 'user', match: ['/match'] },
 			{ href: '/brands', label: '브랜드', icon: 'flag' },
 			{ href: '/products', label: '상품', icon: 'box' },
 			// 정산 탭 안의 화면 칩(`apps/admin/src/lib/money-nav.ts`)이 가는 곳 — 그 화면에서도 탭이 켜져야 한다

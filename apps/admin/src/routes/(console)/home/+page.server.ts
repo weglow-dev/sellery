@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { adminPath, requireAdmin } from '$lib/server/admin';
-import { getAdminDashboard, listRecentActivity } from '$lib/server/partners';
+import { getAdminDashboard, getAdminMatch, listRecentActivity } from '$lib/server/partners';
 import { getPaymentsHealth } from '$lib/server/money';
 import { parseCampaignStatusFilter, sortCampaignStatusCounts } from '@sellery/db/admin/campaign-rules';
 
@@ -21,7 +21,12 @@ export const load: PageServerLoad = async (event) => {
 	const gate = await requireAdmin(event);
 	if (!gate.ok) redirect(303, gate.location);
 
-	const [dash, health, activity] = await Promise.all([getAdminDashboard(), getPaymentsHealth(), listRecentActivity(8)]);
+	const [dash, health, activity, match] = await Promise.all([
+		getAdminDashboard(),
+		getPaymentsHealth(),
+		listRecentActivity(8),
+		getAdminMatch()
+	]);
 
 	// 캠페인 필터는 데모 `S.ui.admCF` 의 실서비스 판 — 주소로 남겨 공유·새로고침이 되게 한다
 	const statusFilter = parseCampaignStatusFilter(event.url.searchParams.get('status'));
@@ -32,6 +37,8 @@ export const load: PageServerLoad = async (event) => {
 		kpi: dash.kpi,
 		todo: dash.todo,
 		activity,
+		// 데모 "오늘 할 일" 의 자동 제안 후보 — 매칭 화면이 생겨 이제 셀 수 있다
+		autoMatchCandidates: match?.candidates.length ?? 0,
 		statusFilter,
 		statusCounts: sortCampaignStatusCounts(dash.statusCounts),
 		campaigns: statusFilter ? dash.campaigns.filter((c) => c.status === statusFilter) : dash.campaigns,
@@ -50,7 +57,8 @@ export const load: PageServerLoad = async (event) => {
 			settle: adminPath('/settle'),
 			payments: adminPath('/payments'),
 			orders: adminPath('/orders'),
-			campaigns: adminPath('/campaigns')
+			campaigns: adminPath('/campaigns'),
+			match: adminPath('/match')
 		}
 	};
 };

@@ -43,6 +43,7 @@
 	<small>
 		가입 {data.counts.all}명 · 비공개 {data.counts.hidden} · 정지 {data.counts.suspended} · 채널 인증 대기 {data.counts.pendingChannel}
 	</small>
+	<a href={data.matchPath} class="btn ghost sm">매칭·자동 제안 →</a>
 </h2>
 
 {#if data.msg}

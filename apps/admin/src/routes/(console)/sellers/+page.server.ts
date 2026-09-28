@@ -57,6 +57,7 @@ export const load: PageServerLoad = async (event) => {
 		msg,
 		msgTone: key.startsWith('err') ? ('danger' as const) : ('ok' as const),
 		self,
+		matchPath: adminPath('/match'),
 		statusChips: SELLER_FILTERS.map((f) => ({
 			key: f,
 			label: SELLER_FILTER_LABELS[f],
