@@ -316,3 +316,69 @@ describe("파서 · 문구", () => {
     expect(dueLabel(null, "2026-09-22")).toBe("기준일 미정");
   });
 });
+
+describe("샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28)", () => {
+  /** p4 · 샘플 구매 ₩75,650 만 있는 캠페인 (판매 0) · 인플 15% · 플랫폼 10% · PG 1.9% */
+  const sampleOnly = (extra: Partial<Parameters<typeof calcSettlement>[0]> = {}) =>
+    calcSettlement({ gross: 75650, sampleNet: 75650, rate: 0.15, sampleRefundCash: 75650, ...extra });
+
+  it("인플루언서는 낸 현금 전액을 받는다 — 수수료가 0 이어도", () => {
+    const k = sampleOnly();
+    expect(k.sf).toBe(0); // base = net − sampleNet = 0
+    expect(k.sellerPayout).toBe(75650);
+  });
+
+  it("재원 = 브랜드 반환 + 플랫폼 포기 + 카드 수수료 (합이 환급액)", () => {
+    const k = sampleOnly();
+    expect(k.sampleRefundBrand + k.sampleRefundPlatform + k.sampleRefundPg).toBe(75650);
+    expect(k.sampleRefundPg).toBe(Math.round(75650 * 0.019));
+  });
+
+  it("브랜드 정산액에서 기여분만큼 빠진다 — 샘플만 있으면 0 이 된다", () => {
+    const off = calcSettlement({ gross: 75650, sampleNet: 75650, rate: 0.15 });
+    const on = sampleOnly();
+    expect(on.sampleRefundBrand).toBe(off.brandPay);
+    expect(on.brandPay).toBe(0);
+  });
+
+  it("플랫폼 수수료에서도 빠진다", () => {
+    const off = calcSettlement({ gross: 75650, sampleNet: 75650, rate: 0.15 });
+    const on = sampleOnly();
+    expect(on.pf).toBe(off.pf - on.sampleRefundPlatform);
+  });
+
+  it("판매가 함께 있으면 브랜드 정산액은 판매분만 남는다", () => {
+    // 5개 판매(₩445,000) + 샘플 ₩75,650
+    const on = calcSettlement({ gross: 520650, sampleNet: 75650, rate: 0.15, sampleRefundCash: 75650 });
+    const sales = calcSettlement({ gross: 445000, rate: 0.15 });
+    expect(on.brandPay).toBeGreaterThan(0);
+    // 판매분 브랜드 몫과 근사(반올림 차이만) — 환급이 샘플 기여분을 정확히 걷어낸다
+    expect(Math.abs(on.brandPay - sales.brandPay)).toBeLessThanOrEqual(2);
+  });
+
+  it("수수료가 샘플비보다 적어도 전액 환급 — 운영 답변의 '그대로'", () => {
+    const k = calcSettlement({ gross: 520650, sampleNet: 75650, rate: 0.15, sampleRefundCash: 75650 });
+    expect(k.sf).toBe(Math.round(445000 * 0.15)); // 66,750 < 75,650
+    expect(k.sellerPayout).toBeGreaterThan(75650); // 수수료 + 환급 전액
+  });
+
+  it("브랜드 추천 부스트가 있으면 그 몫도 함께 반환한다 (bReward 는 플랫폼 부담이라 제외)", () => {
+    const on = sampleOnly({ brandRefBoost: true });
+    const off = calcSettlement({ gross: 75650, sampleNet: 75650, rate: 0.15, brandRefBoost: true });
+    expect(on.sampleRefundBrand).toBe(off.brandPay);
+    expect(on.brandPay).toBe(0);
+  });
+
+  it("환급이 없으면 계산이 한 줄도 바뀌지 않는다", () => {
+    const a = calcSettlement({ gross: 1315600, rate: 0.2, bonusPp: 1 });
+    const b = calcSettlement({ gross: 1315600, rate: 0.2, bonusPp: 1, sampleRefundCash: 0 });
+    expect(a).toEqual(b);
+    expect(a.sampleRefundBrand).toBe(0);
+  });
+
+  it("브랜드 몫은 0 아래로 내려가지 않는다 (payouts.amount >= 0)", () => {
+    // 환급액이 매출보다 큰 비정상 조합
+    const k = calcSettlement({ gross: 10000, sampleNet: 10000, rate: 0.15, sampleRefundCash: 999999 });
+    expect(k.brandPay).toBe(0);
+  });
+});
