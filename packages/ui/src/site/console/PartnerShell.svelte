@@ -42,7 +42,8 @@
 		// 화면이 생기기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) — 브랜드 콘솔 2단계와 같은 방식.
 		// 소유: 인플루언서·브랜드·상품 = 파트너 관리 담당 / 정산 = 정산·돈 담당. **탭을 활성화할 때만 이 표를 고친다.**
 		admin: [
-			{ href: '/home', label: '홈', icon: 'home' },
+			// 캠페인 상세는 홈 대시보드의 전체 캠페인 표 · 최근 활동에서 들어온다(탭이 따로 없다)
+			{ href: '/home', label: '홈', icon: 'home', match: ['/campaigns'] },
 			{ href: '/sellers', label: '인플루언서', icon: 'user' },
 			{ href: '/brands', label: '브랜드', icon: 'flag' },
 			{ href: '/products', label: '상품', icon: 'box' },
