@@ -2,7 +2,7 @@
 	/**
 	 * 관리자 캠페인 상세 — 데모 CampaignDetail · 인플루언서/브랜드 콘솔과 같은 console-det 톤.
 	 *   머리 · 스테퍼 · 스레드(시스템/대화) · 우측 브랜드 대행 액션 · 정산 미리보기.
-	 * 발신은 "셀러리 운영팀" — 브랜드 위장 발신은 하지 않는다.
+	 * 발신은 "셀러리 관리자" — 브랜드 위장 발신은 하지 않는다(운영 결정 2026-09-23).
 	 */
 	import { enhance } from '$app/forms';
 	import { fmtNum } from '@sellery/db/campaign';

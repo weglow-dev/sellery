@@ -160,7 +160,7 @@ describe("칩 · 정렬 · 라벨 · 쿠키", () => {
     expect(csSenderLabel("customer")).toBe("고객");
     expect(csSenderLabel("brand", "바인허브")).toBe("바인허브");
     expect(csSenderLabel("brand", null)).toBe("브랜드");
-    expect(csSenderLabel("admin")).toBe("셀러리 운영팀");
+    expect(csSenderLabel("admin")).toBe("셀러리 관리자"); // 캠페인 스레드(senderLabel)와 같은 이름 — 같은 주체를 두 말로 부르지 않는다
     expect(csTokenCookieName("CS100")).toBe("slry_cs_cs100");
   });
 });

@@ -11,7 +11,7 @@
  *   · 정산 미리보기 → `app_admin_settle_preview`(0020).
  *
  * **데모와 다른 점 하나** — 데모는 "브랜드(관리자 대행)로 발신" 이라 인플루언서에게 브랜드가 말한 것처럼 보인다.
- * 여기서는 `sender='admin'` 으로 남겨 두 콘솔이 **"셀러리 운영팀"** 으로 표시한다(`senderLabel` — chat-rules.ts:127).
+ * 여기서는 `sender='admin'` 으로 남겨 두 콘솔이 **"셀러리 관리자"** + ✓ 셀러리 인증 배지로 표시한다(`senderLabel` · `isOfficialSender`).
  * 브랜드가 쓰지 않은 말이 브랜드 이름으로 남으면 분쟁의 소지가 되고, `campaign_post_chat` 은 sender 와 actor_role 을
  * 같은 값으로 넣으므로 "브랜드로 표시 + 관리자로 감사" 를 애초에 만들 수 없다.
  *
@@ -222,7 +222,7 @@ async function logProxyAction(admin: Admin, campaignId: string, actorUserId: str
     sender: "system",
     actor_role: "admin",
     actor_user_id: actorUserId,
-    body: `셀러리 운영팀이 브랜드를 대신해 ${what}`,
+    body: `셀러리 관리자가 브랜드를 대신해 ${what}`,
     event_type: "admin_proxy_action",
     payload: { what },
   });
@@ -335,7 +335,7 @@ export { CHAT_MAX };
 
 /**
  * 관리자 발신 — `sender='admin'` · `actor_role='admin'` · `actor_user_id` 기록.
- * 두 콘솔은 이것을 "셀러리 운영팀" 으로 표시한다. 연락처 감지는 관리자 메시지에도 적용된다.
+ * 두 콘솔은 이것을 "셀러리 관리자" 로 표시한다. 연락처 감지는 관리자 메시지에도 적용된다.
  */
 export async function postAdminChat(
   ref: string,

@@ -278,7 +278,7 @@ signInWithPassword(email, password) → rpc('app_role') === 'admin'
 
 **주의**
 
-- 아이디가 공개돼 있다 — `official@weglow.biz` 는 전자상거래법상 모든 페이지 푸터·개인정보처리방침에 실리는 고객센터 주소다(`packages/db/src/company.ts`). 공격자에게 아이디는 주어진 값이므로 비밀번호는 서비스 이름이 들어가지 않은 랜덤 문자열이어야 한다. **`apps/admin` 에 실데이터 기능(인플루언서 정지 · 채널 인증 승인 · 정산 실행)을 붙이는 PR 에서 교체한다.**
+- 아이디가 공개돼 있다 — `official@weglow.biz` 는 전자상거래법상 모든 페이지 푸터·개인정보처리방침에 실리는 고객센터 주소다(`packages/db/src/company.ts`). 공격자에게 아이디는 주어진 값이므로 비밀번호는 서비스 이름이 들어가지 않은 랜덤 문자열이어야 한다. **미교체 상태다(2026-09-28 기준)** — 관리자 콘솔 실서비스 전환(PR #38~#69)이 끝났고, 2026-09-28 정리(§6.5)로 이 계정이 **DB 의 유일한 계정**이 되었다. 정지 · 채널 인증 승인 · 정산 실행 · 브랜드 대행 발신이 모두 이 하나에 달려 있으니 오픈 전에 교체한다.
 - `role='admin'` 은 게이트를 통과하는 유일한 조건이고, 관리자 화면은 service role 로 동작해 RLS 를 우회한다. 회수는 같은 방식으로 `role='customer'` 로 내리거나 Authentication → Users 에서 계정 삭제.
 - Basic Auth 이중 잠금(`ADMIN_PASSWORD`)은 `app_role()='admin'` **위에** 얹는 선택 항목이며 단독 인증이 아니다(`app-plan.md §3`). glo 의 `/admin` Basic Auth 블록은 복사하지 않는다 — 세션 갱신을 건너뛰는 구조다.
 
@@ -317,6 +317,8 @@ npm run check                                            # 타입 깨짐 확인 
 
 시드 재투입은 `npx supabase db query --linked --file supabase/seed.sql`(멱등). 원격 조회는 `npx supabase db query --linked "select …"`. 절차 · 주의(`--include-seed` 가 SQL 을 실행하지 않는 문제, `service_role` grant 0007)는 `data-model.md §8 · §10`.
 
+> **운영(`--linked`)에 `seed.sql` 을 넣지 않는다.** 2026-09-28 에 시드·테스트 데이터를 전부 지웠다(§6.5) — 다시 넣으면 고객 페이지에 데모 브랜드·상품과 가짜 누적 판매액이 되살아난다. 시드는 로컬(`npx supabase db reset` · §7.1)에서만 쓴다.
+
 **DB 마이그레이션은 앱 배포보다 먼저**: 새 컬럼·함수를 쓰는 앱을 먼저 올리면 그 사이 요청이 실패한다. 반대로 컬럼을 지우는 마이그레이션은 앱이 더 이상 쓰지 않는 것을 배포한 **다음** 에. DB 마이그레이션은 되돌리지 않고 앞으로만 고친다.
 
 ### 6.2 적용 후 스모크
@@ -338,6 +340,52 @@ npm run check                                            # 타입 깨짐 확인 
 5. **열람(복호)**: 콘솔 함수가 아니다 — 지급명세서 제출 시 운영 스크립트가 `app_seller_rrn_decrypt(seller_id, key, actor, purpose)` 를 호출하고, 호출마다 `sensitive_access_log`(field='rrn' · actor · purpose · at) 1행이 남는다(키 불일치도 로그). `npx supabase db query --linked "select * from sensitive_access_log order by at desc limit 20"` 로 감사.
 6. **회전**: 새 키를 발급한 뒤 행마다 `app_seller_rrn_decrypt(옛 키)` → `app_set_seller_rrn(새 키, p_skip_checksum => true)` 를 한 트랜잭션으로 돌리는 스크립트(미작성 — 필요할 때 `packages/db/scripts/`)를 실행하고 env 를 바꾼다. 그 사이의 저장은 새 키로만 되므로 회전은 점검 시간에.
 7. 계좌번호(`bank_info`)는 §5.9 의 의도적 결정대로 평문 jsonb(service role 전용 · 콘솔 마스킹)이다 — 정산 지급 수단 확정 때 같은 키로 옮길지 결정.
+
+### 6.5 운영 DB 시드·테스트 데이터 전체 삭제 (2026-09-28 실행)
+
+**클라우드 `sellery` 의 업무 데이터를 전부 비웠다.** 오픈 전 정리 — 데모 시드(브랜드 2 · 상품 10 · 캠페인 17 · 주문 1,052)가 고객 페이지에 그대로 노출되고 있었고(`누적 판매액 ₩4.7억` — 전액 `brands.gmv_base` 시드값), 시드 인플루언서 8명이 `/influencers` 에 떠 있었다. 운영팀 확인으로 **실가입자 없음**(`weglow.biz` 셀러 2개도 내부 계정)이라 이관 없이 삭제했다.
+
+**새 Supabase 프로젝트를 만들지 않았다** — 프로젝트를 바꾸면 4개 Vercel 프로젝트의 `PUBLIC_SUPABASE_*` · `SUPABASE_SERVICE_ROLE_KEY` 와 토스 웹훅 · 카카오 리다이렉트를 전부 다시 맞춰야 한다. 스키마는 그대로 두고 행만 지우는 쪽이 짧고 되돌리기도 쉽다.
+
+지운 것 — 자식 → 부모 순서(FK `on delete restrict` 회피). 이 순서가 그대로 재사용 가능한 절차다:
+
+```
+payouts · settlements · cs_messages · cs_conversations · payment_events · orders ·
+checkout_sessions · partner_payments · celery_purchases · celery_ledger · referral_earnings ·
+data_views · product_views · seller_external_sales · sensitive_access_log · campaign_events ·
+exclusive_requests · campaigns · products · seller_channels · sellers · brands · customers
+```
+
+남긴 것:
+
+| 대상 | 이유 |
+|---|---|
+| `categories`(7) · `platform_settings`(26) · `grade_tiers`(7) · `brand_grade_tiers`(7) | 설정·기준값이다. 지우면 `clear_days` · `default_stock_on_approve` · 등급 구간이 사라진다 |
+| `official@weglow.biz` (`profiles.role='admin'`) | **유일한 관리자.** 이것까지 지우면 `/admin` 에 들어갈 수 없다(§5.6 으로 재생성해야 함) |
+| 마이그레이션 `0001~0022` | 스키마는 건드리지 않았다 — `db push` 다시 할 필요 없다 |
+
+지운 계정 10개: `dev-*.sellery.test`(5) · `shingoonk@weglow.biz` · `junho763@weglow.biz` · `orangebear851011@gmail.com` · `chrisneeds@daum.net` · `junho763@naver.com`.
+
+**백업** — 저장소 **밖**(`../sellery-backup/`, git 추적 안 됨):
+
+```
+full-dump-2026-09-28.json    1.2MB  28개 테이블 전체 + auth 계정 11개(메타데이터)
+seed-orders-2026-09-28.json  0.9MB  시드 주문 1,052건
+```
+
+복원 시 주의 — `orders.amount` 는 `generated always as (qty * unit_price)` 라 **insert 에서 빼야 한다**(넣으면 거부). `orders` 를 지우면 `cs_conversations.order_id` 가 `on delete set null` 로 끊기므로 복원 후 `order_code` 로 다시 이어야 한다.
+
+**미처리로 남은 것 — `o2005`**: 환불되지 않은 실제 카드 결제(₩31,900 · 2026-09-15 · `payment_key` `tNHN_2026091519023309KI2` · 배송지 있음 · 운송장 없음). DB 행은 지워졌고 **토스에는 거래가 그대로 있다** — 환불은 토스 콘솔에서 직접 해야 한다. 근거는 위 백업 파일과 토스 대시보드.
+
+정리 직후 상태 확인:
+
+```
+public_stats            gmv 0 · brands 0 · sellers 0
+app_admin_payments_health  settlements · payment_events 전부 0
+sellery.life / · /influencers · /admin/login   200 (빈 상태 렌더 정상 — "진행 중인 판매가 없습니다")
+```
+
+> `official@weglow.biz` 는 §5.6 에서 약한 비밀번호로 만들어졌고 이제 **유일한 계정**이다 — 교체 필요.
 
 ---
 

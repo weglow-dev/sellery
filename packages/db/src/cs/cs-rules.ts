@@ -318,7 +318,7 @@ export function csStatusChip(status: string): { label: string; tone: CsChipTone 
 
 export function csSenderLabel(sender: CsMessage["sender"], brandName?: string | null): string {
   if (sender === "customer") return "고객";
-  if (sender === "admin") return "셀러리 운영팀";
+  if (sender === "admin") return "셀러리 관리자";
   return brandName || "브랜드";
 }
 
