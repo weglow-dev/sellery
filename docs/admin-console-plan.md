@@ -1,15 +1,19 @@
 # 관리자 콘솔 구현 계획 — `apps/admin` 데모 → 실서비스 (sellery.life/admin/*)
 
-> **상태(2026-09-22): 두 작업자가 나눠 만든다.** 셸 · 인증 · **파트너 관리**(인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수)는 Soyunnlee 가
-> `apps/admin/src/routes/(console)/{login,home,auth}` · `apps/admin/src/lib/server/{env,db,admin}.ts`(`getAdminContext` · `requireAdmin` · `adminPath` · `adminNextOf` — PR #38 #40) ·
-> 관리자 셸(`packages/db/src/console-paths.ts` `ConsoleRole='admin'` · `packages/ui/src/site/console/PartnerShell.svelte` `TABS.admin` — PR #49)
-> 로 만들고, 그 문서는 이 파일의 다른 절(작업자가 채운다)이다. 이 절("정산 · 돈")은 **돈이 움직이는 쪽만** 다룬다 — 정산 실행 · 지급 처리 · 이체 파일 · 원천징수 자료 ·
-> 주문/환불/결제 정합성/문의 열람. 마이그레이션 번호는 **0020 · 0021(비회원 구매) 이 이 절**, 0022 부터 파트너 관리. 두 쪽은 서로의 파일을 고치지 않는다(아래 파일 표).
+> **상태(2026-09-28): 관리자 콘솔 실서비스 전환 완료 — 담당자 1명.** 탭 5개가 모두 열렸다: 홈 · 인플루언서 · 브랜드 · 상품 · 정산.
+> `/admin/*` 는 더 이상 localStorage 데모가 아니다(남은 데모 화면은 `(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 에서만).
 >
-> **어느 쪽 소유도 아닌 공용 파일**(4 앱이 같이 쓴다 · append-only, 고칠 일이 생기면 서로 알린다):
+> 이 문서는 두 절로 나뉜다. **"정산 · 돈"**(§정산·돈) 은 돈이 움직이는 쪽 — 정산 실행 · 지급 처리 · 이체 파일 · 원천징수 자료 ·
+> 주문/환불/결제 정합성/문의 열람(마이그레이션 0020 · 0021). **"파트너 관리"**(§파트너 관리) 는 파트너·상품·캠페인 쪽 —
+> 셸 · 인증 · 인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 홈 대시보드 · 캠페인 상세(**마이그레이션 0건**).
+>
+> 2026-09-22~27 에는 두 작업자가 나눠 만들었고 서로의 파일을 고치지 않는 규칙이 있었다. **그 분담은 끝났다** —
+> 담당이 1명이 된 뒤 홈(`(console)/home/+page.*`)에 양쪽 카드를 한 PR 에 올렸다(#63). 아래 파일 표는 소유자 구분이 아니라
+> **어디에 무엇이 있는지** 찾는 용도로 남긴다.
+>
+> **4 앱이 같이 쓰는 공용 파일**(append-only · 고칠 때 영향 범위를 확인한다):
 > `packages/db/src/server/admin.server.ts`(`createAdminClient` · `createAnonClient` — 관리자 게이트가 아니라 service role 클라이언트 팩토리) ·
-> `packages/db/package.json` exports · `apps/admin/src/routes/(console)/+layout.*`(셸 적용 지점) ·
-> `apps/admin/src/routes/(console)/home/+page.*`(양쪽이 카드를 올린다 — 추가 전에 알린다).
+> `packages/db/package.json` exports · `apps/admin/src/routes/(console)/+layout.*`(셸 적용 지점) · `packages/ui/css/site.css`.
 >
 > 근거: 브랜드 콘솔 계획서 골격(`docs/brand-console-plan.md`) · `docs/settlement-policy.md` §3 · §5 · §7 · §8 · §9 · §11.4 · `docs/data-model.md` §4 · §5.2 · `docs/points-policy.md` ·
 > `docs/inf-console-plan.md` §5.9 · `packages/core/src/{helpers,actions}.ts` `calc` · `runSettle` · `runSettleAll` · 0004 · 0005 · 0013 · 0018 · 0019.
@@ -34,7 +38,7 @@
 | M10 | 고객 문의는 **열람만**(`app_admin_cs_list/thread`) · 주문도 열람 + 환불만 | CLAUDE.md "관리자는 열람만" |
 | M11 | 부분취소(PAID · `refund_amount>0`)는 정산 `refunds` 에 차감한다 — 0013/0019 의 pending 예상액과 그 경우에만 다를 수 있다(운영 규칙상 발생하지 않음) | 0008 헤더 "정산 calc 이관 슬라이스에서 refund_amount 차감" |
 
-### 1. 파일 · 경계 (다른 작업자 파일은 손대지 않는다)
+### 1. 파일 배치 (이 절이 만든 것)
 
 ```
 supabase/migrations/0020_admin_settlement.sql        NEW  아래 §2 계약 전부 · 헤더에 규칙→코어 대응표
@@ -53,7 +57,7 @@ packages/db/scripts/partner-admin.mjs                EDIT settle-preview · sett
 
 PR-B 가 만드는 화면(이 절의 몫): `apps/admin/src/routes/(console)/settle`(대기 큐 · [정산 실행] · [도래분 일괄] · 완료 표 · 지급 [완료]/[보류]/[해제] · [이체 파일 CSV] · [지급명세서 CSV]) ·
 `orders`(전 브랜드 표 · 필터 · 검색 · 상세 · [환불] · [조정 큐로 기록]) · `payments`(정합성 카드 · 운영 큐) · `cs`(열람) · 홈 카드 "정산 기준일 도래 n건 · 지급 보류 n건 · 미처리 결제 이벤트 n건".
-탭 추가는 셸 담당자와 조율(`PartnerShell`/관리자 셸의 탭 배열 한 줄).
+탭은 `packages/ui/src/site/console/PartnerShell.svelte` `TABS.admin` 의 한 줄씩이다(5개 전부 활성 — PR #49 #55 #58 #59 #60).
 
 ### 2. 계약 (0020 — 전부 security definer · service_role · `{ok, code}`)
 
@@ -123,4 +127,140 @@ PR-B 가 만드는 화면(이 절의 몫): `apps/admin/src/routes/(console)/sett
 
 **검증(2026-09-22 · 클라우드 `sellery` · dev 서버 5177 · dev 관리자 계정)** — `/settle` 큐 c5·c1·c12(2,493,188 / 9,334,661 = PR-A 스모크와 동일) · `/settle/c5` 명세 전 라인 · 보류 예고 RRN_MISSING · 기준일 전 강제 체크. 일회성 픽스처 c9901(s7 × p3 · PAID 3건 · 종료 D−10)에서 강제 실행 → 스냅샷(net 74,700 · 인플 13,219 held BANK_MISSING · 브랜드 52,738 pending) → 브랜드 보류(MANUAL) → 해제 → 지급 완료(메모 · 이벤트 payout_paid) → 인플루언서 해제 `STILL_INCOMPLETE(정산 계좌 미등록)` → 이체 파일 CSV 200(BOM EF BB BF · CRLF · `x-sellery-logged` 2 · purpose 없으면 400 ACTOR_REQUIRED) → 원천징수 CSV 200(NO_RRN 행 · ids 없으면 400) → `/orders?q=c9901` · o101 상세(결제키 없음 안내) · `?/refund` POST → `NO_PAYMENT_KEY` 문구로 303 · `/payments` 카드 · `/cs` cs105 읽기 전용 · 375px 6화면 `scrollWidth === innerWidth`. 정리: 픽스처 campaigns 1 · orders 3 · campaign_events 3 · settlements 1 · payouts 2 · sensitive_access_log 4 삭제 · s7/b1 등급 재계산(변화 없음). 시드 c5·c106·s101·b2 는 손대지 않았다.
 
-**미룬 것** — 홈 카드("정산 기준일 도래 n건 · 지급 보류 n건 · 미처리 결제 이벤트 n건")는 홈이 셸 담당자 파일이라 넣지 않았다(`getPaymentsHealth` 한 줄로 붙일 수 있다) · 이체 파일은 브라우저 다운로드만(배치 기록 없음 · "지급 완료" 는 행별) · 정산 후 환불 조정(`refund_needs_adjust`) 처리 화면 없음(주문 상세 안내 + 정합성 카드까지) · 자동 정산 크론 미연결(M3) · 관리자 계정 교체(deploy §5.6 주의).
+**미룬 것** — ~~홈 카드~~는 **PR #63 에서 올렸다**(담당이 1명이 된 뒤 파트너 카드와 한 PR 로 · `getPaymentsHealth` 재사용 · 아래 §파트너 관리 5) · 이체 파일은 브라우저 다운로드만(배치 기록 없음 · "지급 완료" 는 행별) · 정산 후 환불 조정(`refund_needs_adjust`) 처리 화면 없음(주문 상세 안내 + 정합성 카드까지) · 자동 정산 크론 미연결(M3) · 관리자 계정 교체(deploy §5.6 주의).
+
+---
+
+## 파트너 관리 (2026-09-23~28 · PR #38 #40 #45 #49 #50 #52 #55 #58 #59 #60 #62 #63 #64)
+
+셸 · 인증 · 인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 홈 대시보드 · 캠페인 상세.
+데모 `apps/admin/src/routes/(demo)/*`(프로토타입 `js/50-admin.js`)를 화면 단위로 옮겼다.
+
+### 0. 결정 요약
+
+| # | 결정 | 이유 |
+|---|---|---|
+| 1 | **마이그레이션 0건** | 필요한 컬럼·함수가 이미 다 있었다(아래 1) |
+| 2 | 쓰기는 **`code` → `id` 를 서버에서 먼저 해석**한 뒤 id 로 UPDATE | 클라이언트가 보낸 ref 를 믿지 않는다. `partner-admin.mjs` 와 같은 방식 |
+| 3 | 목록에는 **되돌릴 수 있는 동작만**. 정지 · 채널 인증 승인은 상세에서만 | 목록은 한 화면에 여러 행이라 오클릭 비용이 크다 |
+| 4 | 상세페이지 미리보기 = **저장하지 않는 합성 `CampaignCard`** · 판매자는 대역 · shop 에 라우트를 두지 않는다 | 검수 전 상품이 공개 URL 로 노출되면 안 된다. 관리자 앱 안에서는 `requireAdmin()` 하나로 막힌다 |
+| 5 | 판매 실적 표에 데모 모달의 **익명화 · 블러 · 🥬 확인권을 넣지 않는다** | 그 셋은 남의 실적을 돈 내고 보는 인플루언서용 장치다. 관리자는 자기 플랫폼 데이터를 실명으로 본다 |
+| 6 | 판매 링크는 **`SCHEDULE_CONFIRMED` 부터** | 0003 `campaign_card` 의 `status in (...)` 과 **같은 목록이어야 한다**. 어긋나면 링크가 404 거나 있는 링크가 안 보인다 |
+| 7 | 대시보드 금액은 캠페인마다 **`app_admin_settle_preview`(0020) 를 부른다** | 정산 규칙(등급 보너스 · 추천 부스트 · 브랜드 할인)을 관리자 쪽에서 다시 구현하지 않는다. 대가는 N+1 호출 |
+| 8 | 캠페인 대행 쓰기는 **브랜드 RPC(`app_brand_*`) 를 그대로 부른다** | 상태 전이·이벤트 문구·기간 우선권 검사가 브랜드 콘솔과 같아야 한다. `p_brand_id` 를 인자로 받고 service_role 에 grant 돼 있다 |
+| 9 | 관리자 발신은 `sender='admin'`(**"셀러리 관리자"** + 인증 배지) | **열린 결정 — 아래 6** |
+| 10 | 데모 **[데이터 초기화]** 는 옮기지 않는다 | localStorage 시드 복원용 데모 버튼(`act.reset()`). 실서비스에서 같은 문구는 운영 데이터를 지우는 뜻이 되어서는 안 된다 |
+
+### 1. 마이그레이션이 필요 없었던 이유
+
+파트너 관리는 **새 마이그레이션을 만들지 않았다**(번호 0022 는 비어 있다). 필요한 것이 전부 있었다.
+
+```
+sellers.active · sellers.hidden                          0001  정지/복구 · 갤러리 노출
+seller_channels.verified · vcode · vcode_confirmed_at    0001 · 0010  채널 인증 큐
+sellers.followers · likes_avg                            0001  판매 실적 지표(likes_avg 는 0001:398 공개 grant 차단)
+brands.active · auto_propose · bank_info · tax_info      0001 · 0019  정지 · 자동제안 · 정산정보 유무
+celery_ledger.reason='admin_grant'                       0005  🥬 지급(platform_settings.admin_grant_cel)
+app_admin_review_product(product, decision, reason)      0015  상품 승인 · 반려 · 노출 중단
+brand_gmv(uuid)                                          0004  브랜드 누적 GMV
+exclusive_requests.status='PENDING'                      0002  독점권 신청 대기 카운트
+campaign_events(kind, sender, actor_role, actor_user_id) 0003  스레드 열람 · 관리자 발신
+campaign_post_chat(campaign, role, actor_user_id, body)  0016  발신(역할을 인자로 받는다) · 연락처 감지 포함
+app_brand_{approve,reject}_sample · ship_sample ·        0015 · 0016  브랜드 대행 액션
+  confirm_schedule · reject_schedule
+app_admin_settle_preview · app_admin_payments_health     0020  정산 미리보기 · 대시보드 정산 숫자
+```
+
+**`sellers.hidden` 쓰기 경로만 새로 생겼다** — 그전에는 읽기만 있었다(`seller_is_public()` · 공개 조인).
+
+### 2. 파일 배치
+
+```
+packages/db/src/admin/seller-rules.ts        순수 — 필터 · 등급 칩 · 상태 문구 · 액션 메시지          20개 테스트
+packages/db/src/admin/brand-rules.ts         순수 — 필터 · 등급 · 정산정보 유무 문구                 16개 테스트
+packages/db/src/admin/product-rules.ts       순수 — 상태 칩 · 필터 · 총 수수료 · 반려 사유            19개 테스트
+packages/db/src/admin/campaign-rules.ts      순수 — 상태 라벨·톤(데모 `ST` 이식) · 흐름 스테퍼 ·      10개 테스트
+                                                    대행 액션 분기 · 기간 표기
+packages/db/src/server/admin/sellers.server.ts    listSellers · getSeller · listPendingChannels ·
+                                                  setSellerActive/Hidden · setChannelVerified · grantCelery
+packages/db/src/server/admin/brands.server.ts     listBrands · getBrand · setBrandActive/AutoPropose · grantBrandCelery
+packages/db/src/server/admin/products.server.ts   listAdminProducts · getAdminProduct · getProductPreviewCard · reviewProduct
+packages/db/src/server/admin/dashboard.server.ts  getAdminDashboard(카운트 · KPI · 오늘 할 일 · 캠페인) · listRecentActivity
+packages/db/src/server/admin/campaigns.server.ts  getAdminCampaign · 브랜드 대행 5종 · postAdminChat
+apps/admin/src/lib/server/{env,db,admin}.ts       getAdminContext · requireAdmin · adminPath · adminNextOf
+apps/admin/src/lib/server/partners.ts             배럴(위 server/admin/* 전부)
+packages/db/src/console-paths.ts                  ConsoleRole += 'admin'
+packages/ui/src/site/console/PartnerShell.svelte  ROLE_LABEL.admin · TABS.admin (5탭)
+packages/ui/src/site/store/StoreView.svelte       `preview?: boolean` 한 줄(기본 false — shop 영향 없음)
+```
+
+화면:
+
+```
+(console)/login · auth/signout                 관리자 로그인 게이트
+(console)/home                                 대시보드 — 히어로 띠 · KPI 4장 · 오늘 할 일 · 최근 활동 · 전체 캠페인
+(console)/sellers · sellers/[code]             인플루언서 목록 · 상세(채널 인증 · 정지/복구 · 🥬 지급)
+(console)/brands · brands/[code]               브랜드 목록 · 상세(GMV · 상품 · 정산정보 · 자동제안 · 정지/복구)
+(console)/products · products/[code]           상품 목록 · 검수 상세(승인/반려/노출 · 판매 실적 · 상세 이미지)
+(console)/products/[code]/preview              상세페이지 미리보기(고객 화면과 같은 `StoreView` · 구매 불가)
+(console)/campaigns/[code]                     캠페인 상세 — 흐름 스테퍼 · 스레드 · 브랜드 대행 · 정산 미리보기
+```
+
+### 3. 데모 → 실서비스 대응
+
+| 데모 화면 | 실서비스 | 비고 |
+|---|---|---|
+| 대시보드 히어로 · KPI 4장 · 오늘 할 일 · 최근 활동 · 전체 캠페인 | `(console)/home` | 최근 활동은 `campaign_events.body` 를 그대로 쓴다(DB 가 완성된 한 줄을 갖고 있어 문구 매핑이 없다) |
+| 대시보드 **[데이터 초기화]** | 없음 | 결정 10 |
+| 오늘 할 일 **"자동 제안 후보"** | 없음 | 자동 매칭 로직·화면이 없다(데모 `autoMatches()` 는 데모 함수) — 아래 5 |
+| 오늘 할 일 "미인증 채널" | **두 줄로 나눔** | 데모는 `!verified` 전부. 관리자가 누를 것이 있는 건은 인증 코드까지 넣은 것뿐이라 "채널 인증 승인 대기" 와 "미인증 채널" 을 따로 둔다 |
+| 상품 목록 **[실적]** 모달 | 상품 상세의 "판매 실적" 표 | 같은 내용이 상세에 있어 모달을 따로 두면 정보가 두 곳에 생긴다. 익명화·블러·🥬 확인권은 빼고 실명으로(결정 5) |
+| 상품 목록 **[상세페이지]** | `products/[code]/preview` | 결정 4 |
+| 캠페인 상세(스레드 · 브랜드 액션 · 정산 미리보기) | `campaigns/[code]` | 결정 8 · 9 |
+| `(demo)/products` · `(demo)/brands` | 삭제 | 콘솔 라우트가 같은 URL 을 받으면 데모를 지운다(정산 쪽이 `settle`/`orders` 에서 쓴 방식) |
+| 매칭 · 자동 제안 / 매출 · 순수익 | **미착수** | 아래 5 |
+
+### 4. 검증 방식
+
+로컬 Supabase 를 쓴다(클라우드에 쓰지 않는다 — `docs/deploy.md §7.1`).
+
+```
+npm run check:boundaries · npm run check · npm test · npm run build   4개 전부
+dev 서버를 빈 포트에 띄우고(5175 는 건드리지 않는다) 세션 쿠키를 만들어 curl
+  sb-127-auth-token=base64-<base64url(JSON.stringify(session))>
+POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는다
+  (Content-Type 없으면 415 · Accept: */* 면 JSON `{"type":"redirect"}`)
+쓰기는 DB 값을 직접 확인한 뒤 **시드를 되돌리고** 되돌아갔는지 다시 확인한다
+레이아웃 · 375px 카드 모드는 curl 로 볼 수 없다 → PR 본문에 "확인 불가" 로 적고 브라우저 확인을 요청한다
+```
+
+### 5. 미착수 — 만들지 않은 이유
+
+| 항목 | 이유 |
+|---|---|
+| **매칭 · 자동 제안** (+ 대시보드 "자동 제안 후보" 카드) | 자동 매칭 로직이 실서비스에 없다. 데모 `autoMatches()` 는 시드 위에서 도는 데모 함수고, 실제 후보를 뽑는 규칙(카테고리 · 등급 · 기간 충돌 · 과거 실적 가중)이 정해지지 않았다. 규칙 없이 화면을 만들면 빈 표가 된다 |
+| **매출 · 순수익** | 대시보드 KPI(누적 GMV · 플랫폼 순수익 · 테이크레이트)와 정산 화면이 이미 같은 숫자를 보여준다. 별도 화면이 필요한지는 운영이 무엇을 더 보고 싶은지 정해진 뒤 |
+| 반려 사유 입력이 `prompt()` | 디자인 시스템 모달이 없다(`influencer-spec §1.3`). 모달이 생길 때 상품 반려 · 캠페인 거절을 함께 고친다 |
+| 일괄 정산 미리보기 RPC | 대시보드가 캠페인마다 `app_admin_settle_preview` 를 부른다(결정 7). 캠페인이 수백 건이 되면 0022 로 일괄 RPC 를 추가한다 |
+
+### 6. 열린 결정 — 관리자 발신자 표시
+
+`docs/data-model-design-notes.md §1.5` 는 **`sender='brand', actor_role='admin'`**(화면은 브랜드명 · DB 에 감사 이력)으로 적고 있고
+`(사용자 결정)` 표시가 있다. 데모도 "브랜드(관리자 대행)로 발신" 이다 — 다만 데모는 `pushChat(cid,'brand',…)` 로 저장해
+**관리자가 썼다는 흔적이 없다**(`packages/core/src/actions.ts:248`).
+
+현재 구현은 **`sender='admin'`** 이다 — 두 콘솔이 `senderLabel()` 로 "셀러리 관리자" + 인증 배지를 표시한다.
+`campaign_post_chat`(0016) 이 `sender` 와 `actor_role` 을 같은 값으로 넣으므로 "브랜드로 표시 + 관리자로 감사" 는
+지금 함수로 만들 수 없다(0022 가 필요하다).
+
+운영에 확인할 것:
+
+1. 브랜드 콘솔에 **자기가 쓰지 않은 메시지가 자기 이름으로** 남는 것이 의도된 동작인가
+2. 맞다면 브랜드 화면에 "운영팀 대행" 표시를 할 것인가(안 하면 문의가 늘고, 하면 결국 현재 구현과 비슷해진다)
+3. 브랜드 명의로 인플루언서에게 의사표시를 하는 **약관 근거**가 있는가(약관에서 대행 조항을 찾지 못했다)
+4. 상태를 바꾸는 대행(샘플 승인 → 브랜드 배송 의무 · 일정 확정 → 판매 링크 생성)을 어떤 조건에서 허용하는가
+   (되돌리는 RPC 는 없다 · 예: "브랜드 무응답 N일 경과 시")
+
+대행 액션은 `admin_proxy_action` 이벤트로 추적되고 양쪽 스레드에 보인다.
+용어가 갈려 있다 — `senderLabel('admin')` = "셀러리 관리자" 인데 `csSenderLabel('admin')`(고객 문의) 과
+`logProxyAction` 문구는 "셀러리 운영팀" 이다. 한쪽으로 통일해야 한다.
