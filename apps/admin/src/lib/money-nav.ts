@@ -10,6 +10,7 @@ export const MONEY_NAV: readonly MoneyNavItem[] = [
 	{ href: '/settle/payouts', label: '지급', title: '지급 관리 — 이체 파일 · 지급 완료/보류' },
 	{ href: '/orders', label: '주문', title: '전체 주문 검색 · 환불' },
 	{ href: '/payments', label: '결제', title: '결제 정합성 대시보드' },
+	{ href: '/revenue', label: '매출·순수익', title: '플랫폼 손익 — GMV · 수수료 매출 · 순수익 · 운영비 · 최종 순이익' },
 	{ href: '/cs', label: '문의', title: '고객 문의 열람 (답변은 브랜드)' }
 ];
 
