@@ -90,6 +90,7 @@ describe("activeNavHref — 탭 하나가 여러 화면을 묶을 때 (ConsoleTa
   /** 관리자 하단 탭 — 정산 탭은 정산 그룹의 화면 칩이 가는 곳도 자기 것으로 본다 */
   const TAB_HREFS = [
     "/admin/home",
+    "/admin/campaigns", // 홈 탭의 match — 캠페인 상세는 홈 대시보드에서 들어온다
     "/admin/sellers",
     "/admin/brands",
     "/admin/products",
@@ -118,7 +119,12 @@ describe("activeNavHref — 탭 하나가 여러 화면을 묶을 때 (ConsoleTa
     expect(activeNavHref("/admin/settle/payouts", TAB_HREFS)).toBe("/admin/settle");
   });
 
+  it("캠페인 상세는 홈 탭 — 홈 대시보드에서 들어온다", () => {
+    expect(activeNavHref("/admin/campaigns/c1", TAB_HREFS)).toBe("/admin/campaigns");
+  });
+
   it("탭에도 match 에도 없는 경로는 여전히 null", () => {
-    expect(activeNavHref("/admin/campaigns/c1", TAB_HREFS)).toBeNull();
+    expect(activeNavHref("/admin/login", TAB_HREFS)).toBeNull();
+    expect(activeNavHref("/admin/demo", TAB_HREFS)).toBeNull();
   });
 });
