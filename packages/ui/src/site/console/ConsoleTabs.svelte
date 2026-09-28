@@ -1,16 +1,34 @@
 <script lang="ts" module>
 	/**
 	 * 콘솔 하단 탭 (web (partner)/console-tabs.tsx 1:1). href 는 셸이 `consolePath` 로 만든 최종 상대 경로(`/influencer/home`).
-	 * 활성 판정은 레이아웃이 넘긴 `pathname`(`page.url.pathname`) 과 href 를 같은 기준(접두 포함)으로 비교한다 — usePathname 대체.
+	 * 활성 판정은 레이아웃이 넘긴 `pathname`(`page.url.pathname`) 과 href 를 **접두 포함 전체 경로**끼리 비교한다(`activeNavHref`) — usePathname 대체.
+	 * `$app/paths` 의 `base` 를 빼서 맞추면 안 된다 — `paths.relative` 기본값 때문에 SSR 에서 `base` 가 `.` · `..` 다.
 	 * `disabled` 탭(아직 없는 단계 — 브랜드 콘솔 1단계의 상품·캠페인·주문·내 정보)은 링크 대신 `aria-disabled` span 으로 그리고 `title` 로 예고한다.
 	 */
 	export type ConsoleTabIcon = 'home' | 'box' | 'flag' | 'chart' | 'truck' | 'user';
-	export type ConsoleTab = { href: string; label: string; icon: ConsoleTabIcon; disabled?: boolean; title?: string };
+	/**
+	 * `match` — 이 탭에 속하지만 href 아래가 아닌 경로(접두 없는 콘솔 경로). 탭 하나가 여러 화면을 묶을 때 쓴다.
+	 * 예: 관리자 "정산" 탭의 화면 칩은 `/orders` `/payments` `/revenue` `/cs` 로도 간다 — 그 화면에서도 탭이 켜져야 한다.
+	 * 비워 두면 href 아래만 활성이다(기존 동작).
+	 */
+	export type ConsoleTab = { href: string; label: string; icon: ConsoleTabIcon; disabled?: boolean; title?: string; match?: readonly string[] };
 </script>
 
 <script lang="ts">
+	import { activeNavHref } from '@sellery/db/console-paths';
+
 	let { tabs, pathname = '/' }: { tabs: ConsoleTab[]; pathname?: string } = $props();
-	const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+	/**
+	 * 겹치는 탭이 있으면 더 구체적인 쪽만 활성 — 정산 칩(`money-nav`)과 같은 함수를 쓴다.
+	 * `match` 로 넘어온 경로도 그 탭의 것으로 본다(가장 구체적인 항목이 이기므로 하위 탭과 충돌하지 않는다).
+	 */
+	const hrefsOf = (t: ConsoleTab) => [t.href, ...(t.match ?? [])];
+	const active = $derived.by(() => {
+		const usable = tabs.filter((t) => !t.disabled);
+		const hit = activeNavHref(pathname, usable.flatMap(hrefsOf));
+		return hit === null ? null : (usable.find((t) => hrefsOf(t).includes(hit))?.href ?? null);
+	});
+	const isActive = (href: string) => active === href;
 </script>
 
 {#snippet icon(t: ConsoleTab)}
