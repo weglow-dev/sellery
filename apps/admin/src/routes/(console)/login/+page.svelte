@@ -58,7 +58,7 @@
 	<section class="card static">
 		<div class="lbl-sm">관리자 콘솔</div>
 		<h2 class="console-title">로그인</h2>
-		<p class="meta">셀러리 운영팀 계정으로 로그인합니다. 관리자 계정은 고객·인플루언서·브랜드 계정과 별개의 이메일 계정이에요.</p>
+		<p class="meta">셀러리 관리자 계정으로 로그인합니다. 관리자 계정은 고객·인플루언서·브랜드 계정과 별개의 이메일 계정이에요.</p>
 		{#if data.foreign}
 			<div class="notice" role="status" style="margin:0 0 14px">
 				지금 <b>{data.foreignEmail ?? (ROLE_LABEL[data.foreignRole ?? ''] ?? '다른')}</b> 계정{#if data.foreignRole && ROLE_LABEL[data.foreignRole]}({ROLE_LABEL[data.foreignRole]}){/if}으로

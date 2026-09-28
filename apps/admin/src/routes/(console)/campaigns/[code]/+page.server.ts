@@ -90,7 +90,7 @@ export const actions: Actions = {
 		done(event.url, r.ok ? (r.already ? 'schedule_already' : 'schedule_rejected') : `err_${r.code}`);
 	},
 
-	/** 관리자 발신 — "셀러리 운영팀" 으로 스레드에 남는다 */
+	/** 관리자 발신 — "셀러리 관리자" 로 스레드에 남는다(+ ✓ 셀러리 인증 배지) */
 	postChat: async (event) => {
 		const gate = await requireAdmin(event);
 		if (!gate.ok) redirect(303, gate.location);

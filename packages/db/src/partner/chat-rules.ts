@@ -6,7 +6,7 @@
  *   CHAT_MAX · parseChatInput(form) 본문 1~1000자 · 제어문자 제거(개행 유지)
  *   LEAK_WARNING                    경고 문구 (0016 이 leak_warned 시스템 행으로도 남긴다 — 화면은 행을 그리면 되고 이 상수는 전송 전 미리보기용)
  *   parseChatResult(json) · CHAT_FAIL_MESSAGES · chatFailMessage
- *   senderLabel(sender, names)      발신자 표시명 (프로토타입 L3564: brand → 브랜드명 · admin → 셀러리 운영팀)
+ *   senderLabel(sender, names)      발신자 표시명 (brand → 브랜드명 · admin → 셀러리 관리자 · 운영 결정 2026-09-23)
  */
 
 /** 프로토타입 pushChat: `/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}|카톡|카카오톡|kakao/i` */
