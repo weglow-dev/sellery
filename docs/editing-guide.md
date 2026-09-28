@@ -265,7 +265,7 @@ Sellery/
 
 브라우저에 남는 키는 세 개입니다: `sellery-proto-vNN`(데모 데이터 — 현재 숫자는 `js/02-state.js` 2행) · `slry-linkctx`(판매링크 유입 컨텍스트 — 같은 카테고리 상품 숨김) · `sellery-session`(로그인 데모 세션).
 
-- 화면에서: **관리자 창구 홈 상단**의 **"데이터 초기화"** 버튼 (`data-act="reset"`) → 확인 → localStorage의 `sellery-proto-vNN`과 `slry-linkctx`가 지워지고 `seedData()`로 다시 생성됩니다.
+- 화면에서: **`/admin/demo` 상단**의 **"데이터 초기화"** 버튼 (`(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 에서만 열립니다. 실서비스 관리자 콘솔 `/admin/home` 에는 이 버튼이 없습니다) → 확인 → localStorage의 `sellery-proto-vNN`과 `slry-linkctx`가 지워지고 `seedData()`로 다시 생성됩니다.
 - 개발자 도구에서: 콘솔에 `localStorage.removeItem('sellery-proto-vNN'); localStorage.removeItem('slry-linkctx')` (NN 은 현재 숫자) 후 새로고침. 링크 컨텍스트 키를 빼먹으면 고객 판매센터가 같은 카테고리 상품을 계속 숨깁니다.
 - 로그인 데모 세션(`sellery-session`)은 별도 키라 초기화에 영향을 받지 않습니다.
 - **모든 방문자를 한 번에 리셋**하려면 `js/02-state.js`의 `LS` 버전을 올리세요 (시드 구조를 바꿨을 때는 필수).

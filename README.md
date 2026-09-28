@@ -11,7 +11,7 @@
 | `/` | 고객 판매 페이지 · 장바구니 · 카카오 로그인(데모) · 내 주문 (shop 앱 — 도메인 루트) |
 | `/influencer/` | 인플루언서 콘솔 1~2단계 (가입 · 이메일 인증 · 로그인 · 홈 · 내 정보 · 채널 인증 — 실서비스). 프로토타입 화면(캠페인 · DM · 상품 갤러리 · 정산 · 랭킹 · 셀러리 샵 · 추천)은 dev 의 `(demo)` 그룹 `/influencer/demo` |
 | `/brand/` | 브랜드 센터 (상품 관리 · 주문·발주 · 고객 문의 · 인플루언서 갤러리 · 정산) |
-| `/admin/` | 관리자 (검수 · 매칭·자동 제안 · 매출·순수익 · 정산 실행 · 데이터 초기화) |
+| `/admin/` | 관리자 콘솔 (홈 대시보드 · 인플루언서 · 브랜드 · 상품 검수 · 정산 실행 — 실서비스). 프로토타입 화면(매칭·자동 제안 · 매출·순수익 · 데이터 초기화)은 dev 의 `(demo)` 그룹 `/admin/demo` |
 | `/s/c1` | 판매 링크 진입 (링크 유입 보호 모드) |
 | `/influencer/login` | 인플루언서 콘솔 로그인 (이메일/비밀번호 · Supabase Auth · 실계정) |
 | `/brand/login` | 브랜드 로그인 데모 (계정 목록은 화면 안 · 비밀번호 8자 이상 아무거나) |
@@ -21,13 +21,13 @@
 ## 현재 서비스 상태 (2026-09-22 · S5 완료 · 도메인 전환 완료 · 파트너 콘솔 1~5단계)
 
 - **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` 판매 링크 · `/login` `/auth/*` 카카오 로그인 · `/checkout*` 토스 결제 · `/account/*` 내 주문 · `/api/*` · `/terms` `/privacy`). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐습니다.
-- `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~5단계**(가입 · 로그인 · 홈 · 내 정보 · 채널 인증 · 상품 갤러리 · 샘플 · 캠페인 · 매출 · 정산) 로, `/brand/*` 는 `apps/brand`(Vercel `sellery-brand`) 의 **브랜드 콘솔 1~5단계**(가입 · 로그인 · 홈 · 상품 · 처리 대기 · 캠페인 · 주문/발주 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급) 로 리라이트됩니다. `/admin/*` 는 아직 localStorage 데모 앱(`apps/admin`) 이며 상단 **데모 띠**("데모 화면 · 데이터는 이 브라우저에만 저장됩니다")와 `noindex` 가 붙습니다(두 콘솔의 남은 데모 화면은 `(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 만). Vercel 은 프로젝트 4개(옛 Next `sellery-app` 은 2026-09-21 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
-- **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료) · 브랜드 콘솔 1~5단계 완료(2026-09-22, 0014~0019 — 가입/로그인 · 상품 · 샘플 승인/발송 · 일정 확정 · 스레드 · 초대 · 주문/발주/운송장 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급).** 남은 것 = 두 콘솔의 6단계(🥬 · 데이터 열람 · 셀러리 샵 — 규제 검토 뒤, inf §5.8 · brand §6) · **관리자 콘솔**(`apps/admin` 데모 → 실서비스: 상품 검수 · 정산 실행 · 채널 인증 큐 · 정지/복구 — 지금은 `packages/db/scripts/partner-admin.mjs` 스크립트) · Preview/Production 의 `PUBLIC_DEMO` 정리. 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md).
+- `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~5단계**(가입 · 로그인 · 홈 · 내 정보 · 채널 인증 · 상품 갤러리 · 샘플 · 캠페인 · 매출 · 정산) 로, `/brand/*` 는 `apps/brand`(Vercel `sellery-brand`) 의 **브랜드 콘솔 1~5단계**(가입 · 로그인 · 홈 · 상품 · 처리 대기 · 캠페인 · 주문/발주 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급) 로 리라이트됩니다. `/admin/*` 는 `apps/admin`(Vercel `sellery-admin`) 의 **관리자 콘솔**(로그인 게이트 · 홈 대시보드 · 인플루언서 · 브랜드 · 상품 검수 · 캠페인 상세 · 정산 실행) 로 리라이트됩니다. 세 앱의 남은 데모 화면은 `(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 에서만 열립니다. Vercel 은 프로젝트 4개(옛 Next `sellery-app` 은 2026-09-21 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
+- **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료) · 브랜드 콘솔 1~5단계 완료(2026-09-22, 0014~0019 — 가입/로그인 · 상품 · 샘플 승인/발송 · 일정 확정 · 스레드 · 초대 · 주문/발주/운송장 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급).** **관리자 콘솔 실서비스 전환 완료(2026-09-28, PR #38~#64 — 로그인 게이트 · 홈 대시보드 · 인플루언서/브랜드 목록·상세 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 상세페이지 미리보기 · 캠페인 상세 · 정산 실행/지급 · 주문·CS).** 남은 것 = 두 콘솔의 6단계(🥬 · 데이터 열람 · 셀러리 샵 — 규제 검토 뒤, inf §5.8 · brand §6) · 관리자 콘솔의 매칭·자동 제안 · 매출·순수익(미착수 — 사유는 admin §파트너 관리 5) · Preview/Production 의 `PUBLIC_DEMO` 정리. 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/admin-console-plan.md](docs/admin-console-plan.md).
 - Supabase 스키마는 `supabase/migrations/0001~0019` 가 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011~0013 인플루언서 샘플/결제/정산 · 0014~0019 브랜드 콘솔). 새 변경은 새 번호로.
 
 ## 기술 스택
 
-**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래(shop 은 루트 `/`, 나머지는 `/influencer` `/brand` `/admin` 경로 — Vercel rewrite)로 배포되며, 같은 origin 이라 데모 앱(brand · admin)의 localStorage 데이터를 앱끼리 공유합니다. shop 과 influencer 콘솔은 Supabase SSR(`hooks.server.ts`) · 토스페이먼츠 실결제 · 카카오/이메일 실인증이 붙어 있고, brand · admin 은 아직 localStorage 데모입니다.
+**SvelteKit 2 · Svelte 5(runes) · TypeScript · Tailwind v4** 모노레포(npm workspaces). 앱 4개가 한 도메인 아래(shop 은 루트 `/`, 나머지는 `/influencer` `/brand` `/admin` 경로 — Vercel rewrite)로 배포되며, 같은 origin 이라 세션 쿠키를 앱끼리 공유합니다. **네 앱 모두** Supabase SSR(`hooks.server.ts`) 로 실인증·실데이터가 붙어 있고(shop 은 토스페이먼츠 실결제 · 카카오/이메일 인증), 각 앱에 남은 프로토타입 화면만 `(demo)` 그룹에서 localStorage 로 돕니다.
 
 ## 로컬 개발
 
@@ -53,7 +53,7 @@ npm run build                # 앱 4개 vite build → apps/*/.vercel/output (ad
 
 **정본은 [docs/deploy.md](docs/deploy.md)** — Vercel 프로젝트 표 · 환경변수 이름 · 리라이트 표 · 도메인 전환 체크리스트 · 운영 스크립트.
 
-Vercel 프로젝트 4개 — `sellery-shop`(Root Directory `apps/shop`, 도메인 `sellery.life` · `www`) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>`; "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel` · 리전 `icn1`). 브라우저 오리진은 하나 — `apps/shop/vercel.json` 의 rewrites 가 `/influencer/*` 를 `sellery-influencer`(콘솔), `/brand/*` `/admin/*` 를 데모 프로젝트로 프록시하므로 세션 쿠키를 모든 앱이 공유합니다. `main` 병합 = 프로덕션, PR = 앱별 Preview URL. 정적 자산은 shop 만 서빙합니다(다른 앱의 Preview URL 에서는 이미지 대신 이모지). 단계 기록은 [docs/monorepo-migration.md](docs/monorepo-migration.md) §7(S1~S5 완료).
+Vercel 프로젝트 4개 — `sellery-shop`(Root Directory `apps/shop`, 도메인 `sellery.life` · `www`) · `sellery-influencer` · `sellery-brand` · `sellery-admin`(각 `apps/<앱>`; "Include source files outside of the Root Directory" ON · Node 22 · `@sveltejs/adapter-vercel` · 리전 `icn1`). 브라우저 오리진은 하나 — `apps/shop/vercel.json` 의 rewrites 가 `/influencer/*` 를 `sellery-influencer`(콘솔), `/brand/*` 를 `sellery-brand`, `/admin/*` 를 `sellery-admin` 으로 프록시하므로 세션 쿠키를 모든 앱이 공유합니다. `main` 병합 = 프로덕션, PR = 앱별 Preview URL. 정적 자산은 shop 만 서빙합니다(다른 앱의 Preview URL 에서는 이미지 대신 이모지). 단계 기록은 [docs/monorepo-migration.md](docs/monorepo-migration.md) §7(S1~S5 완료).
 
 ## 구현된 흐름
 
@@ -85,7 +85,7 @@ apps/                 SvelteKit 앱 4개 — 라우트 = 화면 (폴더 이름�
   */svelte.config.js · vercel.json · src/hooks.server.ts   adapter-vercel(nodejs22.x · env.dir '../..') · 리전 icn1 (shop 은 /influencer /brand /admin rewrites) · Supabase SSR 세션 hooks
   influencer/         인플루언서 센터 (base /influencer)  src/routes/{+page, camps, dm, explore, sales, settle, rank, shop, ref, my, login, c/[cid], s/[cid]}
   brand/              브랜드 센터 (base /brand)           src/routes/{+page, camps, products, orders, cs, gallery, settle, my, dm, sales, shop, login, c/[cid], s/[cid]}
-  admin/              관리자 (base /admin)                src/routes/{+page, products, influencers, brands, orders, match, revenue, settle, c/[cid], s/[cid]}
+  admin/              관리자 콘솔 (base /admin)           src/routes/(console)/{home, login, sellers, brands, products(+[code]/preview), campaigns/[code], (money)/{settle, payouts, orders, payments, cs}} · 남은 데모는 (demo)/{demo, influencers, match, revenue}
 packages/core/src/    프레임워크 무관 로직 (TypeScript)
   constants.ts        PG_RATE · PLAT_RATE · WHT · CLEAR_DAYS · GRADES · LS 키 … 정책 숫자의 정답        ← 정책
   seed.ts             시드 데이터 — 데모 브랜드 · 인플루언서 · 상품 · 캠페인                              ← 카피 · 데모 데이터
@@ -123,6 +123,6 @@ supabase/             Supabase 스키마 — migrations/0001~0010 + seed.sql (�
 
 ---
 
-데이터는 브라우저 localStorage에 저장됩니다. 관리자(`/admin/`) 대시보드 상단의 **데이터 초기화** 버튼으로 시드 상태로 되돌립니다.
+`(demo)` 그룹 화면(dev 또는 `PUBLIC_DEMO=1`)의 데이터는 브라우저 localStorage 에 저장됩니다 — `/admin/demo` 상단의 **데이터 초기화** 버튼으로 시드 상태로 되돌립니다. 실서비스 콘솔은 Supabase 를 씁니다.
 
-> 프로토타입 전용 — 실제 결제·인증·서버는 붙어 있지 않습니다. 문의: official@weglow.biz
+> 문의: official@weglow.biz
