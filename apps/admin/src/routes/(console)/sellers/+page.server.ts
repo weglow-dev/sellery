@@ -61,7 +61,18 @@ export const load: PageServerLoad = async (event) => {
 		statusChips: SELLER_FILTERS.map((f) => ({
 			key: f,
 			label: SELLER_FILTER_LABELS[f],
-			count: f === 'all' ? counts.all : f === 'suspended' ? counts.suspended : f === 'hidden' ? counts.hidden : f === 'pending_channel' ? counts.pendingChannel : null,
+			count:
+				f === 'all'
+					? counts.all
+					: f === 'suspended'
+						? counts.suspended
+						: f === 'hidden'
+							? counts.hidden
+							: f === 'pending_channel'
+								? counts.pendingChannel
+								: f === 'no_settle_info'
+									? counts.noSettleInfo
+									: null,
 			href: chipHref({ filter: f === 'all' ? null : f })
 		})),
 		gradeChips: [{ key: '', label: '전체 등급', count: counts.all, href: chipHref({ grade: null }) }, ...gradeChips(grades).map((g) => ({ ...g, href: chipHref({ grade: g.key }) }))]
