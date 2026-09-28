@@ -5,7 +5,8 @@
 >
 > 이 문서는 두 절로 나뉜다. **"정산 · 돈"**(§정산·돈) 은 돈이 움직이는 쪽 — 정산 실행 · 지급 처리 · 이체 파일 · 원천징수 자료 ·
 > 주문/환불/결제 정합성/문의 열람(마이그레이션 0020 · 0021). **"파트너 관리"**(§파트너 관리) 는 파트너·상품·캠페인 쪽 —
-> 셸 · 인증 · 인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 홈 대시보드 · 캠페인 상세(**마이그레이션 0건**).
+> 셸 · 인증 · 인플루언서/브랜드 목록 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 홈 대시보드 · 캠페인 상세 · 매칭·자동 제안(**마이그레이션 0건**) ·
+> 매출·순수익(**0022** — 손익 집계 · 운영비 저장).
 >
 > 2026-09-22~27 에는 두 작업자가 나눠 만들었고 서로의 파일을 고치지 않는 규칙이 있었다. **그 분담은 끝났다** —
 > 담당이 1명이 된 뒤 홈(`(console)/home/+page.*`)에 양쪽 카드를 한 PR 에 올렸다(#63). 아래 파일 표는 소유자 구분이 아니라
@@ -150,10 +151,13 @@ PR-B 가 만드는 화면(이 절의 몫): `apps/admin/src/routes/(console)/sett
 | 8 | 캠페인 대행 쓰기는 **브랜드 RPC(`app_brand_*`) 를 그대로 부른다** | 상태 전이·이벤트 문구·기간 우선권 검사가 브랜드 콘솔과 같아야 한다. `p_brand_id` 를 인자로 받고 service_role 에 grant 돼 있다 |
 | 9 | 관리자 발신은 `sender='admin'`(**"셀러리 관리자"** + 인증 배지) | **열린 결정 — 아래 6** |
 | 10 | 데모 **[데이터 초기화]** 는 옮기지 않는다 | localStorage 시드 복원용 데모 버튼(`act.reset()`). 실서비스에서 같은 문구는 운영 데이터를 지우는 뜻이 되어서는 안 된다 |
+| 11 | 매출·순수익의 **GMV 는 샘플 구매분을 포함**한다(대시보드는 제외) | 샘플 구매는 실제 `orders` 행(`is_sample` · PAID)이라 돈이 들어온 것이고, 정산 규칙도 이미 다룬다(`base = net − sample_net` → 인플루언서 수수료 0 · PG·플랫폼 10% 적용). 데모와 같다(sample-policy §169 · 두 화면 차이는 §172). 브랜드 지급 규칙은 미정이라(0019:45) 해당 행에 표시한다 |
+| 12 | 매출·순수익 금액은 **0022 `admin_campaign_pnl` 이 계산**한다 | 0020 `app_admin_settle_preview` 는 정산 **실행 대상**만 봐서 `SAMPLE_PURCHASED` 를 거부한다(0020:336). 집계에는 같은 게이트를 쓸 이유가 없다. 계산식은 0020 과 동일하고 LIVE·CLEARING 21항목이 일치함을 확인했다 |
+| 13 | 자동 제안 발송은 **브랜드 RPC `app_brand_invite_seller`(0016) 대행**이다 | 상태 전이·이벤트 문구·게이트(비공개 · 우선권 등급 · 독점 · 중복)를 다시 구현하지 않는다(결정 8 과 같은 방식). 성공한 건에 `auto_proposed=true` 와 `admin_proxy_action` 을 남긴다 — 그 RPC 는 브랜드 직접 제안용이라 `invited=true` 만 세운다 |
 
-### 1. 마이그레이션이 필요 없었던 이유
+### 1. 마이그레이션 — 0022 하나뿐
 
-파트너 관리는 **새 마이그레이션을 만들지 않았다**(번호 0022 는 비어 있다). 필요한 것이 전부 있었다.
+파트너 관리 화면은 거의 다 **기존 컬럼·함수로** 만들었다. 새로 만든 것은 **0022(매출·순수익)** 하나다.
 
 ```
 sellers.active · sellers.hidden                          0001  정지/복구 · 갤러리 노출
@@ -169,9 +173,24 @@ campaign_post_chat(campaign, role, actor_user_id, body)  0016  발신(역할을 
 app_brand_{approve,reject}_sample · ship_sample ·        0015 · 0016  브랜드 대행 액션
   confirm_schedule · reject_schedule
 app_admin_settle_preview · app_admin_payments_health     0020  정산 미리보기 · 대시보드 정산 숫자
+app_brand_invite_candidates · app_brand_invite_seller    0016  자동 제안 후보 조건 · 발송(대행)
+sellers.recent_likes · categories.group_name             0001  성장세 · 카테고리 적합
+grade_tiers.is_priority · invite_cost_cel                0001  우선권 등급 제안 게이트(6단계)
+platform_settings.opex_default                           0001  매출·순수익 운영비 기본값
 ```
 
 **`sellers.hidden` 쓰기 경로만 새로 생겼다** — 그전에는 읽기만 있었다(`seller_is_public()` · 공개 조인).
+
+**0022_admin_revenue.sql** (매출·순수익 — 읽기 2 + `platform_settings` 한 행 쓰기):
+
+```
+admin_campaign_pnl(uuid)     캠페인 1건 손익. 0020 app_admin_settle_preview 의 계산부와 같은 식 · **상태 게이트 없음**
+app_admin_revenue()          손익 요약 19항목 + 판매별 행 + 셀러리 손익 + celCover + opex
+app_admin_save_opex(jsonb)   운영 비용 저장 — 아는 키만 · 음수·비숫자는 0
+```
+
+되돌리려면 세 함수를 `drop` 하면 된다(기존 테이블·함수를 바꾸지 않았다). `opex_default` 값은 보고용이라
+정산·지급에 영향이 없다.
 
 ### 2. 파일 배치
 
@@ -181,17 +200,25 @@ packages/db/src/admin/brand-rules.ts         순수 — 필터 · 등급 · 정�
 packages/db/src/admin/product-rules.ts       순수 — 상태 칩 · 필터 · 총 수수료 · 반려 사유            19개 테스트
 packages/db/src/admin/campaign-rules.ts      순수 — 상태 라벨·톤(데모 `ST` 이식) · 흐름 스테퍼 ·      10개 테스트
                                                     대행 액션 분기 · 기간 표기
+packages/db/src/admin/revenue-rules.ts       순수 — 손익 파서 · 운영비 집계 · 손익분기             21개 테스트
+packages/db/src/admin/match-rules.ts         순수 — 성장세 · 매칭 점수 · 카테고리 적합 · 후보 선정   27개 테스트
 packages/db/src/server/admin/sellers.server.ts    listSellers · getSeller · listPendingChannels ·
                                                   setSellerActive/Hidden · setChannelVerified · grantCelery
 packages/db/src/server/admin/brands.server.ts     listBrands · getBrand · setBrandActive/AutoPropose · grantBrandCelery
 packages/db/src/server/admin/products.server.ts   listAdminProducts · getAdminProduct · getProductPreviewCard · reviewProduct
 packages/db/src/server/admin/dashboard.server.ts  getAdminDashboard(카운트 · KPI · 오늘 할 일 · 캠페인) · listRecentActivity
 packages/db/src/server/admin/campaigns.server.ts  getAdminCampaign · 브랜드 대행 5종 · postAdminChat
+packages/db/src/server/admin/revenue.server.ts    getAdminRevenue · saveOpex (0022)
+packages/db/src/server/admin/match.server.ts      getAdminMatch · runAutoPropose · toggleAutoPropose
 apps/admin/src/lib/server/{env,db,admin}.ts       getAdminContext · requireAdmin · adminPath · adminNextOf
 apps/admin/src/lib/server/partners.ts             배럴(위 server/admin/* 전부)
 packages/db/src/console-paths.ts                  ConsoleRole += 'admin'
 packages/ui/src/site/console/PartnerShell.svelte  ROLE_LABEL.admin · TABS.admin (5탭)
 packages/ui/src/site/store/StoreView.svelte       `preview?: boolean` 한 줄(기본 false — shop 영향 없음)
+packages/db/src/console-paths.ts                  activeNavHref — 내비 활성 판정(접두 포함 전체 경로)
+packages/ui/src/site/console/ConsoleTabs.svelte   activeNavHref 사용 + `ConsoleTab.match`(탭 하나가 여러 화면)
+apps/admin/src/lib/money-nav.ts                   정산·돈 칩 표 + `moneyNavHref` · `MONEY_NAV_HREFS`
+apps/admin/src/lib/server/money.ts                배럴(정산 + 매출·순수익)
 ```
 
 화면:
@@ -204,7 +231,12 @@ packages/ui/src/site/store/StoreView.svelte       `preview?: boolean` 한 줄(�
 (console)/products · products/[code]           상품 목록 · 검수 상세(승인/반려/노출 · 판매 실적 · 상세 이미지)
 (console)/products/[code]/preview              상세페이지 미리보기(고객 화면과 같은 `StoreView` · 구매 불가)
 (console)/campaigns/[code]                     캠페인 상세 — 흐름 스테퍼 · 스레드 · 브랜드 대행 · 정산 미리보기
+(console)/match                                매칭·자동 제안 — 뜨는 인플루언서 · 브랜드 ON/OFF · 후보 · 실행 · 이력
+(console)/(money)/revenue                      매출·순수익 — KPI · 손익 요약 · 셀러리 손익 · 운영비 · 판매별 손익
 ```
+
+탭 배치 — 매칭·자동 제안은 **인플루언서 탭**(`ConsoleTab.match`), 매출·순수익은 **정산 탭의 화면 칩**(`money-nav`),
+캠페인 상세는 **홈 탭**(홈 대시보드에서 들어온다).
 
 ### 3. 데모 → 실서비스 대응
 
@@ -212,13 +244,17 @@ packages/ui/src/site/store/StoreView.svelte       `preview?: boolean` 한 줄(�
 |---|---|---|
 | 대시보드 히어로 · KPI 4장 · 오늘 할 일 · 최근 활동 · 전체 캠페인 | `(console)/home` | 최근 활동은 `campaign_events.body` 를 그대로 쓴다(DB 가 완성된 한 줄을 갖고 있어 문구 매핑이 없다) |
 | 대시보드 **[데이터 초기화]** | 없음 | 결정 10 |
-| 오늘 할 일 **"자동 제안 후보"** | 없음 | 자동 매칭 로직·화면이 없다(데모 `autoMatches()` 는 데모 함수) — 아래 5 |
+| 오늘 할 일 **"자동 제안 후보"** | `(console)/home` 에 있음 | 매칭 화면이 생겨 셀 수 있게 됐다(`getAdminMatch().candidates`) |
 | 오늘 할 일 "미인증 채널" | **두 줄로 나눔** | 데모는 `!verified` 전부. 관리자가 누를 것이 있는 건은 인증 코드까지 넣은 것뿐이라 "채널 인증 승인 대기" 와 "미인증 채널" 을 따로 둔다 |
 | 상품 목록 **[실적]** 모달 | 상품 상세의 "판매 실적" 표 | 같은 내용이 상세에 있어 모달을 따로 두면 정보가 두 곳에 생긴다. 익명화·블러·🥬 확인권은 빼고 실명으로(결정 5) |
 | 상품 목록 **[상세페이지]** | `products/[code]/preview` | 결정 4 |
 | 캠페인 상세(스레드 · 브랜드 액션 · 정산 미리보기) | `campaigns/[code]` | 결정 8 · 9 |
-| `(demo)/products` · `(demo)/brands` | 삭제 | 콘솔 라우트가 같은 URL 을 받으면 데모를 지운다(정산 쪽이 `settle`/`orders` 에서 쓴 방식) |
-| 매칭 · 자동 제안 / 매출 · 순수익 | **미착수** | 아래 5 |
+| 매출·순수익(KPI 4장 · 손익 요약 · 셀러리 손익 · 운영비 · 판매별 손익) | `(console)/(money)/revenue` | 결정 11 · 12. 운영비 기본값은 `platform_settings.opex_default`(0001 시드)에 이미 있었다 |
+| 매출·순수익 **운영 비용 입력** | 같은 화면 | 저장은 `app_admin_save_opex`(0022)가 `opex_default` 한 행에 쓴다. 입력을 바꾸면 저장 전에도 아래 표가 다시 계산된다(데모 `bind:value`) |
+| 매칭·자동 제안(뜨는 인플루언서 · 브랜드 ON/OFF · 후보 · 실행 · 이력) | `(console)/match` | 결정 13. 적격 조건은 `app_brand_invite_candidates`(0016)와 같다 — 데모보다 게이트가 셋 많다(아래) |
+| 매칭 화면의 **비공개·우선권 등급 후보** | 후보에서 제외 | 데모는 비공개를 후보에 넣고 점수만 −5 했다. 실서비스는 익명 스카우트·🥬 제안권이 **6단계**라 `app_brand_invite_seller` 가 `SELLER_HIDDEN` · `PRIORITY_INVITE_GATED` 로 막는다. 데모 안내문 "다이아·블랙은 브랜드 🥬 10 자동 차감" 이 그 게이트다. 뜨는 인플루언서 목록에는 **전원**을 보여주고 적격이 아니면 사유를 적는다 |
+| 매칭 화면의 **자동 제안 실행** | 관리자 수동 버튼 | 데모 안내는 "매일" 이지만 데모도 버튼이다. 크론 연결은 운영 결정 |
+| `(demo)/products` · `(demo)/brands` · `(demo)/revenue` · `(demo)/match` | 삭제 | 콘솔 라우트가 같은 URL 을 받으면 데모를 지운다(정산 쪽이 `settle`/`orders` 에서 쓴 방식) |
 
 ### 4. 검증 방식
 
@@ -238,10 +274,12 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 
 | 항목 | 이유 |
 |---|---|
-| **매칭 · 자동 제안** (+ 대시보드 "자동 제안 후보" 카드) | 자동 매칭 로직이 실서비스에 없다. 데모 `autoMatches()` 는 시드 위에서 도는 데모 함수고, 실제 후보를 뽑는 규칙(카테고리 · 등급 · 기간 충돌 · 과거 실적 가중)이 정해지지 않았다. 규칙 없이 화면을 만들면 빈 표가 된다 |
-| **매출 · 순수익** | 대시보드 KPI(누적 GMV · 플랫폼 순수익 · 테이크레이트)와 정산 화면이 이미 같은 숫자를 보여준다. 별도 화면이 필요한지는 운영이 무엇을 더 보고 싶은지 정해진 뒤 |
-| 반려 사유 입력이 `prompt()` | 디자인 시스템 모달이 없다(`influencer-spec §1.3`). 모달이 생길 때 상품 반려 · 캠페인 거절을 함께 고친다 |
-| 일괄 정산 미리보기 RPC | 대시보드가 캠페인마다 `app_admin_settle_preview` 를 부른다(결정 7). 캠페인이 수백 건이 되면 0022 로 일괄 RPC 를 추가한다 |
+| 반려 사유 입력이 `prompt()` | 디자인 시스템 모달이 없다(`influencer-spec §1.3`). 모달이 생길 때 상품 반려(목록 · 상세 2곳) · 캠페인 거절을 함께 고친다 |
+| 일괄 정산 미리보기 RPC | 대시보드와 매출·순수익이 캠페인마다 `app_admin_settle_preview` / `admin_campaign_pnl` 을 부른다(결정 7 · 12). 캠페인이 수백 건이 되면 일괄 RPC 를 추가한다 |
+| 자동 제안 크론 | 지금은 관리자 수동 버튼이다(결정 13). 매일 돌릴지 · 몇 건씩 · 실패 알림은 운영 결정 |
+| 6단계 의존 화면 | 🥬 제안권 · 갤러리 열람(익명 스카우트) · 셀러리 샵 — 그게 들어오면 매칭 후보에 우선권 등급·비공개 인플루언서가 포함된다 |
+
+**매칭·자동 제안과 매출·순수익은 만들었다** — 미착수 화면은 이제 없다(§3 대응 표).
 
 ### 6. 열린 결정 — 관리자 발신자 표시
 

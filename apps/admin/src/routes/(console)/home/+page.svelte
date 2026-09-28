@@ -76,6 +76,11 @@
 			n: data.todo.noSettleInfoAccounts,
 			label: '정산정보 미등록 계정',
 			href: `${data.paths.brands}?filter=no_settle_info`
+		},
+		{
+			n: data.autoMatchCandidates,
+			label: '자동 제안 후보',
+			href: data.paths.match
 		}
 	]);
 </script>

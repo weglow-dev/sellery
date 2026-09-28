@@ -13,6 +13,7 @@
  *   listBrands · getBrand · setBrandActive · setBrandAutoPropose · grantBrandCelery
  *   listAdminProducts · getAdminProduct · getProductPreviewCard · reviewProduct (0015 app_admin_review_product)
  *   getAdminDashboard · listRecentActivity — 관리자 홈(대시보드) 카운트 · KPI · 오늘 할 일 · 캠페인 · 최근 활동
+ *   getAdminMatch · runAutoPropose · toggleAutoPropose — 매칭·자동 제안(0016 app_brand_invite_seller 대행)
  *   getAdminCampaign · approveSampleAsAdmin · rejectSampleAsAdmin · shipSampleAsAdmin · confirmScheduleAsAdmin ·
  *     rejectScheduleAsAdmin · postAdminChat — 캠페인 상세(브랜드 대행 · 관리자 발신 · 0015/0016 RPC 재사용)
  * 순수 규칙(필터·칩·검색·문구)은 `.svelte` 에서 `@sellery/db/admin/{seller-rules,brand-rules,product-rules}` 를 직접 import 한다.
@@ -24,5 +25,6 @@ export * from '@sellery/db/server/admin/brands';
 export * from '@sellery/db/server/admin/products';
 export * from '@sellery/db/server/admin/dashboard';
 export * from '@sellery/db/server/admin/campaigns';
+export * from '@sellery/db/server/admin/match';
 // 폼 액션 레이트리밋 — 인플루언서·브랜드 콘솔과 같은 유틸(프로세스 메모리 · 30분 20건). 게이트 뒤에서만.
 export { rateLimit, RATE_LIMIT_MESSAGE } from '@sellery/db/server/partner/seller';
