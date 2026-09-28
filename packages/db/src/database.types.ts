@@ -2102,6 +2102,7 @@ export type Database = {
     }
     Functions: {
       admin_bank_snapshot: { Args: { p_bank_info: Json }; Returns: Json }
+      admin_campaign_pnl: { Args: { p_campaign_id: string }; Returns: Json }
       admin_hold_label: { Args: { p_code: string }; Returns: string }
       admin_order_json: {
         Args: { o: Database["public"]["Tables"]["orders"]["Row"] }
@@ -2154,10 +2155,12 @@ export type Database = {
         Returns: Json
       }
       app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
+      app_admin_revenue: { Args: never; Returns: Json }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
         Returns: Json
       }
+      app_admin_save_opex: { Args: { p_opex: Json }; Returns: Json }
       app_admin_rrn_export: {
         Args: {
           p_actor: string

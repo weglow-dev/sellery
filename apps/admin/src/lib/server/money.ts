@@ -8,6 +8,7 @@
  *   `configureDb` 는 넘긴 키만 갱신하므로 `./env` 가 넣은 값은 그대로다. Vercel `sellery-admin` 에 추가되는 이름: `TOSS_SECRET_KEY` · `RRN_ENC_KEY`(둘 다 선택 — docs/deploy.md §1.2).
  *
  *   previewSettlement · runSettlement · runDueSettlements · listAdminSettlements · markPayoutPaid · holdPayout · releasePayout · exportPayouts · exportRrn
+ *   getAdminRevenue · saveOpex — 매출·순수익(0022 app_admin_revenue · app_admin_save_opex)
  *   listAdminOrders · getAdminOrder · getPaymentsHealth · paymentsHealthIssues · listAdminCs · getAdminCsThread · refundOrderAsAdmin
  */
 import './env';
@@ -21,6 +22,7 @@ configureDb({ rrnEncKey: env.RRN_ENC_KEY });
 export * from '@sellery/db/server/admin/settle';
 export * from '@sellery/db/server/admin/orders';
 export * from '@sellery/db/server/admin/payments';
+export * from '@sellery/db/server/admin/revenue';
 export * from '@sellery/db/server/admin/cs';
 export * from '@sellery/payments/server/admin-refund';
 // 폼 액션 레이트리밋 — 인플루언서·브랜드 콘솔과 같은 유틸(프로세스 메모리 · 30분 20건). 게이트(`./admin` requireAdmin) 뒤에서만.
