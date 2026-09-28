@@ -50,3 +50,25 @@ export function consoleUrl(role: ConsoleRole, path: string, siteUrl: string | nu
   const base = (siteUrl ?? "").trim().replace(/\/+$/, "");
   return base ? `${base}${rel}` : rel;
 }
+
+/**
+ * 내비 항목의 활성 판정 — 현재 경로가 어느 항목 아래인가. **둘 다 접두를 포함한 전체 경로**여야 한다
+ * (`packages/ui/src/site/console/ConsoleTabs.svelte` 와 같은 기준).
+ *
+ * `$app/paths` 의 `base` 를 빼서 맞추려 하면 안 된다 — SvelteKit 2 는 `paths.relative` 기본값이 `true` 라서
+ * **SSR 중 `base` 가 상대 경로**(`.` · `..`)가 되고, `pathname.slice(base.length)` 가 `admin/settle` 처럼
+ * 선행 `/` 없는 문자열이 되어 어떤 href 와도 맞지 않는다.
+ *
+ * 겹치는 항목이 있으면(`/admin/settle` 과 `/admin/settle/payouts`) **더 구체적인 쪽만** 활성이다 —
+ * 특정 경로를 예외로 박지 않고 길이로 정한다.
+ */
+export function activeNavHref(pathname: string, hrefs: readonly string[]): string | null {
+  let best: string | null = null;
+  for (const h of hrefs) {
+    if (!h) continue;
+    if (pathname === h || pathname.startsWith(`${h}/`)) {
+      if (best === null || h.length > best.length) best = h;
+    }
+  }
+  return best;
+}

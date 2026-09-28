@@ -46,7 +46,8 @@
 			{ href: '/sellers', label: '인플루언서', icon: 'user' },
 			{ href: '/brands', label: '브랜드', icon: 'flag' },
 			{ href: '/products', label: '상품', icon: 'box' },
-			{ href: '/settle', label: '정산', icon: 'chart' }
+			// 정산 탭 안의 화면 칩(`apps/admin/src/lib/money-nav.ts`)이 가는 곳 — 그 화면에서도 탭이 켜져야 한다
+			{ href: '/settle', label: '정산', icon: 'chart', match: ['/orders', '/payments', '/revenue', '/cs'] }
 		]
 	};
 </script>
@@ -65,7 +66,9 @@
 		children
 	}: { role?: ConsoleRole; me?: ShellMe | null; pathname?: string; children: Snippet } = $props();
 
-	const tabs = $derived(TABS[role].map((t) => ({ ...t, href: consolePath(role, t.href) })));
+	const tabs = $derived(
+		TABS[role].map((t) => ({ ...t, href: consolePath(role, t.href), match: t.match?.map((m) => consolePath(role, m)) }))
+	);
 	const homeHref = $derived(consolePath(role, '/home'));
 	const signoutAction = $derived(`${consolePath(role, '/auth/signout')}?next=${encodeURIComponent(consolePath(role, '/login'))}`);
 </script>

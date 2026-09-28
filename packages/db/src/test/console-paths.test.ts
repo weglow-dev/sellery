@@ -1,6 +1,6 @@
 // 콘솔 경로 — 경로 모드만 (web/src/lib/hosts.ts 의 consolePath 경로 모드 분기와 같은 결과)
 import { describe, expect, it } from "vitest";
-import { CONSOLE_PUBLIC_PATHS, consolePath, consoleUrl, isConsolePublicPath } from "../console-paths";
+import { CONSOLE_PUBLIC_PATHS, activeNavHref, consolePath, consoleUrl, isConsolePublicPath } from "../console-paths";
 
 describe("consolePath", () => {
   it("항상 접두 붙은 상대 경로", () => {
@@ -26,5 +26,99 @@ describe("isConsolePublicPath", () => {
     expect(isConsolePublicPath("/login/x")).toBe(true);
     expect(isConsolePublicPath("/loginx")).toBe(false);
     expect(isConsolePublicPath("/home")).toBe(false);
+  });
+});
+
+describe("activeNavHref — 내비 활성 판정 (접두 포함 전체 경로끼리)", () => {
+  /** 관리자 정산·돈 칩 (apps/admin/src/lib/money-nav.ts 를 consolePath 로 접두 붙인 결과) */
+  const MONEY = [
+    "/admin/settle",
+    "/admin/settle/payouts",
+    "/admin/orders",
+    "/admin/payments",
+    "/admin/revenue",
+    "/admin/cs",
+  ] as const;
+
+  it("정확히 일치하면 그 항목", () => {
+    expect(activeNavHref("/admin/revenue", MONEY)).toBe("/admin/revenue");
+    expect(activeNavHref("/admin/payments", MONEY)).toBe("/admin/payments");
+    expect(activeNavHref("/admin/settle", MONEY)).toBe("/admin/settle");
+  });
+
+  it("하위 경로도 그 항목 — 상세 화면에서도 칩이 켜진다", () => {
+    expect(activeNavHref("/admin/orders/o1151", MONEY)).toBe("/admin/orders");
+    expect(activeNavHref("/admin/cs/q1", MONEY)).toBe("/admin/cs");
+    expect(activeNavHref("/admin/settle/c5", MONEY)).toBe("/admin/settle");
+  });
+
+  it("겹치면 더 구체적인 쪽만 — /settle/payouts 에서 /settle 은 켜지지 않는다", () => {
+    expect(activeNavHref("/admin/settle/payouts", MONEY)).toBe("/admin/settle/payouts");
+    expect(activeNavHref("/admin/settle/payouts/p1", MONEY)).toBe("/admin/settle/payouts");
+  });
+
+  it("어느 항목도 아니면 null", () => {
+    expect(activeNavHref("/admin/home", MONEY)).toBeNull();
+    expect(activeNavHref("/admin/sellers", MONEY)).toBeNull();
+    expect(activeNavHref("/admin", MONEY)).toBeNull();
+  });
+
+  it("접두를 뺀 경로로는 맞지 않는다 — base 를 빼서 비교하면 안 되는 이유", () => {
+    expect(activeNavHref("/revenue", MONEY)).toBeNull();
+    // SvelteKit paths.relative=true 일 때 pathname.slice(base.length) 가 만들어내던 값
+    expect(activeNavHref("admin/revenue", MONEY)).toBeNull();
+  });
+
+  it("부분 문자열에 걸리지 않는다", () => {
+    expect(activeNavHref("/admin/revenues", MONEY)).toBeNull();
+    expect(activeNavHref("/admin/settled", MONEY)).toBeNull();
+  });
+
+  it("빈 href · 빈 목록", () => {
+    expect(activeNavHref("/admin/revenue", [])).toBeNull();
+    expect(activeNavHref("/admin/revenue", ["", "/admin/revenue"])).toBe("/admin/revenue");
+  });
+
+  it("셸 탭에도 같은 기준이 쓰인다", () => {
+    const TABS = ["/admin/home", "/admin/sellers", "/admin/brands", "/admin/products", "/admin/settle"] as const;
+    expect(activeNavHref("/admin/products/p1/preview", TABS)).toBe("/admin/products");
+    expect(activeNavHref("/admin/settle/payouts", TABS)).toBe("/admin/settle");
+  });
+});
+
+describe("activeNavHref — 탭 하나가 여러 화면을 묶을 때 (ConsoleTab.match)", () => {
+  /** 관리자 하단 탭 — 정산 탭은 정산 그룹의 화면 칩이 가는 곳도 자기 것으로 본다 */
+  const TAB_HREFS = [
+    "/admin/home",
+    "/admin/sellers",
+    "/admin/brands",
+    "/admin/products",
+    "/admin/settle",
+    // 정산 탭의 match
+    "/admin/orders",
+    "/admin/payments",
+    "/admin/revenue",
+    "/admin/cs",
+  ] as const;
+
+  it("정산 그룹 화면에서도 히트한다 — 어느 탭에도 안 걸려 탭이 꺼지던 문제", () => {
+    expect(activeNavHref("/admin/orders", TAB_HREFS)).toBe("/admin/orders");
+    expect(activeNavHref("/admin/payments", TAB_HREFS)).toBe("/admin/payments");
+    expect(activeNavHref("/admin/revenue", TAB_HREFS)).toBe("/admin/revenue");
+    expect(activeNavHref("/admin/cs", TAB_HREFS)).toBe("/admin/cs");
+  });
+
+  it("하위 경로도 마찬가지", () => {
+    expect(activeNavHref("/admin/orders/o1151", TAB_HREFS)).toBe("/admin/orders");
+    expect(activeNavHref("/admin/cs/q1", TAB_HREFS)).toBe("/admin/cs");
+  });
+
+  it("match 가 다른 탭을 가로채지 않는다 — 더 구체적인 쪽이 이긴다", () => {
+    expect(activeNavHref("/admin/products/p1/preview", TAB_HREFS)).toBe("/admin/products");
+    expect(activeNavHref("/admin/settle/payouts", TAB_HREFS)).toBe("/admin/settle");
+  });
+
+  it("탭에도 match 에도 없는 경로는 여전히 null", () => {
+    expect(activeNavHref("/admin/campaigns/c1", TAB_HREFS)).toBeNull();
   });
 });
