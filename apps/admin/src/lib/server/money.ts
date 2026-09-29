@@ -9,6 +9,7 @@
  *
  *   previewSettlement · runSettlement · runDueSettlements · listAdminSettlements · markPayoutPaid · holdPayout · releasePayout · exportPayouts · exportRrn
  *   getAdminRevenue · saveOpex — 매출·순수익(0022 app_admin_revenue · app_admin_save_opex)
+ *   listSampleSettleDue · settleSampleAsAdmin · listSampleRefundDue — 샘플 구매 대금(0024)
  *   listAdminOrders · getAdminOrder · getPaymentsHealth · paymentsHealthIssues · listAdminCs · getAdminCsThread · refundOrderAsAdmin
  */
 import './env';
@@ -23,7 +24,10 @@ export * from '@sellery/db/server/admin/settle';
 export * from '@sellery/db/server/admin/orders';
 export * from '@sellery/db/server/admin/payments';
 export * from '@sellery/db/server/admin/revenue';
+export * from '@sellery/db/server/admin/sample';
 export * from '@sellery/db/server/admin/cs';
 export * from '@sellery/payments/server/admin-refund';
+// 샘플 결제 환불 — 토스 현금분 취소 → app_partner_payment_refund 까지 한 함수가 한다(0012 §5.7 순서 보장)
+export { refundSamplePurchase } from '@sellery/payments/server/partner-sample';
 // 폼 액션 레이트리밋 — 인플루언서·브랜드 콘솔과 같은 유틸(프로세스 메모리 · 30분 20건). 게이트(`./admin` requireAdmin) 뒤에서만.
 export { rateLimit, RATE_LIMIT_MESSAGE } from '@sellery/db/server/partner/seller';

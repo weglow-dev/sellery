@@ -2156,11 +2156,17 @@ export type Database = {
       }
       app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
       app_admin_revenue: { Args: never; Returns: Json }
+      app_admin_sample_refund_due: { Args: never; Returns: Json }
+      app_admin_sample_settle_due: { Args: never; Returns: Json }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
         Returns: Json
       }
       app_admin_save_opex: { Args: { p_opex: Json }; Returns: Json }
+      app_admin_settle_sample: {
+        Args: { p_actor_user_id?: string; p_campaign_id: string }
+        Returns: Json
+      }
       app_admin_rrn_export: {
         Args: {
           p_actor: string
@@ -2538,6 +2544,7 @@ export type Database = {
         Args: { c: Database["public"]["Tables"]["campaigns"]["Row"] }
         Returns: Json
       }
+      business_days_after: { Args: { p_days: number; p_from: string }; Returns: string }
       brand_gmv: { Args: { p_brand: string }; Returns: number }
       brand_grade_for_gmv: { Args: { p_gmv: number }; Returns: string }
       brand_normalize_phone: { Args: { p_raw: string }; Returns: string }
