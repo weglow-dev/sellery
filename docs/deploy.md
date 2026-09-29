@@ -435,6 +435,18 @@ npx supabase db reset       # migrations 0001~ + seed.sql 적용 (sellers 8 · b
 
 테스트 계정은 §8.1 의 `dev-{admin,seller,brand,user}.mjs`(모두 production 거부). `db reset` 으로 계정이 사라지면 같은 한 줄로 복구된다.
 
+**새 마이그레이션이 들어오면(`git pull` 로 `supabase/migrations/` 가 늘면) 로컬을 다시 맞춘다.**
+
+```bash
+npx supabase db reset                                   # 새 번호까지 적용 + seed.sql
+node --env-file=.env.local packages/db/scripts/dev-admin.mjs --email admin@local.test --password localdev1234
+                                                        # reset 으로 지워진 계정 복구 (필요하면 dev-seller/brand/user 도)
+```
+
+로컬이 뒤처지면 **새 함수가 없어서 화면이 조용히 실패한다** — 예: 0020 이 없던 로컬에서 정산 화면 전체가 오류였고,
+반대로 0022 를 클라우드에 `db push` 하지 않아 운영 매출·순수익이 "손익을 불러오지 못했습니다" 로 떴다(2026-09-28).
+**마이그레이션이 든 PR 은 병합 뒤 `npx supabase db push --linked` 를 잊지 않는다**(§6.1 · `--dry-run` 으로 올라갈 파일을 먼저 확인).
+
 **함정 세 가지.**
 
 1. **`.env.local` 을 바꾸면 dev 서버를 재시작한다.** `PUBLIC_*` 는 `$env/static/public` — 기동 시점에 번들에 인라인되므로 HMR 로 반영되지 않는다. 브라우저 탭도 하드 리로드(`Cmd+Shift+R`)가 필요하다. 로컬로 바꿨는데 로그인이 실패하면 거의 이것이다(요청이 옛 번들의 클라우드 주소로 간다 — Network 탭의 `token?grant_type=password` Request URL 로 확인).

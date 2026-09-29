@@ -128,3 +128,57 @@ describe("activeNavHref — 탭 하나가 여러 화면을 묶을 때 (ConsoleTa
     expect(activeNavHref("/admin/demo", TAB_HREFS)).toBeNull();
   });
 });
+
+describe("activeNavHref — 세 콘솔의 탭 밖 라우트가 없다 (ConsoleTab.match)", () => {
+  /** PartnerShell TABS 를 consolePath 로 접두 붙인 결과 — 탭 href + match 전부 */
+  const SELLER = [
+    "/influencer/home",
+    "/influencer/products",
+    "/influencer/pay", // 상품 탭의 match — 샘플 구매 결제
+    "/influencer/campaigns",
+    "/influencer/sales",
+    "/influencer/settle", // 매출 탭의 match — 정산 자료
+    "/influencer/my",
+  ] as const;
+
+  const BRAND = [
+    "/brand/home",
+    "/brand/sales", // 홈 탭의 match
+    "/brand/settle", // 홈 탭의 match
+    "/brand/products",
+    "/brand/campaigns",
+    "/brand/requests", // 캠페인 탭의 match
+    "/brand/orders",
+    "/brand/cs", // 주문 탭의 match
+    "/brand/my",
+  ] as const;
+
+  it("인플루언서 — 샘플 결제 · 정산 자료도 걸린다", () => {
+    expect(activeNavHref("/influencer/pay/new", SELLER)).toBe("/influencer/pay");
+    expect(activeNavHref("/influencer/pay/abc123", SELLER)).toBe("/influencer/pay");
+    expect(activeNavHref("/influencer/pay/success", SELLER)).toBe("/influencer/pay");
+    expect(activeNavHref("/influencer/settle", SELLER)).toBe("/influencer/settle");
+    expect(activeNavHref("/influencer/settle/doc", SELLER)).toBe("/influencer/settle");
+  });
+
+  it("브랜드 — 매출·정산·처리 대기·문의도 걸린다", () => {
+    expect(activeNavHref("/brand/sales", BRAND)).toBe("/brand/sales");
+    expect(activeNavHref("/brand/settle", BRAND)).toBe("/brand/settle");
+    expect(activeNavHref("/brand/settle/doc", BRAND)).toBe("/brand/settle");
+    expect(activeNavHref("/brand/requests", BRAND)).toBe("/brand/requests");
+    expect(activeNavHref("/brand/cs/q1", BRAND)).toBe("/brand/cs");
+  });
+
+  it("match 가 기존 탭을 가로채지 않는다", () => {
+    expect(activeNavHref("/influencer/products/p1", SELLER)).toBe("/influencer/products");
+    expect(activeNavHref("/brand/products/p1/invite", BRAND)).toBe("/brand/products");
+    expect(activeNavHref("/brand/campaigns/c1", BRAND)).toBe("/brand/campaigns");
+    expect(activeNavHref("/brand/orders/o1", BRAND)).toBe("/brand/orders");
+  });
+
+  it("공개 경로는 여전히 어느 탭도 아니다 — 셸 밖이다", () => {
+    for (const p of ["/influencer/login", "/influencer/signup", "/brand/apply", "/brand/suspended"]) {
+      expect(activeNavHref(p, [...SELLER, ...BRAND])).toBeNull();
+    }
+  });
+});
