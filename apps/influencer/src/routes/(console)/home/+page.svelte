@@ -97,8 +97,10 @@
 		<a href={data.productsPath} class="btn sm ghost">상품 갤러리</a>
 		<a href={data.campaignsPath} class="btn sm ghost">내 캠페인</a>
 		<a href={data.salesPath} class="btn sm ghost">실시간 매출</a>
-		<!-- 등급을 궁금해하는 사람은 이 카드를 본다 — 랭킹의 주 진입로다(탭 6개로 늘리지 않은 이유) -->
+		<!-- 등급·추천을 궁금해하는 사람은 이 카드를 본다 — 두 화면의 주 진입로다(탭 6개로 늘리지 않은 이유).
+		     라벨은 프로토타입 사이드바와 같다: '랭킹·등급' · '추천 프로그램' -->
 		<a href={data.rankingPath} class="btn sm ghost">랭킹·등급</a>
+		<a href={data.referralPath} class="btn sm ghost">추천 프로그램</a>
 		<a href={data.myPath} class="btn sm ghost">내 정보</a>
 	</div>
 </div>
