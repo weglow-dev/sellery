@@ -4,6 +4,7 @@
 	 * UI 는 sellers/brands 상세 · 주문 상세와 같은 console-det / kv / actions 톤.
 	 */
 	import { nextListingDecision, productStatusChip, totalFeeLine } from '@sellery/db/admin/product-rules';
+	import { REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { GradeBox, ProductIcon, StatusChip } from '@sellery/ui/site';
@@ -24,15 +25,6 @@
 	const ask = (msg: string) => (e: SubmitEvent) => {
 		if (!confirm(msg)) e.preventDefault();
 	};
-	function askReject(e: SubmitEvent) {
-		const form = e.currentTarget as HTMLFormElement;
-		const reason = prompt(`${p.name} 을 반려합니다. 사유를 입력하세요 (브랜드 상품 화면에 표시됩니다 · 200자 이내)`);
-		if (!reason || !reason.trim()) {
-			e.preventDefault();
-			return;
-		}
-		(form.querySelector('input[name="reason"]') as HTMLInputElement).value = reason.trim().slice(0, 200);
-	}
 	const period = (c: { start_date: string | null; end_date: string | null }) =>
 		c.start_date && c.end_date ? `${md(c.start_date)}–${md(c.end_date)}` : '미정';
 </script>
@@ -294,11 +286,21 @@
 						<input type="hidden" name="decision" value="approve" />
 						<button type="submit" class="pri sm">승인</button>
 					</form>
-					<form method="post" action="?/review" onsubmit={askReject}>
-						<input type="hidden" name="decision" value="reject" />
-						<input type="hidden" name="reason" value="" />
-						<button type="submit" class="danger sm">반려</button>
-					</form>
+					<!-- 반려 사유 — 목록 화면과 같은 console-reject 펼침 폼 (prompt() 대신) -->
+					<details class="console-reject">
+						<summary class="btn danger sm">반려</summary>
+						<form method="post" action="?/review" class="console-form console-reject-form">
+							<input type="hidden" name="decision" value="reject" />
+							<textarea
+								name="reason"
+								rows="2"
+								required
+								maxlength={REJECT_REASON_MAX}
+								placeholder="반려 사유 (필수 · 브랜드 상품 화면에 표시돼요 · {REJECT_REASON_MAX}자 이내)"
+							></textarea>
+							<button type="submit" class="danger sm">반려 확정</button>
+						</form>
+					</details>
 				{:else if p.status === 'rejected'}
 					<form method="post" action="?/review">
 						<input type="hidden" name="decision" value="approve" />

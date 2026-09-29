@@ -8,6 +8,7 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { GradeBox, ProductIcon, StatusChip } from '@sellery/ui/site';
 	import { goto } from '$app/navigation';
+	import { REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -30,18 +31,6 @@
 	const ask = (msg: string) => (e: SubmitEvent) => {
 		if (!confirm(msg)) e.preventDefault();
 	};
-	/** 반려 — 사유를 prompt 로 받아 hidden 에 채운다(데모 `rejectProduct` 자리) */
-	function askReject(name: string) {
-		return (e: SubmitEvent) => {
-			const form = e.currentTarget as HTMLFormElement;
-			const reason = prompt(`${name} 을 반려합니다. 사유를 입력하세요 (브랜드 상품 화면에 표시됩니다 · 200자 이내)`);
-			if (!reason || !reason.trim()) {
-				e.preventDefault();
-				return;
-			}
-			(form.querySelector('input[name="reason"]') as HTMLInputElement).value = reason.trim().slice(0, 200);
-		};
-	}
 </script>
 
 <svelte:head>
@@ -224,12 +213,24 @@
 									<input type="hidden" name="decision" value="approve" />
 									<button type="submit" class="pri sm">승인</button>
 								</form>
-								<form method="post" action="?/review" onsubmit={askReject(p.name)}>
-									<input type="hidden" name="product" value={p.code ?? p.id} />
-									<input type="hidden" name="decision" value="reject" />
-									<input type="hidden" name="reason" value="" />
-									<button type="submit" class="danger sm">반려</button>
-								</form>
+								<!-- 반려 사유는 브라우저 prompt() 대신 펼침 폼으로 받는다 — 브랜드 `/requests` 의
+								     console-reject 패턴과 같은 것. prompt() 는 모바일에서 보기 나쁘고 글자 수 제한을
+								     보여주지 못하며, 일부 브라우저가 차단한다. -->
+								<details class="console-reject">
+									<summary class="btn danger sm">반려</summary>
+									<form method="post" action="?/review" class="console-form console-reject-form">
+										<input type="hidden" name="product" value={p.code ?? p.id} />
+										<input type="hidden" name="decision" value="reject" />
+										<textarea
+											name="reason"
+											rows="2"
+											required
+											maxlength={REJECT_REASON_MAX}
+											placeholder="반려 사유 (필수 · 브랜드 상품 화면에 표시돼요 · {REJECT_REASON_MAX}자 이내)"
+										></textarea>
+										<button type="submit" class="danger sm">반려 확정</button>
+									</form>
+								</details>
 							{:else if p.status === 'rejected'}
 								<form method="post" action="?/review">
 									<input type="hidden" name="product" value={p.code ?? p.id} />
