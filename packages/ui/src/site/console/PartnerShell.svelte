@@ -24,18 +24,23 @@
 	export const TABS: Record<ConsoleRole, ConsoleTab[]> = {
 		seller: [
 			{ href: '/home', label: '홈', icon: 'home' },
-			{ href: '/products', label: '상품', icon: 'box' },
+			// 샘플 구매 결제(/pay/*)는 상품 상세에서 들어온다 — 상품에서 샘플을 사는 흐름의 연속
+			{ href: '/products', label: '상품', icon: 'box', match: ['/pay'] },
 			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
-			{ href: '/sales', label: '매출', icon: 'chart' },
+			// 정산 자료(/settle)는 매출·내 정보에서 들어온다 — 매출의 후속 단계
+			{ href: '/sales', label: '매출', icon: 'chart', match: ['/settle'] },
 			{ href: '/my', label: '내 정보', icon: 'user' }
 		],
 		// 브랜드 = 홈 · 상품 · 캠페인 · 주문 · 내 정보 (docs/brand-console-plan.md 결정 6 — 매일 할 일은 발송·CS; /sales /settle /cs 는 홈·주문·내 정보 안의 링크).
 		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) 였다 — 상품·캠페인 2단계 · 주문 4단계 · 내 정보 5단계에서 전부 풀렸다.
 		brand: [
-			{ href: '/home', label: '홈', icon: 'home' },
+			// 매출·정산(/sales · /settle)은 브랜드 탭에 정산 칸이 없고 주 진입로가 홈이라 홈에 묶는다
+			{ href: '/home', label: '홈', icon: 'home', match: ['/sales', '/settle'] },
 			{ href: '/products', label: '상품', icon: 'box' },
-			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
-			{ href: '/orders', label: '주문', icon: 'truck' },
+			// 처리 대기(/requests)는 홈·캠페인·캠페인 상세에서 들어온다 — 캠페인 단계의 할 일
+			{ href: '/campaigns', label: '캠페인', icon: 'flag', match: ['/requests'] },
+			// 고객 문의(/cs)는 홈·주문에서 들어온다 — 배송·교환·반품 문의라 주문과 한 묶음
+			{ href: '/orders', label: '주문', icon: 'truck', match: ['/cs'] },
 			{ href: '/my', label: '내 정보', icon: 'user' }
 		],
 		// 관리자 = 홈 · 인플루언서 · 브랜드 · 상품 · 정산. 지금까지 `packages/db/scripts/partner-admin.mjs` 로 하던 운영을 화면으로 옮긴다.

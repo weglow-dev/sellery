@@ -297,6 +297,12 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 상태 전이 대행(승인 · 발송 · 일정 · 자동 제안)은 `event_type='admin_proxy_action'` 행으로 따로 남는다 —
 브랜드 RPC 가 만드는 이벤트는 `actor_role='brand'` 라 대행 여부를 구분할 수 없기 때문이다(결정 8 · 13).
 
+**탭 밖 라우트**: 세 콘솔 모두 `ConsoleTab.match` 로 묶었다 — 관리자 정산 탭이 `/orders` `/payments`
+`/revenue` `/cs` 를, 홈 탭이 `/campaigns` 를, 인플루언서 탭이 `/match` 를 갖는다. 인플루언서 콘솔은
+상품 탭 ← `/pay`(샘플 결제) · 매출 탭 ← `/settle`(정산 자료), 브랜드 콘솔은 홈 탭 ← `/sales` `/settle`
+(브랜드 탭에 정산 칸이 없고 주 진입로가 홈이다) · 캠페인 탭 ← `/requests` · 주문 탭 ← `/cs`.
+근거는 각 화면의 **실제 진입 경로**다(어디서 링크로 들어오는가).
+
 **용어**: 발신자·행위자 표시는 세 곳 모두 "셀러리 관리자" 로 통일했다 — `senderLabel('admin')`(캠페인 스레드) ·
 `csSenderLabel('admin')`(고객 문의 스레드) · `admin_proxy_action` 이벤트 문구. 일반 명칭으로서의 "운영팀"
 (검수 안내 · 문의 안내 · 정지 안내)은 조직을 가리키는 말이라 그대로 둔다.
