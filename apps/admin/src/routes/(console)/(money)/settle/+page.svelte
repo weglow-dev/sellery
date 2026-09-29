@@ -5,8 +5,10 @@
 	 *   [도래분 일괄 실행] `?/runDue`(confirm) → 건별 결과(settleRunSummary) 를 아래 notice 목록으로.
 	 *   대기 큐 표: 캠페인 · 인플루언서 · 브랜드 · 종료/기준일(dueLabel) · 예상 인플/브랜드 지급 · 보류 예고 · [미리보기] → /settle/[code].
 	 *   정산 명세 표(`?status=`): 스냅샷 행 → /settle/[code]. 375px 는 카드 모드(.admin-table).
+	 *   0024 샘플 구매 대금 두 큐 — 발송 후 진행 안 한 건은 [샘플 대금 정산](브랜드 지급) · 5영업일 미발송은 [환불](토스 취소 + 🥬 복구).
 	 */
 	import { dueLabel, settlementStatusChip } from '@sellery/db/admin/settle-rules';
+	import { SAMPLE_REFUND_NOTICE } from '@sellery/db/admin/sample-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { ProductIcon, StatusChip } from '@sellery/ui/site';
@@ -16,6 +18,14 @@
 	const d = $derived(data.data);
 	const money = (n: number) => `₩${fmtNum(n)}`;
 	const detail = (code: string) => `${data.self}/${encodeURIComponent(code)}`;
+	/** 미발송 환불 — 토스 취소가 함께 일어나므로 확인을 받는다 */
+	const confirmRefund = (name: string, amount: number) => (e: SubmitEvent) => {
+		if (!confirm(`${name} 의 샘플 구매 ${money(amount)} 을 환불할까요? 토스 카드 결제를 전액 취소하고 🥬 를 복구하며, 되돌릴 수 없어요.`)) e.preventDefault();
+	};
+	/** 샘플 대금 정산 — 되돌릴 수 없으므로 확인을 받는다 */
+	const confirmSample = (name: string, amount: number) => (e: SubmitEvent) => {
+		if (!confirm(`${name} 의 샘플 대금 ${money(amount)} 을 브랜드에 지급할까요? 지급 대기에 올라가며 되돌릴 수 없어요.`)) e.preventDefault();
+	};
 	const confirmRunDue = (e: SubmitEvent) => {
 		const n = d?.counts.due_now ?? 0;
 		if (!confirm(`기준일이 도래한 ${n}건을 지금 정산할까요? 스냅샷 · 지급 2건 · 등급 · 🥬 · 추천 보상이 한 번에 기록되며 되돌릴 수 없어요.`)) e.preventDefault();
@@ -72,6 +82,113 @@
 			{/if}
 		{/if}
 	</section>
+
+	<!-- ---------------- 0024 샘플 대금 정산 대기 ---------------- -->
+	{#if data.sampleDue.length}
+		<section class="card static">
+			<h4 class="admin-h4">샘플 대금 정산 <span class="meta">{data.sampleDue.length}건</span></h4>
+			<p class="meta">
+				샘플을 발송한 뒤 인플루언서가 판매를 진행하지 않은 건입니다 — 실물을 이미 보냈으므로 대금은 브랜드에 지급합니다.
+				판매 정산이 돌지 않아 지금까지 어디에도 지급되지 않은 돈입니다.
+			</p>
+			<div class="tblw admin-table">
+				<table>
+					<thead>
+						<tr>
+							<th>캠페인</th>
+							<th>인플루언서</th>
+							<th>브랜드</th>
+							<th class="num">샘플 구매액</th>
+							<th class="num">브랜드 지급</th>
+							<th>발송일</th>
+							<th>상태</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.sampleDue as r (r.campaignId)}
+							<tr>
+								<td data-l="캠페인">
+									{r.productName ?? '—'}
+									{#if r.campaignCode}<span class="console-mono meta">{r.campaignCode.toUpperCase()}</span>{/if}
+									{#if r.productSampleRefund}<span class="meta"> · 환급 옵션 상품이지만 판매 미확정이라 환급하지 않습니다</span>{/if}
+								</td>
+								<td data-l="인플루언서">{r.sellerName ?? '—'} <span class="console-mono meta">{r.sellerHandle ?? ''}</span></td>
+								<td data-l="브랜드">{r.brandName ?? '—'}</td>
+								<td class="num" data-l="샘플 구매액">
+									{money(r.samplePrice)}
+									{#if r.sampleCel}<span class="meta"> 🥬{r.sampleCel}</span>{/if}
+								</td>
+								<td class="num" data-l="브랜드 지급"><b>{money(r.brandPayout)}</b></td>
+								<td data-l="발송일">{r.shippedOn ?? '—'}</td>
+								<td data-l="상태"><StatusChip tone="gray">{r.campaignStatus === 'PASSED' ? '인플루언서 패스' : r.campaignStatus === 'DECLINED' ? '제안 거절' : '거절됨'}</StatusChip></td>
+								<td data-l="">
+									<form method="post" action="?/settleSample" onsubmit={confirmSample(r.productName ?? r.campaignCode ?? '캠페인', r.brandPayout)}>
+										<input type="hidden" name="campaign" value={r.campaignCode ?? r.campaignId} />
+										<button type="submit" class="pri sm">샘플 대금 정산</button>
+									</form>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	{/if}
+
+	<!-- ---------------- 0024 미발송 환불 대상 ---------------- -->
+	{#if data.refundDue.rows.length}
+		<section class="card static">
+			<h4 class="admin-h4">미발송 환불 대상 <span class="meta">{data.refundDue.rows.length}건</span></h4>
+			<p class="notice danger" role="status">{SAMPLE_REFUND_NOTICE}</p>
+			<p class="meta">
+				인플루언서가 샘플을 구매했는데 브랜드가 영업일 {data.refundDue.shipDays}일 안에 발송하지 않은 건입니다.
+				샘플 구매는 브랜드 승인 없이 결제 즉시 발송 단계로 가므로 브랜드가 모르고 방치할 수 있습니다.
+				영업일은 주말만 제외하고 셉니다(공휴일 미반영). 발송한 뒤 진행하지 않은 건은 위 "샘플 대금 정산" 에서 브랜드에 지급합니다.
+			</p>
+			<div class="tblw admin-table">
+				<table>
+					<thead>
+						<tr>
+							<th>캠페인</th>
+							<th>인플루언서</th>
+							<th>브랜드</th>
+							<th class="num">환불액</th>
+							<th>결제일</th>
+							<th>기한</th>
+							<th class="num">경과</th>
+							<th></th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.refundDue.rows as r (r.paymentId)}
+							<tr>
+								<td data-l="캠페인">
+									{r.productName ?? '—'}
+									{#if r.campaignCode}<span class="console-mono meta">{r.campaignCode.toUpperCase()}</span>{/if}
+								</td>
+								<td data-l="인플루언서">{r.sellerName ?? '—'} <span class="console-mono meta">{r.sellerHandle ?? ''}</span></td>
+								<td data-l="브랜드">{r.brandName ?? '—'}</td>
+								<td class="num" data-l="환불액">
+									<b>{money(r.amountTotal)}</b>
+									{#if r.amountCel}<span class="meta"> 현금 {money(r.amountCash)} · 🥬{r.amountCel}</span>{/if}
+								</td>
+								<td data-l="결제일">{r.paidOn ?? '—'}</td>
+								<td data-l="기한">{r.dueOn ?? '—'}</td>
+								<td class="num" data-l="경과">{r.daysOver}일</td>
+								<td data-l="">
+									<form method="post" action="?/refundSample" onsubmit={confirmRefund(r.productName ?? r.campaignCode ?? '캠페인', r.amountTotal)}>
+										<input type="hidden" name="payment" value={r.paymentId} />
+										<button type="submit" class="ghost sm">환불</button>
+									</form>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	{/if}
 
 	<!-- ---------------- 대기 큐 ---------------- -->
 	<div class="sec">정산 대기 (교환 · 환불 기간) <span class="console-sec-sub">— 지금 기준 예상값 · 실행 시점에 다시 계산됩니다</span></div>

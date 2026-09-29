@@ -313,8 +313,8 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 |---|---|---|
 | 판매까지 진행 | 판매 정산에 함께 지급(현행) | ✅ 이미 동작 |
 | **환급 옵션 상품**(`products.sample_refund`) | 인플루언서에게 **전액** 환급 · 재원은 브랜드 몫 + 플랫폼 수수료에서 **차감** · PG 와 `bReward` 는 플랫폼 부담 | ✅ **0023** |
-| 발송 후 진행하지 않음(패스 · 거절) | **브랜드 지급** — 실물을 보냈고, 무상 샘플 경로(등급·월 한도)를 우회하지 않게 | ⬜ 후속 PR |
-| 결제됐으나 **영업일 5일** 내 미발송 | **인플루언서 전액 환불** · 캠페인 종결 | ⬜ 후속 PR |
+| 발송 후 진행하지 않음(패스 · 거절) | **브랜드 지급** — 실물을 보냈고, 무상 샘플 경로(등급·월 한도)를 우회하지 않게 | ✅ **0024** |
+| 결제됐으나 **영업일 5일** 내 미발송 | **인플루언서 전액 환불** · 캠페인 종결 | ✅ **0024** + 화면 `[환불]` |
 
 **0023 이 한 것** — `app_admin_settle_preview` 를 재정의해 환급 재원을 차감한다. `app_admin_settle_run`(0020:555)이
 이 함수를 호출하므로 미리보기 · 실행 · 매출·순수익(0022) 이 모두 따라온다. 0020 파일은 수정하지 않았다.
@@ -322,6 +322,30 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 그래도 요율 변경에 대비해 `greatest(…, 0)` 으로 `payouts.amount >= 0`(0004)을 지킨다.
 환급이 없는 캠페인은 계산이 한 줄도 바뀌지 않음을 적용 전/후 22항목 비교로 확인했다.
 
-**후속 PR 에서 만들 것** — 캠페인 종결 시 샘플 대금만 정산하는 경로(`settlements.campaign_id` 가 unique 라
-판매 정산과 겹치지 않는다) · 영업일 계산 함수(공휴일 미반영) · 5영업일 미발송 자동 환불 크론
-(`app_partner_payment_refund`(0012) 재사용 — 토스 취소 + 🥬 복구) · 관리자 정산 화면의 "샘플 대금" 큐.
+**0024 가 한 것**
+
+```
+business_days_after(date, n)        영업일 계산 — 주말만 제외(**공휴일 미반영**)
+platform_sample_ship_days()         기한 — platform_settings.sample_ship_days(기본 5)
+app_admin_settle_sample(campaign)   발송 후 종결 건의 샘플 대금 정산 → settlements 1행 + payouts(브랜드)
+app_admin_sample_settle_due()       정산 대기 큐
+app_admin_sample_refund_due()       5영업일 미발송 환불 **대상 목록** (실행하지 않는다)
+```
+
+금액은 `admin_campaign_pnl`(0022)을 쓴다 — 샘플만 있는 캠페인의 `brand_payout` 이 곧 샘플 대금의 브랜드 몫이다
+(인플루언서 수수료는 `base = net − sample_net = 0` 이라 0). `settlements` 의 NOT NULL 요율·등급 컬럼은 그 함수가
+반환하지 않아(손익 집계용) 0024 가 `platform_settings` · `grade_tiers` · `brand_grade_tiers` 에서 직접 읽는다.
+
+**환급은 적용하지 않는다** — 환급 조건은 "판매 확정 시" 이고 이 경로는 판매가 확정되지 않은 건이다.
+그래서 `sample_refund_cel/cash` 는 0 이고 대금이 브랜드에 간다. 환급 옵션 상품이면 화면이 그 사실을 적는다.
+
+**환불은 화면에서 실행한다** — `refundSamplePurchase`(`@sellery/payments/server/partner-sample`)가 순서를 지킨다:
+①  토스 현금분 전액 취소(Idempotency-Key `${id}:refund`)  ②  성공(또는 이미 취소)해야
+`app_partner_payment_refund`(0012 — 🥬 복구 · 캠페인 `DECLINED` · 주문 `CANCELED` · 결제 `REFUNDED`).
+**토스 취소가 실패하면 DB 를 건드리지 않는다** — 화면이 "DB 는 바꾸지 않았습니다, 같은 건으로 다시 시도하세요"
+(같은 멱등키라 중복 취소되지 않는다)로 안내하고, 토스는 됐지만 DB 가 실패한 경우는 다른 문구로 구분한다.
+관리자 앱은 이미 `configurePayments({ secretKey: TOSS_SECRET_KEY })` 를 주입한다(`lib/server/money.ts`).
+환불된 건은 주문이 `CANCELED` 라 샘플 대금 정산 큐에서 자동으로 빠진다(`REFUNDED` 코드로 거부).
+
+**남은 것** — 자동 환불 **크론**(지금은 관리자가 버튼으로 실행. 자동화하면 사람 확인 없이 카드가 취소되므로
+켜는 시점은 운영 결정) · 공휴일 반영(`business_days_after` 는 주말만 제외).
