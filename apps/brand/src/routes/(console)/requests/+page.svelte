@@ -121,3 +121,49 @@
 		<div class="empty" style="padding:24px">대기 중인 요청이 없습니다 ✓<div class="meta" style="margin-top:8px">인플루언서가 샘플을 요청하면 여기에 쌓여요 — 보통 24시간 안에 응답해주세요.</div></div>
 	{/each}
 </div>
+
+<!-- 독점권 신청(0025) — 캠페인이 아직 없는 요청이라 위 목록과 데이터 모양이 다르다. 승인하면 그 인플루언서만 상품을 진행할 수 있다. -->
+{#if data.exclusives.length}
+	<div class="sec" style="margin-top:22px">
+		👑 독점권 신청 <span class="badge">{data.exclusives.length}</span>
+		<span class="console-sec-sub">— 승인하면 그 인플루언서만 이 상품을 진행합니다</span>
+	</div>
+	<div class="listcard console-rows">
+		{#each data.exclusives as x (x.id)}
+			<div class="rowitem">
+				<div class="grow">
+					<div class="nm">
+						{#if x.seller.grade}<GradeBox grade={x.seller.grade} sm />{/if}
+						{x.seller.name ?? '알 수 없음'}
+						{#if x.seller.handle}<span class="sub">{x.seller.handle}</span>{/if}
+					</div>
+					<div class="meta">
+						{#if x.productCode && x.productHref}<a href={x.productHref}>{x.productName ?? x.productCode}</a>{:else}{x.productName ?? '-'}{/if}
+						{#if x.label}· {x.label}{/if}
+						{#if x.needGrade}· {x.needGrade} 이상{/if}
+					</div>
+					<div class="meta">
+						{#if x.seller.followers !== null}팔로워 {fmtNum(x.seller.followers)}{/if}
+						{#if x.seller.m3Sales !== null}· 3개월 매출 ₩{fmtNum(x.seller.m3Sales)}{/if}
+					</div>
+				</div>
+				{#if x.locked}
+					<div class="rowacts"><span class="chip">이미 확정된 상품</span></div>
+				{:else}
+					<div class="rowacts">
+						<form method="post" action="?/approveExclusive" class="console-form">
+							<input type="hidden" name="id" value={x.id} />
+							<input type="hidden" name="code" value={x.productCode ?? ''} />
+							<button type="submit" class="pri sm">승인</button>
+						</form>
+						<form method="post" action="?/rejectExclusive" class="console-form">
+							<input type="hidden" name="id" value={x.id} />
+							<input type="hidden" name="code" value={x.productCode ?? ''} />
+							<button type="submit" class="danger sm">거절</button>
+						</form>
+					</div>
+				{/if}
+			</div>
+		{/each}
+	</div>
+{/if}

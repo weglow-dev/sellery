@@ -2,6 +2,8 @@
 	/**
 	 * 상품 상세 — 프로토타입 productDetailModal(js/20-seller.js) 을 페이지로 + 샘플 섹션(sampleBuyModal 의 금액 표 · reqSample 의 배송지 입력).
 	 * 익명 실적 표(인플루언서별 팔로워·참여율·매출 + 데이터패스 마스킹)는 다음 단계 — 지금은 집계 두 개(캠페인 수 · 확정 판매 수량)만.
+	 * 독점권(0025): 오퍼가 걸린 상품이면 `data.exclusive.button` 으로 [독점권 신청] — 자격 판정은 DB, 문구는 `exclusiveButton`.
+	 *   신청 뒤 `?msg=exclusive` 로 돌아온다(대기 상태 표시). 승인은 브랜드 콘솔 `/brand/requests`.
 	 * 샘플 섹션은 `quote.mode`: free(배송지 폼 → ?/requestFree) · buy(금액 표 + [샘플 구매 ₩N] → /pay/new?product= · 🥬 사용 선택은 결제 화면) · locked(독점 안내) · active(캠페인 링크) · unlisted.
 	 * 실패한 제출은 `form`(fail 400) 으로 돌아온다 — 입력값 유지 · 실패 필드 강조 · 문구는 REQUEST_FREE_SAMPLE_MESSAGES / notFreeMessage 원문.
 	 */
@@ -9,6 +11,8 @@
 	import { discountPct, fmtNum, imageSrc } from '@sellery/db/campaign';
 	import { BUY_COMING_SOON, BUY_REASON_TITLES, campaignChip } from '@sellery/db/partner/sample-rules';
 	import { GradeBox, ProductIcon, ShippingFields, StatusChip } from '@sellery/ui/site';
+	import { page } from '$app/state';
+	import { EXCLUSIVE_MESSAGES } from '@sellery/db/partner/exclusive-rules';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -16,6 +20,15 @@
 	const q = $derived(data.quote);
 	const b = $derived(data.button);
 	const disc = $derived(discountPct(p.consumer_price, p.sale_price));
+	const excl = $derived(data.exclusive);
+	/** 신청 직후 303 으로 돌아온 안내 (`?msg=exclusive` · `exclusiveAlready`). */
+	const exclMsg = $derived(
+		page.url.searchParams.get('msg') === 'exclusive'
+			? EXCLUSIVE_MESSAGES.requested
+			: page.url.searchParams.get('msg') === 'exclusiveAlready'
+				? EXCLUSIVE_MESSAGES.already
+				: null
+	);
 	const topBonus = GRADES[0]?.bonus ?? 3;
 	const pct = (r: number) => (r * 100).toFixed(0);
 	const logo = $derived(imageSrc(p.brand.logo_url));
@@ -66,10 +79,23 @@
 	<div class="exclbox">
 		<div class="lbl-sm">👑 브랜드 독점권 오퍼</div>
 		<p><b>{p.exclusive_label}</b> — <b>{p.exclusive_grade ?? '플래티넘'}</b> 등급 이상 인플루언서에게 드립니다.</p>
-		{#if q?.exclusive_locked}
+		{#if exclMsg}
+			<p class="excl-msg" role="status">{exclMsg}</p>
+		{/if}
+		{#if excl}
+			{#if excl.button.enabled}
+				<form method="POST" action="?/requestExclusive">
+					<button class="pri sm" type="submit" title={excl.button.hint}>{excl.button.label}</button>
+				</form>
+			{:else}
+				<p class="excl-state" data-kind={excl.button.kind}><b>{excl.button.label}</b></p>
+			{/if}
+			{#if excl.button.hint}
+				<p class="meta" style="font-size:12px">{excl.button.hint}</p>
+			{/if}
+		{:else if q?.exclusive_locked}
+			<!-- 오퍼 조회를 건너뛴 경우(상품이 내려갔다 등) — 견적의 잠금 플래그로 안내 -->
 			<p style="font-size:12.5px"><b>독점 인플루언서 확정됨</b> — 이 상품의 샘플 요청은 제한됩니다.</p>
-		{:else}
-			<p class="meta" style="font-size:12px">독점권 신청은 다음 단계(브랜드 콘솔과 함께)에서 열립니다.</p>
 		{/if}
 	</div>
 {/if}

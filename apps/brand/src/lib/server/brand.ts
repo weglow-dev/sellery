@@ -19,6 +19,7 @@ export * from '@sellery/db/server/brand/brand';
 export * from '@sellery/db/server/brand/signup';
 export * from '@sellery/db/server/brand/products';
 export * from '@sellery/db/server/brand/campaigns';
+export * from '@sellery/db/server/brand/exclusive';
 export * from '@sellery/db/server/brand/schedule';
 export * from '@sellery/db/server/brand/invite';
 export * from '@sellery/db/server/brand/orders';
