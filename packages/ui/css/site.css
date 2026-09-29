@@ -1156,6 +1156,16 @@
   .exclbox { background: var(--color-lime-soft); padding: 12px 14px; margin: 12px 3px; box-shadow: var(--shadow-frame-soft); }
   .exclbox p { margin: 6px 0 0; font-size: 13px; }
   .exclbox form { margin: 8px 0 0; }
+  /* 랭킹(0026) — 내 행 강조 · 추천 코드 · 보상 구조 목록 */
+  .tblw tr.merow { background: var(--color-lime-soft); font-weight: 700; }
+  .tblw tr.merow td { font-weight: inherit; }
+  .ref-code-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 12px 0 8px; }
+  .ref-code {
+    font-family: var(--font-display); font-size: 27px; font-weight: 800; letter-spacing: 0.12em;
+    background: var(--color-lime); padding: 4px 18px; box-shadow: var(--shadow-frame-soft);
+  }
+  .ref-terms { font-size: 13px; margin: 10px 0 0; padding-left: 18px; line-height: 2; }
+  .ref-terms li + li { margin-top: 2px; }
   /* 독점권(0025) — 신청 직후 안내 · 누를 수 없는 상태 표시. 상태별 톤: 내 것(mine) 은 강조, 나머지는 차분하게 */
   .exclbox .excl-msg {
     margin: 8px 0 0; padding: 7px 10px; font-size: 12.5px; font-weight: 700;

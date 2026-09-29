@@ -26,3 +26,4 @@ export * from '@sellery/db/server/partner/settle';
 export * from '@sellery/db/server/partner/schedule';
 export * from '@sellery/db/server/partner/chat';
 export * from '@sellery/db/server/partner/exclusive';
+export * from '@sellery/db/server/partner/rank';

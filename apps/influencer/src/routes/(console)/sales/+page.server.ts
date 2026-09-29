@@ -34,6 +34,7 @@ export const load: PageServerLoad = async (event) => {
 		totals: sales?.totals ?? null,
 		campaigns,
 		campaignsPath: sellerPath('/campaigns'),
-		settlePath: sellerPath('/settle')
+		settlePath: sellerPath('/settle'),
+		rankingPath: sellerPath('/ranking')
 	};
 };

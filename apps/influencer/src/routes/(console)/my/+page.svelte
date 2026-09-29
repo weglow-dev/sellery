@@ -194,3 +194,12 @@
 		<a href={data.settlePath} class="btn {seller.has_bank_info ? 'ghost' : 'pri'} sm">{seller.has_bank_info ? '정산 정보 · 내역 보기' : '정산 정보 등록'}</a>
 	</div>
 </section>
+
+<!-- 추천 프로그램(0026) — 내 추천 코드·내가 데려온 사람. 같은 탭(내 정보)에 묶여 있다. -->
+<section class="card static" style="margin-top:14px">
+	<div class="lbl-sm">추천 프로그램</div>
+	<p class="meta" style="margin:8px 0 10px">동료 인플루언서를 데려오면 그 사람의 첫 판매에서 보상을 받아요 — 전액 셀러리 부담이라 서로의 수수료율은 그대로예요.</p>
+	<div class="btnrow">
+		<a href={data.referralPath} class="btn ghost sm">내 추천 코드 · 보상 보기</a>
+	</div>
+</section>

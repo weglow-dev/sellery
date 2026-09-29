@@ -30,6 +30,7 @@ export const load: PageServerLoad = async (event) => {
 		productsPath: sellerPath('/products'),
 		campaignsPath: sellerPath('/campaigns'),
 		salesPath: sellerPath('/sales'),
+		rankingPath: sellerPath('/ranking'),
 		myPath: sellerPath('/my')
 	};
 };
