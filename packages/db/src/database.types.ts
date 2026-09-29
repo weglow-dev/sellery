@@ -2158,6 +2158,9 @@ export type Database = {
       app_admin_revenue: { Args: never; Returns: Json }
       app_admin_sample_refund_due: { Args: never; Returns: Json }
       app_admin_exclusive_requests: { Args: { p_status?: string | null }; Returns: Json }
+      app_seller_ranking: { Args: { p_seller_id: string }; Returns: Json }
+      app_seller_referral: { Args: { p_seller_id: string }; Returns: Json }
+      platform_ref_times: { Args: never; Returns: number }
       app_seller_request_exclusive: {
         Args: { p_product_id: string; p_seller_id: string }
         Returns: Json

@@ -82,7 +82,8 @@ export const load: PageServerLoad = async (event) => {
 		shipping: parseStoredShipping(seller.sample_address),
 		invalidField: sp.get('field'),
 		myPath: sellerPath('/my'),
-		settlePath: sellerPath('/settle')
+		settlePath: sellerPath('/settle'),
+		referralPath: sellerPath('/referral')
 	};
 };
 

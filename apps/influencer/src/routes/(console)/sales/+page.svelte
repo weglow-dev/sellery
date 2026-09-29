@@ -52,6 +52,7 @@
 	</div>
 {/if}
 
+<!-- 랭킹 진입은 홈 '내 등급' 카드가 주 경로 — 여기서는 매출을 본 뒤 순위를 보고 싶을 때의 보조 링크 -->
 {#if !data.campaigns.length}
 	<div class="listcard">
 		<div class="empty">
@@ -156,4 +157,9 @@
 			</div>
 		</section>
 	{/each}
+</div>
+
+<div class="btnrow" style="margin-top:16px">
+	<a href={data.settlePath} class="btn sm ghost">정산 내역</a>
+	<a href={data.rankingPath} class="btn sm ghost">랭킹·등급</a>
 </div>

@@ -28,8 +28,10 @@
 			{ href: '/products', label: '상품', icon: 'box', match: ['/pay'] },
 			{ href: '/campaigns', label: '캠페인', icon: 'flag' },
 			// 정산 자료(/settle)는 매출·내 정보에서 들어온다 — 매출의 후속 단계
-			{ href: '/sales', label: '매출', icon: 'chart', match: ['/settle'] },
-			{ href: '/my', label: '내 정보', icon: 'user' }
+			// 랭킹(/ranking)도 매출 기반이다(최근 3개월 확정 매출 순위) — 같은 탭에 묶는다
+			{ href: '/sales', label: '매출', icon: 'chart', match: ['/settle', '/ranking'] },
+			// 추천 프로그램(/referral)은 내 추천 코드·내가 데려온 사람 — 내 정보에 묶는다
+			{ href: '/my', label: '내 정보', icon: 'user', match: ['/referral'] }
 		],
 		// 브랜드 = 홈 · 상품 · 캠페인 · 주문 · 내 정보 (docs/brand-console-plan.md 결정 6 — 매일 할 일은 발송·CS; /sales /settle /cs 는 홈·주문·내 정보 안의 링크).
 		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) 였다 — 상품·캠페인 2단계 · 주문 4단계 · 내 정보 5단계에서 전부 풀렸다.

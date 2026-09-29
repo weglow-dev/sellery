@@ -302,6 +302,11 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 **관리자는 열람만**(`app_admin_exclusive_requests`). 승인 시 같은 상품의 남은 대기 신청을 자동 거절한다
 (프로토타입 `approveExcl` 은 남겨둬서 재승인 시 독점 인플루언서가 덮어써졌다).
 
+**랭킹·추천(0026)**: 프로토타입 `/rank` · `/ref` 를 콘솔로 옮겼다 — 실서비스 이름은 `/ranking` ·
+`/referral`(데모 라우트와 URL 이 충돌한다. 관리자가 데모 `/influencers` → 실서비스 `/sellers` 로 바꾼 것과 같다).
+리더보드는 **본인 외 전원 익명** — RPC 가 남의 이름을 담지 않고 파서가 한 번 더 덮는다. 추천 보상 금액은
+정산이 적재한 `referral_earnings`(0020) 를 읽기만 한다. 탭은 랭킹 → 매출(매출 기반), 추천 → 내 정보(내 코드).
+
 **탭 밖 라우트**: 세 콘솔 모두 `ConsoleTab.match` 로 묶었다 — 관리자 정산 탭이 `/orders` `/payments`
 `/revenue` `/cs` 를, 홈 탭이 `/campaigns` 를, 인플루언서 탭이 `/match` 를 갖는다. 인플루언서 콘솔은
 상품 탭 ← `/pay`(샘플 결제) · 매출 탭 ← `/settle`(정산 자료), 브랜드 콘솔은 홈 탭 ← `/sales` `/settle`
