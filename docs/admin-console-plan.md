@@ -297,6 +297,11 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 상태 전이 대행(승인 · 발송 · 일정 · 자동 제안)은 `event_type='admin_proxy_action'` 행으로 따로 남는다 —
 브랜드 RPC 가 만드는 이벤트는 `actor_role='brand'` 라 대행 여부를 구분할 수 없기 때문이다(결정 8 · 13).
 
+**독점권(0025)**: `exclusive_requests`(0002) 는 테이블만 있고 쓰는 코드가 없었다 — 오퍼와 잠금은 동작하는데
+신청·승인이 없어 운영자가 DB 를 직접 고쳐야 했다. 신청 = 인플루언서 상품 상세, 승인 = 브랜드 `/requests`,
+**관리자는 열람만**(`app_admin_exclusive_requests`). 승인 시 같은 상품의 남은 대기 신청을 자동 거절한다
+(프로토타입 `approveExcl` 은 남겨둬서 재승인 시 독점 인플루언서가 덮어써졌다).
+
 **탭 밖 라우트**: 세 콘솔 모두 `ConsoleTab.match` 로 묶었다 — 관리자 정산 탭이 `/orders` `/payments`
 `/revenue` `/cs` 를, 홈 탭이 `/campaigns` 를, 인플루언서 탭이 `/match` 를 갖는다. 인플루언서 콘솔은
 상품 탭 ← `/pay`(샘플 결제) · 매출 탭 ← `/settle`(정산 자료), 브랜드 콘솔은 홈 탭 ← `/sales` `/settle`

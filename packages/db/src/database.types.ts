@@ -2157,6 +2157,32 @@ export type Database = {
       app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
       app_admin_revenue: { Args: never; Returns: Json }
       app_admin_sample_refund_due: { Args: never; Returns: Json }
+      app_admin_exclusive_requests: { Args: { p_status?: string | null }; Returns: Json }
+      app_seller_request_exclusive: {
+        Args: { p_product_id: string; p_seller_id: string }
+        Returns: Json
+      }
+      app_seller_exclusive_requests: {
+        Args: { p_product_id?: string; p_seller_id: string }
+        Returns: Json
+      }
+      app_brand_exclusive_requests: {
+        Args: { p_brand_id: string; p_status?: string | null }
+        Returns: Json
+      }
+      app_brand_decide_exclusive: {
+        Args: { p_approve: boolean; p_brand_id: string; p_request_id: string }
+        Returns: Json
+      }
+      seller_exclusive_eligible: {
+        Args: { p_product_id: string; p_seller_id: string }
+        Returns: {
+          eligible: boolean
+          grade: string | null
+          need_grade: string | null
+          reason: string
+        }[]
+      }
       app_admin_sample_settle_due: { Args: never; Returns: Json }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }

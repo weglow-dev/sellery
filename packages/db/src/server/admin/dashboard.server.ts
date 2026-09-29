@@ -123,10 +123,10 @@ export type AdminDashboard = {
     pendingProducts: number;
     /**
      * 독점권 신청 대기(`exclusive_requests.status='PENDING'`) — **참고용 숫자다.**
-     * 승인은 브랜드가 한다(데모 `approveExcl` 은 브랜드 화면에서 호출된다). 게다가 실서비스에는
-     * 신청·승인 경로가 아직 없다 — 인플루언서·브랜드 콘솔은 오퍼(`products.exclusive_grade`·`exclusive_label`)만
-     * 보여주고 `exclusive_requests` 에 쓰는 코드가 어디에도 없다(지금 값은 시드 1건).
-     * 그래서 관리자 홈의 "오늘 할 일" 에는 넣지 않는다 — 관리자가 처리할 수 없는 일은 할 일이 아니다.
+     * 승인은 브랜드가 한다(0025 `app_brand_decide_exclusive` · 브랜드 `/requests` 의 독점권 섹션).
+     * 신청은 인플루언서가 한다(0025 `app_seller_request_exclusive` · 상품 상세의 [독점권 신청]).
+     * 관리자는 열람만 한다(`app_admin_exclusive_requests`) — 그래서 관리자 홈의 "오늘 할 일" 에는
+     * 넣지 않는다. 관리자가 처리할 수 없는 일은 할 일이 아니다.
      */
     exclusivePending: number;
     unshippedOrders: number;
