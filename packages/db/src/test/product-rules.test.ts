@@ -53,6 +53,12 @@ describe("totalRateToCommission · commissionToTotalRate — 총 요율(플랫�
   ])("총 %s% → %s", (total, rate) => {
     expect(totalRateToCommission(total)).toBe(rate);
   });
+  it("하한이 걸리는 구간은 11~14.9 뿐 — 폼도 같은 함수를 써야 표시와 저장이 같다", () => {
+    // ProductForm 이 `총 − 10` 으로 계산하면 12% 를 "2%" 로 보여주는데 실제 저장은 5% 다
+    expect(totalRateToCommission(14.9)).toBe(MIN_SELLER_RATE);
+    expect(totalRateToCommission(15)).toBe(0.05); // 같은 값이지만 클램프가 아니라 계산 결과
+    expect(totalRateToCommission(15.5)).toBe(0.055);
+  });
   it("역변환 (폼 프리필)", () => {
     expect(commissionToTotalRate(0.2)).toBe(30);
     expect(commissionToTotalRate(0.15)).toBe(25);
@@ -164,7 +170,11 @@ describe("parseProductInput — 폼 → RPC p_input", () => {
     ["sale_price 소수", { sale_price: 100.5 }, "sale_price"],
     ["sale_price 빈 값", { sale_price: "" }, "sale_price"],
     ["total_rate 10 (플랫폼 몫만)", { total_rate: 10 }, "total_rate"],
+    ["total_rate 10.5 (하한 11 미만)", { total_rate: 10.5 }, "total_rate"],
     ["total_rate 빈 값", { total_rate: "" }, "total_rate"],
+    // 폼은 novalidate(서버 문구로 안내하는 관례)라 브라우저가 max=50 을 막지 않는다 — 서버가 막는다
+    ["total_rate 50.5 (상한 50 초과)", { total_rate: 50.5 }, "total_rate"],
+    ["total_rate 90", { total_rate: 90 }, "total_rate"],
     ["total_rate 101", { total_rate: 101 }, "total_rate"],
     ["stock 음수", { stock: -5 }, "stock"],
     ["sample_text 길이", { sample_text: "a".repeat(61) }, "sample_text"],
@@ -232,7 +242,9 @@ describe("상수 · 칩 · 문구", () => {
     expect(productStatusChip("weird")).toEqual({ label: "weird", tone: "gray" });
   });
   it("productFailMessage — 필드 · 잠금 필드명 · 배정량", () => {
-    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("플랫폼 몫");
+    // 문구가 범위(11~50)와 제안 수수료 하한을 알려 준다 — 폼 min/max 와 같은 값
+    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("11~50%");
+    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("하한");
     expect(productFailMessage({ code: "INVALID_INPUT", field: "zzz" })).toBe("입력 내용을 확인해주세요");
     expect(productFailMessage({ code: "LOCKED_FIELD", field: "sale_price" })).toContain("판매가");
     expect(productFailMessage({ code: "LOCKED_FIELD", field: "options" })).toContain("구매 옵션");

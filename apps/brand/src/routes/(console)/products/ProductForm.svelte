@@ -7,7 +7,16 @@
 	 */
 	import { GRADES } from '@sellery/core/constants';
 	import { fmtNum, imageSrc } from '@sellery/db/campaign';
-	import { EXCLUSIVE_GRADES, IMAGE_URLS_MAX, PLATFORM_RATE_PP, autoOptions, sampleTierOptions, type ProductField } from '@sellery/db/brand/product-rules';
+	import {
+		EXCLUSIVE_GRADES,
+		IMAGE_URLS_MAX,
+		MIN_SELLER_RATE,
+		PLATFORM_RATE_PP,
+		autoOptions,
+		sampleTierOptions,
+		totalRateToCommission,
+		type ProductField
+	} from '@sellery/db/brand/product-rules';
 
 	type Category = { name: string; group_name: string; description: string | null; examples: string | null };
 	let {
@@ -54,7 +63,15 @@
 	let salePrice = $state(Number(String(values.sale_price ?? '').replace(/,/g, '')) || 0);
 	// svelte-ignore state_referenced_locally
 	let buyMode = $state(values.sample_buy_mode || 'auto');
-	const sellerPct = $derived(+(totalRate - PLATFORM_RATE_PP).toFixed(1));
+	/**
+	 * 제안 수수료(%) — **서버와 같은 함수**(`totalRateToCommission`)로 계산한다.
+	 * 단순히 `총 − 10` 으로 쓰면 하한(5%)이 반영되지 않아 총 12% 입력 시 "2%" 라고 보여주고
+	 * 실제로는 5% 가 저장된다 — 브랜드가 본 숫자와 다른 요율로 계약이 성립하고, 캠페인이
+	 * 확정되면 `rate_locked` 로 굳어 되돌릴 수 없다.
+	 */
+	const sellerPct = $derived(+(totalRateToCommission(totalRate) * 100).toFixed(1));
+	/** 하한이 걸렸나 — 걸렸으면 왜 입력값과 다른지 알려 준다 */
+	const rateClamped = $derived(totalRate > PLATFORM_RATE_PP && sellerPct > +(totalRate - PLATFORM_RATE_PP).toFixed(1));
 	const auto = $derived(autoOptions(salePrice));
 	const thumb = $derived(imageSrc(thumbUrl));
 </script>
@@ -156,6 +173,9 @@
 			<div class="hint">
 				{#if totalRate > PLATFORM_RATE_PP}
 					→ 플랫폼 <b>{PLATFORM_RATE_PP}%p</b> + 제안 수수료 <b class="console-accent">{sellerPct}%</b> · 등급 보너스 포함 최대 <b>{+(sellerPct + topBonus).toFixed(1)}%</b> (블랙, 보너스는 플랫폼 부담)
+					{#if rateClamped}
+						<br /><span class="console-danger">제안 수수료 하한 {MIN_SELLER_RATE * 100}% 가 적용됐어요 — 총 {+(MIN_SELLER_RATE * 100 + PLATFORM_RATE_PP).toFixed(1)}% 이상으로 정해야 입력한 대로 저장됩니다.</span>
+					{/if}
 				{:else}
 					<span class="console-danger">총 수수료율은 플랫폼 몫({PLATFORM_RATE_PP}%)보다 커야 합니다</span>
 				{/if}
