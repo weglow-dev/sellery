@@ -162,7 +162,7 @@
 |---|---|---|
 | 다이아↑ 제안을 인플루언서가 **거절** | 제안권 10🥬 브랜드에 전액 환급, 캠페인에 `celRefunded` 기록, 스레드에 "제안권 🥬 10 브랜드에 환급" | `declineInvite` |
 | 제안 후 인플루언서가 수락했다가 이후 PASSED·REJECTED 등으로 종료 | 반환 없음 | 해당 로직 없음 |
-| 셀러리로 결제한 샘플 — 상품이 **환급 옵션**(`samplePolicy.refund`)이고 판매가 **정산(SETTLED)** 됨 | 🥬 결제분(`samplePaid.cel`)은 원장 +로 **🥬로** 환급, 현금분(`samplePaid.cash`)만 인플루언서 정산액(`sellerPay`)에 **원화로** 가산, `c.sampleRefunded` 기록 | `runSettle` — 환급 여부는 **정산 시점의** `spOf(p).refund`로 판정(js/80-actions.js:471). 구매 시점 정책은 저장하지 않으므로 구매 후 브랜드가 옵션을 끄면 🥬·현금 모두 미환급(`saveProduct`는 `locked`와 무관하게 `samplePolicy`를 항상 덮어씀, :502) |
+| 셀러리로 결제한 샘플 — 상품이 **환급 옵션**(`samplePolicy.refund`)이고 판매가 **정산(SETTLED)** 됨 | 🥬 결제분(`samplePaid.cel`)은 원장 +로 **🥬로** 환급, 현금분(`samplePaid.cash`)만 인플루언서 정산액(`sellerPay`)에 **원화로** 가산, `c.sampleRefunded` 기록 | 0028 `app_admin_settle_preview` — 환급 여부는 **샘플을 산 시점의 약속**(`sample_purchased` 이벤트 `payload.refund`)으로 판정. 구매 후 브랜드가 옵션을 바꿔도 이미 산 인플루언서에게는 영향 없음(sample-policy §8). 프로토타입 `runSettle` 은 정산 시점의 `spOf(p).refund` 로 판정해 구매 후 옵션을 끄면 🥬·현금 모두 미환급이었다 |
 | 셀러리로 결제한 샘플 — 환급 옵션 없음, 또는 테스트 후 패스/브랜드 반려 | 반환 없음 | 해당 로직 없음 |
 | 고객 홈 상단 노출 구매 시 노출할 판매가 없음 | 방금 차감분 즉시 취소(원장 제거). 단 `celeryItems.homefeature` 스탬프는 남아 샵에 "보유 중"으로 표시되고 재구매 불가(코드 결함) | `buyItem` |
 | 상품 상단 부스트·우선 검수권 구매 시 적용 대상 상품이 없음 | 반환 없음(차감만 됨) | 해당 로직 없음 |
