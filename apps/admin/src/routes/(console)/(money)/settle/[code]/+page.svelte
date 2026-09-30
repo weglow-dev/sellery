@@ -28,6 +28,7 @@
 		ended: '판매 종료',
 		settled: '정산 완료',
 		payout_held: '지급 보류',
+		payout_released: '보류 해제(정보 등록)',
 		payout_paid: '지급 완료',
 		ref_reward: '추천 보상',
 		brand_ref_reward: '브랜드 추천 보상',
@@ -92,7 +93,7 @@
 				<b>⚠ 지급 보류 예고</b>
 				<span class="meta">
 					{#if p.holds.seller}인플루언서: {p.holds.seller.label}{/if}{#if p.holds.seller && p.holds.brand} · {/if}{#if p.holds.brand}브랜드: {p.holds.brand.label}{/if}
-					— 정산은 기록되고 지급만 보류됩니다. 파트너가 정보를 등록하면 [보류 해제] 로 다음 배치에 포함돼요.
+					— 정산은 기록되고 지급만 보류됩니다. 파트너가 정산 정보를 등록하면 보류가 풀려 지급 대기가 되고, 관리자가 확인 후 다음 이체 때 지급합니다.
 				</span>
 			</div>
 		{/if}

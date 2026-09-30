@@ -117,4 +117,4 @@
 		</tbody>
 	</table>
 </div>
-<p class="meta" style="margin:8px 3px 0">표시 {data.rows.length}건 · 합계 <b>{money(data.totalAmount)}</b> · 계좌는 뒤 4자리만 보여요. 보류 해제는 파트너 정산 정보 완비를 다시 검사합니다(미완비면 해제 불가). 정산 명세 500건까지 표시돼요.</p>
+<p class="meta" style="margin:8px 3px 0">표시 {data.rows.length}건 · 합계 <b>{money(data.totalAmount)}</b> · 계좌는 뒤 4자리만 보여요. 정산 정보 미등록 보류는 파트너가 정보를 등록하면 풀려 지급 대기가 되고, 관리자가 확인 후 이체 파일로 지급합니다. [보류 해제]는 운영자 보류용이며, 파트너 정산 정보 완비를 다시 검사합니다(미완비면 해제 불가). 정산 명세 500건까지 표시돼요.</p>
