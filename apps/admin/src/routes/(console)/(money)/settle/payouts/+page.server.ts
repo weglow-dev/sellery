@@ -43,16 +43,25 @@ export const load: PageServerLoad = async (event) => {
 
 	const rows: PayoutRow[] = [];
 	for (const r of all?.rows ?? []) {
-		for (const po of [r.payouts.seller, r.payouts.brand]) {
+		// 추천 보상(0027)도 펼친다 — 캠페인 당사자가 아니라 인플루언서를 데려온 사람이다.
+		// 없는 정산에서는 `payouts.referrer` 가 null 이라 그냥 건너뛴다.
+		for (const po of [r.payouts.seller, r.payouts.brand, r.payouts.referrer]) {
 			if (!po) continue;
+			const party = po.payee_type === 'brand' ? null : po.payee_type === 'referrer' ? r.referrer : r.seller;
 			rows.push({
 				...po,
 				campaign_code: r.campaign_code,
 				title: r.product?.name ?? r.title ?? null,
 				settlement_id: r.settlement?.id ?? r.settlement_id,
 				settled_at: r.settlement?.settled_at ?? null,
-				payee_name: po.payee_type === 'seller' ? (r.seller?.name ?? '—') : (r.brand?.name ?? '—'),
-				payee_sub: po.payee_type === 'seller' ? [r.seller?.handle, r.seller?.grade].filter(Boolean).join(' · ') : (r.brand?.grade ?? ''),
+				payee_name: party ? (party.name ?? '—') : (r.brand?.name ?? '—'),
+				payee_sub:
+					po.payee_type === 'brand'
+						? (r.brand?.grade ?? '')
+						: po.payee_type === 'referrer'
+							? [party?.handle, `${r.seller?.name ?? '?'} 추천`].filter(Boolean).join(' · ')
+							: [party?.handle, party?.grade].filter(Boolean).join(' · '),
+				// 추천 보상은 원천징수하지 않으므로 정산유형을 쓰지 않는다(원천징수 자료 CSV 대상도 아니다)
 				settle_type: po.payee_type === 'seller' ? (r.seller?.settle_type ?? null) : 'biz'
 			});
 		}

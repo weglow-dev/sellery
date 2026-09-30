@@ -447,6 +447,8 @@
   }
   .chip.brand { color: var(--color-brand); background: var(--color-brand-bg); }
   .chip.seller { color: var(--color-seller); background: var(--color-seller-bg); }
+  /* 추천인 지급 칩(0027) — 캠페인 당사자가 아니라 데려온 사람이다. 인플루언서 톤을 옅게 써 구분한다 */
+  .chip.referrer { color: var(--color-ink); background: var(--color-lime-soft); }
   .chip.plat { color: var(--color-plat); background: var(--color-plat-bg); }
   .chip.auto { color: var(--color-mute); background: var(--color-surface-2); }
   .st {

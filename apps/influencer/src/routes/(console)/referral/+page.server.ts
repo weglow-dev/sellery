@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { getReferral, requireSeller, sellerPath } from '$lib/server/partner';
+import { getReferral, requireSeller } from '$lib/server/partner';
 
 /**
  * `/referral` — 추천 프로그램 (프로토타입 `(demo)/ref/+page.svelte` · 0026 `app_seller_referral`).
@@ -8,6 +8,8 @@ import { getReferral, requireSeller, sellerPath } from '$lib/server/partner';
  *   인플루언서별 (보상 판매 진행 n/5 · 발생 수익) · 내가 피추천인이면 부스트 남은 횟수.
  *
  * 보상 금액은 **정산이 이미 적재한 값**이다(`referral_earnings` · 0020:652) — 이 화면은 읽기만 한다.
+ * 추천인 몫의 실제 입금은 **0027** 이 한다 — 정산 스냅샷이 생기면 트리거가 `payouts`(payee_type='referrer')
+ *   행을 만들고, 관리자 이체 목록에 "추천인" 으로 뜬다. 원천징수는 하지 않는다(문서에 요구가 없다).
  * 진행 횟수는 정산(0020:366)과 같은 식(`LIVE/CLEARING/SETTLED` 캠페인 생성일순 첫 REF_TIMES 회).
  * 추천한 인플루언서는 **실명**이다 — 내가 직접 데려온 사람이고 프로토타입도 실명이다(랭킹의 익명 규칙은
  * "모르는 남" 에 대한 것).
@@ -23,8 +25,6 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		balance,
 		referral,
-		failed: referral === null,
-		rankPath: sellerPath('/ranking'),
-		settlePath: sellerPath('/settle')
+		failed: referral === null
 	};
 };

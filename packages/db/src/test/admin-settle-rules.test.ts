@@ -16,6 +16,8 @@ import {
   sellerHoldReason,
   settleRunSummary,
   toCsv,
+  asPayeeType,
+  payeeTypeLabel,
 } from "../admin/settle-rules";
 import { calcBrandPay } from "../brand/settle-rules";
 import { calcSellerShare, sellerWhtRate } from "../partner/settle-rules";
@@ -380,5 +382,58 @@ describe("샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28)"
     // 환급액이 매출보다 큰 비정상 조합
     const k = calcSettlement({ gross: 10000, sampleNet: 10000, rate: 0.15, sampleRefundCash: 999999 });
     expect(k.brandPay).toBe(0);
+  });
+});
+
+describe("PayeeType — 추천 보상 지급 대상 (0027)", () => {
+  it("seller · brand · referrer 를 받는다", () => {
+    expect(asPayeeType("seller")).toBe("seller");
+    expect(asPayeeType("brand")).toBe("brand");
+    expect(asPayeeType("referrer")).toBe("referrer");
+  });
+
+  it("모르는 값은 seller 로 떨어진다 — 기존 파서와 같은 방어", () => {
+    expect(asPayeeType("wat")).toBe("seller");
+    expect(asPayeeType(null)).toBe("seller");
+    expect(asPayeeType(undefined)).toBe("seller");
+  });
+
+  it("라벨은 화면·CSV 가 같은 것을 쓴다", () => {
+    expect(payeeTypeLabel("seller")).toBe("인플루언서");
+    expect(payeeTypeLabel("brand")).toBe("브랜드");
+    expect(payeeTypeLabel("referrer")).toBe("추천인");
+  });
+});
+
+describe("parseAdminSettlements — payouts.referrer (0027)", () => {
+  const base = {
+    campaign_id: "c",
+    campaign_code: "c5",
+    campaign_status: "SETTLED",
+    seller: { id: "s3", code: "s3", name: "민지", handle: "@minji", grade: "실버", settle_type: "personal" },
+    referrer: { id: "s1", code: "s1", name: "지유", handle: "@jiyu", grade: "골드", settle_type: "biz" },
+    payouts: {
+      seller: { id: "p1", payee_type: "seller", amount: 100, wht: 3, status: "pending" },
+      brand: { id: "p2", payee_type: "brand", amount: 200, wht: 0, status: "pending" },
+      referrer: { id: "p3", payee_type: "referrer", amount: 50, wht: 0, status: "pending" },
+    },
+  };
+
+  it("추천인 지급 행과 프로필을 좁힌다", () => {
+    const [r] = parseAdminSettlements({ ok: true, rows: [base] })!.rows;
+    expect(r.payouts.referrer?.payee_type).toBe("referrer");
+    expect(r.payouts.referrer?.amount).toBe(50);
+    // 추천 보상은 원천징수하지 않는다 (0027)
+    expect(r.payouts.referrer?.wht).toBe(0);
+    expect(r.referrer?.name).toBe("지유");
+  });
+
+  it("추천인이 없는 정산은 null — 화면이 행을 만들지 않는다", () => {
+    const [r] = parseAdminSettlements({
+      ok: true,
+      rows: [{ ...base, referrer: null, payouts: { ...base.payouts, referrer: null } }],
+    })!.rows;
+    expect(r.payouts.referrer).toBeNull();
+    expect(r.referrer).toBeNull();
   });
 });

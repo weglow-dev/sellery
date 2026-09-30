@@ -4,7 +4,7 @@
 	 * · 보류 예고/사유 · [정산 실행] `?/run`(기준일 전이면 강제 체크 · confirm) · 실행 뒤 지급 카드 2장(인플루언서/브랜드 — 금액 · 상태 · 보류 사유 · [지급 완료] 메모 · [보류] 사유 · [보류 해제]) · 이벤트 목록.
 	 * source: live(실시간 예상) · snapshot(정산 완료 스냅샷) · none(스냅샷 없는 이관 SETTLED — 시드 c6).
 	 */
-	import { dueLabel, payoutStatusChip, settlementStatusChip, type PayoutView } from '@sellery/db/admin/settle-rules';
+	import { dueLabel, payoutStatusChip, settlementStatusChip, type PayoutView, payeeTypeLabel } from '@sellery/db/admin/settle-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { ProductIcon, StatusChip } from '@sellery/ui/site';
@@ -35,7 +35,7 @@
 		refunded: '환불',
 		refund_needs_adjust: '정산 후 환불 (조정 큐)'
 	};
-	const payeeLabel = (t: PayoutView['payee_type']) => (t === 'seller' ? '인플루언서' : '브랜드');
+	const payeeLabel = payeeTypeLabel;
 </script>
 
 <svelte:head>
@@ -151,7 +151,7 @@
 				<!-- ---------------- 지급 ---------------- -->
 				{#if p.source === 'snapshot'}
 					<div id="payouts">
-						{#each [p.payouts.seller, p.payouts.brand] as po (po?.id ?? Math.random())}
+						{#each [p.payouts.seller, p.payouts.brand, p.payouts.referrer] as po (po?.id ?? Math.random())}
 							{#if po}
 								{@const chip = payoutStatusChip(po.status)}
 								<div class="card static admin-payout">
@@ -184,7 +184,7 @@
 								</div>
 							{/if}
 						{/each}
-						{#if !p.payouts.seller && !p.payouts.brand}
+						{#if !p.payouts.seller && !p.payouts.brand && !p.payouts.referrer}
 							<div class="card static"><h4>지급</h4><p class="hint">지급 건이 없어요.</p></div>
 						{/if}
 					</div>

@@ -276,9 +276,33 @@ export type PayoutStatus = "pending" | "held" | "paid";
 export type SettlementStatus = PayoutStatus;
 const payoutStatus = (v: unknown): PayoutStatus => (v === "held" || v === "paid" ? v : "pending");
 
+/**
+ * 지급 대상 종류 — `payouts.payee_type`.
+ *   seller   캠페인 인플루언서
+ *   brand    캠페인 브랜드
+ *   referrer 그 인플루언서를 데려온 추천인 (0027 · `settlements.ref_reward` · 원천징수 없음)
+ * 추천인 행은 캠페인 당사자가 아니므로 목록에서 구분해 보여준다.
+ */
+export type PayeeType = "seller" | "brand" | "referrer";
+
+/** 모르는 값은 `seller` 로 떨어뜨린다(기존 파서와 같은 방어). */
+export function asPayeeType(v: unknown): PayeeType {
+  return v === "brand" || v === "referrer" ? v : "seller";
+}
+
+export const PAYEE_TYPE_LABEL: Record<PayeeType, string> = {
+  seller: "인플루언서",
+  brand: "브랜드",
+  referrer: "추천인",
+};
+
+export function payeeTypeLabel(t: PayeeType): string {
+  return PAYEE_TYPE_LABEL[t] ?? "인플루언서";
+}
+
 export type PayoutView = {
   id: string;
-  payee_type: "seller" | "brand";
+  payee_type: PayeeType;
   status: PayoutStatus;
   amount: number;
   wht: number;
@@ -296,7 +320,7 @@ export function parsePayout(raw: unknown): PayoutView | null {
   const bs = obj(o.bank_snapshot);
   return {
     id: o.id,
-    payee_type: o.payee_type === "brand" ? "brand" : "seller",
+    payee_type: asPayeeType(o.payee_type),
     status: payoutStatus(o.status),
     amount: num(o.amount),
     wht: num(o.wht),
@@ -337,6 +361,8 @@ export type SettlePreview = {
   end_date: string | null;
   due_on: string | null;
   seller: SettlePartySeller | null;
+  /** 이 인플루언서를 데려온 추천인 (0027 · 추천 보상 지급 대상 표시용). `referred_by` 가 없으면 null */
+  referrer: SettlePartySeller | null;
   brand: SettlePartyBrand | null;
   product: SettleProduct | null;
   paid_count: number;
@@ -388,7 +414,7 @@ export type SettlePreview = {
   hold_brand: boolean;
   holds: { seller: HoldInfo | null; brand: HoldInfo | null };
   settlement: { id: string; status: SettlementStatus; settled_at: string | null; paid_at: string | null; memo: string | null } | null;
-  payouts: { seller: PayoutView | null; brand: PayoutView | null };
+  payouts: { seller: PayoutView | null; brand: PayoutView | null; referrer: PayoutView | null };
   eligible: boolean;
   reason: string | null;
 };
@@ -436,6 +462,7 @@ export function parseSettlePreview(raw: unknown): SettlePreview | null {
     end_date: str(o.end_date),
     due_on: str(o.due_on),
     seller: parseSeller(o.seller),
+    referrer: parseSeller(o.referrer),
     brand: parseBrand(o.brand),
     product: parseProduct(o.product),
     paid_count: num(o.paid_count),
@@ -486,7 +513,7 @@ export function parseSettlePreview(raw: unknown): SettlePreview | null {
     hold_brand: bool(o.hold_brand),
     holds: { seller: parseHold(holds.seller), brand: parseHold(holds.brand) },
     settlement: st && typeof st.id === "string" ? { id: st.id, status: payoutStatus(st.status), settled_at: str(st.settled_at), paid_at: str(st.paid_at), memo: str(st.memo) } : null,
-    payouts: { seller: parsePayout(po.seller), brand: parsePayout(po.brand) },
+    payouts: { seller: parsePayout(po.seller), brand: parsePayout(po.brand), referrer: parsePayout(po.referrer) },
     eligible: bool(o.eligible),
     reason: str(o.reason),
   };
@@ -508,7 +535,7 @@ export type SettleRunResult =
       platform_fee: number;
       platform_net: number;
       holds: { seller: HoldInfo | null; brand: HoldInfo | null };
-      payouts: { seller: PayoutView | null; brand: PayoutView | null };
+      payouts: { seller: PayoutView | null; brand: PayoutView | null; referrer: PayoutView | null };
       celery: { sample_refund_cel: number; sample_refund_cash: number; seller_earned: number; brand_earned: number };
       referral: { seller_reward: number; brand_reward: number };
       grades: {
@@ -547,7 +574,7 @@ export function parseSettleRunResult(raw: unknown): SettleRunResult {
     platform_fee: num(o.platform_fee),
     platform_net: num(o.platform_net),
     holds: { seller: parseHold(holds.seller), brand: parseHold(holds.brand) },
-    payouts: { seller: parsePayout(po.seller), brand: parsePayout(po.brand) },
+    payouts: { seller: parsePayout(po.seller), brand: parsePayout(po.brand), referrer: parsePayout(po.referrer) },
     celery: { sample_refund_cel: num(cel.sample_refund_cel), sample_refund_cash: num(cel.sample_refund_cash), seller_earned: num(cel.seller_earned), brand_earned: num(cel.brand_earned) },
     referral: { seller_reward: num(ref.seller_reward), brand_reward: num(ref.brand_reward) },
     grades: {
@@ -689,7 +716,7 @@ export type PayoutExportRow = {
   settlement_id: string;
   campaign_code: string;
   title: string | null;
-  payee_type: "seller" | "brand";
+  payee_type: PayeeType;
   payee_code: string | null;
   payee_name: string | null;
   settle_type: string | null;
@@ -727,7 +754,7 @@ export function parsePayoutExport(raw: unknown): PayoutExport {
           settlement_id: str(r.settlement_id) ?? "",
           campaign_code: str(r.campaign_code) ?? "",
           title: str(r.title),
-          payee_type: r.payee_type === "brand" ? "brand" : "seller",
+          payee_type: asPayeeType(r.payee_type),
           payee_code: str(r.payee_code),
           payee_name: str(r.payee_name),
           settle_type: str(r.settle_type),
@@ -1020,7 +1047,7 @@ export function payoutCsv(rows: readonly PayoutExportRow[]): string {
       r.settlement_id,
       r.campaign_code,
       r.title,
-      r.payee_type === "seller" ? "인플루언서" : "브랜드",
+      payeeTypeLabel(r.payee_type),
       r.payee_code,
       r.payee_name,
       r.settle_type === "biz" ? "사업자" : r.settle_type === "personal" ? "개인" : "",

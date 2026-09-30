@@ -23,7 +23,7 @@
 - **정식 주소 https://sellery.life 는 `apps/shop`(Vercel `sellery-shop`) 이 서비스합니다** — 고객 사이트 전부(`/` `/s/*` `/c/*` 판매 링크 · `/login` `/auth/*` 카카오 로그인 · `/checkout*` 토스 결제 · `/account/*` 내 주문 · `/api/*` · `/terms` `/privacy`). 옛 Next.js 앱 `web/` 은 S5 PR-11 에서 저장소에서 삭제됐습니다.
 - `/influencer/*` 는 `apps/influencer`(Vercel `sellery-influencer`) 의 **인플루언서 콘솔 1~5단계**(가입 · 로그인 · 홈 · 내 정보 · 채널 인증 · 상품 갤러리 · 샘플 · 캠페인 · 매출 · 정산 · 랭킹 · 추천) 로, `/brand/*` 는 `apps/brand`(Vercel `sellery-brand`) 의 **브랜드 콘솔 1~5단계**(가입 · 로그인 · 홈 · 상품 · 처리 대기 · 캠페인 · 주문/발주 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급) 로 리라이트됩니다. `/admin/*` 는 `apps/admin`(Vercel `sellery-admin`) 의 **관리자 콘솔**(로그인 게이트 · 홈 대시보드 · 인플루언서 · 브랜드 · 상품 검수 · 캠페인 상세 · 정산 실행) 로 리라이트됩니다. 세 앱의 남은 데모 화면은 `(demo)` 그룹 — dev 또는 `PUBLIC_DEMO=1` 에서만 열립니다. Vercel 은 프로젝트 4개(옛 Next `sellery-app` 은 2026-09-21 삭제). 배포·운영은 [docs/deploy.md](docs/deploy.md)(정본), 설계는 [docs/app-plan.md](docs/app-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/monorepo-migration.md](docs/monorepo-migration.md).
 - **인플루언서 콘솔 1~5단계 완료(2026-09-21, PR #19~#30 — 상품 갤러리 · 샘플 요청/구매 결제 · 캠페인 · 매출 · 정산 자료) · 브랜드 콘솔 1~5단계 완료(2026-09-22, 0014~0019 — 가입/로그인 · 상품 · 샘플 승인/발송 · 일정 확정 · 스레드 · 초대 · 주문/발주/운송장 · 고객 문의 · 실시간 매출 · 정산 · 내 정보/등급).** **관리자 콘솔 실서비스 전환 완료(2026-09-28, PR #38~#69 — 로그인 게이트 · 홈 대시보드 · 인플루언서/브랜드 목록·상세 · 정지/복구 · 채널 인증 큐 · 상품 검수 · 상세페이지 미리보기 · 캠페인 상세(스레드·브랜드 대행) · 매칭·자동 제안 · 정산 실행/지급 · 주문·CS · 매출·순수익).** 남은 것 = 두 콘솔의 6단계(🥬 · 데이터 열람 · 셀러리 샵 · 스카우트 DM — 규제 검토 뒤, inf §5.8 · brand §6) · Preview/Production 의 `PUBLIC_DEMO` 정리. 계획 [docs/brand-console-plan.md](docs/brand-console-plan.md) · [docs/inf-console-plan.md](docs/inf-console-plan.md) · [docs/admin-console-plan.md](docs/admin-console-plan.md).
-- Supabase 스키마는 `supabase/migrations/0001~0026` 가 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011~0013 인플루언서 샘플/결제/정산 · 0014~0019 브랜드 콘솔 · 0020 관리자 정산 · 0021 비회원 구매 · 0022 관리자 매출·순수익 · 0023 샘플 환급 재원 · 0024 샘플 대금 정산·미발송 환불 · 0025 독점권 신청/승인 · 0026 랭킹·추천). 새 변경은 새 번호로.
+- Supabase 스키마는 `supabase/migrations/0001~0027` 가 클라우드 프로젝트 `sellery` 에 적용돼 있습니다(0007 service_role 권한 · 0008 체크아웃/결제 · 0009 가상계좌 판정 수정 · 0010 파트너 가입 · 0011~0013 인플루언서 샘플/결제/정산 · 0014~0019 브랜드 콘솔 · 0020 관리자 정산 · 0021 비회원 구매 · 0022 관리자 매출·순수익 · 0023 샘플 환급 재원 · 0024 샘플 대금 정산·미발송 환불 · 0025 독점권 신청/승인 · 0026 랭킹·추천 · 0027 추천 보상 지급). 새 변경은 새 번호로.
 
 ## 기술 스택
 
@@ -100,7 +100,7 @@ packages/ui/src/      공용 UI
   views/              CampaignDetail · Store · Shop · Sales · DM · LoginPage (여러 앱이 공유)
 scripts/vite-root-assets.mjs   dev 전용 — apps/shop/static 을 4 앱 dev 서버에서 /assets/ /email/ /favicon.svg 로 서빙
 docs/                 운영 정책 문서 · 수정 가이드 · 데이터 모델 · 이식 계획(monorepo-migration.md) (아래)
-supabase/             Supabase 스키마 — migrations/0001~0026 + seed.sql (클라우드 프로젝트 `sellery` 적용 · docs/data-model.md §8 · 병합 뒤 `npx supabase db push --linked`)
+supabase/             Supabase 스키마 — migrations/0001~0027 + seed.sql (클라우드 프로젝트 `sellery` 적용 · docs/data-model.md §8 · 병합 뒤 `npx supabase db push --linked`)
 .github/              CI(프로토타입 점검 = npm run check + build · 더미 PUBLIC_*) · @claude 봇 · 이슈 템플릿 5종 · PR 템플릿
 .env.example          4 앱 공용 환경변수 이름 표 → 복사해서 .env.local (gitignored)
 ```
