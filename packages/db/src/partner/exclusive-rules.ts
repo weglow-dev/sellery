@@ -94,6 +94,8 @@ export type BrandExclusiveRequest = {
   needGrade: string | null;
   /** 이 상품이 이미 누군가로 확정됐나 — true 면 승인 버튼을 막는다. */
   locked: boolean;
+  /** 이 상품에서 진행 중인 다른 인플루언서 캠페인 수 — 승인해도 끝까지 진행된다 (0031) */
+  othersActive: number;
   sellerCode: string | null;
   sellerName: string | null;
   sellerHandle: string | null;
@@ -147,6 +149,7 @@ export function parseBrandExclusiveRequests(payload: unknown): BrandExclusiveReq
         label: str(o.exclusive_label),
         needGrade: str(o.exclusive_grade),
         locked: o.locked === true,
+        othersActive: num(o.others_active) ?? 0,
         sellerCode: str(o.seller_code),
         sellerName: str(o.seller_name),
         sellerHandle: str(o.seller_handle),
@@ -244,7 +247,7 @@ export function exclusiveButton(
 export const EXCLUSIVE_MESSAGES: Record<string, string> = {
   requested: "독점권 신청 완료 — 브랜드에 내 프로필이 공개되고 승인 대기 상태가 됩니다",
   already: "이미 신청한 상품입니다",
-  approved: "독점권 승인 — 이 인플루언서만 상품을 진행할 수 있습니다",
+  approved: "독점권 승인 — 이제 새 샘플 요청 · 제안은 이 인플루언서만 받습니다(진행 중인 다른 판매는 그대로)",
   rejected: "독점권 신청을 거절했습니다",
 };
 

@@ -90,6 +90,12 @@ describe("parseMyExclusiveRequests · parseBrandExclusiveRequests", () => {
     expect(r.sellerName).toBe("서아");
     expect(r.sellerFollowers).toBe(120000);
     expect(r.locked).toBe(false);
+    expect(r.othersActive).toBe(0);
+  });
+
+  it("진행 중인 다른 캠페인 수 (0031) — 없거나 숫자가 아니면 0", () => {
+    expect(parseBrandExclusiveRequests({ rows: [{ id: "x", status: "PENDING", others_active: 2 }] })[0].othersActive).toBe(2);
+    expect(parseBrandExclusiveRequests({ rows: [{ id: "x", status: "PENDING", others_active: "2" }] })[0].othersActive).toBe(0);
   });
 
   it("숫자가 아니면 null — NaN 을 화면에 흘리지 않는다", () => {
