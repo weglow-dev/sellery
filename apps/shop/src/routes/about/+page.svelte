@@ -95,7 +95,7 @@
 			<div class="hand">held in escrow until it is right.</div>
 			<div class="tl">
 				<div class="tl-step"><i>1</i><b>결제</b><span>고객 결제 → 셀러리 보관(에스크로)</span></div>
-				<div class="tl-step"><i>2</i><b>배송</b><span>브랜드 직배송 · 운송장 알림톡</span></div>
+				<div class="tl-step"><i>2</i><b>배송</b><span>브랜드 직배송 · 운송장 이메일 안내</span></div>
 				<div class="tl-step"><i>3</i><b>판매 종료</b><span>기간 한정 가격 마감</span></div>
 				<div class="tl-step hi"><i>4</i><b>{CLEAR}일 환불 보호</b><span>교환·환불 신청 기간 · 대금 계속 보관</span></div>
 				<div class="tl-step"><i>5</i><b>정산</b><span>브랜드·인플루언서에게 지급 · 명세 발행</span></div>
