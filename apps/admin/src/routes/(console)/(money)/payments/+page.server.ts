@@ -26,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
 		partial_refund: { href: `${ordersPath}?f=partial`, how: '토스 콘솔 부분취소 — 정산 refunds 에 차감되지만 운영자가 주문 상세에서 확인' },
 		refund_needs_adjust: { href: `${ordersPath}?f=refunded`, how: '정산 완료 뒤 환불 — 스냅샷은 그대로이니 다음 정산·지급에서 수동 조정' },
 		due_now: { href: settlePath, how: '정산 실행 화면에서 [도래분 일괄 실행]' },
-		payouts_held: { href: `${payoutsPath}?status=held`, how: '파트너가 정산 정보를 등록하면 [보류 해제]' }
+		payouts_held: { href: `${payoutsPath}?status=held`, how: '파트너가 정산 정보를 등록하면 보류가 풀려 지급 대기로 — 남아 있는 건은 운영자 보류이거나 정보가 아직 모자란 건' }
 	};
 
 	return {

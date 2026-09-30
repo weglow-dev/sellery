@@ -193,8 +193,8 @@ export async function recalcBrandGrade(brandId: string, admin: Admin = createAdm
 
 /* ---------------- 정산 이벤트 (화면 PR-B — /admin/settle/[code] "이벤트") ---------------- */
 
-/** 정산·지급이 남기는 campaign_events 종류 (0020 헤더 표 · 0008 refund_needs_adjust · 0018 ended) — 오래된 것부터 */
-export const SETTLE_EVENT_TYPES = ["ended", "settled", "payout_held", "payout_paid", "ref_reward", "brand_ref_reward", "sample_refunded", "refunded", "refund_needs_adjust"] as const;
+/** 정산·지급이 남기는 campaign_events 종류 (0020 헤더 표 · 0008 refund_needs_adjust · 0018 ended · 0029 payout_released) — 오래된 것부터 */
+export const SETTLE_EVENT_TYPES = ["ended", "settled", "payout_held", "payout_released", "payout_paid", "ref_reward", "brand_ref_reward", "sample_refunded", "refunded", "refund_needs_adjust"] as const;
 
 export type SettleEvent = { id: string; event_type: string | null; body: string; payload: Record<string, unknown>; created_at: string | null };
 
