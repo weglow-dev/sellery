@@ -211,7 +211,7 @@
 		{/if}
 	</div>
 	<section class="card static console-form">
-		<p class="meta" style="margin:0 0 10px">세금계산서 발행과 사업자 정산 확인용이에요. JPG · PNG · WebP · PDF, {data.docMaxMb}MB 이하. 파일은 비공개 저장소에 보관되고 본인과 운영팀만 볼 수 있어요.</p>
+		<p class="meta" style="margin:0 0 10px">세금계산서 발행과 사업자 정산 확인용이에요 — <b>등록증을 올려야 사업자 정산이 지급돼요.</b> JPG · PNG · WebP · PDF, {data.docMaxMb}MB 이하. 파일은 비공개 저장소에 보관되고 본인과 운영팀만 볼 수 있어요.</p>
 		{#if info?.has_biz_doc}
 			<p class="meta" style="margin:0 0 10px"><StatusChip tone="green">등록됨</StatusChip> <a href={data.docHref} target="_blank" rel="noopener" style="text-decoration:underline">보기</a> — 새 파일을 올리면 이전 파일은 바뀌어요.</p>
 		{/if}

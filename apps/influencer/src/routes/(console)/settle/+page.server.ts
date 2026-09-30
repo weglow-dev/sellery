@@ -37,7 +37,7 @@ export type SettleMessage = { tone: 'ok' | 'danger' | 'info'; text: string };
 
 const SETTLE_MESSAGES: Record<string, SettleMessage> = {
 	saved: { tone: 'ok', text: '정산 정보 저장 완료 — 다음 정산부터 이 계좌로 지급됩니다.' },
-	saved_biz: { tone: 'ok', text: '정산 정보 저장 완료 — 사업자 정산은 원천징수 없이 세금계산서로 진행돼요. 사업자등록증도 올려주세요.' },
+	saved_biz: { tone: 'ok', text: '정산 정보 저장 완료 — 사업자 정산은 원천징수 없이 세금계산서로 진행돼요. 사업자등록증을 올려야 지급돼요.' },
 	rrn_saved: { tone: 'ok', text: '주민등록번호를 암호화해 저장했어요 — 원천징수 신고에만 쓰이고 화면에는 다시 표시되지 않아요.' },
 	doc_saved: { tone: 'ok', text: '사업자등록증을 등록했어요 — 운영팀이 확인한 뒤 세금계산서 발행에 사용해요.' },
 	err_rate: { tone: 'danger', text: RATE_LIMIT_MESSAGE }

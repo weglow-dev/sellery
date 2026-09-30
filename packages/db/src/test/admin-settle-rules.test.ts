@@ -148,16 +148,19 @@ describe("calcSettlement — 샘플 구매분 · 환급 · 브랜드 추천 · �
   });
 });
 
-describe("지급 보류 판정 — 0020 admin_payout_hold_reason 과 같은 순서", () => {
-  it("인플루언서: 계좌 → (사업자: 사업자번호+세금계산서 · 개인: 주민번호)", () => {
+describe("지급 보류 판정 — 0030 admin_payout_hold_reason 과 같은 순서", () => {
+  it("인플루언서: 계좌 → (사업자: 사업자번호+사업자등록증 · 개인: 주민번호)", () => {
     expect(sellerHoldReason({ hasBankInfo: false, settleType: "personal", hasRrn: true })).toBe("BANK_MISSING");
-    expect(sellerHoldReason({ hasBankInfo: false, settleType: "biz", hasRrn: false, hasBizNo: true, hasTaxInfo: true })).toBe("BANK_MISSING");
+    expect(sellerHoldReason({ hasBankInfo: false, settleType: "biz", hasRrn: false, hasBizNo: true, hasBizDoc: true })).toBe("BANK_MISSING");
     expect(sellerHoldReason({ hasBankInfo: true, settleType: "personal", hasRrn: false })).toBe("RRN_MISSING");
     expect(sellerHoldReason({ hasBankInfo: true, settleType: null, hasRrn: false })).toBe("RRN_MISSING"); // 미등록(null) 은 개인 취급
     expect(sellerHoldReason({ hasBankInfo: true, settleType: "personal", hasRrn: true })).toBeNull();
-    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasTaxInfo: false })).toBe("TAX_INFO_MISSING");
-    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: false, hasTaxInfo: true })).toBe("TAX_INFO_MISSING");
-    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasTaxInfo: true })).toBeNull();
+    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasBizDoc: false })).toBe("TAX_INFO_MISSING");
+    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: false, hasBizDoc: true })).toBe("TAX_INFO_MISSING");
+    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasBizDoc: true })).toBeNull();
+  });
+  it("사업자 보류 문구는 사업자등록증 (0030 — 세금계산서 정보는 선택)", () => {
+    expect(HOLD_LABELS.TAX_INFO_MISSING).toBe("사업자등록증 미등록");
   });
   it("브랜드: 정산 정보 4개 완비 여부 하나", () => {
     expect(brandHoldReason({ settleInfoComplete: false })).toBe("SETTLE_INFO_INCOMPLETE");

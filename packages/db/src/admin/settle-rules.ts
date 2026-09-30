@@ -8,7 +8,7 @@
  *   calcSettlement({ gross, refunds, sampleNet, rate, bonusPp, refBoost, brandRefBoost, brandDiscRate, whtRate, sampleRefundCel, sampleRefundCash, … })
  *     → 모든 라인(net · pg · sf · gBonus · boost · refReward · bBoost · bReward · bDisc · pfGross · costs · pf · vat · pfNet · sfTotal · wht · brandPay · sellerPayout …)
  *       라인마다 독립 반올림(0004 반올림 계약 · JS Math.round = PG round(numeric) — 양수). 인플루언서 쪽 라인은 calcSellerShare, 브랜드 쪽 라인은 calcBrandPay 와 같다.
- *   sellerHoldReason · brandHoldReason — 0020 admin_payout_hold_reason 과 같은 판정 (BANK_MISSING · RRN_MISSING · TAX_INFO_MISSING · SETTLE_INFO_INCOMPLETE)
+ *   sellerHoldReason · brandHoldReason — 0030 admin_payout_hold_reason 과 같은 판정 (BANK_MISSING · RRN_MISSING · TAX_INFO_MISSING · SETTLE_INFO_INCOMPLETE)
  *   settleDue(endDate) — 종료일 + CLEAR_DAYS (partner/settle-rules 재수출)
  *   parseSettlePreview · parseSettleRunResult · parseSettleRunDueResult · parseAdminSettlements · parsePayoutActionResult · parsePayoutExport · parseRrnExport
  *   · parsePaymentsHealth · parseAdminOrders · parseAdminOrder — RPC jsonb 를 타입으로
@@ -29,11 +29,11 @@ export { sellerWhtRate, settleDue };
 export const HOLD_CODES = ["BANK_MISSING", "RRN_MISSING", "TAX_INFO_MISSING", "SETTLE_INFO_INCOMPLETE", "MANUAL"] as const;
 export type HoldCode = (typeof HOLD_CODES)[number];
 
-/** 0020 admin_hold_label 과 같은 문구 */
+/** 0030 admin_hold_label 과 같은 문구 */
 export const HOLD_LABELS: Record<HoldCode, string> = {
   BANK_MISSING: "정산 계좌 미등록",
   RRN_MISSING: "주민등록번호 미등록 — 원천징수 자료",
-  TAX_INFO_MISSING: "사업자 세금계산서 정보 미등록",
+  TAX_INFO_MISSING: "사업자등록증 미등록",
   SETTLE_INFO_INCOMPLETE: "정산 정보 미완비 — 은행·계좌·예금주·사업자등록번호",
   MANUAL: "운영자 보류",
 };
@@ -237,15 +237,15 @@ export type SellerHoldInput = {
   hasBankInfo: boolean;
   settleType: string | null | undefined;
   hasRrn: boolean;
-  /** 사업자: 사업자번호 + 세금계산서 정보(company) */
+  /** 사업자: 사업자번호 + 사업자등록증(biz_doc_url) — 세금계산서 정보(상호 등)는 선택이라 보지 않는다 (0030) */
   hasBizNo?: boolean;
-  hasTaxInfo?: boolean;
+  hasBizDoc?: boolean;
 };
 
-/** 인플루언서 지급 보류 — 계좌 → (사업자면 세금계산서 정보 · 개인이면 주민번호) 순. 없으면 null */
+/** 인플루언서 지급 보류 — 계좌 → (사업자면 사업자등록증 · 개인이면 주민번호) 순. 없으면 null */
 export function sellerHoldReason(s: SellerHoldInput): HoldCode | null {
   if (!s.hasBankInfo) return "BANK_MISSING";
-  if (s.settleType === "biz") return s.hasBizNo && s.hasTaxInfo ? null : "TAX_INFO_MISSING";
+  if (s.settleType === "biz") return s.hasBizNo && s.hasBizDoc ? null : "TAX_INFO_MISSING";
   return s.hasRrn ? null : "RRN_MISSING";
 }
 
