@@ -420,7 +420,7 @@ describe("parseAdminSettlements — payouts.referrer (0027)", () => {
   };
 
   it("추천인 지급 행과 프로필을 좁힌다", () => {
-    const [r] = parseAdminSettlements({ ok: true, rows: [base] }).rows;
+    const [r] = parseAdminSettlements({ ok: true, rows: [base] })!.rows;
     expect(r.payouts.referrer?.payee_type).toBe("referrer");
     expect(r.payouts.referrer?.amount).toBe(50);
     // 추천 보상은 원천징수하지 않는다 (0027)
@@ -432,7 +432,7 @@ describe("parseAdminSettlements — payouts.referrer (0027)", () => {
     const [r] = parseAdminSettlements({
       ok: true,
       rows: [{ ...base, referrer: null, payouts: { ...base.payouts, referrer: null } }],
-    }).rows;
+    })!.rows;
     expect(r.payouts.referrer).toBeNull();
     expect(r.referrer).toBeNull();
   });
