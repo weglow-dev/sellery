@@ -5,7 +5,7 @@
 	 *   [원천징수 자료 CSV] `GET rrn.csv?ids=&purpose=` — 표에서 체크한 인플루언서 지급건의 정산 id. RRN_ENC_KEY 가 없으면 서버가 안내 문구로 응답.
 	 * 375px: `.admin-table` 카드 모드 · 폼은 줄바꿈.
 	 */
-	import { holdLabel, payoutStatusChip } from '@sellery/db/admin/settle-rules';
+	import { holdLabel, payoutStatusChip, payeeTypeLabel } from '@sellery/db/admin/settle-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { StatusChip } from '@sellery/ui/site';
@@ -78,7 +78,7 @@
 				<tr class={r.status === 'held' ? 'row-held' : ''}>
 					<td data-l="선택" class="admin-pick">{#if r.payee_type === 'seller' && r.settlement_id}<input type="checkbox" aria-label="원천징수 자료에 포함" checked={picked.includes(r.settlement_id)} onchange={(e) => togglePick(r.settlement_id ?? '', e.currentTarget.checked)} />{/if}</td>
 					<td data-l="캠페인"><a href={detail(r.campaign_code)} class="console-mono">{r.campaign_code.toUpperCase()}</a><small>{r.title ?? ''}</small></td>
-					<td data-l="대상"><span class="chip {r.payee_type === 'seller' ? 'seller' : 'brand'}">{r.payee_type === 'seller' ? '인플루언서' : '브랜드'}</span> {r.payee_name}<small>{r.payee_sub}{r.payee_type === 'seller' ? ` · ${r.settle_type === 'biz' ? '사업자' : '개인'}` : ''}</small></td>
+					<td data-l="대상"><span class="chip {r.payee_type}">{payeeTypeLabel(r.payee_type)}</span> {r.payee_name}<small>{r.payee_sub}{r.payee_type === 'seller' ? ` · ${r.settle_type === 'biz' ? '사업자' : '개인'}` : ''}</small></td>
 					<td data-l="계좌">{#if r.bank_snapshot?.bank}{r.bank_snapshot.bank} <span class="console-mask">{r.bank_snapshot.account_masked ?? ''}</span><small>{r.bank_snapshot.holder ?? ''}</small>{:else}<span class="meta">미등록</span>{/if}</td>
 					<td class="num" data-l="지급액"><b>{money(r.amount)}</b>{#if r.wht}<small>원천징수 {money(r.wht)} 차감</small>{/if}</td>
 					<td data-l="상태"><StatusChip tone={chip.tone}>{chip.label}</StatusChip>{#if r.status === 'held'}<small class="console-danger">{r.hold_reason ?? holdLabel(r.hold_code) ?? '운영자 보류'}</small>{/if}{#if r.memo}<small>{r.memo}</small>{/if}</td>

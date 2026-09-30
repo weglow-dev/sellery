@@ -5,8 +5,9 @@
 	 *   KPI 2장(누적 수익 · 추천 인원) → 추천 현황(인플루언서별 보상 판매 진행 n/5 · 발생 수익).
 	 *
 	 * 프로토타입의 `act.copyRef`(토스트) 대신 공용 `CopyButton` 을 쓴다 — 콘솔의 판매 링크 복사와 같은 동작.
-	 * **문구·구성은 프로토타입 그대로 둔다.** 추천인 몫의 실제 입금이 미구현이라(`payouts` 행이 생기지 않는다)
-	 *   "정산에 함께 지급돼요" 같은 안내를 덧붙이지 않는다 — docs/settlement-policy.md §5 참고.
+	 * **문구·구성은 프로토타입 그대로 둔다.** 누적액은 `referral_earnings` 합계이고(0020 적재),
+	 *   실제 입금은 0027 이 만드는 `payouts`(payee_type='referrer') 행으로 일어난다 — 들어온 사람의
+	 *   캠페인 정산과 같은 시점. 원천징수는 하지 않는다. docs/settlement-policy.md §5 참고.
 	 * 금액은 정산이 적재한 `referral_earnings` 값이라 이 화면에서는 계산하지 않는다.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
