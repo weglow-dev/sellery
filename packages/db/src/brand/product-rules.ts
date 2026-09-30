@@ -91,7 +91,7 @@ export function canDeleteProduct(campaignStatuses: readonly string[]): boolean {
 
 /**
  * 총 수수료율(%) → 인플루언서 수수료율(소수 4자리). 데모 `Math.max(5, totalRate − 10) / 100` — 총 요율이 15 미만이면 하한 0.05.
- * 총 요율 ≤ 10 은 폼이 먼저 막는다(parseProductInput total_rate).
+ * 범위 검증은 `parseProductInput` 이 한다(`TOTAL_RATE_HINT` 11~50) — 그래서 하한이 걸리는 구간은 11~14.9 뿐이다.
  */
 export function totalRateToCommission(totalPct: number): number {
   const v = Math.max(MIN_SELLER_RATE, totalPct / 100 - PLATFORM_RATE_PP / 100);
@@ -193,7 +193,7 @@ export const PRODUCT_FIELD_MESSAGES: Record<ProductField, string> = {
   category: "카테고리를 선택해주세요 — 건강·웰니스 범위 안의 카테고리만 등록할 수 있어요",
   consumer_price: "소비자가를 확인해주세요 (0 이상)",
   sale_price: "판매가를 입력해주세요 (1원 이상)",
-  total_rate: `총 수수료율은 플랫폼 몫(${PLATFORM_RATE_PP}%)보다 커야 해요`,
+  total_rate: `총 수수료율은 ${TOTAL_RATE_HINT.min}~${TOTAL_RATE_HINT.max}% 사이로 정해주세요 (플랫폼 ${PLATFORM_RATE_PP}%p 포함 · 제안 수수료 하한 ${MIN_SELLER_RATE * 100}%)`,
   stock: "재고를 확인해주세요 (0 이상)",
   sample_text: `샘플 내용은 ${SAMPLE_TEXT_MAX}자 이내로 입력해주세요`,
   sample_policy: "샘플 정책을 확인해주세요 — 지정가를 고르면 금액을 입력해야 해요",
@@ -272,7 +272,15 @@ export function parseProductInput(raw: unknown): ParsedProductInput {
   if (sale_price === null || !Number.isInteger(sale_price) || sale_price <= 0 || sale_price > PRICE_MAX) return fail("sale_price");
 
   const total_rate = num(src, "total_rate");
-  if (total_rate === null || !Number.isFinite(total_rate) || total_rate <= PLATFORM_RATE_PP || total_rate > 100) return fail("total_rate");
+  // 폼 힌트(`TOTAL_RATE_HINT` min 11 · max 50)와 **같은 범위**를 서버도 검증한다.
+  // 폼은 `novalidate` 라 브라우저가 min/max 를 막지 않는다.
+  if (
+    total_rate === null ||
+    !Number.isFinite(total_rate) ||
+    total_rate < TOTAL_RATE_HINT.min ||
+    total_rate > TOTAL_RATE_HINT.max
+  )
+    return fail("total_rate");
 
   const stockRaw = num(src, "stock");
   const stock = stockRaw === null ? 0 : stockRaw;
