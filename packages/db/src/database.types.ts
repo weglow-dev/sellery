@@ -2527,6 +2527,7 @@ export type Database = {
         Returns: Json
       }
       app_seller_grade_recalc: { Args: { p_seller_id: string }; Returns: Json }
+      app_grade_recalc_all: { Args: never; Returns: Json }
       app_seller_rrn_decrypt: {
         Args: {
           p_actor: string

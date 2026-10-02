@@ -92,7 +92,7 @@
 		<div><span class="ms-l">이달 무상 샘플</span><span class="ms-v">{a.sample.left}회 남음</span><span class="ms-s">한도 {a.sample.quota + a.sample.extra}회 · 사용 {a.sample.used}회</span></div>
 		<div><span class="ms-l">정산 정보</span><span class="ms-v">{seller.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">{seller.has_bank_info ? 'D+21 지급' : '정산 화면에서 등록'}</span></div>
 	</div>
-	<p class="meta" style="margin-top:10px">등급은 최근 3개월 확정 매출로 매달 다시 계산되고, 🥬 는 확정 매출 ₩500만당 1개씩 쌓여요.</p>
+	<p class="meta" style="margin-top:10px">등급은 최근 3개월 확정 매출로 <b>매월 1일</b> 다시 계산돼요 — 판매가 없으면 등급이 내려갈 수 있어요. 정산은 실행 시점 등급으로 지급되고, 🥬 는 확정 매출 ₩500만당 1개씩 쌓여요.</p>
 	<div class="btnrow" style="margin-top:10px">
 		<a href={data.productsPath} class="btn sm ghost">상품 갤러리</a>
 		<a href={data.campaignsPath} class="btn sm ghost">내 캠페인</a>
