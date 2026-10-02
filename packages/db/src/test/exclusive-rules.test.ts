@@ -90,6 +90,12 @@ describe("parseMyExclusiveRequests · parseBrandExclusiveRequests", () => {
     expect(r.sellerName).toBe("서아");
     expect(r.sellerFollowers).toBe(120000);
     expect(r.locked).toBe(false);
+    expect(r.othersActive).toBe(0);
+  });
+
+  it("진행 중인 다른 캠페인 수 (0031) — 없거나 숫자가 아니면 0", () => {
+    expect(parseBrandExclusiveRequests({ rows: [{ id: "x", status: "PENDING", others_active: 2 }] })[0].othersActive).toBe(2);
+    expect(parseBrandExclusiveRequests({ rows: [{ id: "x", status: "PENDING", others_active: "2" }] })[0].othersActive).toBe(0);
   });
 
   it("숫자가 아니면 null — NaN 을 화면에 흘리지 않는다", () => {
@@ -132,6 +138,7 @@ describe("exclusiveButton — 프로토타입 ProductDetailModal 분기 순서",
     expect(b.kind).toBe("mine");
     expect(b.enabled).toBe(false);
     expect(b.label).toContain("나 🎉");
+    expect(b.hint).toContain("진행 중이던 다른"); // 기존 캠페인은 끝까지 간다 (0031 결정)
   });
 
   it("대기 중이면 승인 대기 · 프로필 공개 상태를 알린다", () => {

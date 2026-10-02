@@ -122,11 +122,11 @@
 	{/each}
 </div>
 
-<!-- 독점권 신청(0025) — 캠페인이 아직 없는 요청이라 위 목록과 데이터 모양이 다르다. 승인하면 그 인플루언서만 상품을 진행할 수 있다. -->
+<!-- 독점권 신청(0025) — 캠페인이 아직 없는 요청이라 위 목록과 데이터 모양이 다르다. 승인하면 새 샘플 요청 · 제안은 그 인플루언서만 받고, 이미 진행 중인 다른 캠페인은 끝까지 간다(0031). -->
 {#if data.exclusives.length}
 	<div class="sec" style="margin-top:22px">
 		👑 독점권 신청 <span class="badge">{data.exclusives.length}</span>
-		<span class="console-sec-sub">— 승인하면 그 인플루언서만 이 상품을 진행합니다</span>
+		<span class="console-sec-sub">— 승인하면 이 상품의 새 샘플 요청 · 제안은 그 인플루언서만 받아요. 이미 진행 중인 다른 인플루언서의 판매는 끝까지 진행돼요.</span>
 	</div>
 	<div class="listcard console-rows">
 		{#each data.exclusives as x (x.id)}
@@ -146,6 +146,9 @@
 						{#if x.seller.followers !== null}팔로워 {fmtNum(x.seller.followers)}{/if}
 						{#if x.seller.m3Sales !== null}· 3개월 매출 ₩{fmtNum(x.seller.m3Sales)}{/if}
 					</div>
+					{#if !x.locked && x.othersActive > 0}
+						<div class="meta" style="color:var(--color-danger)">⚠ 이 상품에 진행 중인 다른 인플루언서 캠페인 {fmtNum(x.othersActive)}건 — 승인해도 그대로 진행돼요</div>
+					{/if}
 				</div>
 				{#if x.locked}
 					<div class="rowacts"><span class="chip">이미 확정된 상품</span></div>

@@ -76,6 +76,7 @@ export const load: PageServerLoad = async (event) => {
 			label: x.label,
 			needGrade: x.needGrade,
 			locked: x.locked,
+			othersActive: x.othersActive,
 			seller: {
 				name: x.sellerName,
 				handle: x.sellerHandle,

@@ -301,6 +301,8 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 신청·승인이 없어 운영자가 DB 를 직접 고쳐야 했다. 신청 = 인플루언서 상품 상세, 승인 = 브랜드 `/requests`,
 **관리자는 열람만**(`app_admin_exclusive_requests`). 승인 시 같은 상품의 남은 대기 신청을 자동 거절한다
 (프로토타입 `approveExcl` 은 남겨둬서 재승인 시 독점 인플루언서가 덮어써졌다).
+승인은 새로 들어오는 것만 막고 이미 진행 중인 다른 인플루언서의 캠페인은 끝까지 간다(2026-09-30 결정) — 0031 이
+브랜드 신청 행에 그 수(`others_active`)를 실어 승인 전에 경고한다(docs/period-policy.md §3).
 
 **랭킹·추천(0026)**: 프로토타입 `/rank` · `/ref` 를 콘솔로 옮겼다 — 실서비스 이름은 `/ranking` ·
 `/referral`(데모 라우트와 URL 이 충돌한다. 관리자가 데모 `/influencers` → 실서비스 `/sellers` 로 바꾼 것과 같다).
