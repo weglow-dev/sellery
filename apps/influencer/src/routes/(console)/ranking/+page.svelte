@@ -29,7 +29,8 @@
 	<span class="cel" title="셀러리 포인트 잔액">🥬 {data.balance}</span>
 </div>
 <p class="meta rank-lead">
-	최근 3개월 <a href={data.salesPath}>확정 매출</a> 기준 · 등급 보너스는 플랫폼 수수료에서 지급돼요.
+	최근 3개월 <a href={data.salesPath}>확정 매출</a> 기준 · <b>매월 1일</b> 다시 계산돼요 — 판매가 없으면 등급이 내려갈 수 있어요.
+	등급 보너스는 플랫폼 수수료에서 지급되고, 정산은 실행 시점 등급을 따라요.
 </p>
 
 {#if data.failed}
