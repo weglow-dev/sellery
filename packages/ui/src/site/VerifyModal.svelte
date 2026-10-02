@@ -37,7 +37,8 @@
 				</tr>
 				<tr>
 					<td>공급 브랜드</td>
-					<td class="num" style="white-space:normal">{brand.name} · <GradeBox grade={brand.grade} sm />{brand.biz_no ? ` · 사업자 ${brand.biz_no}` : ' · 인증 브랜드'}</td>
+					<!-- ' · 인증 브랜드' 대체 문구 제거 — SellerInfoCard 와 같은 이유(2026-10-02) -->
+					<td class="num" style="white-space:normal">{brand.name} · <GradeBox grade={brand.grade} sm />{brand.biz_no ? ` · 사업자 ${brand.biz_no}` : ''}</td>
 				</tr>
 				<tr>
 					<td>판매 기간</td>
