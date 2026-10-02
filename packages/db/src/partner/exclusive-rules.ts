@@ -200,7 +200,12 @@ export function exclusiveButton(
 ): ExclusiveButton {
   // 내 신청이 살아있으면 자격보다 그 상태를 먼저 보여준다
   if (mine?.status === "APPROVED" || mine?.lockedByMe) {
-    return { kind: "mine", label: "독점권 확정 — 나 🎉", enabled: false, hint: "이 상품은 나만 진행할 수 있습니다." };
+    return {
+      kind: "mine",
+      label: "독점권 확정 — 나 🎉",
+      enabled: false,
+      hint: "이제 이 상품의 새 샘플 요청 · 브랜드 제안은 나만 받아요. 승인 전부터 진행 중이던 다른 인플루언서의 판매는 끝까지 진행될 수 있어요.",
+    };
   }
   if (mine?.status === "PENDING") {
     return {
@@ -239,7 +244,7 @@ export function exclusiveButton(
       ? `독점권 다시 신청 — 내 등급 ${e.grade ?? "-"} 충족 ✓`
       : `독점권 신청 — 내 등급 ${e.grade ?? "-"} 충족 ✓`,
     enabled: true,
-    hint: "신청 시 브랜드에 프로필(이름·채널·지표)이 공개됩니다.",
+    hint: "신청 시 브랜드에 프로필(이름·채널·지표)이 공개됩니다. 승인되면 그때부터 새 샘플 요청 · 제안이 나에게만 오고, 이미 진행 중인 다른 판매는 끝까지 진행돼요.",
   };
 }
 

@@ -138,6 +138,7 @@ describe("exclusiveButton — 프로토타입 ProductDetailModal 분기 순서",
     expect(b.kind).toBe("mine");
     expect(b.enabled).toBe(false);
     expect(b.label).toContain("나 🎉");
+    expect(b.hint).toContain("진행 중이던 다른"); // 기존 캠페인은 끝까지 간다 (0031 결정)
   });
 
   it("대기 중이면 승인 대기 · 프로필 공개 상태를 알린다", () => {
