@@ -207,7 +207,13 @@
 				<label for="pf-sbm">등급 미달 시 샘플 구매가</label>
 				<select id="pf-sbm" name="sample_buy_mode" bind:value={buyMode}>
 					<option value="auto">자동 — 판매가 − 인플루언서 수수료</option>
-					<option value="fixed">브랜드 지정가 (1회 한정)</option>
+					<!--
+						"(1회 한정)" 을 뺐다(2026-10-02) — `sample_buy_mode='fixed'` 는 **가격만** 지정가로 바꾸고
+						구매 횟수를 제한하지 않는다(0011:174). 구매 샘플에는 횟수 한도가 아예 없고,
+						한도가 있는 것은 무상 샘플뿐이다(상품당 1회 `had_free` 0011:20 + 등급별 월 1/2/5회 `sample_quota`).
+						프로토타입 `sampleLine`(helpers.ts:109)도 "· 브랜드 지정가" 로만 쓴다.
+					-->
+					<option value="fixed">브랜드 지정가</option>
 				</select>
 				<input name="sample_fixed_price" type="number" inputmode="numeric" step="100" min="0" value={v('sample_fixed_price')} placeholder="지정가 (₩) — 지정가 선택 시" style="margin-top:6px" required={buyMode === 'fixed'} aria-label="샘플 지정가" />
 			</div>
