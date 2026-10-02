@@ -20,7 +20,7 @@
 	const detail = (code: string) => `${data.self}/${encodeURIComponent(code)}`;
 	/** 미발송 환불 — 토스 취소가 함께 일어나므로 확인을 받는다 */
 	const confirmRefund = (name: string, amount: number) => (e: SubmitEvent) => {
-		if (!confirm(`${name} 의 샘플 구매 ${money(amount)} 을 환불할까요? 토스 카드 결제를 전액 취소하고 🥬 를 복구하며, 되돌릴 수 없어요.`)) e.preventDefault();
+		if (!confirm(`${name} 이(가) 환불을 요청했나요?\n\n요청하지 않았다면 취소하세요 — 기한이 지났어도 기다리는 중일 수 있어요(운영 확인 2026-10-02).\n\n환불하면 샘플 구매 ${money(amount)} 의 토스 카드 결제를 전액 취소하고 🥬 를 복구하며, 되돌릴 수 없어요.`)) e.preventDefault();
 	};
 	/** 샘플 대금 정산 — 되돌릴 수 없으므로 확인을 받는다 */
 	const confirmSample = (name: string, amount: number) => (e: SubmitEvent) => {

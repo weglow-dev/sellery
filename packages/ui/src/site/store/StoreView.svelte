@@ -8,7 +8,7 @@
 	 * 레이아웃을 확인하는 용도라 구매 CTA 를 안내 문구로 바꾼다(합성 캠페인으로 체크아웃에 들어가지 못하게). 고객 화면(shop)은 기본값 false 로 영향이 없다.
 	 * 초기값 옵션 0 · 수량 1 (URL 로 복원하지 않는다). 합계 = options[oi].price × q, 배송비 없음. 결제는 S3(/checkout) — CTA 는 링크만 만든다.
 	 */
-	import { badgeTone, ddayLabel, discountPct, displayStoreUrl, fmtNum, imageSrc, won, type CampaignCard as Card, type HomeCard } from '@sellery/db/campaign';
+	import { badgeTone, ddayLabel, discountPct, displayStoreUrl, fmtNum, imageSrc, isEnded, won, type CampaignCard as Card, type HomeCard } from '@sellery/db/campaign';
 	import { COMPANY } from '@sellery/db/company';
 	import Cel from '../icons/Cel.svelte';
 	import PlatIcon from '../icons/PlatIcon.svelte';
@@ -43,6 +43,14 @@
 	const o = $derived(opts[Math.min(oi, opts.length - 1)]);
 	const cp = $derived(product.consumer_price);
 	const disc = $derived(discountPct(cp, product.sale_price));
+	/**
+	 * 판매 종료 뒤에는 **정가만** 보여준다 — 고객 FAQ "판매 기간이 끝나면 정가로 돌아갑니다"
+	 * (`apps/shop/about` · 브랜드 제안서 p.8 "종료되면 링크가 만료되고 가격이 돌아갑니다" · 운영 확인 2026-10-02).
+	 * 종료 판정은 `BuyCta` 와 같은 `isEnded`(CLEARING·SETTLED 또는 LIVE 인데 end_date 경과).
+	 * 프로토타입은 종료 후에도 할인가를 그대로 보여줬다 — 데모를 **의도적으로 벗어난다**(FAQ 가 약속한 쪽을 따른다).
+	 * 미리보기(관리자 상세페이지)는 합성 캠페인이라 종료가 아니므로 영향 없다.
+	 */
+	const ended = $derived(isEnded(campaign, today));
 </script>
 
 <div class="store">
@@ -79,12 +87,18 @@
 
 			<!-- store-client.tsx -->
 			<div class="prices" style="margin-bottom:14px">
-				<span class="gp">{won(o.price)}</span>
-				{#if oi === 0}
-					<span class="cp">{won(cp)}</span>
-					{#if disc !== null}<span class="disc">-{disc}%</span>{/if}
+				{#if ended}
+					<!-- 종료: 정가만 (취소선·할인율 없음). 판매가는 그 기간에만 유효했다 -->
+					<span class="gp">{won(cp)}</span>
+					<span class="cp" style="text-decoration:none">정가</span>
 				{:else}
-					<span class="cp" style="text-decoration:none">{o.n}</span>
+					<span class="gp">{won(o.price)}</span>
+					{#if oi === 0}
+						<span class="cp">{won(cp)}</span>
+						{#if disc !== null}<span class="disc">-{disc}%</span>{/if}
+					{:else}
+						<span class="cp" style="text-decoration:none">{o.n}</span>
+					{/if}
 				{/if}
 			</div>
 			<div class="lbl-sm" style="margin-bottom:6px">옵션 선택</div>

@@ -171,6 +171,8 @@ export function sampleSettleMessage(key: string | null | undefined): string | nu
  * 한 번에 한다(0012 §5.7 순서). 토스 취소가 실패하면 DB 는 건드리지 않는다.
  */
 export const SAMPLE_REFUND_NOTICE =
+  "영업일 5일이 지난 건이 여기 모입니다 — 자동으로 환불되지 않습니다. 인플루언서가 환불을 요청한 경우에만 누르세요. " +
+  "기다리겠다고 하면 그대로 두면 됩니다(브랜드가 발송하면 목록에서 빠집니다). " +
   "환불하면 토스 카드 결제를 먼저 전액 취소하고, 성공한 뒤에만 🥬 복구·캠페인 종결·주문 취소가 기록됩니다. 되돌릴 수 없습니다.";
 
 /** 환불 결과 문구 — `refundSamplePurchase` 의 반환 코드를 사람이 읽는 말로 */
