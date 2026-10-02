@@ -278,7 +278,9 @@ describe("미발송 환불 요청 (0033 · 운영 확인 2026-10-02)", () => {
 
   it("parseSampleRefundRequest — 성공·멱등·실패", () => {
     expect(parseSampleRefundRequest({ ok: true, already: false, due_on: "2026-09-29" })).toEqual({ ok: true, already: false, dueOn: "2026-09-29" });
-    expect(parseSampleRefundRequest({ ok: true, already: true, due_on: "2026-09-29" }).already).toBe(true);
+    // 유니온이라 ok 로 좁힌 뒤에 읽는다 (ok:false 분기에는 already 가 없다)
+    const again = parseSampleRefundRequest({ ok: true, already: true, due_on: "2026-09-29" });
+    expect(again.ok && again.already).toBe(true);
     expect(parseSampleRefundRequest({ ok: false, code: "TOO_EARLY", due_on: "2026-10-09" })).toEqual({ ok: false, code: "TOO_EARLY", dueOn: "2026-10-09" });
   });
 
