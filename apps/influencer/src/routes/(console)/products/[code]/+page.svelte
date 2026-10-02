@@ -155,7 +155,8 @@
 		<table class="stmt" style="min-width:0;width:100%;font-size:13px">
 			<tbody>
 				{#if q?.buy_mode === 'fixed'}
-					<tr><td>브랜드 지정 샘플가 (1회 한정)</td><td class="num"><b>₩{fmtNum(price)}</b></td></tr>
+					<!-- "(1회 한정)" 제거 — 지정가는 가격만 바꾼다(0011:174). 횟수 한도는 무상 샘플에만 있다 -->
+					<tr><td>브랜드 지정 샘플가</td><td class="num"><b>₩{fmtNum(price)}</b></td></tr>
 				{:else}
 					<tr><td>판매가</td><td class="num">₩{fmtNum(p.sale_price)}</td></tr>
 					<tr><td>− 내 수수료 {pct(p.commission_rate)}%</td><td class="num">−₩{fmtNum(p.sale_price - price)}</td></tr>
