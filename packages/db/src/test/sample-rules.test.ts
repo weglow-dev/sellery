@@ -16,6 +16,11 @@ import {
   sampleLine,
   stepIndex,
   type SampleQuote,
+  parseSampleRefundRequest,
+  parseSampleRefundState,
+  sampleRefundReadyLine,
+  sampleRefundRequestFailMessage,
+  sampleShipDeadlineLine,
 } from "../partner/sample-rules";
 
 /** 0011 app_sample_quote 의 실제 응답 (s101 스타터 × p2 치팅온 ₩26,900 · rate 0.2 · use_cel=true) */
@@ -229,5 +234,59 @@ describe("campaignChip · stepIndex — 프로토타입 ST · FLOW · stepper", 
     expect(stepIndex("TESTING")).toBe(3);
     expect(stepIndex("SETTLED")).toBe(8);
     expect(stepIndex("REJECTED")).toBe(-1);
+  });
+});
+
+describe("미발송 환불 요청 (0033 · 운영 확인 2026-10-02)", () => {
+  it("기한 안내는 '환불된다' 가 아니라 '요청할 수 있다' — 자동이 아니다", () => {
+    const t = sampleShipDeadlineLine(5);
+    expect(t).toContain("영업일 5일");
+    expect(t).toContain("요청할 수 있어요");
+    expect(t).not.toContain("환불돼요"); // 자동 환불로 읽히는 표현을 쓰지 않는다
+    // 반대 방향도 함께 알린다 — 받은 뒤 진행 안 하면 브랜드 지급
+    expect(t).toContain("받은 뒤");
+    expect(t).toContain("환불되지 않아요");
+  });
+
+  it("기한 경과 안내는 요청을 권한다", () => {
+    const t = sampleRefundReadyLine(5);
+    expect(t).toContain("영업일 5일이 지났");
+    expect(t).toContain("요청할 수 있어요");
+  });
+
+  it("일수는 platform_settings 값을 그대로 쓴다", () => {
+    expect(sampleShipDeadlineLine(3)).toContain("영업일 3일");
+    expect(sampleRefundReadyLine(7)).toContain("영업일 7일");
+  });
+
+  it("parseSampleRefundState — applicable/eligible/requestedAt 을 좁힌다", () => {
+    const s = parseSampleRefundState({ ok: true, applicable: true, ship_days: 5, due_on: "2026-09-29", eligible: true, requested_at: "2026-10-02T07:05:05Z" });
+    expect(s).toEqual({ applicable: true, shipDays: 5, dueOn: "2026-09-29", eligible: true, requestedAt: "2026-10-02T07:05:05Z" });
+  });
+
+  it("applicable 이 아니면 화면이 블록을 숨긴다 (LIVE·발송 완료 등)", () => {
+    const s = parseSampleRefundState({ ok: true, applicable: false, ship_days: 5 });
+    expect(s.applicable).toBe(false);
+    expect(s.eligible).toBe(false);
+    expect(s.requestedAt).toBeNull();
+  });
+
+  it("ship_days 가 0/누락이면 5 로 떨어진다 — 문구가 비지 않게", () => {
+    expect(parseSampleRefundState({ ok: true, ship_days: 0 }).shipDays).toBe(5);
+    expect(parseSampleRefundState({}).shipDays).toBe(5);
+  });
+
+  it("parseSampleRefundRequest — 성공·멱등·실패", () => {
+    expect(parseSampleRefundRequest({ ok: true, already: false, due_on: "2026-09-29" })).toEqual({ ok: true, already: false, dueOn: "2026-09-29" });
+    // 유니온이라 ok 로 좁힌 뒤에 읽는다 (ok:false 분기에는 already 가 없다)
+    const again = parseSampleRefundRequest({ ok: true, already: true, due_on: "2026-09-29" });
+    expect(again.ok && again.already).toBe(true);
+    expect(parseSampleRefundRequest({ ok: false, code: "TOO_EARLY", due_on: "2026-10-09" })).toEqual({ ok: false, code: "TOO_EARLY", dueOn: "2026-10-09" });
+  });
+
+  it("실패 문구 — 기한 전·발송 완료는 이유를 알려준다", () => {
+    expect(sampleRefundRequestFailMessage("TOO_EARLY")).toContain("기한");
+    expect(sampleRefundRequestFailMessage("ALREADY_SHIPPED")).toContain("발송");
+    expect(sampleRefundRequestFailMessage("WAT")).toContain("다시 시도");
   });
 });

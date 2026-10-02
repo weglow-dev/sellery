@@ -8,6 +8,7 @@
 	 *         · INVITED → 제안 메시지 + [수락](저장 배송지가 있으면 바로, 없으면 ShippingFields) [거절](사유) · LIVE → 판매 링크 · 나머지는 안내 문구(원문).
 	 *   실패한 제출은 `form`(fail 400 · kind 별)으로 값 유지 · 필드 강조.
 	 */
+	import { sampleRefundReadyLine, sampleShipDeadlineLine } from '@sellery/db/partner/sample-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
 	import { LEAK_WARNING, isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
@@ -144,6 +145,22 @@
 			<div class="card static">
 				<h4>결제 완료 · 샘플 발송 준비 중 ⏳</h4>
 				<p class="hint">{paidLine || '샘플 구매'} — 브랜드가 발송하면 운송장이 표시됩니다. 발송 전에는 고객센터로 취소를 요청할 수 있어요.</p>
+				<!--
+					미발송 환불(0024·0033) — 기한이 지나면 **요청할 수 있다**(자동 환불이 아니다).
+					상태는 서버가 판정한다(`app_seller_sample_refund_state` — 관리자 큐와 같은 기한 함수).
+				-->
+				{#if data.refund.applicable}
+					{#if data.refund.requestedAt}
+						<p class="hint"><b>환불 요청 접수됨</b> — 셀러리 운영팀이 확인하고 결제를 취소해드릴게요.</p>
+					{:else if data.refund.eligible}
+						<p class="hint"><b>{sampleRefundReadyLine(data.refund.shipDays)}</b></p>
+						<form method="post" action="?/requestRefund" class="btnrow" style="margin-top:10px">
+							<button type="submit" class="pri sm">환불 요청하기</button>
+						</form>
+					{:else}
+						<p class="hint">{sampleShipDeadlineLine(data.refund.shipDays)}</p>
+					{/if}
+				{/if}
 			</div>
 		{:else if c.status === 'SAMPLE_APPROVED'}
 			<div class="card static"><h4>샘플 발송 준비 중 ⏳</h4><p class="hint">브랜드가 {c.invited ? '제안 수락을 확인했어요' : '요청을 승인했어요'}. 샘플이 발송되면 운송장이 여기 표시됩니다.</p></div>

@@ -19,6 +19,19 @@ import { cleanText } from "../text";
 import type { Shipping } from "../types";
 
 export { campaignChip, CAMPAIGN_STEPS, stepIndex, ENDED_STATUSES, samplePaidLine, isCampaignStatus, type CampaignChip } from "../partner/sample-rules";
+
+/**
+ * 샘플 구매 건의 발송 기한 안내 — 브랜드가 기한을 모르고 넘기는 것을 막는다.
+ * 정책(docs/sample-policy.md §182 · 0024 · 0033): 결제 후 영업일 `shipDays`
+ * (`platform_settings.sample_ship_days` · 기본 5) 안에 발송하지 않으면 **인플루언서가 환불을 요청할 수 있다.**
+ * 자동 환불이 아니다 — 요청이 오면 운영이 결제를 취소하고 캠페인이 종결된다(운영 확인 2026-10-02).
+ * 반대로 발송한 뒤 인플루언서가 진행하지 않으면(패스·거절) 대금은 **브랜드에 지급된다** — 실물을 이미 보냈기 때문.
+ * 날짜(D-n)는 주지 않는다 — 기한 기준은 `partner_payments.created_at` 인데 브랜드 목록 RPC
+ * (`app_brand_requests`)가 그 값을 반환하지 않는다. 관리자 큐와 다른 날짜를 보여주지 않으려고 규칙만 적는다.
+ */
+export function sampleShipDeadlineNotice(shipDays: number): string {
+  return `결제 완료 — 영업일 ${shipDays}일 안에 발송해주세요. 기한을 넘기면 인플루언서가 환불을 요청할 수 있고, 환불되면 캠페인이 종결됩니다.`;
+}
 export { COURIERS, isCourier, trackingUrlOf, carrierName, type Courier } from "../carriers";
 
 /* ---------------- 브랜드 차례 · 액션 ---------------- */

@@ -1340,6 +1340,12 @@
   .console-reject-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; min-width: 240px; }
   .console-reject-form textarea { width: calc(100% - 6px); font-size: 12.5px; }
   .console-reject-form button { align-self: flex-start; }
+  /* 샘플 발송 기한 안내(0024·0033) — 브랜드 처리 대기의 구매 샘플 행. 놓치면 환불 요청이 들어온다 */
+  .console-req .console-ship-due {
+    flex-basis: 100%; margin: 6px 0 0; padding: 6px 9px;
+    font-size: 11.5px; font-weight: 700; color: var(--color-ink);
+    background: var(--color-accent-soft); box-shadow: var(--shadow-frame-soft);
+  }
   .console-shipform { align-items: center; }
   .console-shipform .fld { margin: 0; flex: 1 1 140px; min-width: 0; }
   .console-shipform .fld select, .console-shipform .fld input { width: calc(100% - 6px); margin: 3px; }

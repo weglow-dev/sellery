@@ -6,6 +6,7 @@
 	 * 실패한 발송 제출은 `form`(fail 400 · code 일치 행)으로 값 유지 · 필드 강조. 인플루언서 배송지 원문은 상세(`/campaigns/<code>`)에서만.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
+	import { sampleShipDeadlineNotice } from '@sellery/db/brand/campaign-rules';
 	import { md } from '@sellery/db/dates';
 	import { COURIERS, REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
 	import { GradeBox, PlatformHandle, ProductIcon, SellerAvatar, StatusChip } from '@sellery/ui/site';
@@ -78,6 +79,10 @@
 					<a href={c.href} class="btn ghost sm">상세</a>
 				</div>
 			{:else if c.action.kind === 'ship'}
+				<!-- 발송 기한(0024·0033) — 구매 샘플만. 기한을 넘기면 인플루언서가 환불을 요청할 수 있다 -->
+				{#if c.purchased}
+					<p class="console-ship-due">{sampleShipDeadlineNotice(data.shipDays)}</p>
+				{/if}
 				<form method="post" action="?/ship" class="rowacts console-form console-shipform">
 					<input type="hidden" name="code" value={c.code} />
 					<div class="fld {f?.field === 'courier' ? 'invalid' : ''}">

@@ -494,6 +494,79 @@ export const SAMPLE_PAY_CANCEL_NOTICE = "브랜드가 샘플을 발송하기 전
 /** 🥬 결제분 안내 — 현금과 달리 카드 명세에 없다 */
 export const SAMPLE_PAY_CEL_NOTICE = "🥬 로 낸 금액은 셀러리 잔액에서 바로 차감돼요 · 취소 시 🥬 로 돌려받아요";
 
+/* ---------------- 미발송 환불 요청 (0033) ---------------- */
+
+/**
+ * 결제 후 기한 안내 — 브랜드가 영업일 N일 안에 발송하지 않으면 **환불을 요청할 수 있다**(0024·0033).
+ * "환불된다" 가 아니라 "요청할 수 있다" 로 쓴다 — 자동이 아니고 요청이 실행 조건이다(운영 확인 2026-10-02).
+ * 뒤 문장은 반대 방향도 알린다: 샘플을 받은 뒤 진행하지 않으면 대금은 브랜드에 지급된다(docs/sample-policy.md §182).
+ */
+export function sampleShipDeadlineLine(shipDays: number): string {
+  return `브랜드가 영업일 ${shipDays}일 안에 발송하지 않으면 환불을 요청할 수 있어요. 샘플을 받은 뒤 진행하지 않으면 구매액은 환불되지 않아요.`;
+}
+
+/** 기한이 지난 뒤 보여주는 적극 안내 — 요청 버튼과 함께 쓴다. */
+export function sampleRefundReadyLine(shipDays: number): string {
+  return `결제 후 영업일 ${shipDays}일이 지났는데 아직 발송되지 않았어요. 환불을 요청할 수 있어요.`;
+}
+
+/** 화면 표시 상태 (0033 `app_seller_sample_refund_state`). */
+export type SampleRefundState = {
+  /** 구매 샘플 + 발송 전 + 결제 완료 — false 면 블록을 숨긴다. */
+  applicable: boolean;
+  shipDays: number;
+  /** 발송 기한 (applicable 일 때만). */
+  dueOn: string | null;
+  /** 기한이 지났나 — 요청 버튼을 켜는 조건. */
+  eligible: boolean;
+  /** 이미 요청했으면 그 시각. */
+  requestedAt: string | null;
+};
+
+export function parseSampleRefundState(raw: unknown): SampleRefundState {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const n = typeof o.ship_days === "number" && Number.isFinite(o.ship_days) ? o.ship_days : 5;
+  return {
+    applicable: o.applicable === true,
+    shipDays: n > 0 ? n : 5,
+    dueOn: typeof o.due_on === "string" && o.due_on ? o.due_on : null,
+    eligible: o.eligible === true,
+    requestedAt: typeof o.requested_at === "string" && o.requested_at ? o.requested_at : null,
+  };
+}
+
+export type SampleRefundRequestResult =
+  | { ok: true; already: boolean; dueOn: string | null }
+  | { ok: false; code: string; dueOn: string | null };
+
+export function parseSampleRefundRequest(raw: unknown): SampleRefundRequestResult {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  const dueOn = typeof o.due_on === "string" && o.due_on.length > 0 ? o.due_on : null;
+  if (o.ok !== true) {
+    return { ok: false, code: typeof o.code === "string" && o.code ? o.code : "ERROR", dueOn };
+  }
+  return { ok: true, already: o.already === true, dueOn };
+}
+
+/** 요청 결과 문구 — 303 `?msg=` / `?err=` 로 돌려준다. */
+export const SAMPLE_REFUND_REQUEST_MESSAGES: Record<string, string> = {
+  requested: "환불 요청을 접수했어요 — 셀러리 운영팀이 확인하고 결제를 취소해드릴게요.",
+  already: "이미 환불을 요청한 건이에요 — 처리 중입니다.",
+};
+
+export const SAMPLE_REFUND_REQUEST_FAIL: Record<string, string> = {
+  TOO_EARLY: "아직 발송 기한이 지나지 않았어요 — 기한이 지난 뒤에 요청할 수 있어요.",
+  ALREADY_SHIPPED: "브랜드가 이미 발송했어요 — 발송 후에는 환불되지 않아요.",
+  NOT_PURCHASED: "샘플을 구매한 건이 아니에요.",
+  NO_PAYMENT: "결제 기록을 찾을 수 없어요 — 고객센터로 문의해주세요.",
+  NOT_FOUND: "캠페인을 찾을 수 없어요.",
+  ERROR: "요청을 처리하지 못했어요. 잠시 후 다시 시도해주세요.",
+};
+
+export function sampleRefundRequestFailMessage(code: string): string {
+  return SAMPLE_REFUND_REQUEST_FAIL[code] ?? SAMPLE_REFUND_REQUEST_FAIL.ERROR;
+}
+
 /* ---------------- app_partner_payment_claim (선점) 결과 ---------------- */
 
 export type BeginSampleCode = "BAD_SHIPPING" | "BAD_ORDER_ID" | "NOT_FOUND" | "NOT_BUYABLE" | "INSUFFICIENT_CEL" | "CASH_TOO_SMALL" | "UNLISTED" | "DB_ERROR";

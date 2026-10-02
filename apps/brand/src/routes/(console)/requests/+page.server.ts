@@ -11,6 +11,7 @@ import {
 	rateLimit,
 	requireBrand
 } from '$lib/server/brand';
+import { getSampleShipDays } from '$lib/server/db';
 import { runSampleAction, type SampleActionKind } from '$lib/server/sample-actions';
 import { runScheduleAction, type ScheduleActionKind } from '$lib/server/schedule-actions';
 
@@ -31,9 +32,10 @@ export const load: PageServerLoad = async (event) => {
 	if (!r.ok) redirect(303, r.location);
 	const { brand } = r.ctx;
 
-	const [rows, exclusives] = await Promise.all([
+	const [rows, exclusives, shipDays] = await Promise.all([
 		listBrandRequests(brand.id),
-		listBrandExclusiveRequests(brand.id)
+		listBrandExclusiveRequests(brand.id),
+		getSampleShipDays()
 	]);
 	const key = event.url.searchParams.get('msg') ?? '';
 	const doneCode = event.url.searchParams.get('code') ?? '';
@@ -87,6 +89,8 @@ export const load: PageServerLoad = async (event) => {
 			createdAt: x.createdAt,
 			productHref: x.productCode ? brandPath(`/products/${encodeURIComponent(x.productCode)}`) : null
 		})),
+		// 발송 기한 안내(0024·0033) — 브랜드가 기한을 모르고 넘기면 인플루언서가 환불을 요청할 수 있다
+		shipDays,
 		campaignsPath: brandPath('/campaigns')
 	};
 };
