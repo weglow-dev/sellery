@@ -11,6 +11,7 @@ import {
   fmtKR,
   imageSrc,
   isBuyable,
+  isEnded,
   isHomeFeat,
   normalizeHandle,
   ogImageSrc,
@@ -149,5 +150,33 @@ describe("포맷 · 이미지 · 보는 중", () => {
     expect(v).toBeGreaterThanOrEqual(14);
     expect(v).toBeLessThanOrEqual(66);
     expect(viewersOf("c1", 1_000_000 + 19_999)).toBe(v);
+  });
+});
+
+describe("isEnded — 종료 판정 (판매 페이지가 정가만 보여주는 기준)", () => {
+  /**
+   * 고객 FAQ "판매 기간이 끝나면 정가로 돌아갑니다"(`apps/shop/about`)를 `StoreView` 가 지키려면
+   * 이 판정이 정확해야 한다. 프로토타입은 종료 후에도 할인가를 보여줬다 — 의도적으로 벗어난 지점이다(운영 확인 2026-10-02).
+   */
+  const c = (status: string, end_date: string | null) => ({ status, end_date }) as never;
+
+  it("CLEARING · SETTLED 는 날짜와 무관하게 종료다", () => {
+    expect(isEnded(c("CLEARING", "2099-12-31"), "2026-10-02")).toBe(true);
+    expect(isEnded(c("SETTLED", null), "2026-10-02")).toBe(true);
+  });
+
+  it("LIVE 는 종료일이 지나야 종료다 — 당일은 아직 판매 중", () => {
+    expect(isEnded(c("LIVE", "2026-10-02"), "2026-10-02")).toBe(false);
+    expect(isEnded(c("LIVE", "2026-10-01"), "2026-10-02")).toBe(true);
+    expect(isEnded(c("LIVE", "2026-10-03"), "2026-10-02")).toBe(false);
+  });
+
+  it("오픈 전(SCHEDULE_CONFIRMED)은 종료가 아니다 — 정가가 아니라 판매가를 보여준다", () => {
+    expect(isEnded(c("SCHEDULE_CONFIRMED", "2026-10-30"), "2026-10-02")).toBe(false);
+  });
+
+  it("종료일이 없거나 깨진 LIVE 는 종료로 보지 않는다 — 실수로 가격을 바꾸지 않는다", () => {
+    expect(isEnded(c("LIVE", null), "2026-10-02")).toBe(false);
+    expect(isEnded(c("LIVE", "깨진값"), "2026-10-02")).toBe(false);
   });
 });
