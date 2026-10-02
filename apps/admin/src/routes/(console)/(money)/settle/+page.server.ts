@@ -82,8 +82,20 @@ export const actions: Actions = {
 		if (!gate.ok) redirect(303, gate.location);
 		if (!rateLimit(`admin-refund-sample:${gate.ctx.user.id}`, 10)) redirect(303, `${adminPath('/settle')}?msg=err_rate`);
 		const fd = await event.request.formData();
-		const r = await refundSamplePurchase(String(fd.get('payment') ?? ''), {
-			reason: '브랜드 미발송 (영업일 5일 경과) — 관리자 환불',
+		const paymentId = String(fd.get('payment') ?? '');
+
+		/**
+		 * 0033 — **인플루언서 요청이 있는 건만** 환불한다(운영 확인 2026-10-02).
+		 * 화면은 요청이 없으면 버튼을 비활성화하지만, URL 로 직접 POST 하는 경로를 서버에서도 막는다.
+		 * 기한이 지나도 인플루언서가 기다리는 중일 수 있으므로 환불은 되돌릴 수 없는 손해가 된다.
+		 */
+		const due = await listSampleRefundDue();
+		const target = due.rows.find((x) => x.paymentId === paymentId);
+		if (!target) redirect(303, `${adminPath('/settle')}?msg=err_refund_NOT_FOUND`);
+		if (!target.requestedAt) redirect(303, `${adminPath('/settle')}?msg=err_refund_NO_REQUEST`);
+
+		const r = await refundSamplePurchase(paymentId, {
+			reason: '브랜드 미발송 (영업일 5일 경과) — 인플루언서 요청으로 관리자 환불',
 			source: 'cancel'
 		});
 		const key = r.ok

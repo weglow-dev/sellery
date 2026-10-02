@@ -40,3 +40,18 @@ export function createAnonClient(env: { url?: string; anonKey?: string } = {}): 
   if (!url || !anonKey) return null;
   return createClient<Database>(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
+
+/**
+ * 샘플 발송 기한(영업일) — `platform_sample_ship_days()`(0024 · `platform_settings.sample_ship_days`, 기본 5).
+ * 브랜드·인플루언서 화면의 기한 안내가 이 값을 읽는다. 관리자 큐(`app_admin_sample_refund_due`)·
+ * 환불 요청 RPC(0033)와 **같은 출처**라 화면끼리 다른 숫자를 보여주지 않는다.
+ * RPC 실패 시 5 로 떨어진다(문구가 비지 않게).
+ */
+export async function getSampleShipDays(admin: Admin = createAdminClient()): Promise<number> {
+  const { data, error } = await admin.rpc("platform_sample_ship_days");
+  if (error) {
+    console.error("[platform] platform_sample_ship_days 실패:", error.message);
+    return 5;
+  }
+  return typeof data === "number" && Number.isFinite(data) && data > 0 ? data : 5;
+}

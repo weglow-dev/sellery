@@ -97,6 +97,13 @@ export type SampleRefundRow = {
   dueOn: string | null;
   /** 기한을 며칠 넘겼는가 (0 이면 오늘이 기한) */
   daysOver: number;
+  /**
+   * 인플루언서가 미발송 환불을 요청한 시각 (0033 · null = 요청 없음).
+   * **요청이 있어야 환불한다** — 기한이 지나도 기다리기로 하면 그대로 둔다(운영 확인 2026-10-02).
+   */
+  requestedAt: string | null;
+  /** 요청 시 스레드에 남은 문구 (관리자 표시용) */
+  requestedBody: string | null;
 };
 
 export type SampleRefundDue = { today: string | null; shipDays: number; rows: SampleRefundRow[] };
@@ -128,6 +135,8 @@ export function parseSampleRefundDue(raw: unknown): SampleRefundDue {
         paidOn: str(x.paid_on),
         dueOn: str(x.due_on),
         daysOver: num(x.days_over),
+        requestedAt: str(x.requested_at),
+        requestedBody: str(x.requested_body),
       },
     ];
   });
@@ -171,8 +180,8 @@ export function sampleSettleMessage(key: string | null | undefined): string | nu
  * 한 번에 한다(0012 §5.7 순서). 토스 취소가 실패하면 DB 는 건드리지 않는다.
  */
 export const SAMPLE_REFUND_NOTICE =
-  "영업일 5일이 지난 건이 여기 모입니다 — 자동으로 환불되지 않습니다. 인플루언서가 환불을 요청한 경우에만 누르세요. " +
-  "기다리겠다고 하면 그대로 두면 됩니다(브랜드가 발송하면 목록에서 빠집니다). " +
+  "영업일 5일이 지난 건이 여기 모입니다 — 자동으로 환불되지 않습니다. 「환불 요청」 표시가 있는 건만 환불하세요. " +
+  "표시가 없으면 인플루언서가 아직 기다리는 중입니다 — 그대로 두면 됩니다(브랜드가 발송하면 목록에서 빠집니다). " +
   "환불하면 토스 카드 결제를 먼저 전액 취소하고, 성공한 뒤에만 🥬 복구·캠페인 종결·주문 취소가 기록됩니다. 되돌릴 수 없습니다.";
 
 /** 환불 결과 문구 — `refundSamplePurchase` 의 반환 코드를 사람이 읽는 말로 */
@@ -180,6 +189,8 @@ export const SAMPLE_REFUND_MESSAGES: Record<string, string> = {
   refunded: "샘플 구매를 환불했습니다 — 토스 취소 · 🥬 복구 · 캠페인 종결까지 처리했습니다.",
   refund_already: "이미 환불된 결제입니다.",
   err_refund_NOT_FOUND: "결제를 찾을 수 없습니다.",
+  err_refund_NO_REQUEST:
+    "인플루언서가 환불을 요청하지 않은 건입니다 — 기한이 지나도 기다리는 중일 수 있어 환불하지 않습니다(0033).",
   err_refund_NOT_REFUNDABLE: "결제 완료 상태가 아니라 환불할 수 없습니다.",
   err_refund_NOT_CANCELABLE: "브랜드가 이미 발송한 건입니다 — 발송 후에는 브랜드에 지급합니다.",
   err_refund_TOSS: "토스 취소에 실패했습니다 — DB 는 바꾸지 않았습니다. 잠시 후 같은 건으로 다시 시도하세요(같은 멱등키라 중복 취소되지 않습니다).",

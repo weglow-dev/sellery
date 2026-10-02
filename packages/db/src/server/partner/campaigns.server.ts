@@ -12,7 +12,15 @@
  */
 import type { Shipping } from "../../types";
 import { CAMPAIGN_CODE_RE } from "../../campaign";
-import { campaignChip, parseStoredShipping, type CampaignChip } from "../../partner/sample-rules";
+import {
+  campaignChip,
+  parseSampleRefundRequest,
+  parseSampleRefundState,
+  parseStoredShipping,
+  type CampaignChip,
+  type SampleRefundRequestResult,
+  type SampleRefundState,
+} from "../../partner/sample-rules";
 import { sellerNextAction, type SellerNextAction } from "../../partner/schedule-rules";
 import { createAdminClient, type Admin } from "../admin.server";
 
@@ -271,4 +279,40 @@ export async function receiveSample(sellerId: string, campaignCode: string, admi
     return { ok: false, code: "DB_ERROR" };
   }
   return parseReceiveSampleResult(data);
+}
+
+/**
+ * 미발송 샘플 환불 요청 (0033 `app_seller_request_sample_refund`).
+ * 기한(영업일 N일) 판정·소유자 검사·멱등은 **DB 가 한다** — 화면에서 날짜를 다시 계산하지 않는다.
+ * 요청은 `campaign_events(sample_refund_requested)` 1행으로 남아 관리자 큐에 「환불 요청」으로 뜨고,
+ * 같은 스레드를 보는 브랜드도 요청을 알게 된다(발송을 서두르게 하는 효과).
+ */
+export async function requestSampleRefund(
+  sellerId: string,
+  campaignId: string,
+  admin: Admin = createAdminClient(),
+): Promise<SampleRefundRequestResult> {
+  const { data, error } = await admin.rpc("app_seller_request_sample_refund", {
+    p_seller_id: sellerId,
+    p_campaign_id: campaignId,
+  });
+  if (error) throw new Error(`app_seller_request_sample_refund failed: ${error.message}`);
+  return parseSampleRefundRequest(data);
+}
+
+/** 미발송 환불 요청 상태 — 화면이 "기한 안내 / 요청 버튼 / 요청 접수됨" 중 무엇을 보여줄지 (0033). */
+export async function getSampleRefundState(
+  sellerId: string,
+  campaignId: string,
+  admin: Admin = createAdminClient(),
+): Promise<SampleRefundState> {
+  const { data, error } = await admin.rpc("app_seller_sample_refund_state", {
+    p_seller_id: sellerId,
+    p_campaign_id: campaignId,
+  });
+  if (error) {
+    console.error("[partner/campaigns] app_seller_sample_refund_state 실패:", error.message);
+    return { applicable: false, shipDays: 5, dueOn: null, eligible: false, requestedAt: null };
+  }
+  return parseSampleRefundState(data);
 }

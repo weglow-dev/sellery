@@ -1,5 +1,9 @@
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import {
+	SAMPLE_REFUND_REQUEST_MESSAGES,
+	sampleRefundRequestFailMessage
+} from '@sellery/db/partner/sample-rules';
 import { storeUrl } from '@sellery/db/campaign';
 import { addDays, kstToday } from '@sellery/db/dates';
 import { chatFailMessage, parseChatInput } from '@sellery/db/partner/chat-rules';
@@ -28,7 +32,9 @@ import {
 	receiveSample,
 	requireSeller,
 	sellerPath,
-	sendCampaignChat
+	sendCampaignChat,
+	getSampleRefundState,
+	requestSampleRefund
 } from '$lib/server/partner';
 
 /**
@@ -50,6 +56,8 @@ const MESSAGES: Record<string, CampaignMessage> = {
 	requested: { tone: 'ok', text: '무상 샘플을 요청했어요 — 브랜드가 프로필을 검토한 뒤 승인하면 배송지로 샘플이 발송됩니다.' },
 	received: { tone: 'ok', text: `샘플 수령을 확인했어요 — 테스트 기한 ${TEST_DAYS}일이 시작됩니다.` },
 	already: { tone: 'info', text: '이미 처리된 캠페인이에요.' },
+	refundRequested: { tone: 'ok', text: SAMPLE_REFUND_REQUEST_MESSAGES.requested },
+	refundAlready: { tone: 'info', text: SAMPLE_REFUND_REQUEST_MESSAGES.already },
 	not_shipped: { tone: 'danger', text: '아직 발송 전이에요 — 브랜드가 발송하면 운송장이 표시됩니다.' },
 	proposed: { tone: 'ok', text: SCHEDULE_DONE_MESSAGE },
 	reproposed: { tone: 'ok', text: SCHEDULE_REPROPOSED_MESSAGE },
@@ -81,7 +89,10 @@ export const load: PageServerLoad = async (event) => {
 	const msg: CampaignMessage | null = err ? { tone: 'danger', text: err } : (MESSAGES[key] ?? null);
 
 	const storePath = storeUrl(seller.handle, c.code);
+	// 미발송 환불 요청(0033) — 기한·요청 여부는 DB 가 판정한다(관리자 큐와 같은 함수)
+	const refund = await getSampleRefundState(seller.id, c.id);
 	return {
+		refund,
 		seller: { name: seller.name, handle: seller.handle, platform: seller.platform },
 		campaign: c,
 		sample_shipping,
@@ -117,6 +128,25 @@ async function begin(event: RequestEvent, kind: ActionKind) {
 const notFound = () => error(404, { message: '캠페인을 찾을 수 없습니다' });
 
 export const actions: Actions = {
+	/**
+	 * 미발송 환불 요청 (0033) — 기한·소유자·멱등은 DB 가 본다. 성공/멱등 모두 303 `?msg=`.
+	 * 요청은 스레드 이벤트로 남아 관리자 큐에 「환불 요청」으로 뜨고, 브랜드도 같은 스레드에서 본다.
+	 */
+	requestRefund: async (event) => {
+		const code = event.params.code;
+		const r = await requireSeller(event, { next: `/campaigns/${encodeURIComponent(code)}` });
+		if (!r.ok) redirect(303, r.location);
+		const self = sellerPath(`/campaigns/${encodeURIComponent(code)}`);
+
+		if (!rateLimit(`refund-req:${r.ctx.user.id}`)) redirect(303, `${self}?err=${encodeURIComponent(RATE_LIMIT_MESSAGE)}`);
+
+		const found = await getSellerCampaign(r.ctx.seller.id, code);
+		if (!found) redirect(303, `${self}?err=${encodeURIComponent(sampleRefundRequestFailMessage('NOT_FOUND'))}`);
+
+		const out = await requestSampleRefund(r.ctx.seller.id, found.campaign.id);
+		if (!out.ok) redirect(303, `${self}?err=${encodeURIComponent(sampleRefundRequestFailMessage(out.code))}`);
+		redirect(303, `${self}?msg=${out.already ? 'refundAlready' : 'refundRequested'}`);
+	},
 	receive: async (event) => {
 		const code = event.params.code;
 		const r = await requireSeller(event, { next: `/campaigns/${encodeURIComponent(code)}` });

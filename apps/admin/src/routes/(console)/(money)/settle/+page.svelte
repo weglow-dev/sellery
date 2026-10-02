@@ -145,6 +145,7 @@
 				인플루언서가 샘플을 구매했는데 브랜드가 영업일 {data.refundDue.shipDays}일 안에 발송하지 않은 건입니다.
 				샘플 구매는 브랜드 승인 없이 결제 즉시 발송 단계로 가므로 브랜드가 모르고 방치할 수 있습니다.
 				영업일은 주말만 제외하고 셉니다(공휴일 미반영). 발송한 뒤 진행하지 않은 건은 위 "샘플 대금 정산" 에서 브랜드에 지급합니다.
+				인플루언서가 캠페인 상세에서 [환불 요청하기] 를 누르면 「환불 요청」 으로 표시되고, 그때만 환불할 수 있습니다.
 			</p>
 			<div class="tblw admin-table">
 				<table>
@@ -157,6 +158,7 @@
 							<th>결제일</th>
 							<th>기한</th>
 							<th class="num">경과</th>
+							<th>요청</th>
 							<th></th>
 						</tr>
 					</thead>
@@ -176,11 +178,24 @@
 								<td data-l="결제일">{r.paidOn ?? '—'}</td>
 								<td data-l="기한">{r.dueOn ?? '—'}</td>
 								<td class="num" data-l="경과">{r.daysOver}일</td>
+								<!-- 0033: 인플루언서 요청이 있어야 환불한다 — 없으면 버튼을 끈다(기다리는 중일 수 있다) -->
+								<td data-l="요청">
+									{#if r.requestedAt}
+										<span class="chip plat" title={r.requestedBody ?? ''}>환불 요청</span>
+										<small class="meta">{md(r.requestedAt)}</small>
+									{:else}
+										<span class="meta">없음</span>
+									{/if}
+								</td>
 								<td data-l="">
-									<form method="post" action="?/refundSample" onsubmit={confirmRefund(r.productName ?? r.campaignCode ?? '캠페인', r.amountTotal)}>
-										<input type="hidden" name="payment" value={r.paymentId} />
-										<button type="submit" class="ghost sm">환불</button>
-									</form>
+									{#if r.requestedAt}
+										<form method="post" action="?/refundSample" onsubmit={confirmRefund(r.productName ?? r.campaignCode ?? '캠페인', r.amountTotal)}>
+											<input type="hidden" name="payment" value={r.paymentId} />
+											<button type="submit" class="ghost sm">환불</button>
+										</form>
+									{:else}
+										<button type="button" class="ghost sm" disabled title="인플루언서가 환불을 요청하면 누를 수 있어요">환불</button>
+									{/if}
 								</td>
 							</tr>
 						{/each}
