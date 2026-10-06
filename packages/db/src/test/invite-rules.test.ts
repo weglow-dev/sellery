@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   INVITE_GATED_GRADES,
+  inviteCostLine,
   INVITE_MAX_GRADE,
   INVITE_MESSAGE_MAX,
   inviteDoneMessage,
@@ -17,13 +18,20 @@ import { parseBrandCampaignRow, parseScheduleActionResult, periodLine, scheduleA
 const S6 = "a0000000-0000-4000-8000-000000000006";
 const P3 = "d0000000-0000-4000-8000-000000000003";
 
-describe("등급 게이트 — 3단계는 플래티넘 이하 (다이아·블랙 = grade_tiers.invite_cost_cel 10 = 6단계 🥬 · 0017)", () => {
-  it("게이트 등급은 GRADES 의 상위 2개 — 플래티넘은 기간 우선권은 있어도 제안은 무료", () => {
+describe("제안권 등급 (0036 — 차단이 아니라 과금)", () => {
+  it("유료 등급은 GRADES 의 상위 2개 — 플래티넘은 기간 우선권은 있어도 제안은 무료", () => {
     expect(INVITE_MAX_GRADE).toBe("플래티넘");
     expect(INVITE_GATED_GRADES).toEqual(["블랙", "다이아"]);
     for (const g of ["플래티넘", "골드", "실버", "브론즈", "스타터"]) expect(isInvitableGrade(g)).toBe(true);
     for (const g of ["다이아", "블랙"]) expect(isInvitableGrade(g)).toBe(false);
     expect(isInvitableGrade(null)).toBe(false);
+  });
+
+  it("inviteCostLine — 무료는 표시하지 않고, 잔액 부족은 밝힌다", () => {
+    expect(inviteCostLine(0)).toBeNull();
+    expect(inviteCostLine(null)).toBeNull();
+    expect(inviteCostLine(10)).toBe("제안권 🥬 10");
+    expect(inviteCostLine(10, false)).toBe("제안권 🥬 10 — 잔액 부족");
   });
 });
 
@@ -85,9 +93,27 @@ describe("parseInviteCandidates (app_brand_invite_candidates)", () => {
 describe("parseInviteResult · inviteFailMessage (app_brand_invite_seller)", () => {
   it("성공", () => {
     const r = parseInviteResult({ ok: true, campaign_id: "id", campaign_code: "c109", status: "INVITED", seller: { id: S6, name: "하늘", handle: "@haneul_fit", grade: "실버" } });
-    expect(r).toEqual({ ok: true, campaignId: "id", campaignCode: "c109", status: "INVITED", seller: { id: S6, name: "하늘", handle: "@haneul_fit", grade: "실버" } });
+    // 0036 — cel_used 가 없으면 0(무료 등급)
+    expect(r).toEqual({ ok: true, campaignId: "id", campaignCode: "c109", status: "INVITED", celUsed: 0, seller: { id: S6, name: "하늘", handle: "@haneul_fit", grade: "실버" } });
     expect(inviteDoneMessage("하늘")).toBe("하늘님에게 제안 발송 — 수락 대기");
     expect(inviteDoneMessage(null)).toBe("인플루언서에게 제안 발송 — 수락 대기");
+
+    // 유료 등급 — 쓴 제안권을 돌려준다
+    const paid = parseInviteResult({ ok: true, campaign_id: "id", campaign_code: "c110", status: "INVITED", cel_used: 10 });
+    if (paid.ok) expect(paid.celUsed).toBe(10);
+  });
+
+  it("0036 실패 코드 — REF_NOT_UNLOCKED · CEL_INSUFFICIENT", () => {
+    const u = parseInviteResult({ ok: false, code: "REF_NOT_UNLOCKED", grade: "다이아", price_cel: 4 });
+    expect(u).toMatchObject({ ok: false, code: "REF_NOT_UNLOCKED", costCel: 4 });
+    if (!u.ok) expect(inviteFailMessage(u)).toContain("갤러리에서 레퍼런스를 열람");
+
+    const i = parseInviteResult({ ok: false, code: "CEL_INSUFFICIENT", grade: "다이아", cost_cel: 10 });
+    expect(i).toMatchObject({ ok: false, code: "CEL_INSUFFICIENT", grade: "다이아", costCel: 10 });
+    if (!i.ok) {
+      expect(inviteFailMessage(i)).toContain("다이아");
+      expect(inviteFailMessage(i)).toContain("10개");
+    }
   });
   it("PRIORITY_INVITE_GATED — 등급·🥬 수를 문구에 · ALREADY_ACTIVE — 캠페인 코드", () => {
     const g = parseInviteResult({ ok: false, code: "PRIORITY_INVITE_GATED", grade: "다이아", cost_cel: 10 });

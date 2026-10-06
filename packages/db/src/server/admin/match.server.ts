@@ -2,7 +2,10 @@
  * 관리자 "매칭 · 자동 제안" 서버 — 데모 `(demo)/match`(프로토타입 `vAdminMatch` · `runAutoPropose`)의 실서비스 판.
  *
  * **마이그레이션 없음.** 읽기는 기존 테이블 조합이고(적격 조건은 `app_brand_invite_candidates`(0016) 와 같다),
- * 쓰기는 브랜드 RPC `app_brand_invite_seller`(0016) 를 **대행 호출**한다 — 캠페인 상세의 브랜드 대행과 같은 방식.
+ * 쓰기는 브랜드 RPC `app_brand_invite_seller`(0036) 를 **대행 호출**한다 — 캠페인 상세의 브랜드 대행과 같은 방식.
+ *   0036 부터 다이아·블랙에 제안권 🥬 10 이 들고(`grade_tiers.invite_cost_cel`) 브랜드 잔액이 모자라면
+ *   `CEL_INSUFFICIENT` 로 건너뛴다(프로토타입 `runAutoPropose` 의 "브랜드 셀러리 부족으로 보류" 와 같다).
+ *   원장 사유는 `p_reason: 'auto_invite'` 로 구분한다.
  * 상태 전이 · 이벤트 문구 · 게이트(비공개 · 우선권 등급 · 독점 · 중복)를 관리자 쪽에서 다시 구현하지 않는다.
  *
  * 적격 필터를 TypeScript 로 한 번 더 쓰는 것은 의도한 중복이다 — 후보를 **여러 브랜드·상품에 걸쳐** 점수순으로
@@ -79,16 +82,20 @@ type SellerRow = {
   active: boolean | null;
 };
 
-/** 적격 여부 — `app_brand_invite_candidates`(0016) 의 where 절과 같은 조건 */
+/**
+ * 적격 여부 — `app_brand_invite_candidates`(0036) 의 where 절과 같은 조건.
+ * 0036 부터 **우선권 등급(다이아·블랙)은 제외하지 않는다** — 제안권 🥬 10 이 들 뿐이다.
+ * 비용·잔액 판정은 브랜드가 정해지는 후보 단계에서 한다(`costCel`·`affordable`).
+ * 비공개는 **브랜드별**로 갈리므로(열람 여부) 여기서는 여전히 제외하고, 갤러리에서 열람한 브랜드가
+ * 상품 초대 화면으로 제안한다 — 자동 제안은 브랜드를 대신 고르므로 익명을 넣지 않는다.
+ */
 function eligibilityOf(
   s: SellerRow,
   tiers: Map<string, Tier>,
   verifiedPrimary: Set<string>
 ): { eligible: boolean; reason: string | null } {
   if (s.active === false) return { eligible: false, reason: "정지" };
-  if (s.hidden === true) return { eligible: false, reason: "비공개 — 갤러리 열람(6단계) 뒤" };
-  const grade = s.grade ?? "";
-  if (tiers.get(grade)?.is_priority) return { eligible: false, reason: `${grade} — 🥬 제안권(6단계) 필요` };
+  if (s.hidden === true) return { eligible: false, reason: "비공개 — 브랜드가 갤러리에서 레퍼런스를 열람한 뒤 제안" };
   if (!verifiedPrimary.has(s.id)) return { eligible: false, reason: "메인 채널 미인증" };
   return { eligible: true, reason: null };
 }
@@ -135,6 +142,7 @@ export async function getAdminMatch(admin: Admin = createAdminClient()): Promise
     growth: growthOf(s.recent_likes),
   });
 
+  // priority 는 0036 부터 제외 사유가 아니다 — 0 으로 남겨 화면·테스트의 모양을 지킨다
   const excluded = { hidden: 0, priority: 0, unverified: 0, suspended: 0 };
   const eligibleSellers: MatchSeller[] = [];
   const rising: AdminMatchView["rising"] = [];
@@ -146,7 +154,6 @@ export async function getAdminMatch(admin: Admin = createAdminClient()): Promise
     if (e.eligible) eligibleSellers.push(m);
     else if (s.active === false) excluded.suspended += 1;
     else if (s.hidden === true) excluded.hidden += 1;
-    else if (tiers.get(s.grade ?? "")?.is_priority) excluded.priority += 1;
     else excluded.unverified += 1;
   }
 
@@ -190,7 +197,16 @@ export async function getAdminMatch(admin: Admin = createAdminClient()): Promise
     productRows.map((p) => [p.id as string, (p.exclusive_seller_id as string) ?? null])
   );
 
-  const candidates = pickCandidates({ products, sellers: eligibleSellers, groups, activePairs, exclusiveOf });
+  const candidates = pickCandidates({
+    products,
+    sellers: eligibleSellers,
+    groups,
+    activePairs,
+    exclusiveOf,
+    // 0036 — 제안권 비용·브랜드 잔액. 모자라면 affordable:false 로 담고 실행이 건너뛴다
+    costOf: (s) => tiers.get(s.grade ?? "")?.invite_cost_cel ?? 0,
+    balanceOf: (brandId) => celeryOf.get(brandId) ?? 0,
+  });
 
   const sellerById = new Map(sellerRows.map((s) => [s.id, s]));
   const productById = new Map(productRows.map((p) => [p.id as string, p]));
@@ -270,11 +286,26 @@ export async function runAutoPropose(
 
   const rows: AutoProposeOutcome[] = [];
   for (const c of view.candidates.slice(0, Math.max(0, limit))) {
+    const base0 = {
+      productCode: c.product.code,
+      productName: c.product.name,
+      sellerName: c.seller.name,
+      sellerHandle: c.seller.handle,
+    };
+    // 0036 — 브랜드 🥬 가 모자라면 RPC 를 부르지 않고 보류한다(프로토타입 runAutoPropose 와 같다).
+    // RPC 도 CEL_INSUFFICIENT 로 막지만, 미리 걸러 "왜 안 보냈나" 를 정확히 알려준다.
+    if (!c.affordable) {
+      rows.push({ ...base0, ok: false, reason: `브랜드 셀러리 부족 — ${c.seller.grade ?? ""} 제안권 🥬 ${c.costCel} 필요`.replace("  ", " "), campaignCode: null });
+      continue;
+    }
     const { data, error } = await admin.rpc("app_brand_invite_seller", {
       p_brand_id: c.product.brandId,
       p_seller_id: c.seller.id,
       p_product_id: c.product.id,
       p_actor_user_id: actorUserId,
+      // 0036 — 원장 사유를 자동 제안으로 구분한다(프로토타입 runAutoPropose 와 같다).
+      // 차감 금액·환급 규칙은 브랜드 직접 제안과 동일하다.
+      p_reason: "auto_invite",
     });
     const base = {
       productCode: c.product.code,

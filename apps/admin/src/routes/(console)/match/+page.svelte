@@ -4,7 +4,10 @@
 	 *   1 요즘 뜨는 인플루언서  2 브랜드 자동 제안 ON/OFF  3 자동 제안 후보 + 실행  4 자동 제안 이력
 	 *
 	 * 데모와 다른 점(실서비스 게이트가 더 많다 — `app_brand_invite_candidates`(0016) 와 같은 조건):
-	 *   · 비공개 인플루언서는 후보에서 **빠진다**(데모는 점수만 −5). 익명 스카우트는 6단계다.
+	 *   · 비공개 인플루언서는 후보에서 **빠진다**(데모는 점수만 −5) — 브랜드가 갤러리에서 레퍼런스를 열람한 뒤
+	 *     상품 초대 화면으로 직접 제안한다(0035·0036). 자동 제안은 브랜드를 대신 고르므로 익명을 넣지 않는다.
+	 *   · 0036: **다이아·블랙도 후보에 든다** — 제안권 🥬 10(`grade_tiers.invite_cost_cel`)이 들고,
+	 *     브랜드 잔액이 모자라면 `affordable:false` 로 와서 발송 대상에서 빠진다(표에 "셀러리 부족" 표시).
 	 *   · 우선권 등급(플래티넘 · 다이아 · 블랙)도 빠진다 — 🥬 제안권이 6단계.
 	 *     데모 안내문 "다이아·블랙 대상은 브랜드 🥬 10 자동 차감" 이 그 게이트다.
 	 *   · 메인 채널 인증이 필요하다.
@@ -29,7 +32,9 @@
 	/** 성장세 막대 — 1위 대비 비율 */
 	const barWidth = (n: number, top: number) => `${Math.max(6, Math.min(100, top > 0 ? (n / top) * 100 : 6))}%`;
 	const topGrowth = $derived(v?.rising[0]?.growth ?? 0);
-	const sendCount = $derived(v ? Math.min(data.batch, v.candidates.length) : 0);
+	// 0036 — 셀러리가 모자란 후보는 실행이 건너뛰므로 발송 수에서 뺀다
+	const sendCount = $derived(v ? v.candidates.slice(0, data.batch).filter((c) => c.affordable).length : 0);
+	const heldCount = $derived(v ? v.candidates.slice(0, data.batch).filter((c) => !c.affordable).length : 0);
 	const autoOn = $derived(v ? v.brands.filter((b) => b.autoPropose).length : 0);
 	const excludedTotal = $derived(
 		v ? v.excluded.hidden + v.excluded.priority + v.excluded.unverified + v.excluded.suspended : 0
@@ -77,7 +82,11 @@
 	<div class="mini-stats admin-strip">
 		<div><div class="ms-l">자동 제안 ON 브랜드</div><div class="ms-v">{fmtNum(autoOn)}<span class="ms-s"> / {fmtNum(v.brands.length)}</span></div></div>
 		<div><div class="ms-l">오늘 후보</div><div class="ms-v">{fmtNum(v.candidates.length)}</div></div>
-		<div><div class="ms-l">이번 실행 발송</div><div class="ms-v">{fmtNum(sendCount)}</div></div>
+		<div>
+			<div class="ms-l">이번 실행 발송</div>
+			<div class="ms-v">{fmtNum(sendCount)}</div>
+			{#if heldCount}<div class="ms-s">셀러리 부족 {fmtNum(heldCount)}건 보류</div>{/if}
+		</div>
 		<div><div class="ms-l">누적 자동 제안</div><div class="ms-v">{fmtNum(v.history.length)}</div></div>
 	</div>
 
@@ -163,6 +172,7 @@
 					<span class="match-excl">
 						제외
 						{#if v.excluded.hidden}<span class="st gray">비공개 {v.excluded.hidden}</span>{/if}
+						<!-- 0036 부터 우선권 등급은 제외 사유가 아니다(유료일 뿐) — 0 이면 칩이 안 나온다 -->
 						{#if v.excluded.priority}<span class="st gray">우선권 등급 {v.excluded.priority}</span>{/if}
 						{#if v.excluded.unverified}<span class="st gray">채널 미인증 {v.excluded.unverified}</span>{/if}
 						{#if v.excluded.suspended}<span class="st gray">정지 {v.excluded.suspended}</span>{/if}
@@ -182,14 +192,16 @@
 						<th>인플루언서</th>
 						<th class="num">성장세</th>
 						<th class="num">3개월 매출</th>
+						<th class="num">제안권</th>
 						<th class="num">매칭 점수</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#each v.candidates as c, i (c.product.id + c.seller.id)}
-						<tr class:willsend={i < data.batch}>
+						<tr class:willsend={i < data.batch && c.affordable} class:unaffordable={!c.affordable}>
 							<td data-l="브랜드 · 상품">
-								{#if i < data.batch}<span class="match-send" title="이번 실행에 발송">발송</span>{/if}
+								{#if i < data.batch && c.affordable}<span class="match-send" title="이번 실행에 발송">발송</span>
+								{:else if !c.affordable}<span class="match-send skip" title="브랜드 셀러리 부족">보류</span>{/if}
 								{#if c.product.code}
 									<a href="{data.paths.products}/{encodeURIComponent(c.product.code)}"><b>{c.product.name}</b></a>
 								{:else}
@@ -208,10 +220,17 @@
 							</td>
 							<td class="num" data-l="성장세"><span class:up={c.seller.growth >= 0} class:down={c.seller.growth < 0}>{growth(c.seller.growth)}</span></td>
 							<td class="num" data-l="3개월 매출">{won(c.seller.m3Sales)}</td>
+							<td class="num" data-l="제안권">
+								{#if c.costCel > 0}
+									<span class:short={!c.affordable} title={c.affordable ? '브랜드 셀러리에서 차감 · 거절 시 환급' : '브랜드 셀러리 부족 — 이번 실행에서 빠집니다'}>🥬 {c.costCel}</span>
+								{:else}
+									<span class="free">무료</span>
+								{/if}
+							</td>
 							<td class="num" data-l="매칭 점수"><b>{fmtNum(c.score)}</b></td>
 						</tr>
 					{:else}
-						<tr><td colspan="5" class="empty">자동 제안 ON 브랜드의 후보가 없습니다</td></tr>
+						<tr><td colspan="6" class="empty">자동 제안 ON 브랜드의 후보가 없습니다</td></tr>
 					{/each}
 				</tbody>
 			</table>

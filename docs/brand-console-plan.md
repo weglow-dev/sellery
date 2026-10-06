@@ -5,7 +5,10 @@
 > **6단계 일부 적용(2026-10-06)**: `/gallery` 인플루언서 갤러리 + 🥬 데이터 열람(0035) — 프로토타입 `(demo)/gallery` 를 콘솔로 옮기고 데모 화면은 삭제했다(실서비스가 `/gallery` 를 가져감 · 인플루언서 `/sales` `/settle` 때와 같은 방식).
 > 유상 충전은 도입하지 않으므로 **무상 🥬 로만 열람**한다(`points-policy.md` §0). 무료 규칙 = 이미 열람(영구) · 함께 판매한 이력(영구) · 브랜드 등급 다이아·블랙 월 5회.
 > **익명 계약**: 비공개 인플루언서는 열람 전 이름·핸들·아바타를 RPC 가 담지 않고, 잠긴 카드의 지표도 `null` 로 보낸다 — 화면에서 가리는 게 아니다. 파서가 한 번 더 덮는다.
-> 남은 6단계: 제안권 🥬 차감(`seller_invite_gated` 0017 해제) · 셀러리 샵 · 스카우트 DM.
+> **제안권 🥬 차감(2026-10-06 · 0036)**: `app_brand_invite_seller` 가 다이아·블랙을 거부하던 `PRIORITY_INVITE_GATED` 를 **과금으로 바꿨다**(`grade_tiers.invite_cost_cel` 10). 인플루언서가 거절하면 전액 환급(`campaigns.cel_refunded` · 멱등).
+> 비공개 인플루언서는 `SELLER_HIDDEN` 거부 대신 **레퍼런스를 열람한 브랜드만** 제안할 수 있다(`REF_NOT_UNLOCKED`) — 열람하면 상품 초대 후보에 "비공개 · 열람함" 으로 나타난다.
+> 관리자 자동 제안도 같은 금액을 쓰고(`auto_invite`) 브랜드 잔액이 모자라면 보류한다. `seller_invite_gated`(0017)는 쓰이지 않지만 표시용으로 남겨뒀다.
+> 남은 6단계: 셀러리 샵 · 스카우트 DM.
 >
 > 근거(전부 저장소 안): `docs/inf-console-plan.md`(§0 결정 · §4 인증 · §5.4 함수 관례 · §6 화면 · §7 단계 · §9) · `apps/influencer/src/**`(`hooks.server.ts` 게이트 · `(console)` `(demo)` 그룹 · `lib/demo.ts` · `auth/{confirm,signout}`) · `packages/db/src/server/partner/*.server.ts` · `packages/db/src/partner/*.ts` · `packages/db/src/console-paths.ts` · `packages/ui/src/site/console/*` · `packages/db/scripts/{partner-admin,dev-seller}.mjs` · `supabase/migrations/0001~0013` · `supabase/seed.sql` · 데모 `apps/brand/src/routes/**` · `packages/core/src/{actions,helpers,constants}.ts` · `docs/{app-plan,data-model,deploy,period-policy,sample-policy,settlement-policy,grade-policy}.md`.
 >
