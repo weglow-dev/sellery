@@ -1198,6 +1198,22 @@
   .match-tbl .short { color: var(--color-danger); font-weight: 700; }
   .match-tbl tr.unaffordable { opacity: 0.6; }
   .match-send.skip { background: var(--color-surface-2); color: var(--color-mute); }
+
+  /* ---- 셀러리 샵(0037) — 아이템 격자 · 가격 칩 · 준비 중 ---- */
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .shop-item { margin: 0; }
+  .shop-item.soon { opacity: 0.7; }
+  .shop-item-head { display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; }
+  .shop-item-head .grow { flex: 1; min-width: 0; }
+  .shop-item-name { font-weight: 800; font-size: 15px; }
+  .shop-item .meta { margin-top: 4px; }
+  .celprice {
+    flex-shrink: 0; font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+    background: var(--color-lime); color: var(--color-ink); padding: 2px 8px;
+    box-shadow: var(--shadow-frame-soft); white-space: nowrap;
+  }
+  /* 셀러리 내역 — 적립은 녹색 */
+  .tblw td.plus b { color: var(--color-plat); }
   /* 독점권(0025) — 신청 직후 안내 · 누를 수 없는 상태 표시. 상태별 톤: 내 것(mine) 은 강조, 나머지는 차분하게 */
   .exclbox .excl-msg {
     margin: 8px 0 0; padding: 7px 10px; font-size: 12.5px; font-weight: 700;

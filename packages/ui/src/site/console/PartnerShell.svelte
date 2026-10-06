@@ -31,7 +31,8 @@
 			// 랭킹(/ranking)도 매출 기반이다(최근 3개월 확정 매출 순위) — 같은 탭에 묶는다
 			{ href: '/sales', label: '매출', icon: 'chart', match: ['/settle', '/ranking'] },
 			// 추천 프로그램(/referral)은 내 추천 코드·내가 데려온 사람 — 내 정보에 묶는다
-			{ href: '/my', label: '내 정보', icon: 'user', match: ['/referral'] }
+			// 샵(/shop)·추천(/referral)은 내 계정에 붙는 것 — 내 정보에 묶는다
+			{ href: '/my', label: '내 정보', icon: 'user', match: ['/referral', '/shop'] }
 		],
 		// 브랜드 = 홈 · 상품 · 캠페인 · 주문 · 내 정보 (docs/brand-console-plan.md 결정 6 — 매일 할 일은 발송·CS; /sales /settle /cs 는 홈·주문·내 정보 안의 링크).
 		// 단계가 열리기 전 탭은 `disabled`(링크 대신 aria-disabled span · title 예고) 였다 — 상품·캠페인 2단계 · 주문 4단계 · 내 정보 5단계에서 전부 풀렸다.
@@ -40,7 +41,7 @@
 			{ href: '/home', label: '홈', icon: 'home', match: ['/sales', '/settle'] },
 			// 갤러리(/gallery)는 "이 상품을 누구에게 제안할까" 를 찾는 화면 — 제안은 상품 상세의
 			// /products/[code]/invite 에서 보낸다. 상품 탭에 묶는다
-			{ href: '/products', label: '상품', icon: 'box', match: ['/gallery'] },
+			{ href: '/products', label: '상품', icon: 'box', match: ['/gallery', '/shop'] },
 			// 처리 대기(/requests)는 홈·캠페인·캠페인 상세에서 들어온다 — 캠페인 단계의 할 일
 			{ href: '/campaigns', label: '캠페인', icon: 'flag', match: ['/requests'] },
 			// 고객 문의(/cs)는 홈·주문에서 들어온다 — 배송·교환·반품 문의라 주문과 한 묶음

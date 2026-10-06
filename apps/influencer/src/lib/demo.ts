@@ -5,7 +5,7 @@
  */
 
 /** 접두(`/influencer`) 없는 데모 경로. 콘솔에 같은 이름의 실제 화면이 생기면 그 항목을 여기서 지운다 — 5단계에서 `/sales` `/settle` 을 뺐다(실제 `(console)/sales` `(console)/settle`). */
-export const DEMO_PATHS = ['/demo', '/demo-login', '/camps', '/dm', '/explore', '/rank', '/ref', '/shop', '/c', '/s'] as const;
+export const DEMO_PATHS = ['/demo', '/demo-login', '/camps', '/dm', '/explore', '/rank', '/ref', '/c', '/s'] as const;
 
 export function isDemoPath(relPath: string): boolean {
 	return DEMO_PATHS.some((p) => relPath === p || relPath.startsWith(`${p}/`));
