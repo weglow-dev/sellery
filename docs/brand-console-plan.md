@@ -1,6 +1,11 @@
 # 브랜드 콘솔 구현 계획 — `apps/brand` 데모 → 실서비스 (sellery.life/brand/*)
 
 > **상태(2026-09-22): 1~5단계 구현 완료 — 5단계 PR-A(0019 — 실시간 매출 · 정산 내역 · 정산 정보 · 브랜드 정보 · 등급 카드) + PR-B(brand `/sales` `/settle`(+`/settle/doc`) `/my` · 탭 5개 전부 활성 · 데모 `/demo-{sales,settle,my}` 제거) 적용(§6 행 5 "적용 기록") · 남은 것은 6단계(🥬 · 데이터 열람 · 갤러리 · 셀러리 샵 — 규제 게이트, inf §5.8) 와 관리자 콘솔.** 인플루언서 콘솔 1~5단계(`docs/inf-console-plan.md §7`, PR #19~#30)가 끝났고, 그 골격(`(console)` 그룹 · `PartnerShell` · `requireSeller()` · form action · `{ok, code}` RPC 관례 · `partner-admin.mjs`)을 **그대로 복사**해 `apps/brand` 를 localStorage 데모에서 브랜드 콘솔로 바꾼다. 인플루언서 계획서 §9 "이후(브랜드 콘솔·관리자)에 그대로 적용되는 것" 이 이 문서의 씨앗이다.
+
+> **6단계 일부 적용(2026-10-06)**: `/gallery` 인플루언서 갤러리 + 🥬 데이터 열람(0035) — 프로토타입 `(demo)/gallery` 를 콘솔로 옮기고 데모 화면은 삭제했다(실서비스가 `/gallery` 를 가져감 · 인플루언서 `/sales` `/settle` 때와 같은 방식).
+> 유상 충전은 도입하지 않으므로 **무상 🥬 로만 열람**한다(`points-policy.md` §0). 무료 규칙 = 이미 열람(영구) · 함께 판매한 이력(영구) · 브랜드 등급 다이아·블랙 월 5회.
+> **익명 계약**: 비공개 인플루언서는 열람 전 이름·핸들·아바타를 RPC 가 담지 않고, 잠긴 카드의 지표도 `null` 로 보낸다 — 화면에서 가리는 게 아니다. 파서가 한 번 더 덮는다.
+> 남은 6단계: 제안권 🥬 차감(`seller_invite_gated` 0017 해제) · 셀러리 샵 · 스카우트 DM.
 >
 > 근거(전부 저장소 안): `docs/inf-console-plan.md`(§0 결정 · §4 인증 · §5.4 함수 관례 · §6 화면 · §7 단계 · §9) · `apps/influencer/src/**`(`hooks.server.ts` 게이트 · `(console)` `(demo)` 그룹 · `lib/demo.ts` · `auth/{confirm,signout}`) · `packages/db/src/server/partner/*.server.ts` · `packages/db/src/partner/*.ts` · `packages/db/src/console-paths.ts` · `packages/ui/src/site/console/*` · `packages/db/scripts/{partner-admin,dev-seller}.mjs` · `supabase/migrations/0001~0013` · `supabase/seed.sql` · 데모 `apps/brand/src/routes/**` · `packages/core/src/{actions,helpers,constants}.ts` · `docs/{app-plan,data-model,deploy,period-policy,sample-policy,settlement-policy,grade-policy}.md`.
 >

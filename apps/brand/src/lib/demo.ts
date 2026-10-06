@@ -15,7 +15,6 @@ export const DEMO_PATHS = [
 	'/demo-login',
 	'/camps',
 	'/dm',
-	'/gallery',
 	'/shop',
 	'/c',
 	'/s'

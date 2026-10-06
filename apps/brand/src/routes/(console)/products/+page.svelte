@@ -24,7 +24,9 @@
 <div class="console-head">
 	<h2>상품 관리</h2>
 	<span class="meta">판매가·수수료율은 등록 시 책정, 판매 진행 중 변경 불가</span>
-	<a href={data.newPath} class="btn pri sm" style="margin-left:auto">+ 새 상품 등록</a>
+	<!-- 갤러리(0035) — 제안할 인플루언서를 찾는 화면. 제안은 상품 상세의 /products/[code]/invite -->
+	<a href={data.galleryPath} class="btn ghost sm" style="margin-left:auto">인플루언서 갤러리</a>
+	<a href={data.newPath} class="btn pri sm">+ 새 상품 등록</a>
 </div>
 
 {#if data.msg}
