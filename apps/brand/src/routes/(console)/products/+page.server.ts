@@ -63,6 +63,7 @@ export const load: PageServerLoad = async (event) => {
 			href: p.code ? brandPath(`/products/${encodeURIComponent(p.code)}`) : null
 		})),
 		newPath: brandPath('/products/new'),
+		galleryPath: brandPath('/gallery'),
 		campaignsPath: brandPath('/campaigns')
 	};
 };

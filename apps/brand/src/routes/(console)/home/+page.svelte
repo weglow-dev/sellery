@@ -113,7 +113,8 @@
 			<div><span class="ms-l">독점 오퍼</span><span class="ms-v">{data.products.exclusive}</span></div>
 		</div>
 		{#if data.products.rejected}<p class="meta" style="margin:0 0 8px">반려 <b>{data.products.rejected}건</b> — 수정 후 저장하면 다시 검수를 요청합니다.</p>{/if}
-		<div class="btnrow"><a href={data.newProductPath} class="btn pri sm">+ 새 상품 등록</a><a href={data.productsPath} class="btn ghost sm">상품 관리</a></div>
+		<!-- 갤러리(0035) — "이 상품을 누구에게 제안할까" 의 진입로. 상품 탭에 묶여 있다 -->
+		<div class="btnrow"><a href={data.newProductPath} class="btn pri sm">+ 새 상품 등록</a><a href={data.productsPath} class="btn ghost sm">상품 관리</a><a href={data.galleryPath} class="btn ghost sm">인플루언서 갤러리</a></div>
 	</div>
 	<div class="card static">
 		<div class="lbl-sm">브랜드</div>

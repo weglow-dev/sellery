@@ -1168,6 +1168,30 @@
   }
   .ref-terms { font-size: 13px; margin: 10px 0 0; padding-left: 18px; line-height: 2; }
   .ref-terms li + li { margin-top: 2px; }
+
+  /* ---- 브랜드 인플루언서 갤러리(0035) — 필터 칩 · 카드 격자 · 데이터 잠금 · 외부 판매 ---- */
+  .gal-filter { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .gal-filter + .gal-filter { margin-top: 8px; }
+  .gal-filter .lbl-sm { min-width: 64px; }
+  .gal-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .gal-card { margin: 0; }
+  .gal-head { display: flex; gap: 12px; align-items: flex-start; }
+  .gal-head .grow { flex: 1; min-width: 0; }
+  /* 잠긴 카드 — 지표가 서버에서 오지 않으므로 자리만 남기고 열람 버튼을 둔다 */
+  .gal-locked {
+    margin-top: 10px; padding: 12px; background: var(--color-surface-2);
+    box-shadow: var(--shadow-frame-soft);
+  }
+  .gal-locked .meta { margin: 0 0 8px; }
+  .gal-m3 { font-family: var(--font-display); font-size: 22px; font-weight: 800; margin: 8px 0 4px; }
+  .gal-m3 .meta { font-family: var(--font-body); font-size: 11px; font-weight: 500; }
+  .gal-ext { display: flex; gap: 8px; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+  .gal-ext .num { color: var(--color-accent); white-space: nowrap; }
+  .gal-est { font-family: var(--font-body); font-weight: 400; letter-spacing: normal; text-transform: none; cursor: help; }
+  /* 최근 게시물 좋아요 추이 (프로토타입 .spark) */
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 34px; }
+  .spark span { flex: 1; min-width: 3px; background: var(--color-lime); box-shadow: var(--shadow-frame-soft); }
   /* 독점권(0025) — 신청 직후 안내 · 누를 수 없는 상태 표시. 상태별 톤: 내 것(mine) 은 강조, 나머지는 차분하게 */
   .exclbox .excl-msg {
     margin: 8px 0 0; padding: 7px 10px; font-size: 12.5px; font-weight: 700;

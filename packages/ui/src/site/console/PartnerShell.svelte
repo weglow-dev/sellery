@@ -38,7 +38,9 @@
 		brand: [
 			// 매출·정산(/sales · /settle)은 브랜드 탭에 정산 칸이 없고 주 진입로가 홈이라 홈에 묶는다
 			{ href: '/home', label: '홈', icon: 'home', match: ['/sales', '/settle'] },
-			{ href: '/products', label: '상품', icon: 'box' },
+			// 갤러리(/gallery)는 "이 상품을 누구에게 제안할까" 를 찾는 화면 — 제안은 상품 상세의
+			// /products/[code]/invite 에서 보낸다. 상품 탭에 묶는다
+			{ href: '/products', label: '상품', icon: 'box', match: ['/gallery'] },
 			// 처리 대기(/requests)는 홈·캠페인·캠페인 상세에서 들어온다 — 캠페인 단계의 할 일
 			{ href: '/campaigns', label: '캠페인', icon: 'flag', match: ['/requests'] },
 			// 고객 문의(/cs)는 홈·주문에서 들어온다 — 배송·교환·반품 문의라 주문과 한 묶음

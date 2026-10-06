@@ -22,6 +22,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const requestsPath = brandPath('/requests');
 	const productsPath = brandPath('/products');
+	const galleryPath = brandPath('/gallery');
 	const campaignsPath = brandPath('/campaigns');
 	const settlePath = brandPath('/settle');
 	const ordersPath = brandPath('/orders');
@@ -92,6 +93,7 @@ export const load: PageServerLoad = async (event) => {
 		campaignsTotal: campaigns.length,
 		requestsPath,
 		productsPath,
+		galleryPath,
 		newProductPath: brandPath('/products/new'),
 		campaignsPath,
 		ordersPath,

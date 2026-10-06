@@ -2169,6 +2169,16 @@ export type Database = {
         Args: { p_campaign_id: string; p_seller_id: string }
         Returns: Json
       }
+      app_brand_gallery: { Args: { p_brand_id: string }; Returns: Json }
+      app_brand_unlock_data: {
+        Args: { p_brand_id: string; p_kind?: string; p_seller_id: string }
+        Returns: Json
+      }
+      brand_free_ref_left: { Args: { p_brand_id: string }; Returns: number }
+      brand_data_free_reason: {
+        Args: { p_brand_id: string; p_seller_id: string }
+        Returns: string
+      }
       app_seller_ranking: { Args: { p_seller_id: string }; Returns: Json }
       app_seller_referral: { Args: { p_seller_id: string }; Returns: Json }
       platform_ref_times: { Args: never; Returns: number }

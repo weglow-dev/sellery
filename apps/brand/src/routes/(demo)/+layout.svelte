@@ -17,7 +17,7 @@
 	const dmN = $derived(dmUnreadN('brand', S.actingBrand) + brandPending(S.actingBrand).n);
 	const tabs = $derived([
 		{ href: '/demo', label: '홈' }, { href: '/dm', label: 'DM', badge: dmN }, { href: '/camps', label: '내 캠페인' },
-		{ href: '/gallery', label: '인플루언서 갤러리' }, { href: '/shop', label: '셀러리 샵' }
+		{ href: '/shop', label: '셀러리 샵' }
 	]);
 	const me = $derived(brand(S.actingBrand));
 	// AppShell 이 init 에서 등록한 goto(base + p) 를 덮어쓴다 — 콘솔과 겹치는 화면 경로만 /demo-* 로 (콘솔 루트·탭과 충돌 방지).
