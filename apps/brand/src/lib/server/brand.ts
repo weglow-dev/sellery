@@ -21,6 +21,7 @@ export * from '@sellery/db/server/brand/products';
 export * from '@sellery/db/server/brand/campaigns';
 export * from '@sellery/db/server/brand/exclusive';
 export * from '@sellery/db/server/brand/gallery';
+export * from '@sellery/db/server/shop';
 export * from '@sellery/db/server/brand/schedule';
 export * from '@sellery/db/server/brand/invite';
 export * from '@sellery/db/server/brand/orders';

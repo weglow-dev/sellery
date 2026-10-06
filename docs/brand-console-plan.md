@@ -8,7 +8,10 @@
 > **제안권 🥬 차감(2026-10-06 · 0036)**: `app_brand_invite_seller` 가 다이아·블랙을 거부하던 `PRIORITY_INVITE_GATED` 를 **과금으로 바꿨다**(`grade_tiers.invite_cost_cel` 10). 인플루언서가 거절하면 전액 환급(`campaigns.cel_refunded` · 멱등).
 > 비공개 인플루언서는 `SELLER_HIDDEN` 거부 대신 **레퍼런스를 열람한 브랜드만** 제안할 수 있다(`REF_NOT_UNLOCKED`) — 열람하면 상품 초대 후보에 "비공개 · 열람함" 으로 나타난다.
 > 관리자 자동 제안도 같은 금액을 쓰고(`auto_invite`) 브랜드 잔액이 모자라면 보류한다. `seller_invite_gated`(0017)는 쓰이지 않지만 표시용으로 남겨뒀다.
-> 남은 6단계: 셀러리 샵 · 스카우트 DM.
+> **셀러리 샵(2026-10-06 · 0037)**: `/shop` — 카탈로그(`platform_settings.shop_items`) · 구매(`app_shop_buy`) · 보유/만료. 데모 화면은 삭제했다.
+> 효과를 붙인 아이템 = 데이터 패스(30일 무제한 열람) · 상품 부스트(`products.boosted_at`) · 고객 홈 상단 노출(`campaigns.home_featured_at`) · 프로필 상단 노출(`sellers.featured_at`).
+> **효과가 없는 아이템은 팔지 않는다** — 우선 검수권 · 재판매 우선권 · 인플루언서 매출 데이터 확인권은 `available:false` 로 "준비 중". 운영 결정(2026-10-06)은 **프로토타입대로 구현**이고 다음 PR 로 나눴다(절차를 바꾸는 아이템이라 영향 범위가 다르다).
+> 남은 6단계: 우선 검수권 · 재판매 우선권 · 인플루언서 익명 실적 표 · 스카우트 DM.
 >
 > 근거(전부 저장소 안): `docs/inf-console-plan.md`(§0 결정 · §4 인증 · §5.4 함수 관례 · §6 화면 · §7 단계 · §9) · `apps/influencer/src/**`(`hooks.server.ts` 게이트 · `(console)` `(demo)` 그룹 · `lib/demo.ts` · `auth/{confirm,signout}`) · `packages/db/src/server/partner/*.server.ts` · `packages/db/src/partner/*.ts` · `packages/db/src/console-paths.ts` · `packages/ui/src/site/console/*` · `packages/db/scripts/{partner-admin,dev-seller}.mjs` · `supabase/migrations/0001~0013` · `supabase/seed.sql` · 데모 `apps/brand/src/routes/**` · `packages/core/src/{actions,helpers,constants}.ts` · `docs/{app-plan,data-model,deploy,period-policy,sample-policy,settlement-policy,grade-policy}.md`.
 >

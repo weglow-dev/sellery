@@ -15,7 +15,7 @@
 	const dmN = $derived(dmUnreadN('seller', S.actingSeller) + sellerPending(S.actingSeller).n);
 	const tabs = $derived([
 		{ href: '/demo', label: '홈' }, { href: '/camps', label: '내 캠페인' }, { href: '/dm', label: 'DM', badge: dmN }, { href: '/explore', label: '상품 갤러리' },
-		{ href: '/rank', label: '랭킹·등급' }, { href: '/shop', label: '셀러리 샵' }, { href: '/ref', label: '추천 프로그램' }
+		{ href: '/rank', label: '랭킹·등급' }, { href: '/ref', label: '추천 프로그램' }
 	]);
 	const me = $derived(seller(S.actingSeller));
 	// AppShell 이 init 에서 등록한 goto(base + p) 를 덮어쓴다 — 데모 홈('/') 만 '/demo' 로 (콘솔 루트와 충돌 방지).

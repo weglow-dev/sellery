@@ -1740,6 +1740,7 @@ export type Database = {
           code: string | null
           created_at: string
           email: string | null
+          featured_at: string | null
           followers: number
           grade: string | null
           handle: string
@@ -1775,6 +1776,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           followers?: number
           grade?: string | null
           handle: string
@@ -1810,6 +1812,7 @@ export type Database = {
           code?: string | null
           created_at?: string
           email?: string | null
+          featured_at?: string | null
           followers?: number
           grade?: string | null
           handle?: string
@@ -2170,6 +2173,19 @@ export type Database = {
         Returns: Json
       }
       app_brand_gallery: { Args: { p_brand_id: string }; Returns: Json }
+      app_shop_catalog: {
+        Args: { p_owner_id: string; p_owner_type: string }
+        Returns: Json
+      }
+      app_shop_buy: {
+        Args: { p_item_id: string; p_owner_id: string; p_owner_type: string }
+        Returns: Json
+      }
+      shop_item_of: { Args: { p_item_id: string; p_role: string }; Returns: Json }
+      shop_item_active: {
+        Args: { p_item_id: string; p_owner_id: string; p_owner_type: string }
+        Returns: boolean
+      }
       app_brand_unlock_data: {
         Args: { p_brand_id: string; p_kind?: string; p_seller_id: string }
         Returns: Json
