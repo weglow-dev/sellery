@@ -413,6 +413,7 @@ export type Database = {
           id: string
           memo: string | null
           owner_type: string
+          paid_part: number
           reason: string
           ref_id: string | null
           ref_type: string | null
@@ -426,6 +427,7 @@ export type Database = {
           id?: string
           memo?: string | null
           owner_type: string
+          paid_part?: number
           reason: string
           ref_id?: string | null
           ref_type?: string | null
@@ -439,6 +441,7 @@ export type Database = {
           id?: string
           memo?: string | null
           owner_type?: string
+          paid_part?: number
           reason?: string
           ref_id?: string | null
           ref_type?: string | null
@@ -2630,12 +2633,17 @@ export type Database = {
         }
         Returns: Json
       }
+      celery_balance_split: {
+        Args: { p_owner_id: string; p_owner_type: string }
+        Returns: { free: number; paid: number; total: number }[]
+      }
       celery_spend: {
         Args: {
           p_delta: number
           p_memo?: string
           p_owner_id: string
           p_owner_type: string
+          p_paid_part?: number | null
           p_reason: string
           p_ref_id?: string
           p_ref_type?: string
