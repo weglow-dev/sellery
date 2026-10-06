@@ -2175,6 +2175,10 @@ export type Database = {
         Returns: Json
       }
       brand_free_ref_left: { Args: { p_brand_id: string }; Returns: number }
+      brand_can_invite_hidden: {
+        Args: { p_brand_id: string; p_seller_id: string }
+        Returns: boolean
+      }
       brand_data_free_reason: {
         Args: { p_brand_id: string; p_seller_id: string }
         Returns: string
@@ -2297,6 +2301,7 @@ export type Database = {
           p_brand_id: string
           p_message?: string
           p_product_id: string
+          p_reason?: string
           p_seller_id: string
         }
         Returns: Json

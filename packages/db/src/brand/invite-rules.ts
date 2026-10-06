@@ -2,7 +2,9 @@
  * 브랜드 직접 제안(초대) 규칙 — 순수 모듈 (`/brand/campaigns/invite` 폼 · 서버 양쪽). DB 호출은 `../server/brand/invite.server.ts`.
  * 원본: 프로토타입 inviteModal(노출 중 상품만 · 메시지) · actions.ts confirmInvite(독점 확정 상품 불가 · 다이아/블랙 🥬 10) · 0016 app_brand_invite_candidates / app_brand_invite_seller.
  *
- *   INVITE_MAX_GRADE · INVITE_GATED_GRADES · isInvitableGrade(grade)   3단계 초대 대상 = 플래티넘 이하(grade_tiers.invite_cost_cel = 0). 다이아·블랙은 6단계 🥬 제안권 게이트 (0017 · brand-console-plan §8 · constants SHOP.brand.diamond)
+ *   INVITE_MAX_GRADE · INVITE_GATED_GRADES · isInvitableGrade(grade)   **0036 이전**의 등급 게이트. 지금은 모든 등급을 제안할 수 있고
+ *     다이아·블랙만 🥬 제안권(`grade_tiers.invite_cost_cel` 10)이 든다. 세 심볼은 "이 등급은 유료" 를 묻는 표시용으로만 남는다.
+ *   inviteCostLine(cost) · INVITE_COST_NOTICE                            제안권 비용 안내 (후보 행의 `cost_cel`·`affordable`)
  *   INVITE_MESSAGE_MAX · parseInviteInput(form)                          seller_id(uuid) · product_id(uuid) · message ≤ 500
  *   parseInviteCandidates(json)                                          app_brand_invite_candidates jsonb → { product, candidates } (ok:false 는 null)
  *   parseInviteResult(json) · INVITE_FAIL_MESSAGES · inviteFailMessage   app_brand_invite_seller 결과
@@ -12,18 +14,25 @@ import { cleanText } from "../text";
 
 /* ---------------- 등급 게이트 ---------------- */
 
-/** 3단계에서 초대 가능한 최고 등급 (`grade_tiers.invite_cost_cel = 0` 중 최상위 — 플래티넘은 기간 우선권은 있어도 제안권은 무료). 위 등급은 PRIORITY_INVITE_GATED. */
+/** 제안권이 **무료**인 최고 등급 (`grade_tiers.invite_cost_cel = 0` 중 최상위 — 플래티넘은 기간 우선권은 있어도 제안권은 무료). */
 export const INVITE_MAX_GRADE = "플래티넘";
 
-/** 제안권 게이트 등급(다이아·블랙 · `invite_cost_cel` 10) — GRADES 의 tierIdx 0~1. 초대는 6단계(🥬 제안권) 부터 (0017) */
+/** 제안권이 **유료**인 등급(다이아·블랙 · `invite_cost_cel` 10). 0036 부터 차단이 아니라 과금이다. */
 export const INVITE_GATED_GRADES: readonly string[] = GRADES.slice(0, GRADES.findIndex((g) => g.g === INVITE_MAX_GRADE)).map((g) => g.g);
 
+/** 제안권이 무료인 등급인가. 0036 부터 "초대 가능" 이 아니라 "무료" 를 뜻한다. */
 export function isInvitableGrade(grade: string | null | undefined): boolean {
   return !!grade && !INVITE_GATED_GRADES.includes(grade);
 }
 
-/** 게이트 안내 (PRIORITY_INVITE_GATED · 후보 목록에 없는 이유) */
-export const INVITE_GATED_NOTICE = "다이아 · 블랙 인플루언서 제안은 🥬 제안권과 함께 다음 단계에서 열려요";
+/** 제안권 안내 (0036) */
+export const INVITE_COST_NOTICE = "다이아 · 블랙 인플루언서 제안에는 🥬 제안권 10개가 들어요 — 거절되면 전액 환급됩니다";
+
+/** 후보 행의 비용 한 줄. 무료면 null(표시하지 않는다). */
+export function inviteCostLine(costCel: number | null | undefined, affordable = true): string | null {
+  if (!costCel || costCel <= 0) return null;
+  return affordable ? `제안권 🥬 ${costCel}` : `제안권 🥬 ${costCel} — 잔액 부족`;
+}
 
 /* ---------------- 폼 ---------------- */
 
@@ -91,12 +100,20 @@ export type InviteCandidate = {
   category: string | null;
   /** 상품 카테고리와 같은 그룹(건강기능식품 / 이너뷰티) — 프로토타입 catFit */
   category_fit: boolean;
+  /** 비공개 프로필인데 레퍼런스를 열람해서 보이는 인플루언서 (0036). 화면이 배지를 단다. */
+  hidden: boolean;
+  /** 제안권 비용 🥬 (0036 · `grade_tiers.invite_cost_cel`). 0 이면 무료. */
+  cost_cel: number;
+  /** 브랜드 잔액으로 이 제안이 가능한가 (0036). false 면 화면이 버튼을 막는다. */
+  affordable: boolean;
   primary_channel: { platform: string; handle: string; url: string | null; followers: number; verified: boolean } | null;
 };
 
 export type InviteCandidates = {
   product: { id: string; code: string | null; name: string; category: string; status: string; exclusive_seller_id: string | null };
   candidates: InviteCandidate[];
+  /** 브랜드 🥬 잔액 (0036) — 제안권 안내에 쓴다. */
+  balance: number;
 };
 
 export function parseInviteCandidate(json: unknown): InviteCandidate | null {
@@ -118,6 +135,10 @@ export function parseInviteCandidate(json: unknown): InviteCandidate | null {
     followers: int(o.followers),
     category: strOrNull(o.category),
     category_fit: o.category_fit === true,
+    hidden: o.hidden === true,
+    cost_cel: int(o.cost_cel),
+    // 0036 이전 응답에는 없다 — 그때는 "가능" 으로 본다(게이트가 RPC 안에 있었다)
+    affordable: o.affordable !== false,
     primary_channel: ch
       ? { platform: str(ch.platform), handle: str(ch.handle), url: strOrNull(ch.url), followers: int(ch.followers), verified: ch.verified === true }
       : null,
@@ -135,6 +156,7 @@ export function parseInviteCandidates(json: unknown): InviteCandidates | null {
   return {
     product: { id: pid, code: strOrNull(p.code), name: pname, category: str(p.category), status: str(p.status), exclusive_seller_id: strOrNull(p.exclusive_seller_id) },
     candidates: Array.isArray(o.candidates) ? o.candidates.map(parseInviteCandidate).filter((c): c is InviteCandidate => c !== null) : [],
+    balance: int(o.balance),
   };
 }
 
@@ -146,6 +168,8 @@ export type InviteCode =
   | "SELLER_NOT_FOUND"
   | "SELLER_HIDDEN"
   | "PRIORITY_INVITE_GATED"
+  | "REF_NOT_UNLOCKED"
+  | "CEL_INSUFFICIENT"
   | "EXCLUSIVE_LOCKED"
   | "ALREADY_ACTIVE"
   | "BAD_MESSAGE"
@@ -157,6 +181,8 @@ export const INVITE_CODES: readonly InviteCode[] = [
   "SELLER_NOT_FOUND",
   "SELLER_HIDDEN",
   "PRIORITY_INVITE_GATED",
+  "REF_NOT_UNLOCKED",
+  "CEL_INSUFFICIENT",
   "EXCLUSIVE_LOCKED",
   "ALREADY_ACTIVE",
   "BAD_MESSAGE",
@@ -168,14 +194,23 @@ export function isInviteCode(v: unknown): v is InviteCode {
 }
 
 export type InviteResult =
-  | { ok: true; campaignId: string; campaignCode: string; status: string; seller: { id: string; name: string; handle: string; grade: string | null } | null }
+  | {
+      ok: true;
+      campaignId: string;
+      campaignCode: string;
+      status: string;
+      /** 쓴 제안권 🥬 (0036). 0 이면 무료 등급. 거절되면 전액 환급된다. */
+      celUsed: number;
+      seller: { id: string; name: string; handle: string; grade: string | null } | null;
+    }
   | {
       ok: false;
       code: InviteCode;
       /** NOT_LISTED */
       status?: string | null;
-      /** PRIORITY_INVITE_GATED */
+      /** PRIORITY_INVITE_GATED · CEL_INSUFFICIENT · REF_NOT_UNLOCKED */
       grade?: string | null;
+      /** 제안권 비용(CEL_INSUFFICIENT) 또는 레퍼런스 열람가(REF_NOT_UNLOCKED) */
       costCel?: number | null;
       /** ALREADY_ACTIVE */
       campaignCode?: string | null;
@@ -196,6 +231,7 @@ export function parseInviteResult(json: unknown): InviteResult {
       campaignId,
       campaignCode,
       status: str(o.status, "INVITED"),
+      celUsed: int(o.cel_used),
       seller: s && sid ? { id: sid, name: str(s.name), handle: str(s.handle), grade: strOrNull(s.grade) } : null,
     };
   }
@@ -204,7 +240,8 @@ export function parseInviteResult(json: unknown): InviteResult {
     code: isInviteCode(o.code) ? o.code : "DB_ERROR",
     status: strOrNull(o.status),
     grade: strOrNull(o.grade),
-    costCel: intOrNull(o.cost_cel),
+    // CEL_INSUFFICIENT · PRIORITY_INVITE_GATED 는 제안권 비용, REF_NOT_UNLOCKED 는 열람가를 준다
+    costCel: intOrNull(o.cost_cel) ?? intOrNull(o.price_cel),
     campaignCode: strOrNull(o.campaign_code),
     campaignStatus: strOrNull(o.campaign_status),
   };
@@ -215,8 +252,12 @@ export const INVITE_FAIL_MESSAGES: Record<InviteCode, string> = {
   NOT_FOUND: "상품을 찾을 수 없어요",
   NOT_LISTED: "노출 중인 상품만 제안할 수 있어요 — 상품을 먼저 노출하세요",
   SELLER_NOT_FOUND: "인플루언서를 찾을 수 없어요",
-  SELLER_HIDDEN: "익명 인플루언서는 레퍼런스 열람 뒤에 제안할 수 있어요 (다음 단계)",
-  PRIORITY_INVITE_GATED: INVITE_GATED_NOTICE,
+  // 0036 이전 코드 — 이제 RPC 가 내지 않지만 배포 순서상 섞일 수 있어 문구는 남긴다
+  SELLER_HIDDEN: "익명 인플루언서는 갤러리에서 레퍼런스를 열람한 뒤에 제안할 수 있어요",
+  PRIORITY_INVITE_GATED: INVITE_COST_NOTICE,
+  // 0036
+  REF_NOT_UNLOCKED: "익명 인플루언서예요 — 갤러리에서 레퍼런스를 열람하면 제안할 수 있어요",
+  CEL_INSUFFICIENT: "셀러리가 부족해요 — 판매가 쌓이면 자동으로 적립됩니다",
   EXCLUSIVE_LOCKED: "이 상품은 독점 인플루언서가 확정되어 다른 인플루언서에게 제안할 수 없습니다",
   ALREADY_ACTIVE: "이 인플루언서와는 같은 상품으로 진행 중인 캠페인이 있어요",
   BAD_MESSAGE: INVITE_FIELD_MESSAGES.message,
@@ -224,6 +265,10 @@ export const INVITE_FAIL_MESSAGES: Record<InviteCode, string> = {
 };
 
 export function inviteFailMessage(r: Extract<InviteResult, { ok: false }>): string {
+  if (r.code === "CEL_INSUFFICIENT" && r.costCel)
+    return `${r.grade ?? ""} 등급 제안에는 🥬 제안권 ${r.costCel}개가 필요해요 — 판매가 쌓이면 자동으로 적립됩니다`.trim();
+  if (r.code === "REF_NOT_UNLOCKED")
+    return `익명 인플루언서예요 — 갤러리에서 레퍼런스를 열람하면(🥬 ${r.costCel ?? ""}) 제안할 수 있어요`.replace("(🥬 )", "");
   if (r.code === "PRIORITY_INVITE_GATED" && r.grade) return `${r.grade} 등급 인플루언서 제안은 🥬 제안권${r.costCel ? ` ${r.costCel}개` : ""}과 함께 다음 단계에서 열려요`;
   if (r.code === "ALREADY_ACTIVE" && r.campaignCode) return `이 인플루언서와는 같은 상품으로 진행 중인 캠페인(${r.campaignCode})이 있어요`;
   return INVITE_FAIL_MESSAGES[r.code];

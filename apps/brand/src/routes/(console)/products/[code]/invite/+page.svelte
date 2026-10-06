@@ -1,11 +1,14 @@
 <script lang="ts">
 	/**
 	 * 인플루언서 직접 제안 — 프로토타입 inviteModal(제안 상품 · 메시지) + 갤러리 sellerCard(등급 · 플랫폼 · 핸들 · 팔로워 · 카테고리 적합)를 폼 하나로.
-	 * 후보 카드 = 라디오(name=seller_id) — 검색은 이름·핸들 부분 일치(matchesCandidateQuery · JS 없이는 전체 목록). 다이아·블랙은 후보에 없고(0017 게이트) 하단 안내만.
+	 * 후보 카드 = 라디오(name=seller_id) — 검색은 이름·핸들 부분 일치(matchesCandidateQuery · JS 없이는 전체 목록).
+	 * 0036: **다이아·블랙도 후보에 든다** — 제안권 🥬 10 이 들고, 잔액이 모자라면 라디오를 막고 "잔액 부족" 을 적는다.
+	 *   거절되면 전액 환급되므로(`app_decline_invite`) 안내에 그 사실을 적는다. 익명(비공개) 인플루언서는
+	 *   여기 목록에 없고 갤러리(`/gallery`)에서 레퍼런스를 열람한 뒤 제안한다.
 	 * 실패한 제출은 `form`(fail 400)으로 선택·메시지 유지 · ALREADY_ACTIVE 는 진행 중 캠페인 링크.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
-	import { INVITE_GATED_NOTICE, INVITE_MESSAGE_MAX, matchesCandidateQuery } from '@sellery/db/brand/invite-rules';
+	import { INVITE_COST_NOTICE, INVITE_MESSAGE_MAX, inviteCostLine, matchesCandidateQuery } from '@sellery/db/brand/invite-rules';
 	import { GradeBox, PlatformHandle, ProductIcon, SellerAvatar, StatusChip } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
 
@@ -63,7 +66,8 @@
 			{#each shown as c (c.id)}
 				{@const ch = c.primary_channel}
 				<label class="console-cand">
-					<input type="radio" name="seller_id" value={c.id} checked={selected === c.id} required />
+					<!-- 제안권 비용이 잔액을 넘으면 선택을 막는다 (0036 `affordable`) -->
+					<input type="radio" name="seller_id" value={c.id} checked={selected === c.id} disabled={!c.affordable} required />
 					<SellerAvatar avatarUrl={c.avatar_url} size={40} />
 					<div class="grow">
 						<div class="nm">
@@ -71,6 +75,10 @@
 							{c.name}
 							<span class="sub"><PlatformHandle platform={c.platform} handle={c.handle} /></span>
 							<span class="fit" class:no={!c.category_fit} title={c.category_fit ? '상품 카테고리와 같은 그룹' : '다른 카테고리 주력'}>{c.category_fit ? '카테고리 적합' : c.category ?? '카테고리 미정'}</span>
+							{#if c.hidden}<span class="chip" title="비공개 프로필 — 갤러리에서 레퍼런스를 열람해 보입니다">비공개 · 열람함</span>{/if}
+							{#if inviteCostLine(c.cost_cel, c.affordable)}
+								<span class="chip" class:danger={!c.affordable}>{inviteCostLine(c.cost_cel, c.affordable)}</span>
+							{/if}
 						</div>
 						<div class="sub">
 							<span>{PLATFORM_LABEL[c.platform] ?? c.platform}</span>
@@ -94,7 +102,9 @@
 			{/each}
 		</div>
 		{#if form?.field === 'seller_id'}<div class="console-err" role="alert">{form.message}</div>{/if}
-		<p class="hint" style="font-size:12px;color:var(--color-mute);margin:0 3px 12px">{INVITE_GATED_NOTICE} · 익명(비공개) 인플루언서는 레퍼런스 열람 뒤에 제안할 수 있어요(다음 단계).</p>
+		<p class="hint" style="font-size:12px;color:var(--color-mute);margin:0 3px 12px">
+			{INVITE_COST_NOTICE} · 지금 🥬 {data.balance}개 · 익명(비공개) 인플루언서는 <a href={data.galleryPath} style="text-decoration:underline">인플루언서 갤러리</a>에서 레퍼런스를 열람한 뒤 제안할 수 있어요.
+		</p>
 
 		<div class="fld" class:invalid={form?.field === 'message'}>
 			<label for="inv-msg">제안 메시지 <span class="font-normal">(선택 · 스레드의 첫 메시지로 전달돼요 · {INVITE_MESSAGE_MAX}자 이내)</span></label>

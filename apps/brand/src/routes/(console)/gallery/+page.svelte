@@ -217,8 +217,9 @@
 							{#if s.stats.engagement !== null} · 참여율 {s.stats.engagement}%{/if}
 							{#if s.stats.perFollower !== null} · 매출/팔로워 ₩{fmtNum(s.stats.perFollower)}{/if}
 						</div>
+						<!-- 열람했으므로 이제 상품별 초대 후보에 "비공개 · 열람함" 으로 나타난다(0036) -->
 						<div class="btnrow" style="margin-top:12px">
-							<a href={data.productsPath} class="btn ghost sm">판매 제안 보내기</a>
+							<a href={data.productsPath} class="btn ghost sm">상품 골라 제안하기 →</a>
 						</div>
 					{:else}
 						<p class="meta">팔로워 ●●●,●●● · 좋아요 평균 ●,●●● — 상세 지표 잠김</p>

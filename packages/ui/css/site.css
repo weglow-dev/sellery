@@ -1192,6 +1192,12 @@
   /* 최근 게시물 좋아요 추이 (프로토타입 .spark) */
   .spark { display: flex; align-items: flex-end; gap: 3px; height: 34px; }
   .spark span { flex: 1; min-width: 3px; background: var(--color-lime); box-shadow: var(--shadow-frame-soft); }
+
+  /* 관리자 매칭 — 제안권 열(0036) */
+  .match-tbl .free { color: var(--color-mute); }
+  .match-tbl .short { color: var(--color-danger); font-weight: 700; }
+  .match-tbl tr.unaffordable { opacity: 0.6; }
+  .match-send.skip { background: var(--color-surface-2); color: var(--color-mute); }
   /* 독점권(0025) — 신청 직후 안내 · 누를 수 없는 상태 표시. 상태별 톤: 내 것(mine) 은 강조, 나머지는 차분하게 */
   .exclbox .excl-msg {
     margin: 8px 0 0; padding: 7px 10px; font-size: 12.5px; font-weight: 700;

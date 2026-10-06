@@ -20,9 +20,11 @@
 | 샘플 구매 대금 일부 | `sample_purchase` · `sample_refund` | 구현(0012 · 0020) |
 | 브랜드 데이터 열람 (공개 인플루언서 성과) | `data_unlock` | **구현(0035)** — 인플루언서 등급별 `grade_tiers.data_price_cel` |
 | 브랜드 익명 레퍼런스 열람 | `ref_unlock` | **구현(0035)** — 같은 가격표 · 열람 후 신원 공개 |
-| 브랜드 제안권 (다이아·블랙 초대) | `invite` · `auto_invite` | 미구현 — `seller_invite_gated`(0017)가 아직 우선권 등급을 초대 후보에서 제외 |
+| 브랜드 제안권 (다이아·블랙 초대) | `invite` · `auto_invite` · `invite_refund` | **구현(0036)** — `grade_tiers.invite_cost_cel` 10 · 거절되면 전액 환급 |
 | 셀러리 샵 아이템 | `shop_item` | 미구현 — 효과가 실제로 있는 4개만 열 예정(`datapass` 는 0035 가 실체) |
 | 유상 충전 | `topup` | 미도입(§0) |
+
+**제안권 규칙(0036 · 프로토타입 `confirmInvite`/`declineInvite`/`runAutoPropose` 그대로)**: 비용은 인플루언서 등급별 `grade_tiers.invite_cost_cel`(다이아·블랙 10 · 나머지 0) · 캠페인 생성 **전에** 차감해 잔액 부족을 먼저 걸러낸다(`CEL_INSUFFICIENT`) · 인플루언서가 거절하면 **전액 환급**(`campaigns.cel_refunded` · 멱등) · 관리자 자동 제안은 같은 금액을 쓰고 원장 사유만 `auto_invite` 로 구분하며 브랜드 잔액이 모자라면 건너뛴다. 비공개(익명) 인플루언서는 **갤러리에서 레퍼런스를 열람한 브랜드만** 제안할 수 있다(0035 `data_views(kind='ref')`).
 
 **무료 열람 규칙(0035 · 프로토타입 `spendData` 그대로)**: ① 이미 열람했으면 영구 무료(`data_views` 행) · ② **함께 판매한 이력**이 있으면 영구 무료(LIVE/CLEARING/SETTLED 캠페인 중 내 브랜드 상품) · ③ 브랜드 등급 다이아·블랙은 **월 5회 무료**(`brand_grade_tiers.free_ref_per_month` · 사용량 `brands.free_ref_used{YYYY-MM}` · KST 기준).
 

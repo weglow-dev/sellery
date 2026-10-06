@@ -7,6 +7,9 @@ import { RATE_LIMIT_MESSAGE, brandPath, getBrandProduct, inviteSeller, listInvit
 /**
  * `/products/[code]/invite` — 인플루언서 직접 제안(초대) 3단계 (docs/brand-console-plan.md §6 행 3 PR-B(brand) "초대 폼(상품 · 인플루언서 검색 — app_brand_invite_candidates)" · 프로토타입 inviteModal + 갤러리 sellerCard 의 3단계 부분집합).
  * load: `getBrandProduct(brand.id, code)` — 내 것이 아니면 404 · 노출 중(listed)이 아니면 후보 없이 안내만. `listInviteCandidates` — 공개 · 플래티넘 이하(다이아·블랙은 6단계 🥬 제안권, 0017) · 인증 채널 · 같은 상품 진행 중 아님 · 팔로워순 ≤ 50.
+ * 0036: 후보에 다이아·블랙도 든다(제안권 🥬 `cost_cel`). 잔액이 모자라면 `affordable: false` 로 와서 화면이 라디오를 막는다.
+ *   RPC 가 차감까지 하므로 화면은 비용만 보여준다. 거절되면 전액 환급(`app_decline_invite`).
+ *   익명(비공개) 인플루언서는 이 목록에 없다 — 갤러리에서 레퍼런스를 열람한 뒤 제안한다(0035).
  * action invite: `parseInviteInput`(seller_id · product_id · message ≤ 500) → `inviteSeller` → 새 캠페인 INVITED → 303 `/campaigns/<code>?msg=invited`.
  *   실패는 fail(400) 로 선택·메시지 유지 — ALREADY_ACTIVE 는 진행 중 캠페인 링크를 함께.
  */
@@ -38,6 +41,9 @@ export const load: PageServerLoad = async (event) => {
 			exclusive_seller_id: product.exclusive_seller_id
 		},
 		candidates: found?.candidates ?? [],
+		// 0036 — 제안권 🥬 잔액. 후보 행의 `affordable` 과 하단 안내에 쓴다
+		balance: found?.balance ?? r.ctx.balance ?? 0,
+		galleryPath: brandPath('/gallery'),
 		defaultMessage: `안녕하세요, ${brand.name}입니다. 채널 결이 저희 ${product.name}와 잘 맞아 판매를 제안드려요. 샘플부터 보내드릴게요!`,
 		productHref: brandPath(`/products/${encodeURIComponent(code)}`),
 		productsPath: brandPath('/products'),

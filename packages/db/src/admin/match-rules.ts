@@ -94,6 +94,10 @@ export type MatchCandidate = {
   product: MatchProduct;
   seller: MatchSeller;
   score: number;
+  /** 제안권 비용 🥬 (0036 · 인플루언서 등급별). 0 이면 무료. */
+  costCel: number;
+  /** 브랜드 잔액으로 이 제안이 가능한가 (0036). false 면 실행이 "셀러리 부족" 으로 건너뛴다. */
+  affordable: boolean;
 };
 
 /** 상품별 상위 N 명 — 데모는 2 명 */
@@ -111,12 +115,19 @@ export type PickInput = {
   /** 상품별 독점 확정 인플루언서 — 있으면 그 사람만 후보 */
   exclusiveOf: Record<string, string | null>;
   perProduct?: number;
+  /** 제안권 비용 🥬 (0036 · `grade_tiers.invite_cost_cel`). 없으면 전부 무료로 본다. */
+  costOf?: (seller: MatchSeller) => number;
+  /** 브랜드 🥬 잔액 (0036). 없으면 0 — 유료 후보는 `affordable: false` 가 된다. */
+  balanceOf?: (brandId: string) => number;
 };
 
 /**
  * 자동 제안 후보 — 데모 `autoMatches()`.
  * 상품마다 카테고리 적합 + 진행 중 캠페인 없음 인플루언서를 점수순으로 상위 N 명. 전체를 다시 점수순으로 정렬한다.
- * 적격 필터(active · 비공개 · 우선권 등급 · 채널 인증)는 **호출자가 이미 걸러서 `sellers` 로 넘긴다**.
+ * 적격 필터(active · 비공개 · 채널 인증)는 **호출자가 이미 걸러서 `sellers` 로 넘긴다**.
+ * 0036: 제안권 비용은 `costOf(seller)` · 브랜드 잔액은 `balanceOf(brandId)` 로 받아 후보에 담는다 —
+ *   우선권 등급(다이아·블랙)은 더 이상 제외가 아니라 **유료**다. 잔액이 모자라면 `affordable: false`
+ *   로 담아 두고 실행 단계가 건너뛴다(프로토타입 `runAutoPropose` 의 "브랜드 셀러리 부족으로 보류").
  */
 export function pickCandidates(i: PickInput): MatchCandidate[] {
   const perProduct = i.perProduct ?? CANDIDATES_PER_PRODUCT;
@@ -130,7 +141,17 @@ export function pickCandidates(i: PickInput): MatchCandidate[] {
         if (i.activePairs.has(`${p.id}:${s.id}`)) return false;
         return categoryFit(p.category, s.category, i.groups);
       })
-      .map((s) => ({ product: p, seller: s, score: matchScore({ growth: s.growth, m3Sales: s.m3Sales, followers: s.followers }) }))
+      .map((s) => {
+        const costCel = i.costOf?.(s) ?? 0;
+        const bal = i.balanceOf?.(p.brandId) ?? 0;
+        return {
+          product: p,
+          seller: s,
+          costCel,
+          affordable: costCel === 0 || bal >= costCel,
+          score: matchScore({ growth: s.growth, m3Sales: s.m3Sales, followers: s.followers }),
+        };
+      })
       .sort((a, b) => b.score - a.score || a.seller.name.localeCompare(b.seller.name))
       .slice(0, perProduct);
     out.push(...picked);
