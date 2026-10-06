@@ -73,7 +73,7 @@
 - [ ] 채팅·문서에 값이 보인 적 있는 키는 전부 회전 후보로 본다: `CRON_SECRET`(회전 시 shop 만) · `SLACK_WEBHOOK_URL`(있다면 Slack 에서 재발급) — **확인 필요(개발)**: 노출 여부.
 - [ ] **개발 계정 삭제(런칭 전)**: `dev-somin@sellery.test`(s7) · `dev-brand@sellery.test`(b1) · `dev-admin@sellery.test`(admin) · `dev@sellery.test`(고객) — 클라우드 Auth 에 존재. `dev-*.mjs` 는 production 거부라 재생성되지 않는다. `dev-admin` 은 `role='admin'` 이므로 반드시.
 - [ ] 관리자 계정 목록 확정: 남길 admin 은 `official@weglow.biz` 1개(운영 결정 2026-09-21) — 개인별 계정으로 나눌지 **확인 필요(대표)**. 확인 쿼리: `select u.email, p.role from auth.users u join public.profiles p on p.id=u.id where p.role='admin'`.
-- [ ] **`RRN_ENC_KEY` 백업** — 지금은 대표 PC 루트 `.env.cloud.local` + Vercel `sellery-influencer`/`sellery-admin` 에만 있다(단일 사본). 잃으면 저장된 주민등록번호 복구 불가(deploy.md §6.4-3). 비밀번호 관리 도구(팀 금고)에 보관하고 Production/Preview 값이 다른지 확인.
+- [ ] **`RRN_ENC_KEY` 백업** — 지금은 대표 PC 루트 `.env.cloud.local` + Vercel `sellery-influencer`/`sellery-admin` 에만 있다(단일 사본). 잃으면 저장된 주민등록번호 복구 불가(deploy.md §6.4-3). 비밀번호 관리 도구(팀 금고)에 보관하고 Production/Preview 값이 다른지 확인. **(2026-10-06: Production 양쪽을 새 키로 통일 — deploy.md §6.4 재발급 기록. 금고 보관 확인 필요)**
 - [ ] **2단계 인증(대표 계정)**: Supabase · Vercel(`weglow-team`) · GitHub(`weglow-dev` 조직 2FA 강제) · 토스 개발자센터 · 카카오 개발자 · Resend · 호스팅케이알(DNS). 저장소로 확인 불가 — **확인 필요(대표)**.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` 를 가진 PC 목록 정리(운영 스크립트 실행자 = 실 DB 쓰기 권한). 퇴사·기기 교체 시 회전.
 
@@ -123,6 +123,12 @@
 - [ ] **Supabase 백업**: 플랜이 Pro(CLAUDE.md "Pro/Micro")면 일일 백업 7일 보관이 기본, **PITR 은 유료 애드온** — 결제·주민번호가 들어가는 DB 이므로 켤지 **확인 필요(대표)**. 저장소로 현재 설정 확인 불가.
 - [ ] 자동 정산 크론은 준비만 됐고 꺼져 있다(`app_admin_settle_run_due` · admin-console-plan.md §5.4) — 첫 달은 수동 실행 권장.
 - [ ] 원천징수 자료(`/admin/settle/rrn.csv` · `exportRrn`)는 `RRN_ENC_KEY` 가 `sellery-admin` 에 있어야 한다. 세무사 전달 경로(§4) 결정 뒤.
+- [ ] **첫 정산 직후 `rrn.csv` 를 1건 내려받아 주민번호가 복호되는지 확인한다.** `RRN_ENC_KEY` 는 인플루언서 앱이
+  암호화하고 관리자 앱이 복호하는데 Vercel `Secret` 은 값을 읽을 수 없어 **두 값이 같은지 사전 확인이 불가능하다**
+  (deploy.md §6.4 2026-10-06 재발급 기록). 불일치면 행에 `RRN_DECRYPT_FAILED` 가 뜨고, 그 인플루언서에게 재입력을
+  요청하면 복구된다(번호는 본인 신분증에 있으므로 소실이 아니다). **위험은 인원수에 비례한다** — 1명일 때 발견하면
+  비용이 거의 없고, 여러 명이 등록한 뒤 세무 신고 때 발견하면 전원 재입력이다. 그래서 **첫 건에서** 확인한다.
+  (개인 `settle_type='personal'` 만 대상. 사업자는 `BIZ` 로 나오는 것이 정상)
 - [ ] 장애 시 롤백: 코드 문제는 Vercel → 해당 프로젝트 → Deployments → 이전 배포 "Promote to Production"(deploy.md §3.6). DB 마이그레이션은 되돌리지 않는다(§6.1).
 
 ---
