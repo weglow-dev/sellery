@@ -88,6 +88,8 @@ export type AdminDashboardCampaign = {
   brand_code: string | null;
   start_date: string | null;
   end_date: string | null;
+  /** 테스트 기한 — `TESTING` 행에만 값이 있다. 표시 전용(위 `staleTesting` 주석 참고) */
+  test_due: string | null;
   /** 브랜드가 직접 제안해 만들어진 캠페인(데모 `c.invited`) */
   invited: boolean;
   /** 자동 매칭으로 만들어진 캠페인(데모 `c.auto`) */
@@ -141,8 +143,24 @@ export type AdminDashboard = {
      */
     noSettleInfoBrands: number;
     noSettleInfoSellers: number;
+    /**
+     * 테스트 기한(`campaigns.test_due`)이 지났는데 아직 `TESTING` 인 캠페인 — **참고용 숫자다.**
+     * 기한은 **표시 전용**이다(운영 결정 2026-10-07 · `docs/period-policy.md` §2.1): 프로토타입도 강제하지 않고
+     * (`packages/core` 에 막는 코드 0곳 · `autoTick` 은 LIVE·CLEARING 전이만 한다), 실서비스도 기한이 지나도
+     * 일정 제안이 그대로 된다(`app_propose_schedule` 에 `test_due` 가드 없음).
+     *
+     * 자동 패스·제안 차단을 넣지 않은 이유: 방치의 비용을 **인플루언서 본인만** 진다 —
+     * `TESTING` 은 재고를 묶지 않고(`ALLOCATING_STATUSES` = SCHEDULE_CONFIRMED · LIVE) 다른 인플루언서도
+     * 막지 않는다(`campaigns_active_pair_uidx` 는 (seller, product) 쌍 단위). 브랜드는 잃는 것이 없고,
+     * 강제하면 늦게라도 진행하려는 인플루언서와 판매를 원하는 브랜드가 함께 손해를 본다.
+     *
+     * 그래서 **가시성만** 준다 — 운영이 스레드로 확인하거나 독촉할 수 있게. 관리자가 누를 버튼은 없다.
+     */
+    staleTesting: number;
   };
   campaigns: AdminDashboardCampaign[];
+  /** 집계 기준일(KST) — 화면이 기한 경과를 같은 날짜로 판정하도록 함께 내려보낸다 */
+  today: string;
   /** 상태별 캠페인 수 — 0 인 상태는 넣지 않는다(데모 `stCounts` 와 같다) */
   statusCounts: { status: string; n: number }[];
 };
@@ -153,6 +171,7 @@ type CampRow = {
   status: string;
   start_date: string | null;
   end_date: string | null;
+  test_due: string | null;
   invited: boolean | null;
   auto_proposed: boolean | null;
   created_at: string | null;
@@ -188,7 +207,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
     admin
       .from("campaigns")
       .select(
-        "id, code, status, start_date, end_date, invited, auto_proposed, created_at, products(code, name, emoji, thumb_url, brands(code, name)), sellers(code, name, handle, platform)"
+        "id, code, status, start_date, end_date, test_due, invited, auto_proposed, created_at, products(code, name, emoji, thumb_url, brands(code, name)), sellers(code, name, handle, platform)"
       )
       .order("created_at", { ascending: false }),
     count(admin.from("campaigns").select("id", head), "캠페인 수"),
@@ -237,6 +256,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       brand_code: c.products?.brands?.code ?? null,
       start_date: c.start_date,
       end_date: c.end_date,
+      test_due: c.test_due,
       invited: c.invited === true,
       auto: c.auto_proposed === true,
       paid_count: p?.paid ?? 0,
@@ -254,7 +274,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
   const statusMap = new Map<string, number>();
   for (const c of campaigns) statusMap.set(c.status, (statusMap.get(c.status) ?? 0) + 1);
 
-  const [ordersToday, ordersRefunded, pendingProducts, exclusivePending, unshippedOrders, awaitingApproval, unverified, brandsNoBank, sellersNoBank] =
+  const [ordersToday, ordersRefunded, pendingProducts, exclusivePending, unshippedOrders, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
     await Promise.all([
       count(admin.from("orders").select("id", head).gte("paid_at", `${today}T00:00:00+09:00`).lte("paid_at", `${today}T23:59:59+09:00`), "오늘 주문"),
       count(admin.from("orders").select("id", head).eq("status", "REFUNDED"), "환불 주문"),
@@ -265,6 +285,8 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       count(admin.from("seller_channels").select("id", head).eq("verified", false), "미인증 채널"),
       count(admin.from("brands").select("id", head).is("bank_info", null), "브랜드 정산정보 미등록"),
       count(admin.from("sellers").select("id", head).is("bank_info", null), "인플루언서 정산정보 미등록"),
+      // 기한이 **지난** 것만 — 오늘이 기한인 건은 아직 시간이 있다(`lt`, not `lte`)
+      count(admin.from("campaigns").select("id", head).eq("status", "TESTING").lt("test_due", today), "테스트 기한 지남"),
     ]);
 
   return {
@@ -293,8 +315,10 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       channelsUnverified: unverified,
       noSettleInfoBrands: brandsNoBank,
       noSettleInfoSellers: sellersNoBank,
+      staleTesting,
     },
     campaigns,
+    today,
     statusCounts: [...statusMap.entries()].map(([status, n]) => ({ status, n })),
   };
 }

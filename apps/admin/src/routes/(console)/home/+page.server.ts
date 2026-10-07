@@ -30,6 +30,18 @@ export const load: PageServerLoad = async (event) => {
 
 	// 캠페인 필터는 데모 `S.ui.admCF` 의 실서비스 판 — 주소로 남겨 공유·새로고침이 되게 한다
 	const statusFilter = parseCampaignStatusFilter(event.url.searchParams.get('status'));
+	/**
+	 * `?overdue=testing` — 테스트 기한이 지난 `TESTING` 만. "오늘 할 일" 의 링크가 쓴다.
+	 * 상태 필터와 **겹치지 않는다**(둘 중 하나만 적용) — 기한 경과는 상태가 아니라 상태 안의 조건이고,
+	 * 둘을 함께 받으면 `?status=LIVE&overdue=testing` 처럼 빈 결과가 나오는 주소가 생긴다.
+	 * 기한이 **지난** 것만 센다(`<`, 오늘이 기한인 건은 아직 시간이 있다) — `dashboard.server.ts` 의 집계와 같은 기준.
+	 */
+	const overdueTesting = event.url.searchParams.get('overdue') === 'testing';
+	const campaigns = overdueTesting
+		? dash.campaigns.filter((c) => c.status === 'TESTING' && c.test_due !== null && c.test_due < dash.today)
+		: statusFilter
+			? dash.campaigns.filter((c) => c.status === statusFilter)
+			: dash.campaigns;
 
 	return {
 		email: gate.ctx.user.email ?? null,
@@ -40,8 +52,10 @@ export const load: PageServerLoad = async (event) => {
 		// 데모 "오늘 할 일" 의 자동 제안 후보 — 매칭 화면이 생겨 이제 셀 수 있다
 		autoMatchCandidates: match?.candidates.length ?? 0,
 		statusFilter,
+		overdueTesting,
+		today: dash.today,
 		statusCounts: sortCampaignStatusCounts(dash.statusCounts),
-		campaigns: statusFilter ? dash.campaigns.filter((c) => c.status === statusFilter) : dash.campaigns,
+		campaigns,
 		money: health
 			? {
 					dueNow: health.settlements.due_now,
