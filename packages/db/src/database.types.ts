@@ -1394,6 +1394,7 @@ export type Database = {
           exclusive_grade: string | null
           exclusive_label: string | null
           exclusive_seller_id: string | null
+          fast_reviewed_at: string | null
           id: string
           image_urls: string[]
           name: string
@@ -1425,6 +1426,7 @@ export type Database = {
           exclusive_grade?: string | null
           exclusive_label?: string | null
           exclusive_seller_id?: string | null
+          fast_reviewed_at?: string | null
           id?: string
           image_urls?: string[]
           name: string
@@ -1456,6 +1458,7 @@ export type Database = {
           exclusive_grade?: string | null
           exclusive_label?: string | null
           exclusive_seller_id?: string | null
+          fast_reviewed_at?: string | null
           id?: string
           image_urls?: string[]
           name?: string

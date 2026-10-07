@@ -44,6 +44,14 @@
 		<span class="meta">브랜드 상품 화면에 그대로 표시됩니다</span>
 	</p>
 {/if}
+<!-- 우선 검수권(0038) — 브랜드가 🥬 로 검수를 건너뛴 상품. 표시광고 사후 점검 대상이라
+     상세 맨 위에 띄운다. 문제가 있으면 아래 [노출 중단]·[반려] 로 되돌릴 수 있다 -->
+{#if p.fast_reviewed_at}
+	<p class="notice danger" role="status">
+		<b>⚡ 검수 생략</b> — 브랜드가 우선 검수권(🥬)으로 {p.fast_reviewed_at} 에 검수 없이 노출했습니다.
+		<span class="meta">상품 정보·표시광고를 지금 확인하고, 문제가 있으면 아래에서 노출 중단 또는 반려하세요.</span>
+	</p>
+{/if}
 
 <section class="card static console-det">
 	<ProductIcon emoji={p.emoji ?? '📦'} thumbUrl={p.thumb_url} size={52} />

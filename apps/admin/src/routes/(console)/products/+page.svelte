@@ -204,6 +204,11 @@
 						{#if p.status === 'rejected' && p.reject_reason}
 							<span class="prods-sub">{p.reject_reason}</span>
 						{/if}
+						<!-- 우선 검수권(0038)으로 검수를 건너뛴 상품 — 표시광고 사후 점검 대상.
+						     관리자는 [노출 중단]·[반려] 로 되돌릴 수 있다 -->
+						{#if p.fast_reviewed_at}
+							<small><StatusChip tone="red">검수 생략 {p.fast_reviewed_at}</StatusChip></small>
+						{/if}
 					</td>
 					<td data-l="관리" class="admin-row-act">
 						<div class="prods-acts">
