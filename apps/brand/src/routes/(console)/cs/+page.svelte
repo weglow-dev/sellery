@@ -42,7 +42,7 @@
 				</div>
 				<div class="sub">
 					<span class="console-mono">{x.code.toUpperCase()}</span>
-					· 주문 {#if x.order_code}<span class="console-mono">{x.order_code.toUpperCase()}</span>{#if x.order_matched}{' '}<span class="chip plat" title="같은 캠페인의 주문으로 확인됨">매칭</span>{:else}{' '}<span class="console-danger">(미확인)</span>{/if}{:else}—{/if}
+					· 주문 {#if x.order_code}<span class="console-mono">{x.order_code.toUpperCase()}</span>{#if x.order_matched}{' '}<span class="chip plat" title="구매 고객 본인의 주문으로 확인됨">매칭</span>{:else}{' '}<span class="console-danger">(미확인)</span>{/if}{:else}—{/if}
 					· {x.buyer_name}{x.is_member ? ' (회원)' : ''}
 					{#if x.campaign.seller}{' '}· {x.campaign.seller.handle}{/if}
 					· {md(x.last_message_at)} · {x.message_count}개

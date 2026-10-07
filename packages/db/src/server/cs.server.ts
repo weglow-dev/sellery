@@ -23,9 +23,15 @@ export type CsCustomerKey = { clientToken?: string | null; userId?: string | nul
 export type CsOpenInput = { type: CsType; body: string; buyerName: string | null; orderCode: string | null };
 
 /** 접수자 — 회원이면 userId(+ customers.id 가 있으면 customerId), 비회원은 둘 다 null */
-export type CsOpener = { userId?: string | null; customerId?: string | null };
+/**
+ * 문의를 접수하는 사람. `guestToken` 은 **그 주문번호의** 비회원 조회 토큰(0021 HttpOnly 쿠키)이다 —
+ * 주문 연결의 소유 증명에만 쓰이고(0041), 로그인 상태에서도 보낸다(비회원으로 사고 나중에 가입한 주문).
+ */
+export type CsOpener = { userId?: string | null; customerId?: string | null; guestToken?: string | null };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** 비회원 주문 조회 토큰 — 32바이트 난수의 hex(0021 `guest_token_rotate`). RPC 안에서도 같은 형식을 검사한다 */
+const GUEST_TOKEN_RE = /^[0-9a-f]{64}$/;
 
 /** 캠페인 code → id (상태는 함수가 검사한다). */
 async function campaignIdOf(admin: Admin, code: string): Promise<string | null | "error"> {
@@ -52,6 +58,8 @@ export async function openCs(campaignCode: string, input: CsOpenInput, who: CsOp
     p_type: input.type,
     p_body: input.body,
     ...(input.orderCode ? { p_order_code: input.orderCode } : {}),
+    // 주문 연결의 소유 증명(0041) — 형식이 어긋난 값은 보내지 않는다(RPC 도 다시 검사한다)
+    ...(input.orderCode && who.guestToken && GUEST_TOKEN_RE.test(who.guestToken) ? { p_guest_token: who.guestToken } : {}),
   });
   if (error) {
     console.error("[cs] app_cs_open failed:", error.message);

@@ -2450,6 +2450,7 @@ export type Database = {
           p_buyer_name: string
           p_campaign_id: string
           p_customer_id: string
+          p_guest_token?: string
           p_order_code?: string
           p_type: string
           p_user_id: string
