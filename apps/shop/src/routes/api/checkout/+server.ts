@@ -19,7 +19,7 @@ import { apiError, gateIsLive, rejectCrossSite, softStockLeft, type CampaignGate
  *   ① 로그인 또는 **비회원(0021 · owner 결정 2026-09-22)**: 미로그인이면 본문 `guest` 가 필수(형식 parseGuestBody) — 없으면 401.
  *      비회원은 IP 레이트리밋(30분 20건 · rateLimit) · customers 행은 app_guest_customer_upsert(체크아웃 1건 = 행 1개, user_id null) ·
  *      세션 user_id null · buyer_name/phone/email 은 주문자 입력값 · 응답 뒤 HttpOnly 쿠키 `slry_gck` = 세션 id(45분) — confirm 이 세션 소유 확인에 쓴다.
- *      supersede(⑥-a)·saveAddress(⑦)·본인 PENDING 되돌림은 회원만.
+ *      supersede(⑥-a)·본인 PENDING 되돌림은 **비회원도 한다**(0042 — 쿠키가 가리키는 이전 세션 1건). saveAddress(⑦)는 회원만.
  *   ② campaign_card(code): LIVE 이고 start_date ≤ today ≤ end_date 아니면 400 NOT_LIVE · qty 정수 1..10 · optionIndex 범위
  *      · 소프트 예약: left = qty − sold_qty − app_checkout_reserved(campaign_id) 가 요청 qty 미만이면 400 SOLD_OUT
  *   ③ 단가 = options[optionIndex].price (서버 값 — 클라이언트 amount 는 받지 않는다), amount ≥ 100
@@ -49,6 +49,27 @@ async function ownPendingQty(admin: Admin, userId: string, campaignId: string): 
 		return 0;
 	}
 	return (data ?? []).reduce((sum, r) => sum + (r.qty ?? 0), 0);
+}
+
+/**
+ * 비회원 판(0042) — 아는 세션이 쿠키가 가리키는 **한 건**뿐이라 그 세션만 본다.
+ * `slry_gck` 는 서버가 세션 생성 때 심는 HttpOnly 쿠키라 소유 증명으로 쓸 수 있다.
+ */
+async function guestPendingQty(admin: Admin, sessionId: string, campaignId: string): Promise<number> {
+	const { data, error } = await admin
+		.from('checkout_sessions')
+		.select('qty')
+		.eq('id', sessionId)
+		.is('user_id', null)
+		.eq('campaign_id', campaignId)
+		.eq('status', 'PENDING')
+		.gt('expires_at', new Date().toISOString())
+		.maybeSingle();
+	if (error) {
+		console.error('[checkout] guest pending read failed:', error.message);
+		return 0;
+	}
+	return data?.qty ?? 0;
 }
 
 type Body = {
@@ -166,8 +187,14 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// ② 소프트 예약 — 잔여가 없으면 결제창을 열지 않는다 (하드 예약은 하지 않는다: 최종 방어선은 app_confirm_checkout).
-	//    본인의 이 캠페인 PENDING 예약분은 ⑥-a 에서 SUPERSEDED 될 것이므로 되돌려 계산한다(비회원은 supersede 가 없어 0).
-	const own = user ? await ownPendingQty(admin, user.id, card.campaign.id) : 0;
+	//    본인의 이 캠페인 PENDING 예약분은 ⑥-a 에서 SUPERSEDED 될 것이므로 되돌려 계산한다.
+	//    비회원도 같다(0042) — 아는 세션은 `slry_gck` 쿠키가 가리키는 한 건뿐이다.
+	const prevGuestSessionId = user ? null : (cookies.get(GUEST_CHECKOUT_COOKIE) ?? null);
+	const own = user
+		? await ownPendingQty(admin, user.id, card.campaign.id)
+		: prevGuestSessionId
+			? await guestPendingQty(admin, prevGuestSessionId, card.campaign.id)
+			: 0;
 	const left = await softStockLeft(admin, card.campaign.id, gate, own);
 	if (left < q) {
 		return apiError(400, 'SOLD_OUT', `남은 수량이 부족합니다 (잔여 ${Math.max(0, left)}개)`);
@@ -195,6 +222,16 @@ export const POST: RequestHandler = async (event) => {
 			.eq('user_id', user.id)
 			.eq('status', 'PENDING');
 		if (error) console.error('[checkout] supersede failed:', error.message);
+	} else if (prevGuestSessionId) {
+		// 비회원도 같게(0042) — 쿠키가 가리키는 이전 세션 1건만. 쿠키는 서버가 심은 HttpOnly 라 소유 증명이 된다.
+		// 없으면 이전 결제창이 `expires_at`(30분)까지 소프트 예약에 남아 재시도마다 잔여가 줄었다.
+		const { error } = await admin
+			.from('checkout_sessions')
+			.update({ status: 'EXPIRED', fail_code: 'SUPERSEDED', fail_message: '새 결제 시도로 대체되었습니다' })
+			.eq('id', prevGuestSessionId)
+			.is('user_id', null)
+			.eq('status', 'PENDING');
+		if (error) console.error('[checkout] guest supersede failed:', error.message);
 	}
 
 	// ⑥-b 세션 insert (PENDING, expires_at 은 DB 기본값 now()+30m)

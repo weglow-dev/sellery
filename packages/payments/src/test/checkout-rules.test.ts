@@ -4,12 +4,15 @@ import {
   EMPTY_DRAFT,
   FAIL_FALLBACK,
   FAIL_PAGE_DEFAULT,
+  FAIL_SESSION_DEFAULT_CODE,
   FAIL_TEXT,
   MEMO_MAX,
   QTY_MAX,
   checkoutHref,
   failPageReason,
+  failSessionCode,
   failText,
+  ownsCheckoutSession,
   parseCheckoutParams,
   parseCheckoutReturn,
   parseSuccessParams,
@@ -114,5 +117,54 @@ describe("parseCheckoutReturn — sessionStorage 복귀 링크", () => {
     expect(parseCheckoutReturn(JSON.stringify({ store: "/s/x/c1", retry: "/evil" }))).toBeNull();
     expect(parseCheckoutReturn("not json")).toBeNull();
     expect(parseCheckoutReturn(null)).toBeNull();
+  });
+});
+
+/**
+ * `/checkout/fail` 이 PENDING 세션을 종결하기 전에 거치는 경계(0042).
+ * `orderId` 는 공개 URL 값이라 이 판정이 없으면 주문번호만 알면 남의 결제 세션을 끝낼 수 있다.
+ */
+describe("ownsCheckoutSession — 결제 세션 소유 판정", () => {
+  const member = { id: "s-member", user_id: "u1" };
+  const guest = { id: "s-guest", user_id: null };
+
+  it("회원 세션은 user_id 가 같을 때만", () => {
+    expect(ownsCheckoutSession(member, { userId: "u1" })).toBe(true);
+    expect(ownsCheckoutSession(member, { userId: "u2" })).toBe(false);
+    expect(ownsCheckoutSession(member, { userId: null })).toBe(false);
+    expect(ownsCheckoutSession(member, {})).toBe(false);
+  });
+
+  it("회원 세션은 쿠키로 열리지 않는다 — 세션 id 를 알아도 남의 회원 세션은 못 끝낸다", () => {
+    expect(ownsCheckoutSession(member, { guestSessionId: "s-member" })).toBe(false);
+    expect(ownsCheckoutSession(member, { userId: "u2", guestSessionId: "s-member" })).toBe(false);
+  });
+
+  it("비회원 세션은 slry_gck 쿠키가 그 세션 id 일 때만", () => {
+    expect(ownsCheckoutSession(guest, { guestSessionId: "s-guest" })).toBe(true);
+    expect(ownsCheckoutSession(guest, { guestSessionId: "s-other" })).toBe(false);
+    expect(ownsCheckoutSession(guest, { guestSessionId: null })).toBe(false);
+    expect(ownsCheckoutSession(guest, {})).toBe(false);
+  });
+
+  it("비회원 세션은 로그인만으로는 열리지 않는다 (쿠키가 있어야 한다)", () => {
+    expect(ownsCheckoutSession(guest, { userId: "u1" })).toBe(false);
+    expect(ownsCheckoutSession(guest, { userId: "u1", guestSessionId: "s-guest" })).toBe(true);
+  });
+});
+
+describe("failSessionCode — 세션에 적을 실패 코드", () => {
+  it("토스 code 형식만 그대로 쓴다", () => {
+    expect(failSessionCode("PAY_PROCESS_CANCELED")).toBe("PAY_PROCESS_CANCELED");
+    expect(failSessionCode("REJECT_CARD")).toBe("REJECT_CARD");
+  });
+
+  it("형식이 어긋나면 기본 코드 — 공개 URL 값을 그대로 저장하지 않는다", () => {
+    expect(failSessionCode("")).toBe(FAIL_SESSION_DEFAULT_CODE);
+    expect(failSessionCode(null)).toBe(FAIL_SESSION_DEFAULT_CODE);
+    expect(failSessionCode(undefined)).toBe(FAIL_SESSION_DEFAULT_CODE);
+    expect(failSessionCode("drop table")).toBe(FAIL_SESSION_DEFAULT_CODE);
+    expect(failSessionCode("reject_card")).toBe(FAIL_SESSION_DEFAULT_CODE);
+    expect(failSessionCode("A".repeat(41))).toBe(FAIL_SESSION_DEFAULT_CODE);
   });
 });
