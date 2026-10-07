@@ -33,7 +33,7 @@
 		<div class="t">{p?.name ?? '문의'} <small>· {c.code.toUpperCase()}</small></div>
 		<div class="meta">
 			<span class="chip">{c.type}</span> · {c.buyer_name}{c.is_member ? ' (회원)' : ' (비회원)'} · 접수 {fmtTime(c.created_at)}
-			{#if c.order_code}{' '}· 주문 <span class="console-mono">{c.order_code.toUpperCase()}</span>{#if !c.order}{' '}<span class="console-danger">(이 캠페인 주문에서 못 찾음)</span>{/if}{/if}
+			{#if c.order_code}{' '}· 주문 <span class="console-mono">{c.order_code.toUpperCase()}</span>{#if !c.order}{' '}<span class="console-danger">(본인 주문으로 확인 안 됨)</span>{/if}{/if}
 			· 캠페인 <a href={data.campaignHref} class="console-mono">{c.campaign.code.toUpperCase()}</a>{#if c.campaign.seller}{' '}· {c.campaign.seller.handle}{/if}
 		</div>
 	</div>
@@ -77,7 +77,7 @@
 		{:else}
 			<div class="card static">
 				<h4>주문</h4>
-				<p class="hint">{c.order_code ? `고객이 적은 주문번호 ${c.order_code.toUpperCase()} 는 이 캠페인 주문에서 찾지 못했어요 — 답변으로 주문번호를 확인해주세요.` : '고객이 주문번호를 남기지 않았어요 — 필요하면 답변으로 물어보세요.'}</p>
+				<p class="hint">{c.order_code ? `고객이 적은 주문번호 ${c.order_code.toUpperCase()} 는 본인 주문으로 확인되지 않았어요 — 주문 내역을 보여 드리기 전에 답변으로 본인 확인을 해주세요.` : '고객이 주문번호를 남기지 않았어요 — 필요하면 답변으로 물어보세요.'}</p>
 				<div class="btnrow"><a href={data.ordersHref} class="btn ghost sm">이 캠페인 주문 →</a></div>
 			</div>
 		{/if}

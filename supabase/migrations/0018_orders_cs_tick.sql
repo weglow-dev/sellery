@@ -23,6 +23,10 @@
 -- | 발주서 = 내 캠페인 PAID 주문(수취인·주소 포함) · 발송 이벤트 po_sent | poCSV · poEmail | app_brand_po_rows(brand, campaign|null) — 행 + 캠페인별 po_exported_at(첫 내보내기에만 이벤트 po_sent) |
 -- | 브랜드 환불 = PAID · 비샘플 · 캠페인 ≠ SETTLED · **발송 전만**(발송 후는 교환·반품 CS 로 — 결정, isRefundable SHIPPED 와 동일) | refund · isRefundable | app_brand_refund_precheck(brand, order) → 소유(NOT_FOUND) · SAMPLE · SHIPPED 뒤 0008 app_refund_precheck(order,'brand') 에 위임. 토스 취소 → app_refund_record(actor 'brand') 는 앱(@sellery/payments brand-refund) |
 -- | 고객 문의는 관리자를 거치지 않고 브랜드로 직행 · 주문번호는 원문 보관 + 같은 캠페인 범위에서 해석 | submitCS · csBrandId · CS_TYPES | app_cs_open — brand_id 는 캠페인에서 파생 · order_code → order_id(대소문자 무시) · 이벤트 cs_received · 비회원은 client_token |
+--
+-- ⚠ 2026-10-07 **0041 에서 주문 연결 규칙이 바뀌었다** — `order_code → order_id` 를 "같은 캠페인" 만으로 하지 않고
+--   소유 증명(회원 본인 · 같은 고객 행 · 비회원 조회 토큰)을 요구한다. 주문번호가 순차라 남의 주문에 문의를 붙여
+--   금액·운송장을 읽을 수 있었다. 이 파일의 `app_cs_open` 은 0041 이 drop 후 재생성한다(인자 8개).
 -- | 답변 → ANSWERED + replied_at · 종료 → CLOSED · 고객 재문의 → OPEN | saveCSReply · csClose | app_brand_cs_reply(→ ANSWERED · 이벤트 cs_replied) · app_brand_cs_close · app_cs_customer_reply(ANSWERED → OPEN · CLOSED 면 거부) |
 --
 -- 설계 요점
