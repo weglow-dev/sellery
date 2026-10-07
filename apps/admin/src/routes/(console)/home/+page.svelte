@@ -84,6 +84,14 @@
 			n: data.autoMatchCandidates,
 			label: '자동 제안 후보',
 			href: data.paths.match
+		},
+		// 테스트 기한은 **표시 전용**이다 — 관리자가 누를 버튼이 없고 자동 처리도 없다(운영 결정 2026-10-07).
+		// 그래도 방치되면 아무도 모르므로(브랜드 처리 대기 큐에도 안 뜬다 — TESTING 은 인플루언서 차례다)
+		// 여기서 보이게만 한다. 운영이 스레드로 확인하거나 독촉하는 용도다.
+		{
+			n: data.todo.staleTesting,
+			label: '테스트 기한 지남 (독촉)',
+			href: `${homePath}?overdue=testing`
 		}
 	]);
 </script>
@@ -182,6 +190,16 @@
 			{c.label}<span class="n"> {c.n}</span>
 		</a>
 	{/each}
+	<!-- 기한 경과는 상태가 아니라 상태 안의 조건이라 별도 칩으로 둔다. 0건이면 넣지 않는다(상태 칩과 같은 규칙) -->
+	{#if data.todo.staleTesting > 0}
+		<a
+			href={`${homePath}?overdue=testing`}
+			class="catchip {data.overdueTesting ? 'on' : ''}"
+			aria-current={data.overdueTesting ? 'page' : undefined}
+		>
+			테스트 기한 지남<span class="n"> {data.todo.staleTesting}</span>
+		</a>
+	{/if}
 </nav>
 
 <div class="tblw admin-table home-camps">
@@ -245,7 +263,15 @@
 							{c.brand_name ?? '—'}
 						{/if}
 					</td>
-					<td class="num" data-l="기간">{campaignPeriodLabel(c.start_date, c.end_date)}</td>
+					<td class="num" data-l="기간">
+						{campaignPeriodLabel(c.start_date, c.end_date)}
+						<!-- TESTING 은 판매 기간이 아직 없다 — 그 칸에 테스트 기한을 보여준다(인플루언서·브랜드 화면과 같은 값) -->
+						{#if c.status === 'TESTING' && c.test_due}
+							<span class="home-test-due" class:over={c.test_due < data.today}>
+								테스트 기한 {md(c.test_due)}{c.test_due < data.today ? ' 지남' : ''}
+							</span>
+						{/if}
+					</td>
 					<td class="num" data-l="주문">
 						{c.paid_count}{#if c.refund_count}
 							<span class="home-ref"> −{c.refund_count}</span>{/if}
@@ -367,6 +393,20 @@
 	}
 	.home-camps {
 		margin-top: 4px;
+	}
+	/* 테스트 기한(표시 전용) — 기간 칸의 둘째 줄. 지난 건은 눈에 띄게 */
+	.home-test-due {
+		display: block;
+		margin-top: 2px;
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+		font-weight: 400;
+		color: var(--color-mute);
+		white-space: nowrap;
+	}
+	.home-test-due.over {
+		font-weight: 700;
+		color: var(--color-danger);
 	}
 	.home-camp-cell {
 		display: flex;
