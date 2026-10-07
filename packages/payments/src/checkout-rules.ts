@@ -225,6 +225,41 @@ export function failPageReason(code: string | null | undefined, message: string 
   return `${FAIL_PAGE_DEFAULT} (코드 ${c})`;
 }
 
+/* ---------------- 실패 랜딩에서 세션을 종결할지 (0042) ---------------- */
+
+/** 위젯 단계 실패를 세션에 적을 때 쓰는 기본 코드 — 토스 code 형식이 아니면 이 값으로 기록한다 */
+export const FAIL_SESSION_DEFAULT_CODE = "USER_CANCELED";
+
+/**
+ * `/checkout/fail` 이 `checkout_sessions.fail_code` 에 적을 값.
+ * 토스가 준 code 는 형식(`^[A-Z_]{1,40}$`)이 맞을 때만 쓴다 — 공개 URL 파라미터라 그대로 저장하지 않는다.
+ */
+export function failSessionCode(code: string | null | undefined): string {
+  const c = (code ?? "").trim();
+  return FAIL_CODE_RE.test(c) ? c : FAIL_SESSION_DEFAULT_CODE;
+}
+
+/** 세션 소유 판정에 필요한 최소 필드 */
+export type SessionOwnership = { id: string; user_id: string | null };
+
+/**
+ * 이 요청자가 그 결제 세션의 주인인가 — `/checkout/fail` 이 **남의 세션을 종결하지 못하게** 하는 경계다.
+ *
+ *   회원   `session.user_id === userId`
+ *   비회원 `session.user_id === null` 이고 HttpOnly 쿠키 `slry_gck`(= 세션 id)가 일치
+ *
+ * 비회원 세션을 로그인 사용자가 종결하는 것도 쿠키가 맞으면 허용한다 — 비회원으로 결제창을 띄운 뒤
+ * 다른 탭에서 로그인한 경우가 있고, 그 세션을 풀어 주는 것이 재고 입장에서 옳다.
+ * `orderId` 는 공개 URL 값이므로 이 판정 없이는 주문번호만 알면 남의 예약을 풀거나 상태를 바꿀 수 있다.
+ */
+export function ownsCheckoutSession(
+  session: SessionOwnership,
+  who: { userId?: string | null; guestSessionId?: string | null },
+): boolean {
+  if (session.user_id !== null) return !!who.userId && session.user_id === who.userId;
+  return !!who.guestSessionId && who.guestSessionId === session.id;
+}
+
 /* ---------------- 성공 페이지 ↔ 체크아웃 복귀 링크 (sessionStorage) ---------------- */
 
 /** successUrl 은 쿼리 없이 고정이라(app-plan §7.1) 실패 뷰의 "판매 페이지로"·"다시 시도" 링크를 결제 직전에 저장해 둔다 */
