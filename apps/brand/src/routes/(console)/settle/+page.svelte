@@ -9,6 +9,7 @@
 	 *   정산 정보 미완이면 `hold` 안내 — 등록 전에 정산이 실행되면 지급 보류로 기록되고, 등록하면 다음 배치에 포함.
 	 */
 	import { brandRateLine, brandSettlementStatusLabel } from '@sellery/db/brand/settle-rules';
+	import { tossSellerStatusLine } from '@sellery/payments/payout-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
@@ -18,6 +19,9 @@
 	const info = $derived(data.info);
 	const list = $derived(data.list);
 	const saveForm = $derived(form?.form === 'save' ? form : null);
+	// 토스 지급대행(0040) — 키가 들어온 환경에서 정산 정보가 완비된 뒤에만 상태 줄을 보여준다
+	const toss = $derived(data.toss);
+	const tossLine = $derived(toss && toss.configured && info?.settle_info_complete ? tossSellerStatusLine(toss.status, toss.error, 'biz') : null);
 	const v = (k: string, fallback = '') => saveForm?.values?.[k] ?? fallback;
 	const invalid = (k: string) => saveForm?.field === k;
 	const money = (n: number | null) => (n === null ? '—' : `₩${fmtNum(n)}`);
@@ -67,6 +71,10 @@
 			{#if info.mail_order_no}
 				<dt>통신판매업</dt>
 				<dd>{info.mail_order_no}</dd>
+			{/if}
+			{#if tossLine}
+				<dt>지급 계좌 확인</dt>
+				<dd><StatusChip tone={tossLine.tone}>{tossLine.label}</StatusChip>{#if tossLine.sub}<small class={tossLine.tone === 'red' ? 'console-danger' : 'meta'} style="display:block;margin-top:4px">{tossLine.sub}</small>{/if}{#if !toss?.phone_set}<small class="console-danger" style="display:block;margin-top:4px">담당자 연락처가 없어요 — 내 정보에서 등록해야 지급대행 본인인증 문자를 받을 수 있어요.</small>{/if}</dd>
 			{/if}
 			{#if info.has_tax_info && info.tax_info}
 				<dt>세금계산서</dt>

@@ -8,7 +8,8 @@
  *   calcSettlement({ gross, refunds, sampleNet, rate, bonusPp, refBoost, brandRefBoost, brandDiscRate, whtRate, sampleRefundCel, sampleRefundCash, … })
  *     → 모든 라인(net · pg · sf · gBonus · boost · refReward · bBoost · bReward · bDisc · pfGross · costs · pf · vat · pfNet · sfTotal · wht · brandPay · sellerPayout …)
  *       라인마다 독립 반올림(0004 반올림 계약 · JS Math.round = PG round(numeric) — 양수). 인플루언서 쪽 라인은 calcSellerShare, 브랜드 쪽 라인은 calcBrandPay 와 같다.
- *   sellerHoldReason · brandHoldReason — 0030 admin_payout_hold_reason 과 같은 판정 (BANK_MISSING · RRN_MISSING · TAX_INFO_MISSING · SETTLE_INFO_INCOMPLETE)
+ *   sellerHoldReason · referrerHoldReason · brandHoldReason — 0040 admin_payout_hold_reason 과 같은 판정 (BANK_MISSING · RRN_MISSING · TAX_INFO_MISSING · SETTLE_INFO_INCOMPLETE
+ *     · payoutMode 'toss' 에서만 PHONE_MISSING · TOSS_SELLER_PENDING — 0040 토스 지급대행) · tossPayoutChip · tossSellerChip
  *   settleDue(endDate) — 종료일 + CLEAR_DAYS (partner/settle-rules 재수출)
  *   parseSettlePreview · parseSettleRunResult · parseSettleRunDueResult · parseAdminSettlements · parsePayoutActionResult · parsePayoutExport · parseRrnExport
  *   · parsePaymentsHealth · parseAdminOrders · parseAdminOrder — RPC jsonb 를 타입으로
@@ -26,7 +27,7 @@ export { sellerWhtRate, settleDue };
 
 /* ---------------- 보류 사유 · 문구 ---------------- */
 
-export const HOLD_CODES = ["BANK_MISSING", "RRN_MISSING", "TAX_INFO_MISSING", "SETTLE_INFO_INCOMPLETE", "MANUAL"] as const;
+export const HOLD_CODES = ["BANK_MISSING", "RRN_MISSING", "TAX_INFO_MISSING", "SETTLE_INFO_INCOMPLETE", "MANUAL", "TOSS_SELLER_PENDING", "PHONE_MISSING"] as const;
 export type HoldCode = (typeof HOLD_CODES)[number];
 
 /** 0030 admin_hold_label 과 같은 문구 */
@@ -36,6 +37,8 @@ export const HOLD_LABELS: Record<HoldCode, string> = {
   TAX_INFO_MISSING: "사업자등록증 미등록",
   SETTLE_INFO_INCOMPLETE: "정산 정보 미완비 — 은행·계좌·예금주·사업자등록번호",
   MANUAL: "운영자 보류",
+  TOSS_SELLER_PENDING: "토스 지급대행 계좌 확인 대기 — 본인인증(문자) 또는 셀러 등록 필요",
+  PHONE_MISSING: "본인인증 휴대폰 번호 미등록 — 토스 지급대행",
 };
 
 export function isHoldCode(v: unknown): v is HoldCode {
@@ -233,6 +236,14 @@ export function calcSettlement(input: SettlementInput): Settlement {
 
 /* ---------------- 보류 판정 (admin_payout_hold_reason) ---------------- */
 
+/** 지급 방식 — platform_settings.payout_mode (0040). 'manual' 이면 토스 조건을 보지 않는다 */
+export type PayoutMode = "manual" | "toss";
+
+/** 토스 셀러가 지급을 받을 수 있는 상태 (0040 · payout-rules tossSellerReady 와 같다) */
+export function tossSellerReady(status: string | null | undefined): boolean {
+  return status === "PARTIALLY_APPROVED" || status === "APPROVED";
+}
+
 export type SellerHoldInput = {
   hasBankInfo: boolean;
   settleType: string | null | undefined;
@@ -240,18 +251,43 @@ export type SellerHoldInput = {
   /** 사업자: 사업자번호 + 사업자등록증(biz_doc_url) — 세금계산서 정보(상호 등)는 선택이라 보지 않는다 (0030) */
   hasBizNo?: boolean;
   hasBizDoc?: boolean;
+  /** 0040 — 기본 'manual'. 'toss' 면 아래 두 값도 본다 */
+  payoutMode?: PayoutMode;
+  /** 개인: settle_phone 등록 여부 (사업자는 보지 않는다) */
+  hasPhone?: boolean;
+  /** sellers.toss_seller_status */
+  tossStatus?: string | null;
 };
 
-/** 인플루언서 지급 보류 — 계좌 → (사업자면 사업자등록증 · 개인이면 주민번호) 순. 없으면 null */
+/** 인플루언서 지급 보류 — 계좌 → (사업자면 사업자등록증 · 개인이면 주민번호) → (toss 모드) 휴대폰 → 토스 셀러 상태 순. 없으면 null */
 export function sellerHoldReason(s: SellerHoldInput): HoldCode | null {
   if (!s.hasBankInfo) return "BANK_MISSING";
-  if (s.settleType === "biz") return s.hasBizNo && s.hasBizDoc ? null : "TAX_INFO_MISSING";
-  return s.hasRrn ? null : "RRN_MISSING";
+  if (s.settleType === "biz") {
+    if (!(s.hasBizNo && s.hasBizDoc)) return "TAX_INFO_MISSING";
+  } else if (!s.hasRrn) {
+    return "RRN_MISSING";
+  }
+  return tossHold(s.payoutMode, s.settleType !== "biz", s.hasPhone, s.tossStatus);
 }
 
-/** 브랜드 지급 보류 — 은행·계좌·예금주·사업자등록번호 4개 (0019 brand_settle_info_complete) */
-export function brandHoldReason(b: { settleInfoComplete: boolean }): HoldCode | null {
-  return b.settleInfoComplete ? null : "SETTLE_INFO_INCOMPLETE";
+/** 추천인(referrer) 지급 보류 — 계좌만 (0027) + toss 모드 조건 (0040) */
+export function referrerHoldReason(s: Pick<SellerHoldInput, "hasBankInfo" | "settleType" | "payoutMode" | "hasPhone" | "tossStatus">): HoldCode | null {
+  if (!s.hasBankInfo) return "BANK_MISSING";
+  return tossHold(s.payoutMode, s.settleType !== "biz", s.hasPhone, s.tossStatus);
+}
+
+export type BrandHoldInput = { settleInfoComplete: boolean; payoutMode?: PayoutMode; hasPhone?: boolean; tossStatus?: string | null };
+
+/** 브랜드 지급 보류 — 은행·계좌·예금주·사업자등록번호 4개 (0019 brand_settle_info_complete) → (toss 모드) 담당자 연락처 → 토스 셀러 상태 */
+export function brandHoldReason(b: BrandHoldInput): HoldCode | null {
+  if (!b.settleInfoComplete) return "SETTLE_INFO_INCOMPLETE";
+  return tossHold(b.payoutMode, true, b.hasPhone, b.tossStatus);
+}
+
+function tossHold(mode: PayoutMode | undefined, needsPhone: boolean, hasPhone: boolean | undefined, tossStatus: string | null | undefined): HoldCode | null {
+  if (mode !== "toss") return null;
+  if (needsPhone && !hasPhone) return "PHONE_MISSING";
+  return tossSellerReady(tossStatus) ? null : "TOSS_SELLER_PENDING";
 }
 
 /* ---------------- RPC jsonb → 타입 ---------------- */
@@ -312,12 +348,19 @@ export type PayoutView = {
   paid_at: string | null;
   memo: string | null;
   created_at: string | null;
+  /** 0040 토스 지급대행 — 요청 전이면 전부 null */
+  toss_payout_id: string | null;
+  toss_payout_status: string | null;
+  toss_requested_at: string | null;
+  toss_schedule_date: string | null;
+  toss_error: { code: string | null; message: string | null; status: string | null } | null;
 };
 
 export function parsePayout(raw: unknown): PayoutView | null {
   const o = obj(raw);
   if (!o || typeof o.id !== "string") return null;
   const bs = obj(o.bank_snapshot);
+  const te = obj(o.toss_error);
   return {
     id: o.id,
     payee_type: asPayeeType(o.payee_type),
@@ -330,7 +373,51 @@ export function parsePayout(raw: unknown): PayoutView | null {
     paid_at: str(o.paid_at),
     memo: str(o.memo),
     created_at: str(o.created_at),
+    toss_payout_id: str(o.toss_payout_id),
+    toss_payout_status: str(o.toss_payout_status),
+    toss_requested_at: str(o.toss_requested_at),
+    toss_schedule_date: str(o.toss_schedule_date),
+    toss_error: te ? { code: str(te.code), message: str(te.message), status: str(te.status) } : null,
   };
+}
+
+/** 토스 지급 상태 칩 (0040) — toss_payout_status 가 없으면 null */
+export function tossPayoutChip(status: string | null | undefined): { label: string; tone: StatusTone } | null {
+  switch (status) {
+    case "REQUESTED":
+      return { label: "토스 요청됨", tone: "blue" };
+    case "IN_PROGRESS":
+      return { label: "토스 이체 중", tone: "amber" };
+    case "COMPLETED":
+      return { label: "토스 이체 완료", tone: "green" };
+    case "FAILED":
+      return { label: "토스 이체 실패", tone: "red" };
+    case "CANCELED":
+      return { label: "토스 요청 취소", tone: "gray" };
+    case "REJECTED":
+      return { label: "토스 거절", tone: "red" };
+    case "DELETED":
+      return { label: "토스 삭제", tone: "gray" };
+    default:
+      return null;
+  }
+}
+
+/** 토스 셀러 상태 칩 (0040) — 등록 전이면 '토스 미등록' */
+export function tossSellerChip(status: string | null | undefined, error?: { code?: string | null; message?: string | null } | null): { label: string; tone: StatusTone } {
+  if (error && (error.code || error.message)) return { label: "계좌 오류", tone: "red" };
+  switch (status) {
+    case "APPROVED":
+      return { label: "지급 가능", tone: "green" };
+    case "PARTIALLY_APPROVED":
+      return { label: "지급 가능 · 주 1천만", tone: "green" };
+    case "KYC_REQUIRED":
+      return { label: "KYC 심사 중", tone: "amber" };
+    case "APPROVAL_REQUIRED":
+      return { label: "본인인증 대기", tone: "amber" };
+    default:
+      return { label: "토스 미등록", tone: "gray" };
+  }
 }
 
 export type SettlePartySeller = {

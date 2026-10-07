@@ -53,8 +53,18 @@
 //   payments-health                         app_admin_payments_health — 결제 정합성 카운트(만료 세션 · 미처리 이벤트 · 부분취소 · 정산 후 조정 큐 …)
 //   admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]   전 브랜드 주문 표
 //
+//   ── 토스 지급대행 (0040 · docs/admin-console-plan.md "정산·돈" §7 · deploy.md §5.3.1 — TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY 필요) ──
+//   payout-mode [manual|toss]               platform_settings.payout_mode 보기/바꾸기 — toss 로 바꾸면 보류 조건에 토스 셀러 상태가 더해지고 전체 지급을 재검사(app_payout_mode_set)
+//   toss-balance                            GET /v2/balances — 지급 가능/대기 잔액
+//   toss-queue                              app_admin_payouts_toss_queue — 지급 대기·보류·최근 지급 행 + 셀러 상태 · requestable · reason
+//   toss-seller-sync <seller> [--brand]     정산 정보 → 토스 셀러 등록/수정(JWE) → app_partner_seller_sync. 계좌 원문을 읽으므로 sensitive_access_log 1행
+//   toss-seller-delete <seller> [--brand]   토스 셀러 삭제 + 로컬 toss_seller_* 비움(테스트 정리)
+//   toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD]   requestable 행을 100건씩 POST /v2/payouts(JWE · Idempotency-Key) → app_payout_mark_requested. 기본 --express
+//   toss-payout-refresh <payout id>         GET /v2/payouts/{toss id} → app_payout_sync_status (웹훅을 놓쳤을 때)
+//   toss-payout-cancel <payout id>          POST /v2/payouts/{toss id}/cancel (REQUESTED 만) → app_payout_sync_status
+//
 //   <seller> · <channel> · <brand> · <product> · <campaign> 는 code('s1' · 'ch1' · 'b1' · 'p1' · 'c3') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
-//   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
+//   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY · toss-* 는 TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
 
 import { existsSync } from "node:fs";
@@ -113,6 +123,8 @@ function usage(code = 2) {
       "  settle-preview <campaign> | settle-run <campaign> [--force] | settle-due | settlements [--status pending|held|paid] [--limit N]",
       "  payouts [--status pending|held|paid|all] | payouts-export [--status pending] --purpose \"…\" [--out file.csv] | payout-paid <id> [\"메모\"] | payout-hold <id> [\"사유\"] | payout-release <id>",
       "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
+      "  payout-mode [manual|toss] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
+      "  toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD] | toss-payout-refresh <payout id> | toss-payout-cancel <payout id>",
     ].join("\n"),
   );
   process.exit(code);
@@ -955,8 +967,303 @@ async function cmdAdminOrders() {
   );
 }
 
+
+/* ---------------- 토스 지급대행 (0040) — @sellery/payments jwe.ts · payout-rules.ts · toss-payouts.server.ts 를 스크립트용으로 인라인 ---------------- */
+
+const PAYOUT_BASE = "https://api.tosspayments.com";
+const TOSS_BANK_CODES = { 국민: "004", 신한: "088", 우리: "020", 하나: "081", 농협: "011", 카카오뱅크: "090", 토스뱅크: "092", 기업: "003", SC제일: "023" };
+const b64u = (bytes) => Buffer.from(bytes).toString("base64url");
+const unb64u = (s) => new Uint8Array(Buffer.from(s, "base64url"));
+
+function payoutKeys() {
+  const secretKey = process.env.TOSS_PAYOUT_SECRET_KEY;
+  const securityKey = process.env.TOSS_PAYOUT_SECURITY_KEY;
+  if (!secretKey || !securityKey) {
+    console.error("[partner-admin] TOSS_PAYOUT_SECRET_KEY / TOSS_PAYOUT_SECURITY_KEY 가 없습니다 — 루트 .env.local 을 확인하세요.");
+    process.exit(1);
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(securityKey)) {
+    console.error("[partner-admin] TOSS_PAYOUT_SECURITY_KEY 는 64자 16진수여야 합니다.");
+    process.exit(1);
+  }
+  return { secretKey, securityKey };
+}
+
+function tossIat() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${kst.getUTCFullYear()}-${p(kst.getUTCMonth() + 1)}-${p(kst.getUTCDate())}T${p(kst.getUTCHours())}:${p(kst.getUTCMinutes())}:${p(kst.getUTCSeconds())}+09:00`;
+}
+
+async function jweKey(hex) {
+  return crypto.subtle.importKey("raw", Buffer.from(hex, "hex"), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+
+async function jweEncrypt(plain, hex) {
+  const header = b64u(Buffer.from(JSON.stringify({ alg: "dir", enc: "A256GCM", iat: tossIat(), nonce: crypto.randomUUID() })));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: Buffer.from(header), tagLength: 128 }, await jweKey(hex), Buffer.from(plain)));
+  return `${header}..${b64u(iv)}.${b64u(sealed.slice(0, -16))}.${b64u(sealed.slice(-16))}`;
+}
+
+async function jweDecrypt(compact, hex) {
+  const [header, , iv, ct, tag] = compact.trim().split(".");
+  const sealed = Buffer.concat([unb64u(ct), unb64u(tag)]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64u(iv), additionalData: Buffer.from(header), tagLength: 128 }, await jweKey(hex), sealed);
+  return Buffer.from(plain).toString("utf8");
+}
+
+/** v2 봉투 { entityBody, error } 를 푼 { ok, status, body } — 암호화 엔드포인트는 encrypt:true */
+async function tossPayoutApi(path, { method = "GET", body, encrypt = false, headers = {} } = {}) {
+  const { secretKey, securityKey } = payoutKeys();
+  const h = { Authorization: `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`, "Content-Type": "application/json", ...headers };
+  let payload;
+  if (body !== undefined) {
+    payload = encrypt ? await jweEncrypt(JSON.stringify(body), securityKey) : JSON.stringify(body);
+    if (encrypt) {
+      h["TossPayments-api-security-mode"] = "ENCRYPTION";
+      h["Content-Type"] = "text/plain";
+    }
+  }
+  const res = await fetch(`${PAYOUT_BASE}${path}`, { method, headers: h, body: payload });
+  const text = await res.text();
+  let json = null;
+  if (text.trim()) {
+    const parts = text.trim().split(".");
+    json = JSON.parse(parts.length === 5 && !text.trim().startsWith("{") ? await jweDecrypt(text, securityKey) : text);
+  }
+  const envelope = json && typeof json === "object" && "entityBody" in json ? json : null;
+  const err = envelope?.error ?? (json && typeof json?.code === "string" ? json : null);
+  if (!res.ok || err) return { ok: false, status: res.status, body: err ?? { code: `HTTP_${res.status}`, message: text.slice(0, 200) } };
+  return { ok: true, status: res.status, body: envelope ? envelope.entityBody : json };
+}
+
+const digitsOf = (v) => String(v ?? "").replace(/\D/g, "");
+const tossRefId = (prefix, uuid) => `${prefix}${String(uuid).replace(/-/g, "").slice(0, 18)}`;
+function businessTypeOfBizNo(bizNo) {
+  const d = digitsOf(bizNo);
+  if (!/^\d{10}$/.test(d)) return null;
+  const mid = Number(d.slice(3, 5));
+  return mid >= 80 && mid <= 89 ? "CORPORATE" : "INDIVIDUAL_BUSINESS";
+}
+
+async function cmdPayoutMode() {
+  const want = positional[0];
+  if (!want) {
+    const { data, error } = await admin.rpc("payout_mode");
+    if (error) throw new Error(`payout_mode failed: ${error.message}`);
+    console.log(`payout_mode = ${data}`);
+    return;
+  }
+  if (want !== "manual" && want !== "toss") usage();
+  const { data, error } = await admin.rpc("app_payout_mode_set", { p_mode: want });
+  if (error) throw new Error(`app_payout_mode_set failed: ${error.message}`);
+  console.log(JSON.stringify(data));
+}
+
+async function cmdTossBalance() {
+  const r = await tossPayoutApi("/v2/balances");
+  if (!r.ok) throw new Error(`balance failed: ${r.body.code} ${r.body.message}`);
+  console.log(`지급 가능 ${won(r.body.availableAmount?.value ?? 0)} · 정산 대기 ${won(r.body.pendingAmount?.value ?? 0)}`);
+}
+
+async function cmdTossQueue() {
+  const { data, error } = await admin.rpc("app_admin_payouts_toss_queue");
+  if (error) throw new Error(`app_admin_payouts_toss_queue failed: ${error.message}`);
+  console.log(`payout_mode = ${data?.mode}`);
+  console.table(
+    (data?.rows ?? []).map((r) => ({
+      payout_id: r.payout_id,
+      캠페인: r.campaign_code,
+      대상: `${r.payee_type} ${r.payee_code ?? ""} ${r.payee_name ?? ""}`,
+      금액: won(r.amount),
+      상태: r.status,
+      보류: r.hold_code ?? "",
+      셀러: r.toss_seller_status ?? (r.toss_seller_id ? "?" : "없음"),
+      지급: r.toss_payout_status ?? "",
+      토스id: r.toss_payout_id ?? "",
+      예정일: r.toss_schedule_date ?? "",
+      요청가능: r.requestable ? "Y" : r.reason ?? "",
+      오류: r.toss_error?.message ?? r.toss_seller_error?.message ?? "",
+    })),
+  );
+}
+
+async function loadPayee() {
+  const isBrand = flags.brand === true;
+  if (isBrand) {
+    const b = await findBrand(positional[0]);
+    const { data, error } = await admin.from("brands").select("id, code, name, email, manager_name, manager_phone, bank_info, biz_no, tax_info, toss_seller_id, toss_seller_status").eq("id", b.id).single();
+    if (error) throw new Error(`brands read failed: ${error.message}`);
+    await admin.from("sensitive_access_log").insert({ brand_id: data.id, field: "bank_info", actor: process.env.ADMIN_ACTOR || "partner-admin.mjs", purpose: "토스 지급대행 셀러 등록" });
+    return { type: "brand", row: data };
+  }
+  const s = await findSeller(positional[0]);
+  const { data, error } = await admin.from("sellers").select("id, code, name, email, settle_type, bank_info, biz_no, tax_info, settle_phone, toss_seller_id, toss_seller_status").eq("id", s.id).single();
+  if (error) throw new Error(`sellers read failed: ${error.message}`);
+  await admin.from("sensitive_access_log").insert({ seller_id: data.id, field: "bank_info", actor: process.env.ADMIN_ACTOR || "partner-admin.mjs", purpose: "토스 지급대행 셀러 등록" });
+  return { type: "seller", row: data };
+}
+
+function buildSellerBody(type, r) {
+  const bank = r.bank_info ?? {};
+  const bankCode = TOSS_BANK_CODES[String(bank.bank ?? "").replace(/\s+/g, "")];
+  if (!bankCode) throw new Error(`은행 코드 없음: ${bank.bank ?? "(계좌 미등록)"}`);
+  const accountNumber = digitsOf(bank.account);
+  if (!/^\d{8,14}$/.test(accountNumber)) throw new Error("계좌번호 형식(숫자 8~14자리)");
+  const email = String(r.email ?? r.tax_info?.email ?? "").trim().toLowerCase();
+  if (!email) throw new Error("이메일 없음");
+  const phone = digitsOf(type === "brand" ? r.manager_phone : r.settle_phone);
+  if (!/^\d{8,15}$/.test(phone)) throw new Error(type === "brand" ? "brands.manager_phone 없음" : "sellers.settle_phone 없음 — 인플루언서 /settle 에서 본인인증 번호 등록");
+  const account = { bankCode, accountNumber, holderName: String(bank.holder ?? "").trim().slice(0, 50) };
+  const refSellerId = tossRefId(type === "brand" ? "b" : "s", r.id);
+  const metadata = { payee_type: type, payee_id: r.id };
+  if (type === "seller" && r.settle_type !== "biz") return { refSellerId, businessType: "INDIVIDUAL", individual: { name: r.name, email, phone }, account, metadata };
+  const businessType = businessTypeOfBizNo(r.biz_no);
+  if (!businessType) throw new Error("사업자등록번호 형식");
+  return {
+    refSellerId,
+    businessType,
+    company: { name: r.tax_info?.company || r.name, representativeName: r.tax_info?.ceo || r.manager_name || account.holderName, businessRegistrationNumber: digitsOf(r.biz_no), email, phone },
+    account,
+    metadata,
+  };
+}
+
+async function recordSellerSync(type, id, tossId, status, raw) {
+  const { data, error } = await admin.rpc("app_partner_seller_sync", { p_payee_type: type, p_payee_id: id, p_toss_seller_id: tossId, p_status: status, p_raw: raw });
+  if (error) throw new Error(`app_partner_seller_sync failed: ${error.message}`);
+  return data;
+}
+
+async function cmdTossSellerSync() {
+  const { type, row } = await loadPayee();
+  let body;
+  try {
+    body = buildSellerBody(type, row);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await recordSellerSync(type, row.id, null, null, { code: "PAYLOAD", message: msg });
+    throw new Error(`본문 생성 실패 — ${msg}`);
+  }
+  let r = row.toss_seller_id ? await tossPayoutApi(`/v2/sellers/${encodeURIComponent(row.toss_seller_id)}`, { method: "POST", body, encrypt: true }) : await tossPayoutApi("/v2/sellers", { method: "POST", body, encrypt: true });
+  if (!r.ok && row.toss_seller_id && r.status === 404) r = await tossPayoutApi("/v2/sellers", { method: "POST", body, encrypt: true });
+  if (!r.ok) {
+    await recordSellerSync(type, row.id, row.toss_seller_id, null, { code: r.body.code, message: r.body.message, http: r.status });
+    throw new Error(`토스 거절 — ${r.body.code} ${r.body.message}`);
+  }
+  const { account: _a, company: _c, individual: _i, ...rest } = r.body;
+  const out = await recordSellerSync(type, row.id, r.body.id, r.body.status, { eventType: "seller.synced", seller: rest });
+  console.log(`${type} ${row.code} → 토스 셀러 ${r.body.id} · ${r.body.status} (이전 ${out?.previous ?? "-"})`);
+}
+
+async function cmdTossSellerDelete() {
+  const { type, row } = await loadPayee();
+  if (row.toss_seller_id) {
+    const r = await tossPayoutApi(`/v2/sellers/${encodeURIComponent(row.toss_seller_id)}`, { method: "DELETE" });
+    if (!r.ok && r.status !== 404) throw new Error(`토스 삭제 실패 — ${r.body.code} ${r.body.message}`);
+  }
+  const { error } = await admin.from(type === "brand" ? "brands" : "sellers").update({ toss_seller_id: null, toss_seller_status: null, toss_seller_error: null, toss_seller_synced_at: new Date().toISOString() }).eq("id", row.id);
+  if (error) throw new Error(`update failed: ${error.message}`);
+  await admin.from("payout_events").insert({ source: "seller_sync", event_type: "seller.deleted", toss_seller_id: row.toss_seller_id, payload: { payee_type: type, payee_id: row.id }, handled: true, result: "deleted" });
+  console.log(`${type} ${row.code} 토스 셀러 ${row.toss_seller_id ?? "(없음)"} 삭제 · 로컬 비움`);
+}
+
+async function syncPayoutStatus(tossPayoutId, status, raw) {
+  const { data, error } = await admin.rpc("app_payout_sync_status", { p_toss_payout_id: tossPayoutId, p_status: status, p_raw: raw });
+  if (error) throw new Error(`app_payout_sync_status failed: ${error.message}`);
+  return data;
+}
+
+async function cmdTossPayoutRequest() {
+  const { data, error } = await admin.rpc("app_admin_payouts_toss_queue");
+  if (error) throw new Error(`app_admin_payouts_toss_queue failed: ${error.message}`);
+  if (data?.mode !== "toss") throw new Error(`payout_mode 가 ${data?.mode} 입니다 — 'payout-mode toss' 먼저`);
+  const scheduleType = flags.date ? "SCHEDULED" : "EXPRESS";
+  const payoutDate = flags.date ? String(flags.date) : null;
+  if (payoutDate && !/^\d{4}-\d{2}-\d{2}$/.test(payoutDate)) usage();
+  const wanted = flags.id ? new Set([String(flags.id)]) : null;
+  if (!wanted && flags.all !== true) usage();
+  const rows = (data.rows ?? []).filter((r) => r.requestable && (!wanted || wanted.has(r.payout_id)));
+  if (!rows.length) {
+    console.log("요청 가능한 지급 건이 없습니다 (toss-queue 로 사유 확인)");
+    return;
+  }
+  for (let i = 0; i < rows.length; i += 100) {
+    const chunk = rows.slice(i, i + 100);
+    const items = chunk.map((r) => ({
+      refPayoutId: r.payout_id,
+      destination: r.toss_seller_id,
+      scheduleType,
+      ...(payoutDate ? { payoutDate } : {}),
+      amount: { currency: "KRW", value: Math.round(r.amount) },
+      transactionDescription: "셀러리정산",
+      metadata: { campaign: r.campaign_code, payee: `${r.payee_type}:${r.payee_code ?? ""}` },
+    }));
+    const keyText = `${scheduleType}|${payoutDate ?? ""}|${chunk.map((r) => r.payout_id).sort().join(",")}`;
+    const idem = `slry-po-${Buffer.from(await crypto.subtle.digest("SHA-256", Buffer.from(keyText))).toString("hex")}`;
+    const r = await tossPayoutApi("/v2/payouts", { method: "POST", body: items, encrypt: true, headers: { "Idempotency-Key": idem } });
+    if (!r.ok) {
+      await admin.from("payout_events").insert({ source: "request", event_type: "request.failed", payload: { code: r.body.code, message: r.body.message, http: r.status, payout_ids: chunk.map((x) => x.payout_id), scheduleType, payoutDate, actor: process.env.ADMIN_ACTOR || "partner-admin.mjs" }, handled: true, result: `error: ${r.body.code}` });
+      throw new Error(`토스 지급 요청 실패 — ${r.body.code} ${r.body.message}`);
+    }
+    const list = Array.isArray(r.body) ? r.body : (r.body?.data ?? []);
+    for (const p of list) {
+      const { data: mk, error: mkErr } = await admin.rpc("app_payout_mark_requested", { p_payout_id: p.refPayoutId, p_toss_payout_id: p.id, p_status: p.status, p_schedule_date: p.payoutDate ?? payoutDate ?? undefined, p_raw: { ...p, actor: process.env.ADMIN_ACTOR || "partner-admin.mjs" } });
+      if (mkErr || !mk?.ok) console.error(`[partner-admin] 기록 실패 ${p.refPayoutId} → ${p.id}: ${mkErr?.message ?? mk?.code}`);
+      else console.log(`${p.refPayoutId} → ${p.id} ${p.status} ${won(p.amount?.value)}`);
+    }
+  }
+}
+
+async function cmdTossPayoutRefresh() {
+  const id = positional[0];
+  if (!id || !UUID_RE.test(id)) usage();
+  const { data, error } = await admin.from("payouts").select("toss_payout_id").eq("id", id).maybeSingle();
+  if (error || !data?.toss_payout_id) throw new Error("토스에 요청된 지급 건이 아닙니다");
+  const r = await tossPayoutApi(`/v2/payouts/${encodeURIComponent(data.toss_payout_id)}`);
+  if (!r.ok) throw new Error(`재조회 실패 — ${r.body.code} ${r.body.message}`);
+  console.log(JSON.stringify(await syncPayoutStatus(data.toss_payout_id, r.body.status, { eventType: "payout.refreshed", ...r.body })));
+}
+
+async function cmdTossPayoutCancel() {
+  const id = positional[0];
+  if (!id || !UUID_RE.test(id)) usage();
+  const { data, error } = await admin.from("payouts").select("toss_payout_id, status").eq("id", id).maybeSingle();
+  if (error || !data?.toss_payout_id) throw new Error("토스에 요청된 지급 건이 아닙니다");
+  if (data.status === "paid") throw new Error("이미 지급 완료");
+  const r = await tossPayoutApi(`/v2/payouts/${encodeURIComponent(data.toss_payout_id)}/cancel`, { method: "POST" });
+  if (!r.ok) throw new Error(`취소 실패 — ${r.body.code} ${r.body.message}`);
+  await admin.from("payout_events").insert({ source: "cancel", event_type: "cancel", payout_id: id, toss_payout_id: data.toss_payout_id, payload: { actor: process.env.ADMIN_ACTOR || "partner-admin.mjs" }, handled: true, result: r.body.status });
+  console.log(JSON.stringify(await syncPayoutStatus(data.toss_payout_id, r.body.status, { eventType: "payout.canceled", ...r.body })));
+}
+
 try {
   switch (cmd) {
+    case "payout-mode":
+      await cmdPayoutMode();
+      break;
+    case "toss-balance":
+      await cmdTossBalance();
+      break;
+    case "toss-queue":
+      await cmdTossQueue();
+      break;
+    case "toss-seller-sync":
+      await cmdTossSellerSync();
+      break;
+    case "toss-seller-delete":
+      await cmdTossSellerDelete();
+      break;
+    case "toss-payout-request":
+      await cmdTossPayoutRequest();
+      break;
+    case "toss-payout-refresh":
+      await cmdTossPayoutRefresh();
+      break;
+    case "toss-payout-cancel":
+      await cmdTossPayoutCancel();
+      break;
     case "list":
       await cmdList();
       break;

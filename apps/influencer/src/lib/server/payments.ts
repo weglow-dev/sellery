@@ -9,3 +9,5 @@ import './env';
 export * from '@sellery/payments/server/config';
 export * from '@sellery/payments/server/toss';
 export * from '@sellery/payments/server/partner-sample';
+// 토스 지급대행(0040) — /settle 저장 뒤 셀러 동기화 · 상태 표시 · 본인인증 번호
+export { syncPayeeWithToss, getPayeeTossStatus, saveSettlePhone } from '@sellery/payments/server/payouts';

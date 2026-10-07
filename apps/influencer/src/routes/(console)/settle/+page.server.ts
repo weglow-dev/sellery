@@ -22,6 +22,7 @@ import {
 	uploadBizDoc,
 	type SellerReady
 } from '$lib/server/partner';
+import { getPayeeTossStatus, saveSettlePhone, syncPayeeWithToss } from '$lib/server/payments';
 
 /**
  * `/settle` — 정산 정보 등록 + 정산 내역 5단계 (docs/inf-console-plan.md §5.9 · §6 `/settle` · §7 "5." · 프로토타입 vSellerSettle + vMy 정산 정보 폼).
@@ -32,6 +33,8 @@ import {
  *   save       정산 유형 · 은행 · 계좌 · 예금주 (+ 사업자: 사업자등록번호 · 세금계산서 정보) → `parseSettleInfoInput`(0013 app_set_settle_info 와 같은 조건) → `saveSettleInfo`
  *   setRrn     개인(personal) 원천징수 신고용 주민등록번호 → `validateRrn`(형식·검증숫자) → `setSellerRrn`(pgp_sym_encrypt · 키 없으면 RRN_KEY_MISSING) — 원문은 로그에도 남기지 않는다
  *   uploadDoc  사업자등록증(JPG · PNG · WebP · PDF · 10MB) → `uploadBizDoc`(Storage partner-docs · object path 만 저장) — 보기는 `/settle/doc`(단기 서명 URL 로 302)
+ * 토스 지급대행(0040): save 는 본인인증 휴대폰(`settle_phone` · `saveSettlePhone`)도 받고, 저장이 끝난 뒤 `syncPayeeWithToss('seller')` 로 토스 셀러를 등록/수정한다 —
+ *   토스 장애·키 없음이어도 저장은 성공(결과만 `?msg=`). load 의 `toss`(getPayeeTossStatus) 로 "계좌 확인 중 / 본인인증 필요 / 지급 가능 / 계좌 오류" 를 보여준다.
  */
 export type SettleMessage = { tone: 'ok' | 'danger' | 'info'; text: string };
 
@@ -40,6 +43,9 @@ const SETTLE_MESSAGES: Record<string, SettleMessage> = {
 	saved_biz: { tone: 'ok', text: '정산 정보 저장 완료 — 사업자 정산은 원천징수 없이 세금계산서로 진행돼요. 사업자등록증을 올려야 지급돼요.' },
 	rrn_saved: { tone: 'ok', text: '주민등록번호를 암호화해 저장했어요 — 원천징수 신고에만 쓰이고 화면에는 다시 표시되지 않아요.' },
 	doc_saved: { tone: 'ok', text: '사업자등록증을 등록했어요 — 운영팀이 확인한 뒤 세금계산서 발행에 사용해요.' },
+	saved_toss: { tone: 'ok', text: '정산 정보 저장 완료 — 토스 지급대행에 계좌를 등록했어요. 아래 "지급 계좌 확인" 상태를 확인해주세요.' },
+	saved_toss_err: { tone: 'info', text: '정산 정보는 저장됐지만 토스 지급대행 계좌 확인에 실패했어요 — 아래 안내를 확인하고 다시 저장해주세요.' },
+	saved_toss_wait: { tone: 'info', text: '정산 정보 저장 완료 — 토스 계좌 확인은 잠시 뒤 다시 시도돼요(다음 저장 때 또는 운영팀 확인).' },
 	err_rate: { tone: 'danger', text: RATE_LIMIT_MESSAGE }
 };
 
@@ -50,7 +56,7 @@ export const load: PageServerLoad = async (event) => {
 	if (!r.ok) redirect(303, r.location);
 	const { seller, balance } = r.ctx;
 
-	const [info, list] = await Promise.all([getSellerSettleInfo(seller.id), listSellerSettlements(seller.id)]);
+	const [info, list, toss] = await Promise.all([getSellerSettleInfo(seller.id), listSellerSettlements(seller.id), getPayeeTossStatus('seller', seller.id)]);
 	const msg = SETTLE_MESSAGES[event.url.searchParams.get('msg') ?? ''] ?? null;
 
 	return {
@@ -58,6 +64,7 @@ export const load: PageServerLoad = async (event) => {
 		balance,
 		info,
 		list,
+		toss,
 		msg,
 		banks: BANKS,
 		typeLabels: SETTLE_TYPE_LABEL,
@@ -98,7 +105,7 @@ const FIELD_OF: Record<string, SettleInfoInputError['field']> = {
 };
 
 /** 정산 정보 폼의 문자열 값만 — 되돌릴 입력값 (주민번호 필드는 이 폼에 없다) */
-const SETTLE_KEYS = ['settle_type', 'bank', 'account', 'holder', 'biz_no', 'company', 'ceo', 'biz_type', 'biz_item', 'tax_email'] as const;
+const SETTLE_KEYS = ['settle_type', 'bank', 'account', 'holder', 'biz_no', 'company', 'ceo', 'biz_type', 'biz_item', 'tax_email', 'settle_phone'] as const;
 function settleValues(formData: FormData): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const k of SETTLE_KEYS) {
@@ -116,9 +123,18 @@ export const actions: Actions = {
 
 		const parsed = parseSettleInfoInput(Object.fromEntries(formData.entries()));
 		if (!parsed.ok) return bad(parsed.error.code);
+		// 본인인증 휴대폰(토스 지급대행 · 개인) — 숫자 8~15, 비우면 지움. 형식이 틀리면 저장 전에 거른다
+		const phoneRaw = typeof values.settle_phone === 'string' ? values.settle_phone.replace(/\D/g, '') : '';
+		if (phoneRaw && !/^\d{8,15}$/.test(phoneRaw)) return fail(400, { form: 'save' as SettleForm, message: '본인인증 휴대폰 번호는 숫자 8~15자리로 입력해주세요', field: 'settle_phone', values });
 		const res = await saveSettleInfo(ctx.seller.id, parsed.value);
 		if (!res.ok) return bad(res.code);
-		back(`msg=${parsed.value.settle_type === 'biz' ? 'saved_biz' : 'saved'}#settle-info`);
+		const ph = await saveSettlePhone(ctx.seller.id, phoneRaw);
+		if (!ph.ok && ph.code === 'BAD_PHONE') return fail(400, { form: 'save' as SettleForm, message: '본인인증 휴대폰 번호는 숫자 8~15자리로 입력해주세요', field: 'settle_phone', values });
+		// 토스 지급대행 셀러 등록 — 저장은 이미 끝났다. 키 없음(NOT_CONFIGURED)이면 기존 문구, 토스 장애(UNCERTAIN)면 "잠시 뒤", 거절이면 "확인 실패"
+		const sync = await syncPayeeWithToss('seller', ctx.seller.id);
+		const base = parsed.value.settle_type === 'biz' ? 'saved_biz' : 'saved';
+		const key = sync.ok ? 'saved_toss' : sync.code === 'NOT_CONFIGURED' ? base : sync.code === 'UNCERTAIN' ? 'saved_toss_wait' : 'saved_toss_err';
+		back(`msg=${key}#settle-info`);
 	},
 
 	setRrn: async (event) => {

@@ -14,6 +14,7 @@ import {
 	uploadBrandBizDoc,
 	type BrandReady
 } from '$lib/server/brand';
+import { getPayeeTossStatus, syncPayeeWithToss } from '$lib/server/payments';
 
 /**
  * `/settle` — 정산 정보 등록 + 사업자등록증 + 정산 내역 5단계 (docs/brand-console-plan.md §5 `/brand/settle` · §6 행 5 PR-B · §8 "플랫폼+PG 열" · "사업자등록번호 수정" · "자동 발주" · "세금계산서"
@@ -31,6 +32,9 @@ const SETTLE_MESSAGES: Record<string, SettleMessage> = {
 	saved: { tone: 'ok', text: '정산 정보 저장 완료 — 다음 정산부터 이 계좌로 지급되고, 보류된 정산이 있으면 다음 지급 배치에 포함돼요.' },
 	saved_partial: { tone: 'info', text: '정산 계좌를 저장했어요 — 사업자등록번호까지 등록해야 지급이 실행됩니다.' },
 	doc_saved: { tone: 'ok', text: '사업자등록증을 등록했어요 — 운영팀이 확인한 뒤 정산 명세·세금계산서 발행에 사용해요.' },
+	saved_toss: { tone: 'ok', text: '정산 정보 저장 완료 — 토스 지급대행에 계좌를 등록했어요. 아래 "지급 계좌 확인" 상태를 확인해주세요.' },
+	saved_toss_err: { tone: 'info', text: '정산 정보는 저장됐지만 토스 지급대행 계좌 확인에 실패했어요 — 아래 안내를 확인하고 다시 저장해주세요.' },
+	saved_toss_wait: { tone: 'info', text: '정산 정보 저장 완료 — 토스 계좌 확인은 잠시 뒤 다시 시도돼요(다음 저장 때 또는 운영팀 확인).' },
 	err_rate: { tone: 'danger', text: RATE_LIMIT_MESSAGE }
 };
 
@@ -41,7 +45,7 @@ export const load: PageServerLoad = async (event) => {
 	if (!r.ok) redirect(303, r.location);
 	const { brand, balance } = r.ctx;
 
-	const [info, list] = await Promise.all([getBrandSettleInfo(brand.id), listBrandSettlements(brand.id)]);
+	const [info, list, toss] = await Promise.all([getBrandSettleInfo(brand.id), listBrandSettlements(brand.id), getPayeeTossStatus('brand', brand.id)]);
 	const msg = SETTLE_MESSAGES[event.url.searchParams.get('msg') ?? ''] ?? null;
 
 	return {
@@ -49,6 +53,7 @@ export const load: PageServerLoad = async (event) => {
 		balance,
 		info,
 		list,
+		toss,
 		msg,
 		banks: BANKS.filter((b) => b !== '선택'),
 		docMaxMb: Math.round(BIZ_DOC_MAX_BYTES / 1024 / 1024),
@@ -110,7 +115,11 @@ export const actions: Actions = {
 		if (!parsed.ok) return bad(parsed.error.code);
 		const res = await saveBrandSettleInfo(ctx.brand.id, parsed.value);
 		if (!res.ok) return bad(res.code);
-		back(`msg=${res.info.settle_info_complete ? 'saved' : 'saved_partial'}#settle-info`);
+		if (!res.info.settle_info_complete) back('msg=saved_partial#settle-info');
+		// 토스 지급대행 셀러 등록(0040) — 저장은 이미 끝났다. 키 없음이면 기존 문구, 토스 장애면 "잠시 뒤", 거절이면 "확인 실패"
+		const sync = await syncPayeeWithToss('brand', ctx.brand.id);
+		const key = sync.ok ? 'saved_toss' : sync.code === 'NOT_CONFIGURED' ? 'saved' : sync.code === 'UNCERTAIN' ? 'saved_toss_wait' : 'saved_toss_err';
+		back(`msg=${key}#settle-info`);
 	},
 
 	uploadDoc: async (event) => {
