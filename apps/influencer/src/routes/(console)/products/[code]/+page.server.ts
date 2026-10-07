@@ -15,6 +15,7 @@ import { exclusiveButton, exclusiveFailMessage } from '@sellery/db/partner/exclu
 import {
 	exclusiveEligibility,
 	getProductForSeller,
+	getProductPerformance,
 	myExclusiveRequest,
 	RATE_LIMIT_MESSAGE,
 	rateLimit,
@@ -32,6 +33,9 @@ import {
  * action requestFree: requireSeller → rateLimit → `parseShippingInput(FormData)` → `requestFreeSample` RPC → 성공 `redirect(303, /campaigns/<code>)`.
  *   실패는 `fail(400, { message, field, values, campaignCode })` — 평범한 POST 라 입력값을 `form` 으로 되돌려 다시 그린다(JS 불필요).
  *   ALREADY_ACTIVE 는 그 캠페인 링크, NOT_FREE 는 `notFreeMessage(reason)`(그 사이 한도·등급이 바뀐 경우).
+ * 실적 표(0039): `getProductPerformance(seller.id, product_id)` — 캠페인별 팔로워·참여율·기간·확정 매출.
+ *   **확인권(🥬 2 · `shop_items.seller[].datapass`)이 없으면 첫 행과 내 캠페인만 지표가 오고** 나머지는 null 이다.
+ *   인플루언서 이름·핸들은 아예 오지 않는다(익명). 구매는 샵(`/shop`)에서 하고 영구·계정 단위다.
  * action requestExclusive(0025): 독점권 신청 — `requestExclusive(seller.id, product_id)`. 자격 판정은 DB(`seller_exclusive_eligible`)가
  *   하므로 여기서는 등급을 다시 계산하지 않는다. 성공/멱등 모두 303 `?msg=exclusive|exclusiveAlready`(평범한 POST · JS 불필요).
  *   버튼 문구는 `exclusiveButton(eligibility, mine)` — 프로토타입 `ProductDetailModal` 분기 순서 그대로.
@@ -46,10 +50,14 @@ export const load: PageServerLoad = async (event) => {
 	if (!found) error(404, { message: '상품을 찾을 수 없습니다' });
 	const { product, performance } = found;
 	const q = product.quote;
+	const productId0 = q?.product_id ?? null;
+
+	// 상품별 익명 실적 표(0039) — 확인권이 없으면 첫 행·내 캠페인만 지표가 온다
+	const perfView = productId0 ? await getProductPerformance(seller.id, productId0) : null;
 
 	// 독점권 — 오퍼가 걸린 상품만 조회한다(없으면 DB 왕복 2번을 아낀다)
 	const hasOffer = product.exclusive_label !== null || product.exclusive_grade !== null;
-	const productId = q?.product_id ?? null;
+	const productId = productId0;
 	const [eligibility, mineReq] =
 		hasOffer && productId
 			? await Promise.all([
@@ -79,6 +87,8 @@ export const load: PageServerLoad = async (event) => {
 			brand: { name: product.brand.name, grade: product.brand.grade, logo_url: product.brand.logo_url, category: product.brand.category }
 		},
 		performance,
+		// 0039 — 캠페인별 지표. RPC 실패(null)면 화면이 집계 두 개만 보여준다
+		perf: perfView,
 		quote: q,
 		button: sampleButton(q),
 		line: sampleLine(q),
@@ -90,6 +100,7 @@ export const load: PageServerLoad = async (event) => {
 			eligibility !== null
 				? { button: exclusiveButton(eligibility, mineReq), status: mineReq?.status ?? null }
 				: null,
+		shopPath: sellerPath('/shop'),
 		listPath: sellerPath('/products'),
 		campaignsPath: sellerPath('/campaigns'),
 		myPath: sellerPath('/my')
