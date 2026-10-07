@@ -154,6 +154,10 @@ PR-B 가 만드는 화면(이 절의 몫): `apps/admin/src/routes/(console)/sett
 | 11 | 매출·순수익의 **GMV 는 샘플 구매분을 포함**한다(대시보드는 제외) | 샘플 구매는 실제 `orders` 행(`is_sample` · PAID)이라 돈이 들어온 것이고, 정산 규칙도 이미 다룬다(`base = net − sample_net` → 인플루언서 수수료 0 · PG·플랫폼 10% 적용). 데모와 같다(sample-policy §169 · 두 화면 차이는 §172). 브랜드 지급 규칙은 미정이라(0019:45) 해당 행에 표시한다 |
 | 12 | 매출·순수익 금액은 **0022 `admin_campaign_pnl` 이 계산**한다 | 0020 `app_admin_settle_preview` 는 정산 **실행 대상**만 봐서 `SAMPLE_PURCHASED` 를 거부한다(0020:336). 집계에는 같은 게이트를 쓸 이유가 없다. 계산식은 0020 과 동일하고 LIVE·CLEARING 21항목이 일치함을 확인했다 |
 | 13 | 자동 제안 발송은 **브랜드 RPC `app_brand_invite_seller`(0016) 대행**이다 | 상태 전이·이벤트 문구·게이트(비공개 · 우선권 등급 · 독점 · 중복)를 다시 구현하지 않는다(결정 8 과 같은 방식). 성공한 건에 `auto_proposed=true` 와 `admin_proxy_action` 을 남긴다 — 그 RPC 는 브랜드 직접 제안용이라 `invited=true` 만 세운다 |
+| 14 | 긴급 판매 중단은 **새 상태를 만들지 않고 `LIVE → CLEARING`**(0040 `app_admin_end_sale`) | 구매 게이트가 전부 `status='LIVE'` 를 요구한다(`gateIsLive` · `isBuyable`) — CLEARING 으로 보내면 결제·화면이 동시에 막히고 "판매 종료"·정가 복귀(#87)가 그대로 재사용된다. 판매 링크는 열린 채 남겨 이미 산 고객의 주문 조회·CS 를 끊지 않는다 |
+| 15 | 중단할 때 **`end_date` 는 바꾸지 않는다** | 정산 예정일이 `end_date + clear_days`(0020:416·550·746)다. 종료일을 당기면 지급일도 당겨지는데, 긴급 중단은 환불이 쏟아지는 상황이라 돈이 먼저 나가면 안 된다. 원래 예정 종료일이 기록으로도 남는다 |
+| 16 | **재개(`CLEARING → LIVE`)를 같이 넣는다**(0040 `app_admin_resume_sale`) | 되돌릴 수 없는 레버는 급할 때 못 누른다. 정산 전(`ALREADY_SETTLED`) · 기간 내(`PERIOD_OVER`) · 상품 `listed`(`NOT_LISTED`) 일 때만 열어, 기간이 끝난 건을 되살려 스케줄러가 다시 종료시키는 무의미한 왕복을 막는다 |
+| 17 | 중단 **사유는 필수**이고 `campaign_events` 에 남긴다 | 인플루언서·브랜드 스레드에도 보인다. 인플루언서 정지 사유가 Slack 으로만 가고 `SLACK_WEBHOOK_URL` 미설정이면 사라지는 것과 같은 실수를 반복하지 않는다 |
 
 ### 1. 마이그레이션 — 0022 하나뿐
 

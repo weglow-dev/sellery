@@ -41,6 +41,8 @@ export const load: PageServerLoad = async (event) => {
 		previewPath: `${adminPath('/products')}/${encodeURIComponent(event.params.code)}/preview`,
 		brandsPath: adminPath('/brands'),
 		sellersPath: adminPath('/sellers'),
+		// 캠페인 상세 — 긴급 판매 중단([판매 중단] · 0040)이 거기 있다. 실적 표의 코드에서 바로 간다
+		campaignsPath: adminPath('/campaigns'),
 		// 판매 페이지는 **shop 앱**에 있다 — 로컬은 포트가 다르고(관리자 5175 · shop 5176) 프로덕션은 같은 오리진이다.
 		// `event.url.origin` 을 쓰면 로컬에서 관리자 오리진으로 열려 404 가 된다. 다른 콘솔과 같이 `PUBLIC_SITE_URL`(`SITE_URL`) 을 쓴다.
 		siteUrl: SITE_URL

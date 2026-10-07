@@ -4,10 +4,12 @@ import { adminPath, requireAdmin } from '$lib/server/admin';
 import {
 	approveSampleAsAdmin,
 	confirmScheduleAsAdmin,
+	endSaleAsAdmin,
 	getAdminCampaign,
 	postAdminChat,
 	rejectSampleAsAdmin,
 	rejectScheduleAsAdmin,
+	resumeSaleAsAdmin,
 	shipSampleAsAdmin
 } from '$lib/server/partners';
 import { parseShipInput } from '@sellery/db/brand/campaign-rules';
@@ -88,6 +90,28 @@ export const actions: Actions = {
 		const form = await event.request.formData();
 		const r = await rejectScheduleAsAdmin(event.params.code, String(form.get('reason') ?? ''), gate.ctx.user.id);
 		done(event.url, r.ok ? (r.already ? 'schedule_already' : 'schedule_rejected') : `err_${r.code}`);
+	},
+
+	/**
+	 * 긴급 판매 중단 — 운영 고유 액션(브랜드 대행 아님 · 0040).
+	 * 사유는 필수다. 빈 값은 RPC 까지 가지 않고 폼 오류로 돌려준다(입력값을 잃지 않게 `fail`).
+	 */
+	endSale: async (event) => {
+		const gate = await requireAdmin(event);
+		if (!gate.ok) redirect(303, gate.location);
+		const form = await event.request.formData();
+		const reason = String(form.get('reason') ?? '');
+		const r = await endSaleAsAdmin(event.params.code, reason, gate.ctx.user.id);
+		if (!r.ok && r.code === 'BAD_REASON') return fail(400, { endError: '중단 사유를 입력해주세요 — 스레드에 남아 인플루언서·브랜드도 보게 됩니다.' });
+		done(event.url, r.ok ? (r.already ? 'end_already' : 'ended') : `err_${r.code}`);
+	},
+
+	/** 판매 재개 — 잘못 누른 중단을 되돌린다(정산 전 · 기간 내 · 상품 노출 중) */
+	resumeSale: async (event) => {
+		const gate = await requireAdmin(event);
+		if (!gate.ok) redirect(303, gate.location);
+		const r = await resumeSaleAsAdmin(event.params.code, gate.ctx.user.id);
+		done(event.url, r.ok ? (r.already ? 'resume_already' : 'resumed') : `err_${r.code}`);
 	},
 
 	/** 관리자 발신 — "셀러리 관리자" 로 스레드에 남는다(+ ✓ 셀러리 인증 배지) */

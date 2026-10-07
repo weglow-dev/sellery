@@ -8,7 +8,7 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
-	import { adminCampaignAction, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
+	import { adminCampaignAction, adminSaleControl, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
 	import { COURIERS } from '@sellery/db/brand/campaign-rules';
 	import { CampaignStepper, PlatformHandle, ProductIcon, StatusChip, ThreadComposer } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
@@ -19,6 +19,10 @@
 	const p = $derived(c.product);
 	const chip = $derived(campaignStatusChip(c.status));
 	const action = $derived(adminCampaignAction(c.status));
+	const sale = $derived(adminSaleControl(c.status));
+	const ask = (msg: string) => (e: SubmitEvent) => {
+		if (!confirm(msg)) e.preventDefault();
+	};
 	const names = $derived({ seller: c.seller?.name ?? null, brand: c.brand?.name ?? null });
 	const money = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `₩${fmtNum(n)}`);
 	const pct = (r: number | null | undefined) => (r === null || r === undefined ? '—' : `${(r * 100).toFixed(0)}%`);
@@ -34,6 +38,14 @@
 		schedule_already: { tone: 'ok', text: '이미 처리된 일정입니다.' },
 		sent: { tone: 'ok', text: '메시지를 보냈습니다 — 양쪽 스레드에 셀러리 관리자로 표시됩니다.' },
 		sent_leak: { tone: 'danger', text: '메시지를 보냈지만 연락처·외부 메신저 공유로 감지되어 경고가 함께 남았습니다.' },
+		ended: { tone: 'ok', text: '판매를 중단했습니다 — 구매가 즉시 막히고 판매 링크는 "판매 종료"로 표시됩니다. 이미 결제된 주문과 정산 예정일은 그대로입니다.' },
+		end_already: { tone: 'ok', text: '이미 판매가 끝난 캠페인입니다.' },
+		resumed: { tone: 'ok', text: '판매를 재개했습니다 — 판매 기간이 끝날 때까지 다시 구매할 수 있습니다.' },
+		resume_already: { tone: 'ok', text: '이미 판매 중입니다.' },
+		err_BAD_REASON: { tone: 'danger', text: '중단 사유를 입력해주세요.' },
+		err_ALREADY_SETTLED: { tone: 'danger', text: '정산이 끝난 캠페인은 재개할 수 없습니다.' },
+		err_PERIOD_OVER: { tone: 'danger', text: '판매 기간이 지나 재개할 수 없습니다 — 다시 열려면 새 일정을 확정해야 합니다.' },
+		err_NOT_LISTED: { tone: 'danger', text: '상품이 노출 중이 아닙니다 — 상품 상세에서 노출을 재개한 뒤 다시 시도해주세요.' },
 		err_NOT_FOUND: { tone: 'danger', text: '대상을 찾을 수 없습니다.' },
 		err_WRONG_STATUS: { tone: 'danger', text: '현재 상태에서는 할 수 없는 동작입니다 — 화면을 새로 고쳐주세요.' },
 		err_PERIOD_BLOCKED: { tone: 'danger', text: '같은 기간에 우선권 인플루언서가 이미 진입해 확정할 수 없습니다.' },
@@ -206,6 +218,44 @@
 				<p class="hint">
 					이 단계에서는 브랜드 대행 액션이 없습니다. 인플루언서 차례(수령·일정 제안)이거나 이미 끝난 단계입니다.
 				</p>
+			</div>
+		{/if}
+
+		{#if sale.kind !== 'none'}
+			<!-- 운영 고유 레버 (0040) — 상품 검수의 [노출 중단]은 새 제안만 막는다. 이쪽이 진행 중인 판매를 멈춘다. -->
+			<div class="card static">
+				<h4>{sale.label} <span class="chip">운영 전용</span></h4>
+				<p class="hint">{sale.hint}</p>
+
+				{#if sale.kind === 'end'}
+					<form
+						method="POST"
+						action="?/endSale"
+						use:enhance
+						class="console-form camp-endsale"
+						onsubmit={ask(`${p?.name ?? c.code} 판매를 지금 중단할까요? 고객은 즉시 구매할 수 없게 됩니다.`)}
+					>
+						<label for="end_reason">중단 사유 (필수)</label>
+						<input
+							id="end_reason"
+							name="reason"
+							type="text"
+							maxlength="200"
+							required
+							placeholder="예: 표시광고 문의 접수 — 성분 표기 확인 필요"
+						/>
+						<p class="hint">
+							사유는 캠페인 스레드에 남아 <b>인플루언서·브랜드에게도 보입니다</b>.
+							{#if c.sold_qty}현재까지 판매 {fmtNum(c.sold_qty)}건은 유지되고 환불은 따로 처리합니다.{/if}
+						</p>
+						<button type="submit" class="danger sm">판매 중단</button>
+					</form>
+					{#if form?.endError}<p class="notice danger" role="alert">{form.endError}</p>{/if}
+				{:else}
+					<form method="POST" action="?/resumeSale" use:enhance onsubmit={ask(`${p?.name ?? c.code} 판매를 다시 열까요?`)}>
+						<button type="submit" class="ghost sm">판매 재개</button>
+					</form>
+				{/if}
 			</div>
 		{/if}
 

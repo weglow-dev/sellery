@@ -254,7 +254,9 @@
 									<td class="num" data-l="참여율">{engagement(c)}</td>
 									<td data-l="상태">
 										{c.status}
-										{#if c.code}<span class="console-mono meta"> {c.code}</span>{/if}
+										{#if c.code}
+											<a href="{data.campaignsPath}/{encodeURIComponent(c.code)}" class="console-mono meta">{c.code}</a>
+										{/if}
 									</td>
 									<td data-l="기간">{period(c)}</td>
 									<td class="num" data-l="확정 매출"><b>{money(c.net)}</b></td>
@@ -283,7 +285,8 @@
 				{:else if p.status === 'rejected'}
 					반려 상태입니다. 승인으로 바꾸면 바로 노출됩니다.
 				{:else if p.status === 'listed'}
-					노출 중입니다. 중단하면 새 제안이 막히고 진행 중인 판매에는 영향이 없습니다.
+					노출 중입니다. 중단하면 새 제안이 막히고 진행 중인 판매에는 영향이 없습니다 — 진행 중인 판매를 당장 멈추려면
+					<b>판매 실적</b> 표에서 캠페인 코드를 눌러 <b>[판매 중단]</b> 을 씁니다.
 				{:else}
 					노출이 중단된 상태입니다. 재개하면 다시 갤러리에 보입니다.
 				{/if}
