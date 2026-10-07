@@ -33,7 +33,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const STORE_OPEN_STATES: readonly string[] = ["SCHEDULE_CONFIRMED", "LIVE", "CLEARING", "SETTLED"];
 
 const LIST_COLUMNS =
-  "id, code, brand_id, name, description, emoji, thumb_url, category, consumer_price, sale_price, commission_rate, stock, status, reject_reason, exclusive_grade, exclusive_label, exclusive_seller_id, created_at, updated_at";
+  "id, code, brand_id, name, description, emoji, thumb_url, category, consumer_price, sale_price, commission_rate, stock, status, reject_reason, exclusive_grade, exclusive_label, exclusive_seller_id, fast_reviewed_at, created_at, updated_at";
 
 export type AdminProductRow = {
   id: string;
@@ -53,6 +53,8 @@ export type AdminProductRow = {
   exclusive_grade: string | null;
   exclusive_label: string | null;
   exclusive_seller_id: string | null;
+  /** 우선 검수권(🥬)으로 검수 없이 노출된 날 (0038). 사후 점검 대상 — 화면이 "검수 생략" 으로 표시한다. */
+  fast_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
   /** 표시용 */

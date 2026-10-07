@@ -11,7 +11,9 @@
 > **셀러리 샵(2026-10-06 · 0037)**: `/shop` — 카탈로그(`platform_settings.shop_items`) · 구매(`app_shop_buy`) · 보유/만료. 데모 화면은 삭제했다.
 > 효과를 붙인 아이템 = 데이터 패스(30일 무제한 열람) · 상품 부스트(`products.boosted_at`) · 고객 홈 상단 노출(`campaigns.home_featured_at`) · 프로필 상단 노출(`sellers.featured_at`).
 > **효과가 없는 아이템은 팔지 않는다** — 우선 검수권 · 재판매 우선권 · 인플루언서 매출 데이터 확인권은 `available:false` 로 "준비 중". 운영 결정(2026-10-06)은 **프로토타입대로 구현**이고 다음 PR 로 나눴다(절차를 바꾸는 아이템이라 영향 범위가 다르다).
-> 남은 6단계: 우선 검수권 · 재판매 우선권 · 인플루언서 익명 실적 표 · 스카우트 DM.
+> **우선 검수권(2026-10-06 · 0038)**: 🥬 1 로 검수 대기 상품 **전부** 즉시 노출. 운영 결정은 "프로토타입대로" 라서 관리자 검수를 실제로 건너뛴다.
+> 표시광고 사후 점검을 위해 `products.fast_reviewed_at` 를 남기고 관리자 목록·상세가 "검수 생략" 으로 경고한다 — 되돌려도(노출 중단·반려) 기록은 유지된다.
+> 남은 6단계: 재판매 흐름 + 재판매 우선권(`campaigns.regongu` 를 세우는 코드가 아직 없다) · 인플루언서 익명 실적 표 + 매출 데이터 확인권 · 스카우트 DM.
 >
 > 근거(전부 저장소 안): `docs/inf-console-plan.md`(§0 결정 · §4 인증 · §5.4 함수 관례 · §6 화면 · §7 단계 · §9) · `apps/influencer/src/**`(`hooks.server.ts` 게이트 · `(console)` `(demo)` 그룹 · `lib/demo.ts` · `auth/{confirm,signout}`) · `packages/db/src/server/partner/*.server.ts` · `packages/db/src/partner/*.ts` · `packages/db/src/console-paths.ts` · `packages/ui/src/site/console/*` · `packages/db/scripts/{partner-admin,dev-seller}.mjs` · `supabase/migrations/0001~0013` · `supabase/seed.sql` · 데모 `apps/brand/src/routes/**` · `packages/core/src/{actions,helpers,constants}.ts` · `docs/{app-plan,data-model,deploy,period-policy,sample-policy,settlement-policy,grade-policy}.md`.
 >
