@@ -10,6 +10,7 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { rateLine, settlementStatusLabel, validateRrn, whtLine } from '@sellery/db/partner/settle-rules';
+	import { tossSellerStatusLine } from '@sellery/payments/payout-rules';
 	import { ProductIcon, StatusChip } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
 
@@ -34,6 +35,9 @@
 	const rrnOk = $derived(rrnDigits.length === 13 && validateRrn(rrnDigits) !== null);
 
 	const whtPct = $derived(Math.round((info?.wht_rate ?? list?.wht_rate ?? 0.033) * 1000) / 10);
+	// 토스 지급대행(0040) — 키가 들어온 환경에서 계좌가 등록된 뒤에만 상태 줄을 보여준다
+	const toss = $derived(data.toss);
+	const tossLine = $derived(toss && toss.configured && info?.has_bank_info ? tossSellerStatusLine(toss.status, toss.error, info?.settle_type) : null);
 	const money = (n: number | null) => (n === null ? '—' : `₩${fmtNum(n)}`);
 	const setDate = (iso: string | null) => (iso ? iso.slice(0, 10).replace(/-/g, '.') : '');
 </script>
@@ -81,6 +85,14 @@
 				<dt>사업자번호</dt>
 				<dd><span class="console-mask">{info.biz_no_masked ?? '—'}</span>{#if info.tax_info?.company}{' '}· {info.tax_info.company}{/if}</dd>
 			{/if}
+			{#if toss?.phone_masked}
+				<dt>본인인증 번호</dt>
+				<dd><span class="console-mask">{toss.phone_masked}</span></dd>
+			{/if}
+			{#if tossLine}
+				<dt>지급 계좌 확인</dt>
+				<dd><StatusChip tone={tossLine.tone}>{tossLine.label}</StatusChip>{#if tossLine.sub}<small class={tossLine.tone === 'red' ? 'console-danger' : 'meta'} style="display:block;margin-top:4px">{tossLine.sub}</small>{/if}</dd>
+			{/if}
 		</dl>
 		<p class="meta" style="margin:0 0 12px">바꾸려면 아래 폼을 다시 채워 저장하세요 — 보안을 위해 계좌번호는 화면에 뒤 4자리만 보이고, 저장할 때마다 전체를 다시 입력해요.</p>
 	{:else}
@@ -124,6 +136,11 @@
 			<label for="st-account">계좌번호</label>
 			<input id="st-account" name="account" value={v('account')} inputmode="numeric" autocomplete="off" placeholder={info?.account_masked ? `등록된 계좌 ${info.account_masked} — 바꾸거나 다시 입력` : '숫자만 8~16자리'} maxlength={40} required />
 			<div class="hint">'-' 없이 숫자만 입력해도 돼요.</div>
+		</div>
+		<div class="fld" class:invalid={invalid('settle_phone')}>
+			<label for="st-phone">본인인증 휴대폰 번호{type === 'personal' ? '' : ' (선택)'}</label>
+			<input id="st-phone" name="settle_phone" value={v('settle_phone')} inputmode="tel" autocomplete="tel" placeholder={toss?.phone_masked ? `등록됨 ${toss.phone_masked} — 바꾸려면 다시 입력` : '010-0000-0000'} maxlength={20} />
+			<div class="hint">지급대행(토스페이먼츠)이 예금주 본인인증 문자를 보내는 번호예요{type === 'personal' ? ' — 개인 정산은 인증 전까지 지급이 보류돼요' : ''}. 비워 두면 기존 번호를 유지해요.</div>
 		</div>
 
 		{#if type === 'biz'}

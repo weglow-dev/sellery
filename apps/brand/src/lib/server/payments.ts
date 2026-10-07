@@ -9,3 +9,5 @@ import './env';
 
 export * from '@sellery/payments/server/config';
 export * from '@sellery/payments/server/brand-refund';
+// 토스 지급대행(0040) — /settle 저장 뒤 셀러 동기화 · 상태 표시
+export { syncPayeeWithToss, getPayeeTossStatus } from '@sellery/payments/server/payouts';

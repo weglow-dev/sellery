@@ -12,3 +12,5 @@ export * from '@sellery/payments/server/config';
 export * from '@sellery/payments/server/toss';
 export * from '@sellery/payments/server/checkout-sync';
 export * from '@sellery/payments/server/partner-sample';
+// 토스 지급대행 웹훅(0040) — /api/payouts/webhook 가 재조회로만 반영한다
+export { handleSellerChanged, handlePayoutChanged } from '@sellery/payments/server/payouts';

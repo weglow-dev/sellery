@@ -4,7 +4,7 @@
 	 * · 보류 예고/사유 · [정산 실행] `?/run`(기준일 전이면 강제 체크 · confirm) · 실행 뒤 지급 카드 2장(인플루언서/브랜드 — 금액 · 상태 · 보류 사유 · [지급 완료] 메모 · [보류] 사유 · [보류 해제]) · 이벤트 목록.
 	 * source: live(실시간 예상) · snapshot(정산 완료 스냅샷) · none(스냅샷 없는 이관 SETTLED — 시드 c6).
 	 */
-	import { dueLabel, payoutStatusChip, settlementStatusChip, type PayoutView, payeeTypeLabel } from '@sellery/db/admin/settle-rules';
+	import { dueLabel, payoutStatusChip, settlementStatusChip, type PayoutView, payeeTypeLabel, tossPayoutChip } from '@sellery/db/admin/settle-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { ProductIcon, StatusChip } from '@sellery/ui/site';
@@ -163,6 +163,11 @@
 										{#if po.status === 'held'}<dt>보류 사유</dt><dd class="console-danger">{po.hold_reason ?? (po.hold_code ? data.holdLabels[po.hold_code as keyof typeof data.holdLabels] ?? po.hold_code : '운영자 보류')}</dd>{/if}
 										{#if po.paid_at}<dt>지급일</dt><dd>{fmtTime(po.paid_at)}</dd>{/if}
 										{#if po.memo}<dt>메모</dt><dd>{po.memo}</dd>{/if}
+										{#if po.toss_payout_status}
+											{@const tchip = tossPayoutChip(po.toss_payout_status)}
+											<dt>토스 지급대행</dt>
+											<dd>{#if tchip}<StatusChip tone={tchip.tone}>{tchip.label}</StatusChip>{/if} <span class="console-mono">{po.toss_payout_id ?? ''}</span>{#if po.toss_schedule_date}{' '}· 예정 {po.toss_schedule_date}{/if}{#if po.toss_error?.message}<small class="console-danger"> · {po.toss_error.message}</small>{/if}</dd>
+										{/if}
 									</dl>
 									{#if po.status === 'pending'}
 										<form method="post" action="?/paid" class="console-form admin-inline-form" onsubmit={(e) => { if (!confirm(`${payeeLabel(po.payee_type)} ${money(po.amount)} 을 지급 완료로 표시할까요? 실제 이체를 마친 뒤에만 눌러주세요.`)) e.preventDefault(); }}>

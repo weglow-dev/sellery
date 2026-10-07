@@ -11,9 +11,13 @@ import {
   parsePayoutExport,
   parseSettlePreview,
   parseSettleRunResult,
+  parsePayout,
   payoutCsv,
+  referrerHoldReason,
   rrnCsv,
   sellerHoldReason,
+  tossPayoutChip,
+  tossSellerChip,
   settleRunSummary,
   toCsv,
   asPayeeType,
@@ -169,6 +173,58 @@ describe("지급 보류 판정 — 0030 admin_payout_hold_reason 과 같은 순�
   it("문구가 있다", () => {
     expect(HOLD_LABELS.BANK_MISSING).toBe("정산 계좌 미등록");
     expect(HOLD_LABELS.RRN_MISSING).toContain("주민등록번호");
+    expect(HOLD_LABELS.TOSS_SELLER_PENDING).toContain("토스");
+    expect(HOLD_LABELS.PHONE_MISSING).toContain("휴대폰");
+  });
+});
+
+describe("지급 보류 판정 — 0040 payout_mode (manual 은 그대로 · toss 는 휴대폰 → 토스 셀러 상태 추가)", () => {
+  const ok = { hasBankInfo: true, settleType: "personal", hasRrn: true } as const;
+  it("manual(기본 · 생략) 에서는 토스 값이 무엇이든 보류 없음", () => {
+    expect(sellerHoldReason({ ...ok })).toBeNull();
+    expect(sellerHoldReason({ ...ok, payoutMode: "manual", hasPhone: false, tossStatus: null })).toBeNull();
+    expect(brandHoldReason({ settleInfoComplete: true, payoutMode: "manual", hasPhone: false, tossStatus: null })).toBeNull();
+    expect(referrerHoldReason({ hasBankInfo: true, settleType: "personal", payoutMode: "manual" })).toBeNull();
+  });
+  it("toss: 기존 조건이 먼저 — 계좌 · 주민번호 · 사업자등록증", () => {
+    expect(sellerHoldReason({ ...ok, hasBankInfo: false, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBe("BANK_MISSING");
+    expect(sellerHoldReason({ ...ok, hasRrn: false, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBe("RRN_MISSING");
+    expect(sellerHoldReason({ hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasBizDoc: false, payoutMode: "toss", tossStatus: "APPROVED" })).toBe("TAX_INFO_MISSING");
+  });
+  it("toss: 개인은 휴대폰 → 토스 셀러 상태(PARTIALLY_APPROVED · APPROVED 만 통과)", () => {
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: false, tossStatus: "APPROVED" })).toBe("PHONE_MISSING");
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: true, tossStatus: null })).toBe("TOSS_SELLER_PENDING");
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVAL_REQUIRED" })).toBe("TOSS_SELLER_PENDING");
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: true, tossStatus: "KYC_REQUIRED" })).toBe("TOSS_SELLER_PENDING");
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: true, tossStatus: "PARTIALLY_APPROVED" })).toBeNull();
+    expect(sellerHoldReason({ ...ok, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBeNull();
+  });
+  it("toss: 사업자 인플루언서는 휴대폰을 보지 않는다(회사 연락처는 본문 생성에서) · 토스 상태만", () => {
+    const biz = { hasBankInfo: true, settleType: "biz", hasRrn: false, hasBizNo: true, hasBizDoc: true, payoutMode: "toss" as const };
+    expect(sellerHoldReason({ ...biz, hasPhone: false, tossStatus: "APPROVED" })).toBeNull();
+    expect(sellerHoldReason({ ...biz, hasPhone: false, tossStatus: null })).toBe("TOSS_SELLER_PENDING");
+  });
+  it("toss: 추천인은 계좌 → 휴대폰 → 토스 상태 · 브랜드는 4개 완비 → 담당자 연락처 → 토스 상태", () => {
+    expect(referrerHoldReason({ hasBankInfo: false, settleType: "personal", payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBe("BANK_MISSING");
+    expect(referrerHoldReason({ hasBankInfo: true, settleType: "personal", payoutMode: "toss", hasPhone: false, tossStatus: "APPROVED" })).toBe("PHONE_MISSING");
+    expect(referrerHoldReason({ hasBankInfo: true, settleType: "personal", payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBeNull();
+    expect(brandHoldReason({ settleInfoComplete: false, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBe("SETTLE_INFO_INCOMPLETE");
+    expect(brandHoldReason({ settleInfoComplete: true, payoutMode: "toss", hasPhone: false, tossStatus: "APPROVED" })).toBe("PHONE_MISSING");
+    expect(brandHoldReason({ settleInfoComplete: true, payoutMode: "toss", hasPhone: true, tossStatus: "KYC_REQUIRED" })).toBe("TOSS_SELLER_PENDING");
+    expect(brandHoldReason({ settleInfoComplete: true, payoutMode: "toss", hasPhone: true, tossStatus: "APPROVED" })).toBeNull();
+  });
+  it("칩 — 토스 지급 상태 · 셀러 상태", () => {
+    expect(tossPayoutChip(null)).toBeNull();
+    expect(tossPayoutChip("COMPLETED")).toEqual({ label: "토스 이체 완료", tone: "green" });
+    expect(tossPayoutChip("FAILED")?.tone).toBe("red");
+    expect(tossSellerChip(null)).toEqual({ label: "토스 미등록", tone: "gray" });
+    expect(tossSellerChip("APPROVED", { code: "X", message: "m" })).toEqual({ label: "계좌 오류", tone: "red" });
+    expect(tossSellerChip("APPROVAL_REQUIRED").tone).toBe("amber");
+  });
+  it("parsePayout — 토스 필드 (없으면 null)", () => {
+    const po = parsePayout({ id: "p1", payee_type: "seller", status: "pending", amount: 10, wht: 0, toss_payout_id: "payout_1", toss_payout_status: "REQUESTED", toss_schedule_date: "2026-10-08", toss_error: { code: "E", message: "m", status: "FAILED" } });
+    expect(po).toMatchObject({ toss_payout_id: "payout_1", toss_payout_status: "REQUESTED", toss_schedule_date: "2026-10-08", toss_error: { code: "E", message: "m", status: "FAILED" } });
+    expect(parsePayout({ id: "p2", payee_type: "brand", status: "paid", amount: 1, wht: 0 })).toMatchObject({ toss_payout_id: null, toss_payout_status: null, toss_error: null });
   });
 });
 

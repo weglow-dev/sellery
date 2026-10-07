@@ -102,6 +102,10 @@ export type Database = {
           referred_by: string | null
           tax_info: Json | null
           terms_agreed_at: string | null
+          toss_seller_error: Json | null
+          toss_seller_id: string | null
+          toss_seller_status: string | null
+          toss_seller_synced_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -131,6 +135,10 @@ export type Database = {
           referred_by?: string | null
           tax_info?: Json | null
           terms_agreed_at?: string | null
+          toss_seller_error?: Json | null
+          toss_seller_id?: string | null
+          toss_seller_status?: string | null
+          toss_seller_synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -160,6 +168,10 @@ export type Database = {
           referred_by?: string | null
           tax_info?: Json | null
           terms_agreed_at?: string | null
+          toss_seller_error?: Json | null
+          toss_seller_id?: string | null
+          toss_seller_status?: string | null
+          toss_seller_synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1246,6 +1258,53 @@ export type Database = {
         }
         Relationships: []
       }
+      payout_events: {
+        Row: {
+          event_type: string | null
+          handled: boolean
+          id: string
+          payload: Json
+          payout_id: string | null
+          received_at: string
+          result: string | null
+          source: string
+          toss_payout_id: string | null
+          toss_seller_id: string | null
+        }
+        Insert: {
+          event_type?: string | null
+          handled?: boolean
+          id?: string
+          payload: Json
+          payout_id?: string | null
+          received_at?: string
+          result?: string | null
+          source: string
+          toss_payout_id?: string | null
+          toss_seller_id?: string | null
+        }
+        Update: {
+          event_type?: string | null
+          handled?: boolean
+          id?: string
+          payload?: Json
+          payout_id?: string | null
+          received_at?: string
+          result?: string | null
+          source?: string
+          toss_payout_id?: string | null
+          toss_seller_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_events_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payouts: {
         Row: {
           amount: number
@@ -1261,6 +1320,11 @@ export type Database = {
           seller_id: string | null
           settlement_id: string
           status: string
+          toss_error: Json | null
+          toss_payout_id: string | null
+          toss_payout_status: string | null
+          toss_requested_at: string | null
+          toss_schedule_date: string | null
           updated_at: string
           wht: number
         }
@@ -1278,6 +1342,11 @@ export type Database = {
           seller_id?: string | null
           settlement_id: string
           status?: string
+          toss_error?: Json | null
+          toss_payout_id?: string | null
+          toss_payout_status?: string | null
+          toss_requested_at?: string | null
+          toss_schedule_date?: string | null
           updated_at?: string
           wht?: number
         }
@@ -1295,6 +1364,11 @@ export type Database = {
           seller_id?: string | null
           settlement_id?: string
           status?: string
+          toss_error?: Json | null
+          toss_payout_id?: string | null
+          toss_payout_status?: string | null
+          toss_requested_at?: string | null
+          toss_schedule_date?: string | null
           updated_at?: string
           wht?: number
         }
@@ -1763,9 +1837,14 @@ export type Database = {
           rrn_set_at: string | null
           sample_address: Json | null
           sample_extra: number
+          settle_phone: string | null
           settle_type: string | null
           tax_info: Json | null
           terms_agreed_at: string | null
+          toss_seller_error: Json | null
+          toss_seller_id: string | null
+          toss_seller_status: string | null
+          toss_seller_synced_at: string | null
           updated_at: string
           user_id: string | null
         }
@@ -1799,9 +1878,14 @@ export type Database = {
           rrn_set_at?: string | null
           sample_address?: Json | null
           sample_extra?: number
+          settle_phone?: string | null
           settle_type?: string | null
           tax_info?: Json | null
           terms_agreed_at?: string | null
+          toss_seller_error?: Json | null
+          toss_seller_id?: string | null
+          toss_seller_status?: string | null
+          toss_seller_synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1835,9 +1919,14 @@ export type Database = {
           rrn_set_at?: string | null
           sample_address?: Json | null
           sample_extra?: number
+          settle_phone?: string | null
           settle_type?: string | null
           tax_info?: Json | null
           terms_agreed_at?: string | null
+          toss_seller_error?: Json | null
+          toss_seller_id?: string | null
+          toss_seller_status?: string | null
+          toss_seller_synced_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -2164,6 +2253,20 @@ export type Database = {
         Returns: Json
       }
       app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
+      app_admin_payouts_toss_queue: { Args: never; Returns: Json }
+      app_partner_seller_sync: {
+        Args: { p_payee_id: string; p_payee_type: string; p_raw?: Json; p_status?: string | null; p_toss_seller_id?: string | null }
+        Returns: Json
+      }
+      app_payout_mark_requested: {
+        Args: { p_payout_id: string; p_raw?: Json; p_schedule_date?: string | null; p_status: string; p_toss_payout_id: string }
+        Returns: Json
+      }
+      app_payout_mode_set: { Args: { p_mode: string }; Returns: Json }
+      app_payout_sync_status: { Args: { p_raw?: Json; p_status: string; p_toss_payout_id: string }; Returns: Json }
+      app_set_settle_phone: { Args: { p_phone: string; p_seller_id: string }; Returns: Json }
+      admin_payouts_recheck: { Args: { p_brand_id?: string | null; p_seller_id?: string | null }; Returns: Json }
+      payout_mode: { Args: never; Returns: string }
       app_admin_revenue: { Args: never; Returns: Json }
       app_admin_sample_refund_due: { Args: never; Returns: Json }
       app_admin_exclusive_requests: { Args: { p_status?: string | null }; Returns: Json }

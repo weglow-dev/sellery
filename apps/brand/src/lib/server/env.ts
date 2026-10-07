@@ -11,7 +11,7 @@ import { env } from '$env/dynamic/private';
 import { PUBLIC_SITE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { configureDb } from '@sellery/db/server/config';
 import { configureMail } from '@sellery/db/server/mail';
-import { configurePayments } from '@sellery/payments/server/config';
+import { configurePayments, configurePayouts } from '@sellery/payments/server/config';
 
 configureDb({
 	url: PUBLIC_SUPABASE_URL,
@@ -21,6 +21,8 @@ configureDb({
 });
 
 configurePayments({ secretKey: env.TOSS_SECRET_KEY });
+// 토스 지급대행(0040) — 결제 키와 별개의 상점/키(API 개별 연동 시크릿 + 보안 키). 둘 다 없으면 셀러 동기화·지급 요청이 조용히 NOT_CONFIGURED — docs/deploy.md §1.2 · §5.3.1
+configurePayouts({ secretKey: env.TOSS_PAYOUT_SECRET_KEY, securityKey: env.TOSS_PAYOUT_SECURITY_KEY });
 
 /** 고객 사이트 오리진 (약관·처리방침 절대 URL · "← 셀러리 고객 사이트"). 형식이 어긋나면 로컬 shop dev 주소. */
 export const SITE_URL: string = (() => {

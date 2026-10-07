@@ -39,6 +39,7 @@
 - [ ] Vercel Firewall → `/api/payments/webhook` IP 레이트리밋(예 분당 60) — 웹훅은 서명 없는 공개 엔드포인트(deploy.md §5.3). **확인 필요(개발)**: 현재 규칙이 있는지.
 - [ ] **실결제 리허설 1건**: 본인 카드로 소액 주문(§8) → `/brand/orders` 에 PAID → 브랜드 콘솔에서 환불 → 토스 콘솔 취소 확인 → `/admin/payments` 정합성 0건 이상 없음.
 - [ ] 운영 규칙 공유: 토스 콘솔에서 **부분취소 금지**(전액 취소만 정식 지원 — 부분취소는 `payment_events handled=false` 큐로 남아 수동 조정 · deploy.md §5.3). 정산 완료 뒤 콘솔 취소도 같은 큐.
+- [ ] **토스 지급대행(0040 · deploy.md §5.3.1 · 2026-10-07 결정)** — D+21 지급을 이체 파일 대신 토스 API 로: ① 지급대행 계약·상점 결정(**확인 필요(대표)**: A `peerkeamf5` 전용 / B `NHN_shingoonk` 에 계약) ② 그 상점의 **API 개별 연동 시크릿 키 + 보안 키** → Vercel 4 프로젝트 `TOSS_PAYOUT_SECRET_KEY` · `TOSS_PAYOUT_SECURITY_KEY`(Production 라이브 · Preview 테스트) ③ 지급대행 상점 웹훅 `https://sellery.life/api/payouts/webhook`(`seller.changed` · `payout.changed`) + Firewall 레이트리밋 ④ 파트너 정산 정보 재저장(또는 `partner-admin.mjs toss-seller-sync`)으로 셀러 등록 · 본인인증 문자 완료 확인 ⑤ `partner-admin.mjs payout-mode toss` ⑥ 소액 1건 `toss-payout-request --id` → `COMPLETED` 웹훅 → `/admin/settle/payouts` 지급 완료 확인. 켜기 전(`manual`)에는 아무것도 바뀌지 않는다.
 
 ---
 
