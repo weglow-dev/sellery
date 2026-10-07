@@ -1214,6 +1214,31 @@
   }
   /* 셀러리 내역 — 적립은 녹색 */
   .tblw td.plus b { color: var(--color-plat); }
+
+  /* ---- 상품별 익명 실적 표(0039) ---- */
+  .perf-tbl table { min-width: 0; }
+  .perf-tbl td { font-size: 12.5px; }
+  /* 잠긴 행 — 값은 서버가 보내지 않고 ● 자리표시자가 온다. 블러는 "잠겨 있다" 는 표시다 */
+  .perf-tbl tr.blurrow td { filter: blur(3.5px); user-select: none; pointer-events: none; }
+  .perf-tbl tr.blurrow td:last-child { filter: none; }
+  .perf-tbl .mebadge { margin-left: 4px; }
+  @media (max-width: 640px) {
+    .perf-tbl table { width: 100%; }
+    .perf-tbl thead { display: none; }
+    .perf-tbl tbody, .perf-tbl tr { display: block; }
+    .perf-tbl tr {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
+      padding: 10px 12px; border-bottom: 1px solid var(--color-soft-line);
+    }
+    .perf-tbl tr:last-child { border-bottom: 0; }
+    .perf-tbl td { display: block; padding: 0; border: 0; text-align: left; }
+    .perf-tbl td.num { text-align: left; }
+    .perf-tbl td::before {
+      content: attr(data-l); display: block; font-family: var(--font-mono);
+      font-size: 9.5px; color: var(--color-mute); letter-spacing: 0.05em;
+      text-transform: uppercase; font-weight: 700; margin-bottom: 2px;
+    }
+  }
   /* 독점권(0025) — 신청 직후 안내 · 누를 수 없는 상태 표시. 상태별 톤: 내 것(mine) 은 강조, 나머지는 차분하게 */
   .exclbox .excl-msg {
     margin: 8px 0 0; padding: 7px 10px; font-size: 12.5px; font-weight: 700;

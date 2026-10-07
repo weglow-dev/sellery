@@ -2,6 +2,9 @@
 	/**
 	 * 상품 상세 — 프로토타입 productDetailModal(js/20-seller.js) 을 페이지로 + 샘플 섹션(sampleBuyModal 의 금액 표 · reqSample 의 배송지 입력).
 	 * 익명 실적 표(인플루언서별 팔로워·참여율·매출 + 데이터패스 마스킹)는 다음 단계 — 지금은 집계 두 개(캠페인 수 · 확정 판매 수량)만.
+	 * 실적 표(0039): 캠페인별 팔로워·참여율·기간·확정 매출 — **인플루언서 익명**. 매출 데이터 확인권(🥬 2)이
+	 *   없으면 첫 행과 내 캠페인만 열리고 나머지는 `blurrow` + ● 자리표시자다(값은 서버가 보내지 않는다).
+	 *   구매는 샵(`/shop`)에서 — 영구·계정 단위라 상품마다 사지 않는다.
 	 * 독점권(0025): 오퍼가 걸린 상품이면 `data.exclusive.button` 으로 [독점권 신청] — 자격 판정은 DB, 문구는 `exclusiveButton`.
 	 *   신청 뒤 `?msg=exclusive` 로 돌아온다(대기 상태 표시). 승인은 브랜드 콘솔 `/brand/requests`.
 	 * 샘플 섹션은 `quote.mode`: free(배송지 폼 → ?/requestFree) · buy(금액 표 + [샘플 구매 ₩N] → /pay/new?product= · 🥬 사용 선택은 결제 화면) · locked(독점 안내) · active(캠페인 링크) · unlisted.
@@ -12,6 +15,14 @@
 	import { BUY_COMING_SOON, BUY_REASON_TITLES, campaignChip } from '@sellery/db/partner/sample-rules';
 	import { GradeBox, ProductIcon, ShippingFields, StatusChip } from '@sellery/ui/site';
 	import { page } from '$app/state';
+	import {
+		PERFORMANCE_EMPTY,
+		PERFORMANCE_ME,
+		PERFORMANCE_TITLE_SUB,
+		dataPassCta,
+		lockedNote,
+		periodLabel
+	} from '@sellery/db/partner/performance-rules';
 	import { EXCLUSIVE_MESSAGES } from '@sellery/db/partner/exclusive-rules';
 	import type { ActionData, PageData } from './$types';
 
@@ -21,6 +32,7 @@
 	const b = $derived(data.button);
 	const disc = $derived(discountPct(p.consumer_price, p.sale_price));
 	const excl = $derived(data.exclusive);
+	const perf = $derived(data.perf);
 	/** 신청 직후 303 으로 돌아온 안내 (`?msg=exclusive` · `exclusiveAlready`). */
 	const exclMsg = $derived(
 		page.url.searchParams.get('msg') === 'exclusive'
@@ -100,16 +112,56 @@
 	</div>
 {/if}
 
-<div class="sec" style="margin-top:20px">이 상품의 판매 실적 <span class="console-sec-sub">— 인플루언서 익명</span></div>
+<!-- 상품별 익명 실적 표(0039) — 확인권이 없으면 첫 행과 내 캠페인만 지표가 온다.
+     **잠긴 행은 값이 아예 없다**(서버가 null) — 블러는 "잠겨 있다" 를 알리는 표시일 뿐이다. -->
+<div class="sec" style="margin-top:20px">
+	이 상품의 판매 실적 <span class="console-sec-sub">— {PERFORMANCE_TITLE_SUB}</span>
+</div>
 <section class="card static">
 	{#if data.performance.campaigns > 0}
 		<div class="mini-stats" style="margin:0">
 			<div><span class="ms-l">진행된 캠페인</span><span class="ms-v">{fmtNum(data.performance.campaigns)}건</span></div>
 			<div><span class="ms-l">확정 판매 수량</span><span class="ms-v">{fmtNum(data.performance.sold_qty)}개</span></div>
 		</div>
-		<p class="meta" style="margin-top:10px">인플루언서별 팔로워·참여율·확정 매출 표와 매출 데이터 확인권(🥬)은 다음 단계에서 열립니다.</p>
+		{#if perf && perf.rows.length}
+			<div class="tblw perf-tbl" style="margin-top:12px">
+				<table>
+					<thead>
+						<tr>
+							<th class="num">팔로워</th><th class="num">좋아요</th><th class="num">참여율</th>
+							<th class="num">기간</th><th class="num">확정 매출</th><th>상태</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each perf.rows as r (r.rank)}
+							<tr class:blurrow={!r.open} class:merow={r.isMe}>
+								<td class="num" data-l="팔로워">{r.open ? fmtNum(r.followers ?? 0) : '●●●,●●●'}</td>
+								<td class="num" data-l="좋아요">{r.open ? fmtNum(r.likesAvg ?? 0) : '●,●●●'}</td>
+								<td class="num" data-l="참여율">{r.open && r.engagement !== null ? `${r.engagement}%` : '●.●%'}</td>
+								<td class="num" data-l="기간">{r.open ? periodLabel(r) : '●/● – ●/●'}</td>
+								<td class="num" data-l="확정 매출">
+									{#if r.open}<b>₩{fmtNum(r.net ?? 0)}</b>{:else}₩●,●●●,●●●{/if}
+								</td>
+								<td data-l="상태">
+									<StatusChip tone={campaignChip(r.status).tone}>{campaignChip(r.status).label}</StatusChip>
+									{#if r.isMe}<span class="mebadge">{PERFORMANCE_ME}</span>{/if}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			{#if !perf.hasPass && perf.locked > 0}
+				<p class="meta" style="margin-top:10px">{lockedNote(perf)}</p>
+				<div class="btnrow" style="margin-top:8px">
+					<a href={data.shopPath} class="btn pri sm">{dataPassCta(perf)}</a>
+				</div>
+			{:else if perf.hasPass}
+				<p class="meta" style="margin-top:10px">매출 데이터 확인권 보유 — 전체 실적이 열려 있어요.</p>
+			{/if}
+		{/if}
 	{:else}
-		<div class="empty" style="padding:18px">아직 진행된 판매가 없습니다 — 첫 인플루언서가 되어보세요</div>
+		<div class="empty" style="padding:18px">{PERFORMANCE_EMPTY}</div>
 	{/if}
 </section>
 

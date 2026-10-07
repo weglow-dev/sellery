@@ -2202,6 +2202,11 @@ export type Database = {
         Args: { p_brand_id: string; p_seller_id: string }
         Returns: string
       }
+      app_seller_product_performance: {
+        Args: { p_product_id: string; p_seller_id: string }
+        Returns: Json
+      }
+      product_campaign_net: { Args: { p_campaign_id: string }; Returns: number }
       app_seller_ranking: { Args: { p_seller_id: string }; Returns: Json }
       app_seller_referral: { Args: { p_seller_id: string }; Returns: Json }
       platform_ref_times: { Args: never; Returns: number }

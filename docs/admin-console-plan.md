@@ -175,7 +175,7 @@ app_brand_{approve,reject}_sample · ship_sample ·        0015 · 0016  브랜�
 app_admin_settle_preview · app_admin_payments_health     0020  정산 미리보기 · 대시보드 정산 숫자
 app_brand_invite_candidates · app_brand_invite_seller    0016  자동 제안 후보 조건 · 발송(대행)
 sellers.recent_likes · categories.group_name             0001  성장세 · 카테고리 적합
-grade_tiers.is_priority · invite_cost_cel                0001  우선권 등급 제안 게이트(6단계)
+grade_tiers.is_priority · invite_cost_cel                0001  우선권 등급 제안권 비용(0036 부터 차단이 아니라 과금 · 거절 시 환급)
 platform_settings.opex_default                           0001  매출·순수익 운영비 기본값
 ```
 
@@ -252,7 +252,7 @@ apps/admin/src/lib/server/money.ts                배럴(정산 + 매출·순수
 | 매출·순수익(KPI 4장 · 손익 요약 · 셀러리 손익 · 운영비 · 판매별 손익) | `(console)/(money)/revenue` | 결정 11 · 12. 운영비 기본값은 `platform_settings.opex_default`(0001 시드)에 이미 있었다 |
 | 매출·순수익 **운영 비용 입력** | 같은 화면 | 저장은 `app_admin_save_opex`(0022)가 `opex_default` 한 행에 쓴다. 입력을 바꾸면 저장 전에도 아래 표가 다시 계산된다(데모 `bind:value`) |
 | 매칭·자동 제안(뜨는 인플루언서 · 브랜드 ON/OFF · 후보 · 실행 · 이력) | `(console)/match` | 결정 13. 적격 조건은 `app_brand_invite_candidates`(0016)와 같다 — 데모보다 게이트가 셋 많다(아래) |
-| 매칭 화면의 **비공개·우선권 등급 후보** | 후보에서 제외 | 데모는 비공개를 후보에 넣고 점수만 −5 했다. 실서비스는 익명 스카우트·🥬 제안권이 **6단계**라 `app_brand_invite_seller` 가 `SELLER_HIDDEN` · `PRIORITY_INVITE_GATED` 로 막는다. 데모 안내문 "다이아·블랙은 브랜드 🥬 10 자동 차감" 이 그 게이트다. 뜨는 인플루언서 목록에는 **전원**을 보여주고 적격이 아니면 사유를 적는다 |
+| 매칭 화면의 **비공개·우선권 등급 후보** | **갱신(2026-10-06 · 0036)**: 우선권 등급(다이아·블랙)은 후보에 **포함**하고 제안권 🥬 10 을 비용으로 표시한다(잔액 부족이면 "보류"). 비공개는 여전히 제외 — 열람 여부가 **브랜드별**로 갈리고(0035 `data_views`) 자동 제안은 브랜드를 대신 고르므로 익명을 넣지 않는다. 브랜드가 직접 제안할 때는 갤러리에서 레퍼런스를 열람하면 상품 초대 후보에 "비공개 · 열람함" 으로 나타난다. 뜨는 인플루언서 목록에는 **전원**을 보여주고 적격이 아니면 사유를 적는다<br>_(이전 서술: 익명 스카우트·🥬 제안권이 6단계라 `SELLER_HIDDEN` · `PRIORITY_INVITE_GATED` 로 막았다 — 0036 이 과금으로 바꿨다)_ |
 | 매칭 화면의 **자동 제안 실행** | 관리자 수동 버튼 | 데모 안내는 "매일" 이지만 데모도 버튼이다. 크론 연결은 운영 결정 |
 | `(demo)/products` · `(demo)/brands` · `(demo)/revenue` · `(demo)/match` | 삭제 | 콘솔 라우트가 같은 URL 을 받으면 데모를 지운다(정산 쪽이 `settle`/`orders` 에서 쓴 방식) |
 
@@ -277,7 +277,7 @@ POST 폼 액션은 Origin · Accept: text/html · Content-Type 을 모두 넣는
 | ~~반려 사유 입력이 `prompt()`~~ **해결(2026-09-29)** | 브랜드 `/requests` 가 쓰던 `console-reject` 펼침 폼(`<details>` + `<textarea maxlength>`)을 상품 반려 2곳(목록 · 상세)에 그대로 적용했다. **디자인 시스템 모달을 기다리지 않았다** — 같은 일을 하는 패턴이 이미 17곳에서 쓰이고 있었고, 모달보다 가볍다(JS 불필요 · 평범한 POST). `prompt()` 는 모바일에서 보기 나쁘고 글자 수 제한을 못 보여주며 일부 브라우저가 차단한다 |
 | 일괄 정산 미리보기 RPC | 대시보드와 매출·순수익이 캠페인마다 `app_admin_settle_preview` / `admin_campaign_pnl` 을 부른다(결정 7 · 12). 캠페인이 수백 건이 되면 일괄 RPC 를 추가한다 |
 | 자동 제안 크론 | 지금은 관리자 수동 버튼이다(결정 13). 매일 돌릴지 · 몇 건씩 · 실패 알림은 운영 결정 |
-| 6단계 의존 화면 | 🥬 제안권 · 갤러리 열람(익명 스카우트) · 셀러리 샵 — 그게 들어오면 매칭 후보에 우선권 등급·비공개 인플루언서가 포함된다 |
+| 6단계 의존 화면 | **해소됨(2026-10-06~07)**: 🥬 제안권(0036) · 갤러리 열람·익명 스카우트(0035) · 셀러리 샵(0037~0039) 모두 들어왔다. 매칭 후보에 우선권 등급이 포함되고(비용 표시) 비공개는 브랜드별 열람 여부 때문에 자동 제안에서만 제외한다 |
 
 **매칭·자동 제안과 매출·순수익은 만들었다** — 미착수 화면은 이제 없다(§3 대응 표).
 
