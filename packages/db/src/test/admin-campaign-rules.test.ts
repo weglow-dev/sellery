@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   CAMPAIGN_FLOW,
   CAMPAIGN_STATUS_LABELS,
+  adminCampaignAction,
+  adminSaleControl,
   campaignPeriodLabel,
   campaignStatusChip,
   parseCampaignStatusFilter,
@@ -88,5 +90,43 @@ describe("campaignPeriodLabel", () => {
     expect(campaignPeriodLabel(null, null)).toBe("—");
     expect(campaignPeriodLabel("2026-09-21", null)).toBe("—");
     expect(campaignPeriodLabel(null, "2026-09-25")).toBe("—");
+  });
+});
+
+/**
+ * 긴급 판매 중단·재개(0040) — 운영 고유 레버다. 브랜드 대행 액션(`adminCampaignAction`)과
+ * 같은 상태에서 동시에 뜨면 안 된다. 실제 성공 여부는 RPC 가 정하고(정산 전 · 기간 내 · 상품 listed),
+ * 여기서는 "어느 상태에서 버튼을 보여줄지" 만 본다.
+ */
+describe("adminSaleControl", () => {
+  it("LIVE 는 중단, CLEARING 은 재개", () => {
+    expect(adminSaleControl("LIVE").kind).toBe("end");
+    expect(adminSaleControl("CLEARING").kind).toBe("resume");
+  });
+
+  it("판매가 시작되기 전·정산 뒤에는 레버가 없다", () => {
+    for (const s of ["SAMPLE_REQUESTED", "INVITED", "SAMPLE_APPROVED", "TESTING", "SCHEDULE_PROPOSED", "SCHEDULE_CONFIRMED", "SETTLED"]) {
+      expect(adminSaleControl(s).kind, s).toBe("none");
+    }
+  });
+
+  it("모르는 상태에도 터지지 않는다", () => {
+    expect(adminSaleControl("").kind).toBe("none");
+    expect(adminSaleControl("WAT").kind).toBe("none");
+  });
+
+  it("레버가 있는 상태는 문구가 비어 있지 않다", () => {
+    for (const s of ["LIVE", "CLEARING"]) {
+      const r = adminSaleControl(s);
+      expect(r.label, s).not.toBe("");
+      expect(r.hint, s).not.toBe("");
+    }
+  });
+
+  it("브랜드 대행 액션과 같은 상태에서 동시에 뜨지 않는다 — 버튼 두 줄이 섞이면 운영이 헷갈린다", () => {
+    for (const s of CAMPAIGN_FLOW) {
+      const both = adminSaleControl(s).kind !== "none" && adminCampaignAction(s).kind !== "none";
+      expect(both, s).toBe(false);
+    }
   });
 });

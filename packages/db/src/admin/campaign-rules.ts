@@ -167,3 +167,39 @@ export function normalizeRejectReason(raw: string | null | undefined): string | 
   const v = (raw ?? "").replace(/\s+/g, " ").trim().slice(0, REJECT_REASON_MAX);
   return v === "" ? null : v;
 }
+
+/* ---------------------------------------------------------------- 긴급 판매 중단 · 재개 (0040) ---------------------------------------------------------------- */
+
+export type AdminSaleControlKind = "end" | "resume" | "none";
+
+/**
+ * 진행 중인 판매를 멈추는 레버(0040). 브랜드 대행 액션과 **별개**다 —
+ * 브랜드가 할 수 있는 일을 대신하는 게 아니라, 운영만 할 수 있는 일이다.
+ *
+ *   LIVE     → 중단 가능 (`app_admin_end_sale`: LIVE → CLEARING)
+ *   CLEARING → 재개 가능 (`app_admin_resume_sale`: CLEARING → LIVE)
+ *              — 실제 성공 여부는 RPC 가 정한다(정산 전 · 기간 내 · 상품 listed).
+ *                기간이 지난 건은 눌러도 `PERIOD_OVER` 라서, 화면은 버튼을 주되 안내를 함께 띄운다.
+ *   그 외     → 없음 (판매가 시작되기 전이거나 이미 정산됐다)
+ *
+ * 상품 검수의 [노출 중단]과 혼동하지 않게 문구를 분리한다 — 그쪽은 새 제안만 막고
+ * 진행 중인 판매에는 영향이 없다(0015 `app_admin_review_product`).
+ */
+export function adminSaleControl(status: string): { kind: AdminSaleControlKind; label: string; hint: string } {
+  switch (status) {
+    case "LIVE":
+      return {
+        kind: "end",
+        label: "판매 중단",
+        hint: "지금 바로 구매를 막습니다. 판매 링크는 '판매 종료'로 남고 이미 결제된 주문과 정산 예정일은 그대로입니다.",
+      };
+    case "CLEARING":
+      return {
+        kind: "resume",
+        label: "판매 재개",
+        hint: "중단을 되돌립니다. 정산 전이고 판매 기간이 남아 있고 상품이 노출 중일 때만 됩니다.",
+      };
+    default:
+      return { kind: "none", label: "", hint: "" };
+  }
+}

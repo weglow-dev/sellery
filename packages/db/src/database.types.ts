@@ -2241,6 +2241,14 @@ export type Database = {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
         Returns: Json
       }
+      app_admin_end_sale: {
+        Args: { p_actor_user_id?: string; p_campaign_id: string; p_reason: string }
+        Returns: Json
+      }
+      app_admin_resume_sale: {
+        Args: { p_actor_user_id?: string; p_campaign_id: string }
+        Returns: Json
+      }
       app_admin_save_opex: { Args: { p_opex: Json }; Returns: Json }
       app_admin_settle_sample: {
         Args: { p_actor_user_id?: string; p_campaign_id: string }

@@ -329,6 +329,64 @@ export function rejectScheduleAsAdmin(
   );
 }
 
+/* ---------------------------------------------------------------- 긴급 판매 중단 · 재개 (0040) ---------------------------------------------------------------- */
+
+/**
+ * 관리자 고유 액션이라 `callBrandRpc` 를 쓰지 않는다 — 브랜드 대행이 아니고,
+ * RPC 가 이미 `actor_role='admin'` · `actor_user_id` 로 이벤트를 남기므로 `logProxyAction` 도 겹치지 않게 뺀다.
+ */
+async function callAdminCampaignRpc(
+  ref: string,
+  admin: Admin,
+  fn: (t: { id: string }) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  label: string
+): Promise<AdminCampaignActionResult> {
+  const t = await campaignTarget(admin, ref);
+  if (!t) return { ok: false, code: "NOT_FOUND" };
+  const { data, error } = await fn(t);
+  if (error) {
+    console.error(`[admin/campaigns] ${label} 실패:`, error.message);
+    return { ok: false, code: "DB_ERROR" };
+  }
+  return parseBrandRpc(data);
+}
+
+/**
+ * 긴급 판매 중단 — `LIVE → CLEARING`(0040 `app_admin_end_sale`).
+ * 구매가 즉시 막히고(게이트는 전부 `status='LIVE'` 를 요구한다) 판매 링크는 "판매 종료" 로 남는다.
+ * `end_date` 는 바꾸지 않는다 — 정산 예정일을 당기지 않기 위해서다(0040 설계 결정 2).
+ * 사유는 필수다(`BAD_REASON`) — 스레드 이벤트로 남아 인플루언서·브랜드도 본다.
+ */
+export function endSaleAsAdmin(
+  ref: string,
+  reason: string | null,
+  actorUserId: string,
+  admin: Admin = createAdminClient()
+): Promise<AdminCampaignActionResult> {
+  const r = normalizeRejectReason(reason);
+  if (!r) return Promise.resolve({ ok: false, code: "BAD_REASON" });
+  return callAdminCampaignRpc(
+    ref,
+    admin,
+    (t) => admin.rpc("app_admin_end_sale", { p_campaign_id: t.id, p_reason: r, p_actor_user_id: actorUserId }),
+    "판매 중단"
+  );
+}
+
+/**
+ * 판매 재개 — `CLEARING → LIVE`(0040 `app_admin_resume_sale`). 잘못 누른 중단을 되돌린다.
+ * 정산 전 · 기간이 남아 있고 · 상품이 `listed` 일 때만 열린다
+ * (`ALREADY_SETTLED` · `PERIOD_OVER` · `NOT_LISTED`).
+ */
+export function resumeSaleAsAdmin(ref: string, actorUserId: string, admin: Admin = createAdminClient()): Promise<AdminCampaignActionResult> {
+  return callAdminCampaignRpc(
+    ref,
+    admin,
+    (t) => admin.rpc("app_admin_resume_sale", { p_campaign_id: t.id, p_actor_user_id: actorUserId }),
+    "판매 재개"
+  );
+}
+
 export type AdminChatResult = { ok: true; leak: boolean } | { ok: false; code: "NOT_FOUND" | "BAD_BODY" | "DB_ERROR"; message?: string };
 
 export { CHAT_MAX };
