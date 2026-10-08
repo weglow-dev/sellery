@@ -22,6 +22,7 @@ import {
 } from "../../partner/schedule-rules";
 import type { Shipping } from "../../types";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type { ScheduleContext, ScheduleResult, SellerActionResult, PeriodHolder, SellerNextAction } from "../../partner/schedule-rules";
 
@@ -67,7 +68,9 @@ export async function proposeSchedule(
     console.error("[partner/schedule] app_propose_schedule failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseScheduleResult(data);
+  const result = parseScheduleResult(data);
+  if (result.ok) await notifyCampaignChanged(id, "status");
+  return result;
 }
 
 type SellerFn = "app_pass_campaign" | "app_accept_invite" | "app_decline_invite";
@@ -82,7 +85,9 @@ async function callSeller(admin: Admin, fn: SellerFn, sellerId: string, code: st
     console.error(`[partner/schedule] ${fn} failed:`, error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseSellerActionResult(data);
+  const result = parseSellerActionResult(data);
+  if (result.ok && !result.already) await notifyCampaignChanged(id, "status");
+  return result;
 }
 
 /** 테스트 후 패스 — TESTING → PASSED (이벤트 passed). 이미 PASSED 면 already. */

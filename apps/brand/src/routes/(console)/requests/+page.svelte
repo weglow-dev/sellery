@@ -9,7 +9,8 @@
 	import { sampleShipDeadlineNotice } from '@sellery/db/brand/campaign-rules';
 	import { md } from '@sellery/db/dates';
 	import { COURIERS, REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
-	import { GradeBox, PlatformHandle, ProductIcon, SellerAvatar, StatusChip } from '@sellery/ui/site';
+	import { GradeBox, LiveRefresh, PlatformHandle, ProductIcon, SellerAvatar, StatusChip } from '@sellery/ui/site';
+	import { invalidate } from '$app/navigation';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -20,6 +21,9 @@
 <svelte:head>
 	<title>처리 대기 — 셀러리 파트너</title>
 </svelte:head>
+
+<!-- 큐는 인플루언서 쪽 행동(요청 · 결제 · 수령 · 제안)으로 바뀐다 — 탭이 보이는 동안 20초마다 다시 읽는다 -->
+<LiveRefresh refresh={() => invalidate('console:requests')} intervalMs={20_000} />
 
 <div class="console-head">
 	<h2>승인 · 처리 대기</h2>

@@ -7,6 +7,7 @@
  * 정산(CLEARING → SETTLED)은 여기 없다 — 관리자 단계.
  */
 import { createAdminClient, type Admin } from "./admin.server";
+import { notifyCampaignChanged, notifyCampaignCodesChanged } from "./realtime.server";
 
 export type CampaignTickResult = {
   ok: true;
@@ -45,6 +46,8 @@ export async function runCampaignTick(admin: Admin = createAdminClient()): Promi
   if (error) throw new Error(`app_campaign_tick failed: ${error.message}`);
   const r = parseCampaignTickResult(data);
   if (!r) throw new Error("app_campaign_tick returned an unexpected shape");
+  // 열려 있는 캠페인 상세(두 콘솔)가 LIVE/CLEARING 전이를 바로 보도록 — 실패는 삼킨다
+  await notifyCampaignCodesChanged(admin, [...r.wentLiveCodes, ...r.endedCodes], "tick");
   return r;
 }
 
@@ -58,6 +61,7 @@ export async function tickCampaign(campaignId: string, admin: Admin = createAdmi
   const o = obj(data);
   if (!o) return { ok: false, code: "DB_ERROR" };
   if (o.ok !== true) return { ok: false, code: o.code === "NOT_FOUND" ? "NOT_FOUND" : "DB_ERROR" };
+  if (o.went_live === true || o.ended === true) await notifyCampaignChanged(String(o.campaign_id ?? campaignId), "tick");
   return {
     ok: true,
     campaignId: String(o.campaign_id ?? campaignId),

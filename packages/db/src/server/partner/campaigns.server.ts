@@ -23,6 +23,7 @@ import {
 } from "../../partner/sample-rules";
 import { sellerNextAction, type SellerNextAction } from "../../partner/schedule-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type SellerCampaign = {
   id: string;
@@ -278,7 +279,9 @@ export async function receiveSample(sellerId: string, campaignCode: string, admi
     console.error("[campaigns] app_receive_sample failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseReceiveSampleResult(data);
+  const result = parseReceiveSampleResult(data);
+  if (result.ok && !result.already) await notifyCampaignChanged(c.id, "status");
+  return result;
 }
 
 /**
@@ -297,7 +300,9 @@ export async function requestSampleRefund(
     p_campaign_id: campaignId,
   });
   if (error) throw new Error(`app_seller_request_sample_refund failed: ${error.message}`);
-  return parseSampleRefundRequest(data);
+  const result = parseSampleRefundRequest(data);
+  if (result.ok && !result.already) await notifyCampaignChanged(campaignId, "refund_request");
+  return result;
 }
 
 /** 미발송 환불 요청 상태 — 화면이 "기한 안내 / 요청 버튼 / 요청 접수됨" 중 무엇을 보여줄지 (0033). */

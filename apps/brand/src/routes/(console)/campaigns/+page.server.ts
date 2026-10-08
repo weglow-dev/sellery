@@ -12,6 +12,7 @@ import { brandPath, listBrandCampaigns, requireBrand } from '$lib/server/brand';
 const isFilter = (v: string | null): v is BrandCampaignFilter => BRAND_CAMPAIGN_FILTERS.some((f) => f.key === v);
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('console:campaigns'); // LiveRefresh 폴링(20초) 이 이 load 만 다시 돌린다
 	const r = await requireBrand(event, { next: '/campaigns' });
 	if (!r.ok) redirect(303, r.location);
 	const { brand } = r.ctx;

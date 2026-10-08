@@ -34,6 +34,7 @@ import {
   type PartnerPaymentView,
 } from "@sellery/db/partner/sample-rules";
 import { createAdminClient, type Admin } from "@sellery/db/server/admin";
+import { notifyCampaignChanged } from "@sellery/db/server/realtime";
 import type { Shipping } from "@sellery/db/types";
 import { generateOrderId, isPartnerOrderId } from "../money";
 import { TOSS_KEY_RE, cancelReasonFor, logPaymentEvent, type EventSource } from "./checkout-sync.server";
@@ -293,6 +294,8 @@ async function confirmViaRpc(
         handled: true,
         result: "confirmed",
       });
+      // 브랜드 처리 대기·캠페인 상세가 SAMPLE_PURCHASED 를 바로 보도록(실패는 삼킨다)
+      await notifyCampaignChanged(r.campaignId, "sample_payment");
     }
     return {
       ok: true,
@@ -556,6 +559,7 @@ export async function refundSamplePurchase(
     result: r.ok ? (r.already ? "noop" : "refunded") : `needs_manual_adjust: ${r.code}`.slice(0, 200),
   });
   if (!r.ok) return { ok: false, code: r.code, message: r.message ?? `환불 기록 실패 (${r.code})`, tossCanceled };
+  if (!r.already) await notifyCampaignChanged(r.campaignId ?? p.campaign_id, "sample_payment");
   return { ok: true, already: r.already, campaignId: r.campaignId ?? p.campaign_id, balance: r.balance ?? null, tossCanceled };
 }
 

@@ -28,6 +28,7 @@ import { runScheduleAction, type ScheduleActionKind } from '$lib/server/schedule
 export type RequestsMessage = { tone: 'ok' | 'danger' | 'info'; text: string };
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('console:requests'); // LiveRefresh 폴링(20초) 이 이 load 만 다시 돌린다
 	const r = await requireBrand(event, { next: '/requests' });
 	if (!r.ok) redirect(303, r.location);
 	const { brand } = r.ctx;

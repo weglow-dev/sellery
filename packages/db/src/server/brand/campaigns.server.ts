@@ -22,6 +22,7 @@ import {
 } from "../../brand/campaign-rules";
 import type { Courier } from "../../carriers";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type { BrandCampaignRow, BrandCampaignDetail, BrandCampaignEvent, BrandSellerSummary, SampleActionResult } from "../../brand/campaign-rules";
 
@@ -75,7 +76,9 @@ async function callSample(admin: Admin, fn: SampleFn, brandId: string, code: str
     console.error(`[brand/campaigns] ${fn} failed:`, error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseSampleActionResult(data);
+  const result = parseSampleActionResult(data);
+  if (result.ok && !result.already) await notifyCampaignChanged(id, "status");
+  return result;
 }
 
 /** 샘플 요청 승인 — SAMPLE_REQUESTED → SAMPLE_APPROVED (이벤트 sample_approved). 이미 승인이면 already. */

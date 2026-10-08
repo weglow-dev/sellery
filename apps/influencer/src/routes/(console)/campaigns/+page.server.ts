@@ -19,6 +19,7 @@ const NEXT_HINT: Record<string, string> = {
 };
 
 export const load: PageServerLoad = async (event) => {
+	event.depends('console:campaigns'); // LiveRefresh 폴링(20초) 이 이 load 만 다시 돌린다
 	const r = await requireSeller(event, { next: '/campaigns' });
 	if (!r.ok) redirect(303, r.location);
 	const { seller } = r.ctx;
