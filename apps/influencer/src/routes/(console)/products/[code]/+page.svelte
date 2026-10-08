@@ -181,7 +181,7 @@
 {/if}
 
 {#if b.kind === 'free'}
-	<section class="card static console-form" id="sample">
+	<section class="card static console-form">
 		<div class="lbl-sm">무상 샘플 요청</div>
 		<!-- 어떤 상품을 요청하는지 폼 맨 위에 보인다 (대표 QA 2026-10-08 — 모바일에서 상품 정보가 화면 밖으로 밀려 안 보임) -->
 		<div class="sample-target">
