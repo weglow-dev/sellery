@@ -18,7 +18,6 @@
 	import { fmtNum, isBuyable, isEnded, stockLeft, type CampaignCard } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { showToast } from '../toast.svelte';
-	import { NOTIFY_TOAST } from '../constants';
 
 	let { card, optionIndex, qty, signedIn }: { card: CampaignCard; optionIndex: number; qty: number; signedIn: boolean } = $props();
 
@@ -45,7 +44,13 @@
 	<button type="button" class="buy" disabled style="opacity:0.6">판매가 종료되었습니다</button>
 	<div class="meta" style="text-align:center;margin-top:8px">교환·환불은 종료 후 {card.settings.clear_days}일까지 셀러리 고객센터에서 처리됩니다</div>
 {:else if c.status === 'SCHEDULE_CONFIRMED'}
-	<button type="button" class="pri buy" onclick={() => showToast(NOTIFY_TOAST)}>🔔 {c.start_date ? md(c.start_date) : ''} 오픈 알림 받기</button>
+	<!--
+		오픈 예정 — 알림 신청 버튼을 두지 않는다. 신청을 저장하는 테이블·발송 경로가 없어서
+		"신청 완료" 토스트만 띄우던 자리였다(허위 안내 · 2026-10-08 제거). 오픈 알림(이메일 또는
+		추후 카카오 알림톡)이 생기면 여기에 다시 버튼을 넣는다 — docs/launch-checklist.md §5 결정 3.
+	-->
+	<button type="button" class="buy" disabled style="opacity:0.6">{c.start_date ? md(c.start_date) : ''} 오픈 예정</button>
+	<div class="meta" style="text-align:center;margin-top:8px">오픈일부터 이 페이지에서 구매할 수 있어요</div>
 {:else}
 	<div class="buyrow">
 		<button type="button" class="pri buy" onclick={onBuy} disabled={soldOut || !buyable.ok} style={soldOut ? 'opacity:0.5' : undefined}>{soldOut ? '품절' : '구매하기'}</button>

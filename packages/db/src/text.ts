@@ -1,8 +1,9 @@
 /**
  * 문자열 정리 — 계약 docs/app-plan.md §10.0. 소유: E.
  *
- * 배송지(recipient/address1/address2/memo)·환불 사유는 브랜드 발주 CSV·알림톡·택배사 시스템으로 흘러가므로
+ * 배송지(recipient/address1/address2/memo)·환불 사유는 브랜드 발주 CSV·거래 메일·택배사 시스템으로 흘러가므로
  * 저장 시점에 이모지·비BMP 문자를 제거한다 (glo ebut.ts cleanText — "선경💙" 한 행이 WMS 배치 전체를 거부한 실사고).
+ * (알림톡은 보류 상태 — 도입하면 소비처가 하나 더 늘어난다. docs/launch-checklist.md §5 결정 3)
  */
 
 /**

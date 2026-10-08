@@ -15,7 +15,7 @@
 		{/each}
 		{#if os.length > 1}<tr class="tot"><td>총 결제</td><td class="num">₩{fmt(total)}</td></tr>{/if}
 	</tbody></table>
-	<p style="font-size:12px;color:var(--mute);margin-top:10px">{#if S.cust}<b>{S.cust.name}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요. {/if}운송장은 카카오 알림톡으로 안내됩니다. 실서비스에서는 이 단계에서 PG 결제창이 열립니다.</p>
+	<p style="font-size:12px;color:var(--mute);margin-top:10px">{#if S.cust}<b>{S.cust.name}</b>님의 <b>내 주문</b>에서 배송·환불을 관리할 수 있어요. {/if}운송장은 내 주문에서 확인하고, 이메일을 남기면 메일로도 안내됩니다. 실서비스에서는 이 단계에서 PG 결제창이 열립니다.</p>
 	<div class="foot">
 		{#if os.length}<button onclick={() => openModal('cs', { cid: os[0].campaignId, oid: os[0].id })}>문의하기</button>{/if}
 		{#if S.cust}<button onclick={() => { closeModal(); go.screen('orders'); }}>내 주문</button>{/if}

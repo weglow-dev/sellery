@@ -99,6 +99,7 @@
   - [ ] Vercel `sellery-shop` · `sellery-brand`(필수) · `sellery-admin`(선택) Production 에 `RESEND_API_KEY`(Sending access · 도메인 `sellery.life`) — deploy.md §1.2 · §5.7. **없으면 조용히 비활성**이라 넣기 전까지는 알림이 나가지 않는다. Preview 는 비워 둔다.
   - [ ] 시드 `brands.email`(`*.example`)은 반송된다 — §2 시드 정리 때 실제 담당자 주소로.
   - (a) 카카오 알림톡은 보류(발신 프로필 · 템플릿 심사 · 대행사 계약 필요). 비회원·카카오 회원은 이메일이 없을 수 있으므로(`privacy.ts:81` "이메일(있는 경우)") 메일은 보조 수단, 주문 조회 화면이 정본.
+  - [x] **고객 화면 문구를 이 결정에 맞춤 (2026-10-08)** — 결정은 2026-09-22 였는데 화면은 계속 "카카오 알림톡으로 안내"라고 말하고 있었다. 고친 곳: 판매 페이지 배송 카드(`packages/ui/src/site/ShippingPolicyCard.svelte` — "운송장은 **내 주문**에서 확인, 이메일을 남기면 메일로도 안내") · `/about` 회원 혜택 카드(오픈 알림 → 주문·배송 메일) · `/cs/[code]` 주석(답변 메일이 실제로 가므로 "알림 없다"는 낡은 기술) · 데모 3곳(`views/Store.svelte` · `modals/{OrderDoneModal,CSModal}` · `core/actions.ts`). **오픈 알림 버튼 2곳은 제거**(신청 저장·발송 경로 없음 — period-policy.md "오픈 알림은 없다" 참고). 알림톡을 도입하면 이 목록을 역순으로 되살린다.
 - [ ] **CS 당번**: 고객 문의는 `/cs/new` → 해당 브랜드 `/brand/cs` 로 직행, 관리자는 `/admin/cs` 열람만. 브랜드가 며칠 안 보면 아무도 모른다 → 브랜드 SLA(예 영업일 1일) 를 입점 안내에 명시하고, 운영자가 매일 `/admin/cs` 또는 `partner-admin.mjs cs --open` 으로 미답변을 본다. 담당자 **확인 필요(대표)**.
 - [ ] `official@weglow.biz` 메일함(푸터 고객센터 · 방침 §303)을 누가 보는지, 응답 시간.
 - [ ] Slack: 운영 채널에 `SLACK_WEBHOOK_URL` 을 shop · influencer · brand 세 프로젝트에 넣으면 가입·인증·환불이 한 줄씩 온다(개인정보 없이). 주문 알림은 코드에 없다.

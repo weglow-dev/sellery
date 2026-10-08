@@ -15,8 +15,6 @@
 	import SellerAvatar from './SellerAvatar.svelte';
 	import Viewers from './Viewers.svelte';
 	import VerifyLauncher from './VerifyLauncher.svelte';
-	import { showToast } from './toast.svelte';
-	import { NOTIFY_TOAST } from './constants';
 
 	let { c, today, featureDays = 7, allowFeat = true }: { c: HomeCard; today: string; featureDays?: number; allowFeat?: boolean } = $props();
 
@@ -62,9 +60,12 @@
 	<div class="btnrow">
 		{#if live}
 			<a {href} class="btn pri sm">구매하기</a>
-		{:else if soon}
-			<button type="button" class="sm ghost" onclick={() => showToast(NOTIFY_TOAST)}>🔔 오픈 알림</button>
 		{:else}
+			<!--
+				오픈 예정(soon)에 "🔔 오픈 알림" 버튼이 있던 자리 — 신청을 저장하는 테이블·발송 경로가 없어
+				토스트만 띄우던 허위 안내였다(2026-10-08 제거 · BuyCta 와 같은 이유). 오픈 D-n 은 위 배지가 보여준다.
+				오픈 알림(이메일 또는 추후 카카오 알림톡)이 생기면 이 분기를 다시 나눈다 — docs/launch-checklist.md §5 결정 3.
+			-->
 			<a {href} class="btn sm ghost">판매 페이지</a>
 		{/if}
 		<VerifyLauncher code={c.code} class="sm ghost"><Cel /> 인증 확인</VerifyLauncher>

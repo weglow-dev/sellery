@@ -1,7 +1,10 @@
 <script lang="ts">
 	/**
 	 * 고객 문의 스레드 — 머리(상품 · 브랜드 · 유형 · 상태 칩) · 주문 요약(매칭됐을 때 · 운송장 조회) · 말풍선(내 글은 오른쪽 `mine` · 브랜드/운영팀은 왼쪽) · 추가 문의 폼(`?/reply`).
-	 * CLOSED 는 폼 대신 "처리 종료" 안내 + 새 문의 링크. "브랜드가 답변하면 여기서 확인" 안내 — 알림 채널(알림톡·메일)은 없다(§8).
+	 * CLOSED 는 폼 대신 "처리 종료" 안내 + 새 문의 링크. "브랜드가 답변하면 여기서 확인" 안내.
+	 * 알림: 브랜드가 답변하면 `notifyCsReplied`(Resend) 가 메일 한 통을 보낸다(2026-09-22 거래 메일 · brand/cs.server `replyCs`).
+	 * 이메일을 남기지 않은 비회원·카카오 계정은 발송되지 않으므로 **이 화면이 정본**이다(§8 · docs/launch-checklist.md §5 결정 3).
+	 * 카카오 알림톡은 보류 상태이며 추후 도입 가능성이 있다.
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
