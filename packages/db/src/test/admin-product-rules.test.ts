@@ -3,10 +3,13 @@ import { PLAT_RATE } from "@sellery/core/constants";
 import {
   CATEGORY_POLICY_NOTE,
   PRODUCT_ACTION_MESSAGES,
+  PRODUCT_SPECIAL_FILTERS,
+  PRODUCT_SPECIAL_FILTER_LABELS,
   PRODUCT_STATUSES,
   PRODUCT_STATUS_LABELS,
   REVIEW_FAIL_MESSAGES,
   nextListingDecision,
+  parseProductSpecialFilter,
   parseProductStatusFilter,
   productSearchHit,
   productStatusChip,
@@ -124,5 +127,44 @@ describe("카테고리 정책 안내", () => {
   it("건강·웰니스 한정과 표시광고 사전 심의를 함께 담는다", () => {
     expect(CATEGORY_POLICY_NOTE).toContain("건강·웰니스");
     expect(CATEGORY_POLICY_NOTE).toContain("사전 심의");
+  });
+});
+
+/**
+ * 사후 점검 필터 (0046) — 우선 검수권으로 검수를 건너뛴 상품을 찾는 특수 칩.
+ * 상태 칩(`?status=`)과 **배타적**이다 — 라우트가 `special` 이 있으면 `status` 를 비운다.
+ */
+describe("parseProductSpecialFilter", () => {
+  it("아는 값만 통과", () => {
+    expect(parseProductSpecialFilter("fast_review")).toBe("fast_review");
+  });
+
+  it("빈 값·모르는 값·상태값은 null — 상태 필터와 섞이지 않는다", () => {
+    expect(parseProductSpecialFilter(null)).toBeNull();
+    expect(parseProductSpecialFilter(undefined)).toBeNull();
+    expect(parseProductSpecialFilter("")).toBeNull();
+    expect(parseProductSpecialFilter("listed")).toBeNull();
+    expect(parseProductSpecialFilter("FAST_REVIEW")).toBeNull();
+    expect(parseProductSpecialFilter("<script>")).toBeNull();
+  });
+
+  it("모든 특수 필터에 라벨이 있다", () => {
+    for (const k of PRODUCT_SPECIAL_FILTERS) expect(PRODUCT_SPECIAL_FILTER_LABELS[k]).toBeTruthy();
+  });
+
+  it("상태값과 특수값이 겹치지 않는다 — 한 쿼리 파라미터로 오인될 수 없다", () => {
+    for (const k of PRODUCT_SPECIAL_FILTERS) expect(PRODUCT_STATUSES).not.toContain(k as never);
+  });
+});
+
+describe("PRODUCT_ACTION_MESSAGES — 사후 점검 결과", () => {
+  it("점검 완료·중복·실패 문구가 있다", () => {
+    for (const k of ["fast_check", "fast_check_already", "err_NOT_FAST_REVIEWED"]) {
+      expect(PRODUCT_ACTION_MESSAGES[k], k).toBeTruthy();
+    }
+  });
+
+  it("점검 완료 문구가 '상품을 내린다' 로 읽히지 않는다 — 노출은 유지된다", () => {
+    expect(PRODUCT_ACTION_MESSAGES.fast_check).toMatch(/그대로|노출/);
   });
 });

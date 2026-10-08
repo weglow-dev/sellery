@@ -42,8 +42,7 @@ const STATUS_TONES: Record<ProductStatus, StatusTone> = {
 };
 
 export function productStatusChip(status: ProductStatus | string): { label: string; tone: StatusTone } {
-  const s = status as ProductStatus;
-  return PRODUCT_STATUSES.includes(s)
+  const s = status as ProductStatus;  return PRODUCT_STATUSES.includes(s)
     ? { label: PRODUCT_STATUS_LABELS[s], tone: STATUS_TONES[s] }
     : { label: String(status), tone: "gray" };
 }
@@ -51,6 +50,25 @@ export function productStatusChip(status: ProductStatus | string): { label: stri
 /** `?status=` — 목록 필터. 빈 값·모르는 값은 null(전체) */
 export function parseProductStatusFilter(raw: string | null | undefined): ProductStatus | null {
   return PRODUCT_STATUSES.includes(raw as ProductStatus) ? (raw as ProductStatus) : null;
+}
+
+/**
+ * 상태 칩 외의 특수 필터 (0046). 지금은 **사후 점검 대기** 하나다.
+ *
+ * 우선 검수권(🥬)으로 관리자 검수를 건너뛴 상품은 `pending → listed` 가 되어 검수 대기 큐에서
+ * 사라진다 — 관리자가 사후에 볼 트리거가 없었다(0046 배경 2). 이 필터가 그 큐다.
+ * 조건: `fast_reviewed_at` 있고 · `fast_review_checked_at` 없고 · 아직 `listed`.
+ * 반려·노출 중단으로 상태가 바뀌면 그 행위가 곧 점검이므로 큐에서 빠진다.
+ */
+export const PRODUCT_SPECIAL_FILTERS = ["fast_review"] as const;
+export type ProductSpecialFilter = (typeof PRODUCT_SPECIAL_FILTERS)[number];
+
+export const PRODUCT_SPECIAL_FILTER_LABELS: Record<ProductSpecialFilter, string> = {
+  fast_review: "검수 생략 · 점검 대기",
+};
+
+export function parseProductSpecialFilter(raw: string | null | undefined): ProductSpecialFilter | null {
+  return PRODUCT_SPECIAL_FILTERS.includes(raw as ProductSpecialFilter) ? (raw as ProductSpecialFilter) : null;
 }
 
 /**
@@ -82,6 +100,12 @@ export function reviewFailMessage(code: string | null | undefined): string {
 }
 
 export const PRODUCT_ACTION_MESSAGES: Record<string, string> = {
+  // 사후 점검 (0046)
+  fast_check: "사후 점검 완료로 기록했습니다 — 점검 대기 목록에서 빠집니다. 상품은 그대로 노출됩니다.",
+  fast_check_already: "이미 점검한 상품입니다.",
+  err_NOT_FAST_REVIEWED: "검수 생략으로 올라온 상품이 아닙니다 — 점검 대상이 아닙니다.",
+  err_NOT_FOUND: "상품을 찾을 수 없습니다.",
+  err_DB_ERROR: "처리에 실패했습니다. 잠시 후 다시 시도해주세요.",
   approved: "승인했습니다 — 노출 중으로 바뀌었습니다.",
   approved_already: "이미 노출 중입니다.",
   rejected: "반려했습니다. 사유는 브랜드 상품 화면에 표시됩니다.",
