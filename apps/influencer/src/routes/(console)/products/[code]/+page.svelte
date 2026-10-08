@@ -193,7 +193,7 @@
 		</div>
 		<div class="lbl-sm" style="margin-top:12px">배송지</div>
 		<p class="meta" style="margin:6px 0 12px">
-			브랜드가 승인하면 이 주소로 샘플이 발송돼요. 무상 샘플은 <b>같은 상품은 1회만</b> 받을 수 있고, 요청하면 <b>이달 무상 한도에서 1회</b>가 차감됩니다{#if data.quotaText}{' '}({data.quotaText}){/if}. 배송지는 <a href={data.myPath} style="text-decoration:underline">내 정보</a> 에 기본값으로 저장돼요.
+			브랜드가 승인하면 이 주소로 샘플이 발송돼요. 무상 샘플은 요청할 때마다 <b>이달 무상 한도에서 1회</b>가 줄어요{#if data.quotaText}{' '}({data.quotaText}){/if}. <b>같은 상품은 한 번만</b> 무상으로 받을 수 있고, 두 번째부터는 샘플 구매로 진행돼요. 배송지는 <a href={data.myPath} style="text-decoration:underline">내 정보</a> 에 기본값으로 저장돼요.
 		</p>
 		<form method="post" action="?/requestFree">
 			<ShippingFields value={shippingValue} invalid={form?.field ?? null} idPrefix="sample" />
