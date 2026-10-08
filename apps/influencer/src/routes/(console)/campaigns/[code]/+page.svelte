@@ -184,9 +184,9 @@
 				{/if}
 
 				{#if ctx}
-					<details class="console-sched-wrap" open={showForm}>
-						<!-- 열려 있을 때는 라벨을 바꿔 아래 [승인 요청 보내기]와 역할이 겹쳐 보이지 않게 (대표 QA 2026-10-08) -->
-						<summary class="btn {c.status === 'TESTING' ? 'pri' : ''}"><span class="when-closed">{c.status === 'TESTING' ? '진행할게요 → 일정 제안' : '다른 기간으로 다시 제안'}</span><span class="when-open">일정 제안 폼 접기 ↑</span></summary>
+					<!-- 아코디언: 헤더 바를 누르면 폼이 펼쳐진다 (대표 QA 2026-10-08) -->
+					<details class="console-sched-wrap accordion" open={showForm}>
+						<summary class="acc-head"><span class="acc-title">{c.status === 'TESTING' ? '진행할게요 — 판매 일정 제안' : '다른 기간으로 다시 제안'}</span><span class="acc-sub">시작일 · 기간 · 배정 재고</span><span class="acc-chev" aria-hidden="true">▾</span></summary>
 						<form method="post" action="?/propose" class="console-form console-sched" style="margin-top:12px">
 							{#if pf?.message}<p class="notice danger" role="alert">{pf.message}</p>{/if}
 							<div class="fld">
@@ -229,7 +229,8 @@
 					</details>
 				{/if}
 				{#if c.status === 'TESTING'}
-					<form method="post" action="?/pass" class="btnrow" style="margin-top:10px" onsubmit={confirmPass}>
+					<form method="post" action="?/pass" class="console-pass" onsubmit={confirmPass}>
+						<div class="lbl-sm">다른 선택</div>
 						<button type="submit" class="ghost sm">진행하지 않을게요</button>
 						<span class="hint" style="margin:0;align-self:center">이 캠페인을 여기서 끝내요 — 페널티 없음 · 이 상품의 무상 샘플 1회는 소진. 기한({c.test_due ? md(c.test_due) : '—'})은 <b>진행 여부를 정하는</b> 날이라, 판매 시작일은 그 뒤여도 괜찮아요 — 일정이 늦어질 뿐이면 패스 대신 원하는 시작일로 제안하세요.</span>
 					</form>
