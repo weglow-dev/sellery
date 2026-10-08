@@ -1825,3 +1825,17 @@
 .sample-target .nm { font-weight:700; }
 .sample-target .grow { flex:1; min-width:0; }
 
+/* 인플루언서 홈 상단 요약 — 칩 + 실시간 시계 (2026-10-08) */
+.home-meta { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:-6px 0 16px; }
+.home-chips { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.hchip { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; background:#fff; border:1px solid var(--color-line); font-size:12.5px; line-height:1; }
+.hchip .k { color:var(--color-mute); font-size:11px; }
+.hchip.todo { background:var(--color-lime); border-color:var(--color-ink); }
+.hchip.live { background:var(--color-lime); }
+.liveclock { display:inline-flex; align-items:baseline; gap:8px; font-family:var(--font-mono, ui-monospace, monospace); font-size:12.5px; color:var(--color-mute); white-space:nowrap; }
+.liveclock .lc-time { font-size:15px; font-weight:700; color:var(--color-ink); letter-spacing:0.04em; font-variant-numeric:tabular-nums; }
+.liveclock .lc-time.lc-live::after { content:''; display:inline-block; width:6px; height:6px; margin-left:6px; vertical-align:middle; background:var(--color-accent); animation:lc-blink 1s steps(2, start) infinite; }
+@keyframes lc-blink { to { visibility:hidden; } }
+@media (prefers-reduced-motion: reduce) { .liveclock .lc-time.lc-live::after { animation:none; } }
+@media (max-width:640px) { .home-meta { align-items:flex-start; } }
+
