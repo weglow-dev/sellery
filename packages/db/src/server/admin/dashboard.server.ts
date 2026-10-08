@@ -133,6 +133,15 @@ export type AdminDashboard = {
     exclusivePending: number;
     unshippedOrders: number;
     /**
+     * 샘플 발송 대기 — 브랜드가 샘플 요청을 승인했거나 인플루언서가 샘플을 구매했는데 아직
+     * 보내지 않은 캠페인(`SAMPLE_APPROVED` · `SAMPLE_PURCHASED`).
+     *
+     * 샘플은 `orders` 가 아니라 `campaigns.sample_courier` · `tracking_no` 로 발송을 기록하므로
+     * (0015:668) 위 `unshippedOrders` 에서는 빠진다 — 그래서 따로 센다. 이게 없으면 샘플 미발송을
+     * 아무도 보지 않는다. 미발송 샘플은 5영업일 뒤 환불 대상이다(0024 · docs/sample-policy.md).
+     */
+    sampleToShip: number;
+    /**
      * 우선 검수권(🥬)으로 관리자 검수를 건너뛴 상품 중 **아직 사후 점검하지 않은** 건 (0046).
      * `pending → listed` 로 바뀌어 "검수 대기" 에서 사라지므로 따로 세지 않으면 아무도 보지 않는다.
      * 건강·웰니스 상품은 표시광고 규제 대상이라 점검이 운영 업무다.
@@ -280,7 +289,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
   const statusMap = new Map<string, number>();
   for (const c of campaigns) statusMap.set(c.status, (statusMap.get(c.status) ?? 0) + 1);
 
-  const [ordersToday, ordersRefunded, pendingProducts, fastReviewPending, exclusivePending, unshippedOrders, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
+  const [ordersToday, ordersRefunded, pendingProducts, fastReviewPending, exclusivePending, unshippedOrders, sampleToShip, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
     await Promise.all([
       count(admin.from("orders").select("id", head).gte("paid_at", `${today}T00:00:00+09:00`).lte("paid_at", `${today}T23:59:59+09:00`), "오늘 주문"),
       count(admin.from("orders").select("id", head).eq("status", "REFUNDED"), "환불 주문"),
@@ -297,7 +306,20 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
         "사후 점검 대기",
       ),
       count(admin.from("exclusive_requests").select("id", head).eq("status", "PENDING"), "독점권 신청 대기"),
-      count(admin.from("orders").select("id", head).eq("status", "PAID").is("tracking_no", null), "미발송 주문"),
+      // 미발송 주문 — **도착지(`/orders?f=unshipped`)와 같은 조건이어야 한다**(0020:1109 `and not o.is_sample`).
+      //   샘플 주문(`is_sample`)은 `orders.tracking_no` 를 **구조적으로 받지 못한다**:
+      //   생성 시 null 이고(0012:522-527) 그 값을 세우는 유일한 RPC `app_brand_ship_order` 가
+      //   샘플을 `SAMPLE` 코드로 거부한다(0018:281-282). 샘플 운송장은 `campaigns.tracking_no` 에 저장된다(0015:668).
+      //   그래서 샘플을 포함해 세면 카운트가 **영원히 줄어들지 않고**, 눌러서 들어간 화면에는 그 건이 없다.
+      //   샘플 발송 대기는 캠페인 상태(`SAMPLE_APPROVED`)로 따로 센다 — 아래 `sampleToShip`.
+      count(
+        admin.from("orders").select("id", head).eq("status", "PAID").is("tracking_no", null).eq("is_sample", false),
+        "미발송 주문",
+      ),
+      count(
+        admin.from("campaigns").select("id", head).in("status", ["SAMPLE_APPROVED", "SAMPLE_PURCHASED"]),
+        "샘플 발송 대기",
+      ),
       count(admin.from("seller_channels").select("id", head).eq("verified", false).not("vcode_confirmed_at", "is", null), "채널 승인 대기"),
       count(admin.from("seller_channels").select("id", head).eq("verified", false), "미인증 채널"),
       count(admin.from("brands").select("id", head).is("bank_info", null), "브랜드 정산정보 미등록"),
@@ -329,6 +351,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       fastReviewPending,
       exclusivePending,
       unshippedOrders,
+      sampleToShip,
       channelsAwaitingApproval: awaitingApproval,
       channelsUnverified: unverified,
       noSettleInfoBrands: brandsNoBank,
