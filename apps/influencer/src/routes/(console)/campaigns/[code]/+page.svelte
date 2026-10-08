@@ -51,7 +51,8 @@
 	const endDate = $derived(start && start.length === 10 ? endOfPeriod(start, len) : '');
 	/** 내가 고른 기간과 겹치는 우선권 기간 — 폼 위 안내 (판정은 DB) */
 	const clash = $derived(endDate ? data.priorityHolders.filter((h) => !(endDate < h.start || start > h.end)) : []);
-	const showForm = $derived(c.status === 'TESTING' || (c.status === 'SCHEDULE_PROPOSED' && !!pf));
+	// 기본은 접힘(대표 결정 2026-10-08) — 제안 제출이 실패해 오류를 보여줘야 할 때만 펼친다
+	const showForm = $derived(!!pf);
 
 	const confirmPass = (e: SubmitEvent) => {
 		if (!confirm('이번 상품은 진행하지 않고 패스할까요? 이 캠페인은 종료되고, 이 상품의 무상 샘플 1회는 사용한 것으로 남아요.')) e.preventDefault();
@@ -166,10 +167,10 @@
 				{#if c.status === 'TESTING'}
 					<h4>테스트 후 진행 결정 <span class="chip seller">인플루언서 액션</span></h4>
 					<p class="hint">
-						기한 <b>{c.test_due ? md(c.test_due) : '—'}</b>{#if c.test_due}
+						진행하려면 <b>{c.test_due ? md(c.test_due) : '—'}</b>{#if c.test_due}
 							{@const left = dday(c.test_due)}
 							{#if !Number.isNaN(left)}{' '}({left < 0 ? '기한 지남' : left === 0 ? '오늘 마감' : `D-${left}`}){/if}{/if}
-						까지. 진행하려면 판매 일정(시작일 · 기간 · 배정 재고)을 제안하세요 — 브랜드가 승인하면 판매 링크가 열려요.
+						까지 판매 일정(시작일 · 기간 · 배정 재고)을 제안하세요 — 브랜드가 승인하면 판매 링크가 열려요.
 						{#if c.decision_reason}<br /><span class="console-danger">브랜드 반려 사유: {c.decision_reason}</span> — 다른 기간·수량으로 다시 제안할 수 있어요.{/if}
 					</p>
 				{:else}
@@ -184,9 +185,9 @@
 				{/if}
 
 				{#if ctx}
-					<details class="console-sched-wrap" open={showForm}>
-						<!-- 열려 있을 때는 라벨을 바꿔 아래 [승인 요청 보내기]와 역할이 겹쳐 보이지 않게 (대표 QA 2026-10-08) -->
-						<summary class="btn {c.status === 'TESTING' ? 'pri' : ''}"><span class="when-closed">{c.status === 'TESTING' ? '진행할게요 → 일정 제안' : '다른 기간으로 다시 제안'}</span><span class="when-open">일정 제안 폼 접기 ↑</span></summary>
+					<!-- 아코디언: 헤더 바를 누르면 폼이 펼쳐진다 (대표 QA 2026-10-08) -->
+					<details class="console-sched-wrap accordion" open={showForm}>
+						<summary class="acc-head"><span class="acc-title">{c.status === 'TESTING' ? '진행할게요 — 판매 일정 제안' : '다른 기간으로 다시 제안'}</span><span class="acc-sub">시작일 · 기간 · 배정 재고</span><span class="acc-chev" aria-hidden="true">▾</span></summary>
 						<form method="post" action="?/propose" class="console-form console-sched" style="margin-top:12px">
 							{#if pf?.message}<p class="notice danger" role="alert">{pf.message}</p>{/if}
 							<div class="fld">
@@ -229,7 +230,8 @@
 					</details>
 				{/if}
 				{#if c.status === 'TESTING'}
-					<form method="post" action="?/pass" class="btnrow" style="margin-top:10px" onsubmit={confirmPass}>
+					<form method="post" action="?/pass" class="console-pass" onsubmit={confirmPass}>
+						<div class="lbl-sm">다른 선택</div>
 						<button type="submit" class="ghost sm">진행하지 않을게요</button>
 						<span class="hint" style="margin:0;align-self:center">이 캠페인을 여기서 끝내요 — 페널티 없음 · 이 상품의 무상 샘플 1회는 소진. 기한({c.test_due ? md(c.test_due) : '—'})은 <b>진행 여부를 정하는</b> 날이라, 판매 시작일은 그 뒤여도 괜찮아요 — 일정이 늦어질 뿐이면 패스 대신 원하는 시작일로 제안하세요.</span>
 					</form>
