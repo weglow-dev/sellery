@@ -68,6 +68,14 @@
 //   toss-payout-refresh <payout id>         GET /v2/payouts/{toss id} → app_payout_sync_status (웹훅을 놓쳤을 때)
 //   toss-payout-cancel <payout id>          POST /v2/payouts/{toss id}/cancel (REQUESTED 만) → app_payout_sync_status
 //
+//   ── 택배 자동 추적 (0049 · 스마트택배 · docs/deploy.md §5.8 · §8.2 — SWEETTRACKER_API_KEY 필요 · 전부 POST JSON · 월 5,000회 공유) ──
+//   tracking-due [--limit N]                app_tracking_due — 지금 조회 대상(샘플 먼저) · 14일 경과분은 TIMEOUT 으로 닫는다(API 호출 없음)
+//   tracking-sweep [--dry-run] [--limit N]  크론 /api/cron/tracking 과 같은 한 바퀴 — 조회 → 스냅샷 기록 → 배송 완료면 샘플 TESTING 전이 · 주문 delivered_at.
+//                                           --dry-run 은 기록·전이 없이 결과만 출력(API 는 호출한다 — 호출량 소모)
+//   track <택배사> <송장>                  trackingInfo 1회(DB 기록 없음) — 코드 표·응답 모양 확인용. 택배사는 COURIERS 한글명('CJ대한통운' …)
+//   tracking-usage                          key/usage — 이번 달 호출량(크론 응답에도 실린다)
+//   tracking-companies                      companylist — 택배사 코드 표(우리 5개 코드 대조: 01 우체국 · 04 CJ · 05 한진 · 06 로젠 · 08 롯데)
+//
 //   <seller> · <channel> · <brand> · <product> · <campaign> 는 code('s1' · 'ch1' · 'b1' · 'p1' · 'c3') 또는 uuid. 이메일은 마스킹하지 않지만 키·비밀은 절대 출력하지 않는다.
 //   .env.local 은 자동으로 읽는다(저장소 루트 .env.local · 값 미출력 — PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY · refund-sample 은 TOSS_SECRET_KEY · toss-* 는 TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY). 대안은 언제나 `npx supabase db query --linked "…"`.
 //   Slack 알림(SLACK_WEBHOOK_URL 있을 때만): suspend/reactivate/verify-channel/refund-sample/suspend-brand/reactivate-brand 한 줄 — 이메일·핸들·URL·사업자번호 없이.
@@ -130,6 +138,7 @@ function usage(code = 2) {
       "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
       "  payout-mode [manual|toss] | payout-cap [<원>] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
       "  toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD] | toss-payout-refresh <payout id> | toss-payout-cancel <payout id>",
+      "  tracking-due [--limit N] | tracking-sweep [--dry-run] [--limit N] | track <택배사> <송장> | tracking-usage | tracking-companies",
     ].join("\n"),
   );
   process.exit(code);
@@ -633,6 +642,151 @@ async function cmdRefundSample() {
 }
 
 /* ------------------------------------------------------------ 브랜드 콘솔 4단계 (0018) ------------------------------------------------------------ */
+
+// ── 택배 자동 추적 (0049) — packages/db/src/tracking/sweettracker.ts · server/tracking.server.ts 와 같은 규칙(.mjs 라 TS 를 import 하지 못해 요청 형식만 여기 복제)
+const SWEET_BASE = "https://info.sweettracker.co.kr";
+const SWEET_CODES = { 우체국택배: "01", CJ대한통운: "04", 한진택배: "05", 로젠택배: "06", 롯데택배: "08" };
+function sweetKey() {
+  const k = (process.env.SWEETTRACKER_API_KEY || "").trim();
+  if (!k) {
+    console.error("[partner-admin] SWEETTRACKER_API_KEY 가 없습니다 — 루트 .env.local(또는 --env-file) 을 확인하세요 (docs/deploy.md §5.8).");
+    process.exit(1);
+  }
+  return k;
+}
+/** 전부 POST + application/json (GET 은 2026-10-30 종료 · 폼 인코딩은 companylist/key-usage 가 415) */
+async function sweetPost(path, body) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${SWEET_BASE}${path}`, { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    const text = await res.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(`응답이 JSON 이 아닙니다 (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} · ${json?.msg ?? text.slice(0, 200)}`);
+    return json;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function sweetParse(json) {
+  if (!json || typeof json !== "object") return { status: "ERROR", error: "bad json" };
+  if (json.status === false) return { status: /운송장|송장|배송\s*정보|없습니다|존재하지/.test(json.msg ?? "") ? "NOT_FOUND" : "ERROR", error: json.msg ?? "스마트택배 오류", code: json.code };
+  const details = Array.isArray(json.trackingDetails) ? json.trackingDetails : [];
+  const last = json.lastDetail ?? details[details.length - 1] ?? null;
+  const level = Number.isFinite(Number(json.level)) ? Number(json.level) : last?.level ?? null;
+  const delivered = json.complete === true || level === 6;
+  const toIso = (ts) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(ts ?? ""));
+    return m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? "00"}+09:00` : null;
+  };
+  const done = [...details].reverse().find((e) => Number(e?.level) === 6) ?? (last && Number(last.level) === 6 ? last : null);
+  return {
+    status: delivered ? "DELIVERED" : "IN_TRANSIT",
+    level,
+    deliveredAt: delivered ? (toIso(done?.timeString) ?? toIso(last?.timeString)) : null,
+    last: last ? { at: toIso(last.timeString), where: last.where ?? null, kind: last.kind ?? null, level: Number.isFinite(Number(last.level)) ? Number(last.level) : null } : null,
+    error: null,
+  };
+}
+
+async function cmdTrackingDue() {
+  const limit = Number(flags.limit ?? 50) || 50;
+  const { data, error } = await admin.rpc("app_tracking_due", { p_limit: limit, p_max_age_days: 14 });
+  if (error) throw new Error(`app_tracking_due failed: ${error.message}`);
+  const rows = [...(data?.samples ?? []), ...(data?.orders ?? [])].map((p) => ({ kind: p.kind, code: p.code, courier: p.courier, tracking_no: p.tracking_no, shipped: fmtDate(p.shipped_at), last: p.tracking_status ?? "-" }));
+  console.log(`[partner-admin] 조회 대상 ${rows.length}건 (샘플 ${data?.samples?.length ?? 0} · 주문 ${data?.orders?.length ?? 0}) · 14일 경과 TIMEOUT 처리 샘플 ${data?.timed_out?.samples ?? 0} · 주문 ${data?.timed_out?.orders ?? 0}`);
+  if (rows.length) console.table(rows);
+}
+
+async function cmdTrackingSweep() {
+  const key = sweetKey();
+  const dry = flags["dry-run"] === true;
+  const limit = Number(flags.limit ?? 50) || 50;
+  const { data, error } = await admin.rpc("app_tracking_due", { p_limit: limit, p_max_age_days: 14 });
+  if (error) throw new Error(`app_tracking_due failed: ${error.message}`);
+  const parcels = [...(data?.samples ?? []), ...(data?.orders ?? [])];
+  console.log(`[partner-admin] ${dry ? "(dry-run) " : ""}조회 대상 ${parcels.length}건 · TIMEOUT 처리 ${(data?.timed_out?.samples ?? 0) + (data?.timed_out?.orders ?? 0)}건`);
+  const rows = [];
+  for (const p of parcels) {
+    const code = SWEET_CODES[p.courier];
+    const digits = String(p.tracking_no ?? "").replace(/\D/g, "");
+    let snap;
+    if (!code || !digits) snap = { status: "NOT_FOUND", error: `미지원 택배사/송장: ${p.courier} ${p.tracking_no}` };
+    else {
+      try {
+        snap = sweetParse(await sweetPost("/api/v1/trackingInfo", { t_key: key, t_code: code, t_invoice: digits }));
+      } catch (e) {
+        snap = { status: "ERROR", error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+    let result = "-";
+    if (!dry) {
+      const { data: r, error: e2 } = await admin.rpc("app_tracking_record", {
+        p_kind: p.kind,
+        p_id: p.id,
+        p_status: snap.status,
+        p_last: snap.last ?? undefined,
+        p_delivered_at: snap.deliveredAt ?? undefined,
+        p_source: "sweettracker",
+      });
+      if (e2) result = `record 실패: ${e2.message}`;
+      else if (!r?.ok) result = `record 거부: ${r?.code}`;
+      else if (r.transitioned) result = `TESTING 전이 (기한 ${r.test_due})`;
+      else if (r.already) result = "이미 전이됨(already)";
+      else if (r.newly_delivered) result = "delivered_at 기록";
+      else result = "스냅샷";
+    }
+    rows.push({ kind: p.kind, code: p.code, courier: p.courier, tracking_no: p.tracking_no, status: snap.status, level: snap.level ?? "", last: snap.last ? `${snap.last.kind ?? ""} ${snap.last.where ?? ""} ${snap.last.at ?? ""}`.trim() : snap.error ?? "", result });
+  }
+  if (rows.length) console.table(rows);
+  if (parcels.length) {
+    try {
+      const u = await sweetPost("/api/v1/key/usage", { t_key: key });
+      console.log(`[partner-admin] key/usage: ${JSON.stringify(u)}`);
+    } catch (e) {
+      console.log(`[partner-admin] key/usage 조회 실패: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+}
+
+async function cmdTrack() {
+  const key = sweetKey();
+  const [courier, no] = positional;
+  const code = SWEET_CODES[courier];
+  const digits = String(no ?? "").replace(/\D/g, "");
+  if (!code || !digits) {
+    console.error(`[partner-admin] 택배사는 ${Object.keys(SWEET_CODES).join(" · ")} 중 하나, 송장은 숫자: track CJ대한통운 123456789012`);
+    process.exit(2);
+  }
+  const json = await sweetPost("/api/v1/trackingInfo", { t_key: key, t_code: code, t_invoice: digits });
+  const snap = sweetParse(json);
+  console.log(`[partner-admin] ${courier}(${code}) ${digits}: ${snap.status}${snap.level ? ` · level ${snap.level}` : ""}${snap.deliveredAt ? ` · 완료 ${snap.deliveredAt}` : ""}${snap.error ? ` · ${snap.error}` : ""}`);
+  if (Array.isArray(json?.trackingDetails)) console.table(json.trackingDetails.map((d) => ({ time: d.timeString, where: d.where, kind: d.kind, level: d.level })));
+  else console.log(JSON.stringify(json, null, 2));
+}
+
+async function cmdTrackingUsage() {
+  const u = await sweetPost("/api/v1/key/usage", { t_key: sweetKey() });
+  console.log(`[partner-admin] key/usage (월 5,000회 공유): ${JSON.stringify(u)}`);
+}
+
+async function cmdTrackingCompanies() {
+  const j = await sweetPost("/api/v1/companylist", { t_key: sweetKey() });
+  const list = Array.isArray(j?.Company) ? j.Company : Array.isArray(j) ? j : j?.companies ?? [];
+  const ours = new Set(Object.values(SWEET_CODES));
+  const rows = list.map((c) => ({ code: c.Code ?? c.code, name: c.Name ?? c.name, ours: ours.has(String(c.Code ?? c.code)) ? "●" : "" }));
+  if (rows.length) console.table(rows);
+  else console.log(JSON.stringify(j, null, 2));
+  for (const [name, code] of Object.entries(SWEET_CODES)) {
+    const hit = rows.find((r) => String(r.code) === code);
+    console.log(`  ${code} ${name} → ${hit ? hit.name : "⚠ 목록에 없음"}`);
+  }
+}
 
 async function cmdTick() {
   const { data, error } = await admin.rpc("app_campaign_tick");
@@ -1448,6 +1602,21 @@ try {
       break;
     case "campaign":
       await cmdCampaign();
+      break;
+    case "tracking-due":
+      await cmdTrackingDue();
+      break;
+    case "tracking-sweep":
+      await cmdTrackingSweep();
+      break;
+    case "track":
+      await cmdTrack();
+      break;
+    case "tracking-usage":
+      await cmdTrackingUsage();
+      break;
+    case "tracking-companies":
+      await cmdTrackingCompanies();
       break;
     case "tick":
       await cmdTick();
