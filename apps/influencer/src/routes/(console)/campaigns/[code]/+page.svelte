@@ -109,7 +109,7 @@
 
 	<div class="console-actions">
 		{#if c.status === 'SAMPLE_REQUESTED'}
-			<div class="card static"><h4>브랜드 승인 대기 중 ⏳</h4><p class="hint">샘플 요청이 접수됐어요. 브랜드가 프로필을 검토 중입니다 — 보통 24시간 내 응답해요.</p></div>
+			<div class="card static"><h4>브랜드 승인 대기 중 ⏳</h4><p class="hint">샘플 요청이 접수됐어요. 브랜드가 프로필을 검토 중입니다 — 보통 24시간 내 응답해요.<br />재고 소진이나 기타 이슈로 거절될 수도 있습니다.</p></div>
 		{:else if c.status === 'INVITED'}
 			<div class="card static">
 				<h4>브랜드 직접 제안 <span class="chip seller">인플루언서 액션</span></h4>
