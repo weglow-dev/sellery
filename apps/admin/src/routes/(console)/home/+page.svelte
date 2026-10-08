@@ -53,6 +53,12 @@
 			href: `${data.paths.products}?status=pending`
 		},
 		{
+			// 우선 검수권으로 검수를 건너뛴 상품의 사후 점검(0046) — 표시광고 규제 대응
+			n: data.todo.fastReviewPending,
+			label: '검수 생략 상품 점검',
+			href: `${data.paths.products}?special=fast_review`
+		},
+		{
 			n: data.money?.dueNow ?? 0,
 			label: '정산 실행 가능',
 			href: data.paths.settle

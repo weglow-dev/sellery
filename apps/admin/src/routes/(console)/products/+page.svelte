@@ -87,6 +87,19 @@
 			{c.label}<span class="n"> {c.count}</span>
 		</a>
 	{/each}
+	<!--
+		사후 점검 대기(0046) — 우선 검수권(🥬)으로 관리자 검수를 건너뛴 상품. `pending → listed` 로
+		바뀌어 "검수 대기" 칩에서 사라지므로 따로 걸러야 찾을 수 있다. 0건이면 숨긴다.
+	-->
+	{#if data.specialChip.count > 0 || data.special === 'fast_review'}
+		<a
+			href={data.specialChip.href}
+			class="catchip {data.special === 'fast_review' ? 'on' : ''}"
+			aria-current={data.special === 'fast_review' ? 'page' : undefined}
+		>
+			⚡ {data.specialChip.label}<span class="n"> {data.specialChip.count}</span>
+		</a>
+	{/if}
 </nav>
 
 <nav class="cats prods-subchips" aria-label="브랜드 필터">
@@ -207,7 +220,13 @@
 						<!-- 우선 검수권(0038)으로 검수를 건너뛴 상품 — 표시광고 사후 점검 대상.
 						     관리자는 [노출 중단]·[반려] 로 되돌릴 수 있다 -->
 						{#if p.fast_reviewed_at}
-							<small><StatusChip tone="red">검수 생략 {p.fast_reviewed_at}</StatusChip></small>
+							<small>
+								{#if p.fast_review_checked_at}
+									<StatusChip tone="gray">검수 생략 · 점검 {p.fast_review_checked_at}</StatusChip>
+								{:else}
+									<StatusChip tone="red">검수 생략 {p.fast_reviewed_at}</StatusChip>
+								{/if}
+							</small>
 						{/if}
 					</td>
 					<td data-l="관리" class="admin-row-act">
@@ -254,6 +273,32 @@
 									<input type="hidden" name="decision" value={next.decision} />
 									<button type="submit" class="ghost sm">{next.label}</button>
 								</form>
+								<!--
+									검수 생략 상품의 사후 점검(0046) — 아직 점검하지 않은 노출 중 상품에만.
+									[점검 완료] 는 상품을 그대로 두고 확인 사실만 기록한다. 문제가 있으면 [반려] 를 쓴다
+									(RPC 는 listed → rejected 를 허용한다 · 0015).
+								-->
+								{#if p.fast_reviewed_at && !p.fast_review_checked_at && p.status === 'listed'}
+									<form method="post" action="?/fastCheck">
+										<input type="hidden" name="product" value={p.code ?? p.id} />
+										<button type="submit" class="pri sm">점검 완료</button>
+									</form>
+									<details class="console-reject">
+										<summary class="btn danger sm">반려</summary>
+										<form method="post" action="?/review" class="console-form console-reject-form">
+											<input type="hidden" name="product" value={p.code ?? p.id} />
+											<input type="hidden" name="decision" value="reject" />
+											<textarea
+												name="reason"
+												rows="2"
+												required
+												maxlength={REJECT_REASON_MAX}
+												placeholder="반려 사유 (필수 · 브랜드 상품 화면에 표시돼요 · {REJECT_REASON_MAX}자 이내)"
+											></textarea>
+											<button type="submit" class="danger sm">반려 확정</button>
+										</form>
+									</details>
+								{/if}
 							{/if}
 							<a href="{detail(p)}/preview" class="btn ghost sm">상세페이지</a>
 						</div>

@@ -1469,6 +1469,8 @@ export type Database = {
           exclusive_label: string | null
           exclusive_seller_id: string | null
           fast_reviewed_at: string | null
+          fast_review_checked_at: string | null
+          fast_review_checked_by: string | null
           id: string
           image_urls: string[]
           name: string
@@ -1501,6 +1503,8 @@ export type Database = {
           exclusive_label?: string | null
           exclusive_seller_id?: string | null
           fast_reviewed_at?: string | null
+          fast_review_checked_at?: string | null
+          fast_review_checked_by?: string | null
           id?: string
           image_urls?: string[]
           name: string
@@ -1533,6 +1537,8 @@ export type Database = {
           exclusive_label?: string | null
           exclusive_seller_id?: string | null
           fast_reviewed_at?: string | null
+          fast_review_checked_at?: string | null
+          fast_review_checked_by?: string | null
           id?: string
           image_urls?: string[]
           name?: string
@@ -2342,6 +2348,10 @@ export type Database = {
       app_admin_sample_settle_due: { Args: never; Returns: Json }
       app_admin_review_product: {
         Args: { p_decision: string; p_product_id: string; p_reason?: string }
+        Returns: Json
+      }
+      app_admin_fast_review_check: {
+        Args: { p_actor_user_id?: string; p_product_id: string }
         Returns: Json
       }
       app_admin_end_sale: {

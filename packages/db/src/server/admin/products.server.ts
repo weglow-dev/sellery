@@ -16,7 +16,7 @@
  *   reviewProduct(ref, decision, reason)                      0015 RPC — approve · reject · pause
  * 순수 규칙(상태 칩·수수료 문구·실패 문구)은 `../../admin/product-rules.ts`.
  */
-import { reviewFailMessage, type ProductStatus } from "../../admin/product-rules";
+import { reviewFailMessage, type ProductSpecialFilter, type ProductStatus } from "../../admin/product-rules";
 import { DEFAULT_SETTINGS, storeUrl, type CampaignCard } from "../../campaign";
 import { createAdminClient, type Admin } from "../admin.server";
 import { notifySlack } from "../partner/slack.server";
@@ -33,7 +33,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const STORE_OPEN_STATES: readonly string[] = ["SCHEDULE_CONFIRMED", "LIVE", "CLEARING", "SETTLED"];
 
 const LIST_COLUMNS =
-  "id, code, brand_id, name, description, emoji, thumb_url, category, consumer_price, sale_price, commission_rate, stock, status, reject_reason, exclusive_grade, exclusive_label, exclusive_seller_id, fast_reviewed_at, created_at, updated_at";
+  "id, code, brand_id, name, description, emoji, thumb_url, category, consumer_price, sale_price, commission_rate, stock, status, reject_reason, exclusive_grade, exclusive_label, exclusive_seller_id, fast_reviewed_at, fast_review_checked_at, created_at, updated_at";
 
 export type AdminProductRow = {
   id: string;
@@ -55,6 +55,8 @@ export type AdminProductRow = {
   exclusive_seller_id: string | null;
   /** 우선 검수권(🥬)으로 검수 없이 노출된 날 (0038). 사후 점검 대상 — 화면이 "검수 생략" 으로 표시한다. */
   fast_reviewed_at: string | null;
+  /** 관리자가 사후 점검을 마친 날 (0046). null 이면 점검 대기 — 목록의 ⚡ 칩이 그 집합이다. */
+  fast_review_checked_at: string | null;
   created_at: string;
   updated_at: string;
   /** 표시용 */
@@ -112,14 +114,22 @@ async function brandIdOf(admin: Admin, ref: string): Promise<string | null> {
  * (상품 수가 수백 단위라는 전제 — 넘으면 집계 뷰나 RPC 로 옮긴다).
  */
 export async function listAdminProducts(
-  opts: { status?: ProductStatus | null; brand?: string | null; category?: string | null; q?: string | null; limit?: number } = {},
+  opts: {
+    status?: ProductStatus | null;
+    /** 특수 필터 — 지금은 `fast_review`(사후 점검 대기) 하나 (0046) */
+    special?: ProductSpecialFilter | null;
+    brand?: string | null;
+    category?: string | null;
+    q?: string | null;
+    limit?: number;
+  } = {},
   admin: Admin = createAdminClient(),
 ): Promise<AdminProductList> {
-  const { status = null, brand = null, category = null, q = null, limit = 300 } = opts;
+  const { status = null, special = null, brand = null, category = null, q = null, limit = 300 } = opts;
   const empty: AdminProductList = { rows: [], counts: { all: 0 }, brands: [], categories: [] };
 
   const [allProducts, brandRows, campaigns, orders] = await Promise.all([
-    admin.from("products").select("id, brand_id, status, category").is("deleted_at", null),
+    admin.from("products").select("id, brand_id, status, category, fast_reviewed_at, fast_review_checked_at").is("deleted_at", null),
     admin.from("brands").select("id, code, name, grade"),
     admin.from("campaigns").select("id, product_id, status"),
     admin.from("orders").select("campaign_id, status, unit_price, qty, refund_amount"),
@@ -135,6 +145,10 @@ export async function listAdminProducts(
   const all = allProducts.data ?? [];
   const counts: Record<string, number> & { all: number } = { all: all.length };
   for (const p of all) counts[p.status as string] = (counts[p.status as string] ?? 0) + 1;
+  // 사후 점검 대기 수(0046) — 상태 칩과 나란히 쓰는 특수 칩
+  counts.fast_review = all.filter(
+    (p) => p.fast_reviewed_at !== null && p.fast_review_checked_at === null && p.status === "listed",
+  ).length;
 
   const brandMap = new Map((brandRows.data ?? []).map((b) => [b.id as string, b]));
   const brandCount = new Map<string, number>();
@@ -168,6 +182,10 @@ export async function listAdminProducts(
     .order("created_at", { ascending: false })
     .limit(limit);
   if (status) sel = sel.eq("status", status);
+  // 사후 점검 대기(0046) — 검수 생략으로 올라왔고 아직 점검하지 않은 노출 중 상품
+  if (special === "fast_review") {
+    sel = sel.not("fast_reviewed_at", "is", null).is("fast_review_checked_at", null).eq("status", "listed");
+  }
   if (category) sel = sel.eq("category", category);
   if (brand) {
     const bid = await brandIdOf(admin, brand);
@@ -507,4 +525,40 @@ export async function reviewProduct(
   const verb = decision === "reject" ? "반려" : decision === "pause" ? "노출 중단" : prevStatus === "paused" ? "노출 재개" : "승인";
   await notifySlack(`[셀러리] 상품 ${verb} · ${code} · ${name}${reason ? ` · ${reason}` : ""}`);
   return { ok: true, code: msgCode, status: res.status ?? "" };
+}
+
+/* ---------------------------------------------------------------- 우선 검수권 사후 점검 (0046) ---------------------------------------------------------------- */
+
+export type FastReviewCheckResult =
+  | { ok: true; already: boolean; code: string; checkedOn: string | null }
+  | { ok: false; code: "NOT_FOUND" | "NOT_FAST_REVIEWED" | "DB_ERROR" };
+
+/**
+ * 검수 생략 상품을 "확인했다" 고 기록한다 (0046 `app_admin_fast_review_check`).
+ *
+ * 상품은 그대로 둔다(노출 유지) — 문제가 있으면 `reviewProduct('reject' | 'pause')` 를 쓰고,
+ * 그러면 `status` 가 바뀌어 점검 대기 큐에서 자연히 빠진다. 건강·웰니스 상품은 표시광고 규제
+ * 대상이라 누가·언제 점검했는지가 남아야 한다(`fast_review_checked_by`).
+ */
+export async function checkFastReviewedProduct(
+  ref: string,
+  actorUserId: string,
+  admin: Admin = createAdminClient(),
+): Promise<FastReviewCheckResult> {
+  const id = await productIdOf(admin, ref);
+  if (id === "error") return { ok: false, code: "DB_ERROR" };
+  if (!id) return { ok: false, code: "NOT_FOUND" };
+  const { data, error } = await admin.rpc("app_admin_fast_review_check", {
+    p_product_id: id,
+    p_actor_user_id: actorUserId,
+  });
+  if (error) {
+    console.error("[admin/products] app_admin_fast_review_check failed:", error.message);
+    return { ok: false, code: "DB_ERROR" };
+  }
+  const o = (data ?? {}) as { ok?: boolean; already?: boolean; code?: string; checked_on?: string };
+  if (o.ok !== true) {
+    return { ok: false, code: o.code === "NOT_FAST_REVIEWED" ? "NOT_FAST_REVIEWED" : o.code === "NOT_FOUND" ? "NOT_FOUND" : "DB_ERROR" };
+  }
+  return { ok: true, already: o.already === true, code: o.code ?? ref, checkedOn: o.checked_on ?? null };
 }

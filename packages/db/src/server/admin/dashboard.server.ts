@@ -132,6 +132,12 @@ export type AdminDashboard = {
      */
     exclusivePending: number;
     unshippedOrders: number;
+    /**
+     * 우선 검수권(🥬)으로 관리자 검수를 건너뛴 상품 중 **아직 사후 점검하지 않은** 건 (0046).
+     * `pending → listed` 로 바뀌어 "검수 대기" 에서 사라지므로 따로 세지 않으면 아무도 보지 않는다.
+     * 건강·웰니스 상품은 표시광고 규제 대상이라 점검이 운영 업무다.
+     */
+    fastReviewPending: number;
     /** 인증 코드까지 넣고 승인만 기다리는 채널 — 실제로 관리자가 누를 것이 있는 건 */
     channelsAwaitingApproval: number;
     /** 아직 인증되지 않은 채널 전부(데모 "미인증 채널" 과 같은 기준 — 코드 입력 전도 포함) */
@@ -274,11 +280,22 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
   const statusMap = new Map<string, number>();
   for (const c of campaigns) statusMap.set(c.status, (statusMap.get(c.status) ?? 0) + 1);
 
-  const [ordersToday, ordersRefunded, pendingProducts, exclusivePending, unshippedOrders, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
+  const [ordersToday, ordersRefunded, pendingProducts, fastReviewPending, exclusivePending, unshippedOrders, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
     await Promise.all([
       count(admin.from("orders").select("id", head).gte("paid_at", `${today}T00:00:00+09:00`).lte("paid_at", `${today}T23:59:59+09:00`), "오늘 주문"),
       count(admin.from("orders").select("id", head).eq("status", "REFUNDED"), "환불 주문"),
       count(admin.from("products").select("id", head).eq("status", "pending").is("deleted_at", null), "검수 대기"),
+      // 사후 점검 대기(0046) — 검수 생략으로 올라와 아직 점검하지 않은 노출 중 상품
+      count(
+        admin
+          .from("products")
+          .select("id", head)
+          .not("fast_reviewed_at", "is", null)
+          .is("fast_review_checked_at", null)
+          .eq("status", "listed")
+          .is("deleted_at", null),
+        "사후 점검 대기",
+      ),
       count(admin.from("exclusive_requests").select("id", head).eq("status", "PENDING"), "독점권 신청 대기"),
       count(admin.from("orders").select("id", head).eq("status", "PAID").is("tracking_no", null), "미발송 주문"),
       count(admin.from("seller_channels").select("id", head).eq("verified", false).not("vcode_confirmed_at", "is", null), "채널 승인 대기"),
@@ -309,6 +326,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
     },
     todo: {
       pendingProducts,
+      fastReviewPending,
       exclusivePending,
       unshippedOrders,
       channelsAwaitingApproval: awaitingApproval,
