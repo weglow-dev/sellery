@@ -70,6 +70,13 @@
 			href: `${data.paths.orders}?f=unshipped`
 		},
 		{
+			// 샘플은 orders 가 아니라 campaigns 로 발송을 기록해(0015) 위 "미발송 주문" 에서 빠진다 — 따로 센다.
+			// 미발송 샘플은 5영업일 뒤 환불 대상이라(0024) 방치하면 돈이 움직인다.
+			n: data.todo.sampleToShip,
+			label: '샘플 발송 대기',
+			href: statusHref('SAMPLE_APPROVED')
+		},
+		{
 			n: data.todo.channelsAwaitingApproval,
 			label: '채널 인증 대기',
 			href: `${data.paths.sellers}?filter=pending_channel`
