@@ -24,6 +24,12 @@ describe("shipLabel", () => {
     expect(shipLabel({ ...paid, tracking_no: "1234", courier: "CJ대한통운" }, live, settings)).toBe("CJ대한통운 1234 · 배송 중");
     expect(shipLabel({ ...paid, tracking_no: "1234", courier: null }, live, settings)).toBe("택배 1234 · 배송 중");
   });
+  it("배송 완료(0049 delivered_at) — LIVE 면 '배송 완료' · CLEARING 이면 환불 창을 뒤에 잇는다 · 송장 없는 delivered_at 은 무시", () => {
+    const done = { ...paid, tracking_no: "1234", courier: "CJ대한통운", delivered_at: "2026-10-08T09:02:00Z" };
+    expect(shipLabel(done, live, settings)).toBe("CJ대한통운 1234 · 배송 완료");
+    expect(shipLabel(done, { status: "CLEARING", end_date: "2026-09-10" }, settings)).toBe("CJ대한통운 1234 · 배송 완료 · 교환·환불 10/1까지");
+    expect(shipLabel({ ...paid, delivered_at: "2026-10-08T09:02:00Z" }, live, settings)).toBe("브랜드 발송 준비 중");
+  });
   it("CLEARING: 교환·환불 {end+clear_days}까지 (clear_days 가 비정상이면 기본 21)", () => {
     expect(shipLabel(paid, { status: "CLEARING", end_date: "2026-09-10" }, settings)).toBe("교환·환불 10/1까지");
     expect(shipLabel(paid, { status: "CLEARING", end_date: "2026-09-10" }, { clear_days: NaN })).toBe("교환·환불 10/1까지");

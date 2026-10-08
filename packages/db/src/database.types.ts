@@ -273,6 +273,7 @@ export type Database = {
           sample_price: number | null
           sample_refunded: boolean
           sample_shipped_at: string | null
+          sample_delivered_at: string | null
           sample_shipping: Json | null
           seller_id: string
           settled_at: string | null
@@ -280,7 +281,10 @@ export type Database = {
           start_date: string | null
           status: string
           test_due: string | null
+          tracking_checked_at: string | null
+          tracking_last: Json | null
           tracking_no: string | null
+          tracking_status: string | null
           updated_at: string
         }
         Insert: {
@@ -313,6 +317,7 @@ export type Database = {
           sample_price?: number | null
           sample_refunded?: boolean
           sample_shipped_at?: string | null
+          sample_delivered_at?: string | null
           sample_shipping?: Json | null
           seller_id: string
           settled_at?: string | null
@@ -320,7 +325,10 @@ export type Database = {
           start_date?: string | null
           status?: string
           test_due?: string | null
+          tracking_checked_at?: string | null
+          tracking_last?: Json | null
           tracking_no?: string | null
+          tracking_status?: string | null
           updated_at?: string
         }
         Update: {
@@ -353,6 +361,7 @@ export type Database = {
           sample_price?: number | null
           sample_refunded?: boolean
           sample_shipped_at?: string | null
+          sample_delivered_at?: string | null
           sample_shipping?: Json | null
           seller_id?: string
           settled_at?: string | null
@@ -360,7 +369,10 @@ export type Database = {
           start_date?: string | null
           status?: string
           test_due?: string | null
+          tracking_checked_at?: string | null
+          tracking_last?: Json | null
           tracking_no?: string | null
+          tracking_status?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -985,6 +997,7 @@ export type Database = {
           courier: string | null
           created_at: string
           customer_id: string | null
+          delivered_at: string | null
           id: string
           is_sample: boolean
           option_name: string | null
@@ -1002,7 +1015,10 @@ export type Database = {
           shipped_at: string | null
           shipping: Json | null
           status: string
+          tracking_checked_at: string | null
+          tracking_last: Json | null
           tracking_no: string | null
+          tracking_status: string | null
           unit_price: number
           updated_at: string
           user_id: string | null
@@ -1018,6 +1034,7 @@ export type Database = {
           courier?: string | null
           created_at?: string
           customer_id?: string | null
+          delivered_at?: string | null
           id?: string
           is_sample?: boolean
           option_name?: string | null
@@ -1035,7 +1052,10 @@ export type Database = {
           shipped_at?: string | null
           shipping?: Json | null
           status?: string
+          tracking_checked_at?: string | null
+          tracking_last?: Json | null
           tracking_no?: string | null
+          tracking_status?: string | null
           unit_price: number
           updated_at?: string
           user_id?: string | null
@@ -1051,6 +1071,7 @@ export type Database = {
           courier?: string | null
           created_at?: string
           customer_id?: string | null
+          delivered_at?: string | null
           id?: string
           is_sample?: boolean
           option_name?: string | null
@@ -1068,7 +1089,10 @@ export type Database = {
           shipped_at?: string | null
           shipping?: Json | null
           status?: string
+          tracking_checked_at?: string | null
+          tracking_last?: Json | null
           tracking_no?: string | null
+          tracking_status?: string | null
           unit_price?: number
           updated_at?: string
           user_id?: string | null
@@ -2556,6 +2580,21 @@ export type Database = {
       app_campaign_alert_sent: { Args: { p_ids: string[] }; Returns: Json }
       app_follow_seller: {
         Args: { p_seller_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_tracking_due: {
+        Args: { p_limit?: number; p_max_age_days?: number }
+        Returns: Json
+      }
+      app_tracking_record: {
+        Args: {
+          p_delivered_at?: string
+          p_id: string
+          p_kind: string
+          p_last?: Json
+          p_source?: string
+          p_status: string
+        }
         Returns: Json
       }
       app_unfollow_seller: {
