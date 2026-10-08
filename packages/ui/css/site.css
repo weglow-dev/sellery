@@ -1842,9 +1842,17 @@
 @media (prefers-reduced-motion: reduce) { .liveclock .lc-time.lc-live::after { animation:none; } }
 @media (max-width:640px) { .home-meta { align-items:flex-start; } }
 
-/* 일정 제안 접기/펼치기 라벨 (details 상태별) */
-.console-sched-wrap > summary .when-open { display:none; }
-.console-sched-wrap[open] > summary .when-closed { display:none; }
-.console-sched-wrap[open] > summary .when-open { display:inline; }
-.console-sched-wrap[open] > summary { background:var(--color-surface); color:var(--color-ink); }
+/* 일정 제안 아코디언 + 패스 영역 분리 (2026-10-08 대표 QA) */
+.console-sched-wrap.accordion { border:1px solid var(--color-line); background:#fff; box-shadow:var(--shadow-frame-soft); margin-top:12px; }
+.console-sched-wrap.accordion > summary.acc-head { display:flex; align-items:center; gap:10px; width:100%; box-sizing:border-box; padding:12px 14px; background:var(--color-lime); cursor:pointer; list-style:none; }
+.console-sched-wrap.accordion > summary.acc-head::-webkit-details-marker { display:none; }
+.console-sched-wrap.accordion .acc-title { font-weight:700; }
+.console-sched-wrap.accordion .acc-sub { font-size:11.5px; color:var(--color-mute); flex:1; }
+.console-sched-wrap.accordion .acc-chev { font-size:14px; transition:transform .15s ease; }
+.console-sched-wrap.accordion[open] > summary.acc-head { background:var(--color-ink); color:var(--color-lime); }
+.console-sched-wrap.accordion[open] > summary.acc-head .acc-sub { color:var(--color-lime); opacity:.8; }
+.console-sched-wrap.accordion[open] .acc-chev { transform:rotate(180deg); }
+.console-sched-wrap.accordion > form { padding:4px 14px 14px; margin-top:0 !important; }
+.console-pass { margin-top:22px; padding-top:14px; border-top:1px dashed var(--color-line); display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.console-pass .lbl-sm { width:100%; }
 
