@@ -28,6 +28,8 @@ import {
  * 토스 지급대행(0040 · `payout_mode`):
  *   `payoutMode` 는 항상 싣는다. 'toss' 면 `payoutTossOverview()`(토스 잔액 · 행별 셀러 상태 · 지급 상태 · requestable) 도 싣고 화면이 [토스로 지급 요청] 블록을 그린다 — 이체 파일은 그대로 남는다(폴백).
  *   액션 `?/tossRequest`(체크한 payout_ids · EXPRESS 또는 예약일 → `requestDuePayouts` · 결과는 ActionData) · `?/tossCancel`(REQUESTED 만) · `?/tossRefresh`(재조회) · `?/tossSync`(파트너 셀러 재등록)
+ *   **공유 잔액 가드(2026-10-08)**: 지급대행 상점 `peerkeamf5` 는 다른 서비스와 잔액을 공유한다 — `toss.guard`(셀러리 지급 대기 합계 · 오늘 요청 · 하루 상한 `platform_settings.payout_daily_cap`)를 싣고,
+ *   `requestDuePayouts` 가 배치 전체를 잔액·큐 합계·하루 상한으로 검사해 걸리면(BALANCE_UNKNOWN · BALANCE_EXCEEDED · QUEUE_EXCEEDED · DAILY_CAP_EXCEEDED) 한 건도 보내지 않는다 — 화면은 errors 로 보여준다.
  *   · `?/payoutMode`(manual ↔ toss · 보류 재검사 · confirm). 'manual' 에서는 토스 블록·칩이 보이지 않고 기존 흐름 그대로.
  * 액션 `?/paid` `?/hold` `?/release` — `/settle/[code]` 와 같은 함수 · 303 `?status=…&msg=` 로 돌아온다.
  */
@@ -121,7 +123,15 @@ export const load: PageServerLoad = async (event) => {
 					balance: overview.balance ? { available: overview.balance.availableAmount, pending: overview.balance.pendingAmount } : null,
 					balanceError: overview.balanceError,
 					requestable: overview.rows.filter((x) => x.requestable).length,
-					inFlight: overview.rows.filter((x) => x.toss_payout_status === 'REQUESTED' || x.toss_payout_status === 'IN_PROGRESS').length
+					inFlight: overview.rows.filter((x) => x.toss_payout_status === 'REQUESTED' || x.toss_payout_status === 'IN_PROGRESS').length,
+					// 공유 잔액 가드(2026-10-08) — "토스 잔액 · 셀러리 지급 대기 · 오늘 요청 / 상한" 한 줄 + 요청 전 안내
+					guard: {
+						queueTotal: overview.guard.queueTotal,
+						inFlightTotal: overview.guard.inFlightTotal,
+						requestedToday: overview.guard.requestedToday,
+						dailyCap: overview.guard.dailyCap,
+						remainingToday: Math.max(0, overview.guard.dailyCap - overview.guard.requestedToday)
+					}
 				}
 			: null,
 		chips: [

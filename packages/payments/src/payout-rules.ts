@@ -351,3 +351,81 @@ export function parsePayoutWebhook(raw: unknown): TossWebhook<TossPayout> | null
 
 /** 토스 지급대행 id 형식 — 웹훅 본문에서 재조회 전에 거르는 용도(영숫자 · 35자 이하) */
 export const TOSS_ID_RE = /^[A-Za-z0-9_-]{4,40}$/;
+
+/* ---------------- 지급 요청 가드 (공유 잔액 보호 · 2026-10-08 launch-prep) ---------------- */
+
+/**
+ * 토스 지급대행 상점 `peerkeamf5` 는 **다른 서비스와 잔액을 공유**한다(같은 회사 · docs/deploy.md §5.3.1). 그래서 셀러리는 한 번의 요청에서
+ *   ① 토스 잔액(`availableAmount`)을 넘지 않고            → BALANCE_EXCEEDED (잔액을 못 읽으면 BALANCE_UNKNOWN — 요청하지 않는다)
+ *   ② 셀러리 지급 대기 합계(requestable 행의 합)를 넘지 않고 → QUEUE_EXCEEDED (구조상 넘을 수 없지만 명시 · 테스트)
+ *   ③ 하루(KST) 요청 합계가 `platform_settings.payout_daily_cap` 을 넘지 않는다 → DAILY_CAP_EXCEEDED (우리 쪽 버그가 남의 돈을 쓰지 못하게)
+ * 셋 중 하나라도 걸리면 **배치 전체를 거절**한다(부분 요청 없음). 순수 함수 — 서버 글루(`server/payouts.server.ts` requestDuePayouts)와 스크립트(partner-admin.mjs)가 같은 값을 넣는다.
+ */
+export const PAYOUT_DAILY_CAP_DEFAULT = 5_000_000;
+export const PAYOUT_DAILY_CAP_KEY = "payout_daily_cap";
+
+export type PayoutGuardInput = {
+  /** 이번 배치 합계(원) */
+  batchTotal: number;
+  /** 셀러리 지급 대기 합계 — requestable 행 전부의 합(원) */
+  queueTotal: number;
+  /** 토스 `availableAmount` · 조회 실패면 null */
+  available: number | null;
+  /** 오늘(KST) 이미 요청한 합계(원) — 취소·거절·실패·삭제는 제외 */
+  requestedToday: number;
+  /** 하루 상한(원) · 0 이하·NaN 이면 기본값 */
+  dailyCap: number | null | undefined;
+};
+
+export type PayoutGuardCode = "BALANCE_UNKNOWN" | "BALANCE_EXCEEDED" | "QUEUE_EXCEEDED" | "DAILY_CAP_EXCEEDED";
+
+export type PayoutGuardResult = { ok: true; remainingToday: number } | { ok: false; code: PayoutGuardCode; message: string; remainingToday: number };
+
+const won = (n: number) => `₩${Math.round(n).toLocaleString("ko-KR")}`;
+
+/** 상한 값 정규화 — 설정이 없거나 잘못되면 기본 5,000,000 */
+export function normalizeDailyCap(v: unknown): number {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : Number.NaN;
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : PAYOUT_DAILY_CAP_DEFAULT;
+}
+
+export function checkPayoutGuard(input: PayoutGuardInput): PayoutGuardResult {
+  const cap = normalizeDailyCap(input.dailyCap);
+  const requestedToday = Math.max(0, Math.round(Number(input.requestedToday) || 0));
+  const remainingToday = Math.max(0, cap - requestedToday);
+  const batch = Math.round(Number(input.batchTotal) || 0);
+  const queue = Math.round(Number(input.queueTotal) || 0);
+  if (batch > queue) {
+    return { ok: false, code: "QUEUE_EXCEEDED", message: `요청 합계 ${won(batch)} 가 셀러리 지급 대기 합계 ${won(queue)} 를 넘어요 — 큐를 다시 읽어주세요`, remainingToday };
+  }
+  if (input.available === null || input.available === undefined || !Number.isFinite(input.available)) {
+    return { ok: false, code: "BALANCE_UNKNOWN", message: "토스 잔액을 읽지 못했어요 — 공유 잔액이라 확인 없이는 요청하지 않아요. 잠시 뒤 다시 시도하세요", remainingToday };
+  }
+  if (batch > input.available) {
+    return { ok: false, code: "BALANCE_EXCEEDED", message: `요청 합계 ${won(batch)} 가 토스 지급 가능 잔액 ${won(input.available)} 을 넘어요 — 잔액은 다른 서비스와 공유되므로 셀러리 몫만 요청하세요`, remainingToday };
+  }
+  if (requestedToday + batch > cap) {
+    return {
+      ok: false,
+      code: "DAILY_CAP_EXCEEDED",
+      message: `오늘 요청 ${won(requestedToday)} + 이번 ${won(batch)} 가 하루 상한 ${won(cap)} 을 넘어요 — 남은 한도 ${won(remainingToday)}. 상한은 partner-admin.mjs payout-cap <원> 으로 바꿉니다`,
+      remainingToday,
+    };
+  }
+  return { ok: true, remainingToday: remainingToday - batch };
+}
+
+/** 오늘(KST) 요청 합계에 넣을 행인지 — 토스에 요청됐고 돈이 되돌아오지 않은 상태(REQUESTED · IN_PROGRESS · COMPLETED) */
+export function countsTowardDailyCap(tossPayoutStatus: string | null | undefined): boolean {
+  return tossPayoutStatus === "REQUESTED" || tossPayoutStatus === "IN_PROGRESS" || tossPayoutStatus === "COMPLETED";
+}
+
+/** KST 자정(ISO · UTC 표기) — `toss_requested_at >= kstDayStartIso()` 조회용 */
+export function kstDayStartIso(now: Date = new Date()): string {
+  return new Date(`${todayKst(now)}T00:00:00+09:00`).toISOString();
+}
+
+/** 합계 — 숫자가 아닌 값은 0 */
+export function sumAmounts(rows: readonly { amount: number | null | undefined }[]): number {
+  return rows.reduce((a, r) => a + (Number.isFinite(Number(r.amount)) ? Math.round(Number(r.amount)) : 0), 0);
+}
