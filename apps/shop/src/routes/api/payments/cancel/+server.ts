@@ -64,12 +64,21 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
 	const admin = createAdminClient();
 
-	// ① 로그인 — 또는 비회원 조회 토큰 쿠키 (0021)
+	// ① 소유 확인 — 회원 본인 주문(RLS) 또는 비회원 조회 토큰 쿠키 (0021)
+	//
+	//   로그인 상태에서도 **토큰 폴백을 시도한다.** 비회원으로 사고 나중에 가입·로그인한 고객의 주문은
+	//   `orders.user_id` 가 null 이라 RLS `orders_select_own`(`auth.uid() = user_id`)에 걸려 0행이 되고,
+	//   예전에는 그대로 404 였다 — 그런데 `/orders/g/[code]` 는 쿠키만 보고 화면과 [환불 신청] 버튼을
+	//   정상 렌더하므로(그 라우트는 세션을 보지 않는다) 고객에게는 "버튼이 있는데 누르면 주문을 찾을 수
+	//   없다" 로 보였다. "비회원으로 사고 나중에 가입" 은 흔한 경로라 그 고객 전원이 셀프 환불에서 막혔다.
+	//
+	//   폴백 순서가 중요하다: 회원 조회를 **먼저** 해서 본인 주문이면 그걸 쓰고(RLS 가 소유를 보장),
+	//   0행일 때만 토큰을 본다. 토큰은 서버가 심은 HttpOnly 쿠키라 그 자체가 소유 증명이다(0021).
 	const { user } = await locals.safeGetSession();
 	type OrderLite = { id: string; code: string; status: string; campaign_id: string; tracking_no: string | null };
 	let order: OrderLite | null = null;
 	if (user && locals.supabase) {
-		// ② 본인 주문 (RLS orders_select_own — 타인 주문은 보이지 않는다 → 404). 화면은 대문자로 보여 주므로 소문자도 같이 찾는다.
+		// ② 본인 주문 (RLS orders_select_own — 타인 주문은 보이지 않는다). 화면은 대문자로 보여 주므로 소문자도 같이 찾는다.
 		const codes = Array.from(new Set([codeRaw, codeRaw.toLowerCase()]));
 		const { data, error: orderError } = await locals.supabase
 			.from('orders')
@@ -82,7 +91,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
 		}
 		order = data;
-	} else {
+	}
+	// ②-b 회원 조회가 0행이거나 비로그인 — 비회원 조회 토큰으로 확인한다
+	if (!order) {
 		let orderId: string | null = null;
 		try {
 			orderId = await verifyGuestOrder(codeRaw.toLowerCase(), cookies.get(guestTokenCookieName(codeRaw)), admin);
@@ -90,13 +101,16 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 			console.error('[cancel] guest verify failed:', e instanceof Error ? e.message : e);
 			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
 		}
-		if (!orderId) return apiError(401, 'UNAUTHORIZED');
-		const { data, error: orderError } = await admin.from('orders').select('id, code, status, campaign_id, tracking_no').eq('id', orderId).maybeSingle();
-		if (orderError) {
-			console.error('[cancel] guest order read failed:', orderError.message);
-			return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+		// 비로그인인데 토큰도 없으면 인증이 아예 없다 — 401. 로그인 상태라면 소유가 아닌 것이므로 아래 404.
+		if (!orderId && !user) return apiError(401, 'UNAUTHORIZED');
+		if (orderId) {
+			const { data, error: orderError } = await admin.from('orders').select('id, code, status, campaign_id, tracking_no').eq('id', orderId).maybeSingle();
+			if (orderError) {
+				console.error('[cancel] guest order read failed:', orderError.message);
+				return apiError(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+			}
+			order = data;
 		}
-		order = data;
 	}
 	if (!order) return apiError(404, 'NOT_FOUND', '주문을 찾을 수 없습니다');
 
