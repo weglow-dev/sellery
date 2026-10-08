@@ -1800,7 +1800,9 @@
 
 /* 인플루언서 상품 카드 — 브랜드 로고/이름 · 가격 라벨 · 샘플 두 줄 (2026-10-08 대표 QA) */
 .brandline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.brandlogo { width:18px; height:18px; object-fit:contain; box-shadow:var(--shadow-frame-soft); background:#fff; }
+.brandlogo { width:36px; height:36px; object-fit:contain; box-shadow:var(--shadow-frame-soft); background:#fff; border-radius:4px; }
+.brandlogo.lg { width:48px; height:48px; vertical-align:middle; margin-right:6px; }
+.brandname { font-size:14px; }
 .brandname { font-weight:700; font-size:13px; }
 .pricegrid { display:flex; flex-direction:column; gap:2px; margin-top:8px; }
 .pricegrid > div { display:flex; align-items:baseline; gap:8px; }

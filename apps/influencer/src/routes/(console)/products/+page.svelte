@@ -66,10 +66,7 @@
 				<div><span class="pl">수수료</span><span class="rate">{pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</span></div>
 			</div>
 			{#if p.status.rule}
-				<div class="samplebox">
-					<div class="rule">🎁 {p.status.rule}</div>
-					<div class="mine">{p.status.mine}</div>
-				</div>
+				<div class="samplebox"><div class="rule">🎁 {p.status.rule}</div></div>
 			{/if}
 			<div class="meta">
 				건당 예상 수수료 ₩{fmtNum(Math.round(p.sale_price * p.commission_rate))}{#if b.kind === 'locked'}{' '}· <b style="color:var(--color-danger)">독점 인플루언서 확정 상품</b>{/if}
