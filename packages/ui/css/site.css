@@ -1800,8 +1800,8 @@
 
 /* 인플루언서 상품 카드 — 브랜드 로고/이름 · 가격 라벨 · 샘플 두 줄 (2026-10-08 대표 QA) */
 .brandline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.brandlogo { width:36px; height:36px; object-fit:contain; box-shadow:var(--shadow-frame-soft); background:#fff; border-radius:4px; }
-.brandlogo.lg { width:48px; height:48px; vertical-align:middle; margin-right:6px; }
+.brandlogo { width:44px; height:44px; object-fit:contain; background:#fff; border-radius:6px; }
+.brandlogo.lg { width:56px; height:56px; vertical-align:middle; margin-right:8px; }
 .brandname { font-size:14px; }
 .brandname { font-weight:700; font-size:13px; }
 .pricegrid { display:flex; flex-direction:column; gap:2px; margin-top:8px; }
@@ -1811,3 +1811,10 @@
 .samplebox { margin-top:8px; padding:8px 10px; background:var(--color-bg); border:1px solid var(--color-line); font-size:12px; line-height:1.55; }
 .samplebox .rule { font-weight:700; }
 .samplebox .mine { margin-top:2px; }
+
+/* 상품 갤러리 — 무상 샘플 체크 토글 (카테고리와 별개) */
+.filtertoggle { display:inline-flex; align-items:center; gap:8px; margin:4px 0 12px; padding:8px 12px; border:1px solid var(--color-line); background:#fff; text-decoration:none; color:inherit; font-size:13px; font-weight:700; }
+.filtertoggle .box { width:18px; height:18px; border:2px solid var(--color-ink); display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; background:#fff; }
+.filtertoggle.on { background:var(--color-lime); }
+.filtertoggle.on .box { background:var(--color-ink); color:#fff; }
+
