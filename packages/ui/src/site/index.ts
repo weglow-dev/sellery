@@ -40,7 +40,7 @@ export { default as Viewers } from './Viewers.svelte';
 export { default as ViewersSum } from './ViewersSum.svelte';
 export { default as Tilt } from './Tilt.svelte';
 export { tilt } from './tilt';
-export { NOTIFY_TOAST, CS_TYPES, VERIFY_LOAD_FAIL } from './constants';
+export { CS_TYPES, VERIFY_LOAD_FAIL } from './constants';
 
 // 인증 · 카드 · 판매 페이지
 export { default as SiteVerifyModal } from './VerifyModal.svelte';

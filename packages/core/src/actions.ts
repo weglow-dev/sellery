@@ -369,11 +369,16 @@ export function submitCS(cid: string, type: string, msg: string, oid: string) {
 	const c = camp(cid)!, p = prod(c.productId), b = brand(p.brandId);
 	(D_().cs = D_().cs || []).push({ id: nextId('cs'), cid, orderId: oid.trim() || null, buyer: S.cust ? S.cust.name : '고객', type, msg: msg.trim(), status: 'OPEN', at: ymd(today()) });
 	pushSys(cid, `💬 구매 고객이 <b>${esc(type)}</b> 문의를 남겼습니다 — <b>${esc(b.name)}</b> 고객 문의함으로 전달되었습니다`);
-	closeModal(); save(); toast(`문의가 ${b.name}에 접수되었습니다 — 답변은 알림톡으로 안내됩니다`);
+	closeModal(); save(); toast(`문의가 ${b.name}에 접수되었습니다 — 답변은 문의 화면에서 확인하고 이메일로도 안내됩니다`);
 }
-export function saveCSReply(id: string, t: string) { const x = csList().find((v) => v.id === id); if (!x) return; if (!t.trim()) { toast('답변 내용을 입력해주세요'); return; } x.reply = t.trim(); x.repliedAt = ymd(today()); x.status = 'ANSWERED'; pushSys(x.cid, `💬 브랜드가 고객 문의에 답변했습니다 (${esc(x.type)})`); closeModal(); save(); toast('답변 전송 — 고객에게 알림톡으로 안내됩니다'); }
+export function saveCSReply(id: string, t: string) { const x = csList().find((v) => v.id === id); if (!x) return; if (!t.trim()) { toast('답변 내용을 입력해주세요'); return; } x.reply = t.trim(); x.repliedAt = ymd(today()); x.status = 'ANSWERED'; pushSys(x.cid, `💬 브랜드가 고객 문의에 답변했습니다 (${esc(x.type)})`); closeModal(); save(); toast('답변 전송 — 고객에게 이메일로 안내됩니다'); }
 export function csClose(id: string) { const x = csList().find((v) => v.id === id); if (!x) return; x.status = 'CLOSED'; save(); toast('처리 종료로 변경했습니다'); }
-export function notifyMe() { toast('오픈 알림 신청 완료 — 판매 시작 시 카카오 알림톡으로 안내 (시뮬레이션)'); }
+/**
+ * 데모 전용 — 프로토타입의 오픈 알림 버튼(views/Store.svelte). 실서비스에는 **없다**:
+ * 신청 테이블·발송 훅이 모두 미구현이라 2026-10-08 에 고객 화면(site/CampaignCard · site/store/BuyCta)에서 제거했다.
+ * 채널 결정값은 이메일(docs/launch-checklist.md §5 결정 3)이고 카카오 알림톡은 보류 · 추후 도입 가능성이 있다.
+ */
+export function notifyMe() { toast('오픈 알림 신청 완료 — 판매 시작 시 안내 (시뮬레이션 · 실서비스 미구현)'); }
 
 /* 카카오 로그인 — 키가 비면 데모 계정 선택, 있으면 SDK authorize 리다이렉트(서버 콜백 필요) */
 export function kakaoStart(after: string) {

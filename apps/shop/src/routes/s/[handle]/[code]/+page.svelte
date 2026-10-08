@@ -21,4 +21,4 @@
 	{#if m.ogImage}<meta name="twitter:image" content={m.ogImage} />{/if}
 </svelte:head>
 
-<StoreView card={data.card} others={data.others} signedIn={data.signedIn} />
+<StoreView card={data.card} others={data.others} signedIn={data.signedIn} alert={data.alert} alertMsg={data.alertMsg} />

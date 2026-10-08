@@ -68,7 +68,7 @@
 		</div>
 		<div class="card"><h4>배송 · 교환 · 환불</h4>
 			{#if !c.preview}<div class="btnrow" style="margin:0 0 11px"><button class="sm" onclick={() => openModal('cs', { cid })}>💬 판매자에게 문의하기</button></div>{/if}
-			<ul class="store-ul"><li>결제 후 2–3일 내 <b>{b.name}</b>에서 직배송, 운송장은 셀러리 알림톡으로 안내</li><li>판매 종료 후 <b>{CLEAR_DAYS}일</b> 동안 교환·환불 신청 가능 (단순 변심 7일 · 하자 {CLEAR_DAYS}일)</li><li>대금은 정산 전까지 <b>셀러리</b>가 보관하므로 환불이 지연되지 않습니다</li><li>문의: 셀러리 고객센터(채널톡) — 인플루언서 DM이 아닌 셀러리로 접수</li></ul></div>
+			<ul class="store-ul"><li>결제 후 2–3일 내 <b>{b.name}</b>에서 직배송, 운송장은 <b>내 주문</b>에서 확인 (이메일을 남기면 메일로도 안내)</li><li>판매 종료 후 <b>{CLEAR_DAYS}일</b> 동안 교환·환불 신청 가능 (단순 변심 7일 · 하자 {CLEAR_DAYS}일)</li><li>대금은 정산 전까지 <b>셀러리</b>가 보관하므로 환불이 지연되지 않습니다</li><li>문의: 셀러리 고객센터 — 인플루언서 DM이 아닌 셀러리로 접수</li></ul></div>
 		{#if mine.length}<div class="sec">{s.name}님의 다른 판매</div><div class="grid g3">{#each mine as x}<CustCard c={x} />{/each}</div>{/if}
 		<div class="store-foot">{@html CEL} <b>SELLERY</b> · 셀러리는 통신판매중개자로 거래 당사자가 아니며, 상품·거래 정보의 책임은 공급 브랜드({b.name})에 있습니다 · #광고 · 인플루언서는 판매 수수료를 받습니다</div>
 	</div>

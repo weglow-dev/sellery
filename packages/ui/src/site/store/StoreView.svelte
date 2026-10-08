@@ -9,6 +9,7 @@
 	 * 초기값 옵션 0 · 수량 1 (URL 로 복원하지 않는다). 합계 = options[oi].price × q, 배송비 없음. 결제는 S3(/checkout) — CTA 는 링크만 만든다.
 	 */
 	import { badgeTone, ddayLabel, discountPct, displayStoreUrl, fmtNum, imageSrc, isEnded, won, type CampaignCard as Card, type HomeCard } from '@sellery/db/campaign';
+	import { alertMessage, type AlertState } from '@sellery/db/campaign-alerts';
 	import { COMPANY } from '@sellery/db/company';
 	import Cel from '../icons/Cel.svelte';
 	import PlatIcon from '../icons/PlatIcon.svelte';
@@ -27,8 +28,10 @@
 		card,
 		others = [],
 		signedIn = false,
-		preview = false
-	}: { card: Card; others?: HomeCard[]; signedIn?: boolean; preview?: boolean } = $props();
+		preview = false,
+		alert = null,
+		alertMsg = null
+	}: { card: Card; others?: HomeCard[]; signedIn?: boolean; preview?: boolean; alert?: AlertState | null; alertMsg?: string | null } = $props();
 
 	const { campaign, product, seller, brand } = $derived(card);
 	const today = $derived(campaign.today);
@@ -116,7 +119,10 @@
 					<span class="meta">인플루언서 일정이 확정되면 이 레이아웃으로 판매 링크가 생성됩니다 · 재고 {fmtNum(campaign.qty ?? 0)}개</span>
 				</div>
 			{:else}
-				<BuyCta {card} optionIndex={oi} qty={q} {signedIn} />
+				{#if alertMessage(alertMsg)}
+					<p class="store-alert-msg" role="status">{alertMessage(alertMsg)}</p>
+				{/if}
+				<BuyCta {card} optionIndex={oi} qty={q} {signedIn} {alert} />
 			{/if}
 		</div>
 	</div>
@@ -174,5 +180,14 @@
 	.store-preview-cta .meta {
 		display: block;
 		margin-top: 4px;
+	}
+	/* 오픈 알림 신청·취소 결과 (0044) — 폼 POST 뒤 `?alert=` 로 돌아온다 */
+	.store-alert-msg {
+		margin: 0 0 10px;
+		border: 2px solid var(--color-line);
+		padding: 10px 12px;
+		font-size: 12.5px;
+		line-height: 1.6;
+		text-align: center;
 	}
 </style>

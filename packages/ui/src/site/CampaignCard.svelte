@@ -15,8 +15,6 @@
 	import SellerAvatar from './SellerAvatar.svelte';
 	import Viewers from './Viewers.svelte';
 	import VerifyLauncher from './VerifyLauncher.svelte';
-	import { showToast } from './toast.svelte';
-	import { NOTIFY_TOAST } from './constants';
 
 	let { c, today, featureDays = 7, allowFeat = true }: { c: HomeCard; today: string; featureDays?: number; allowFeat?: boolean } = $props();
 
@@ -62,9 +60,12 @@
 	<div class="btnrow">
 		{#if live}
 			<a {href} class="btn pri sm">구매하기</a>
-		{:else if soon}
-			<button type="button" class="sm ghost" onclick={() => showToast(NOTIFY_TOAST)}>🔔 오픈 알림</button>
 		{:else}
+			<!--
+				오픈 예정(soon)에 "🔔 오픈 알림" 버튼이 있던 자리 — 신청을 저장하지도 보내지도 않는 허위 안내였다(2026-10-08 제거).
+				오픈 알림은 **판매 페이지에서만** 신청받는다(0044) — 홈 카드에 폼을 두면 카드마다 POST 대상이 생기고
+				로그인·이메일 유무 안내를 카드 크기에 담을 수 없다. 오픈 D-n 은 위 배지가 보여준다.
+			-->
 			<a {href} class="btn sm ghost">판매 페이지</a>
 		{/if}
 		<VerifyLauncher code={c.code} class="sm ghost"><Cel /> 인증 확인</VerifyLauncher>

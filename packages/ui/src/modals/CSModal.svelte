@@ -13,6 +13,6 @@
 	<div class="fld"><label>문의 유형</label><select bind:value={type}>{#each CS_TYPES as t}<option>{t}</option>{/each}</select></div>
 	<div class="fld"><label>주문번호 <span class="font-normal">(선택)</span></label><input bind:value={order} placeholder="예: O1153" /></div>
 	<div class="fld"><label>문의 내용</label><textarea rows="4" bind:value={msg} placeholder="배송 상태, 교환·반품 사유 등을 적어주세요"></textarea></div>
-	<p style="font-size:12px;color:var(--mute)">실서비스에서는 로그인 계정의 주문 내역에서 바로 문의를 접수하고, 답변은 카카오 알림톡으로 안내됩니다.</p>
+	<p style="font-size:12px;color:var(--mute)">실서비스에서는 로그인 계정의 주문 내역에서 바로 문의를 접수하고, 답변은 문의 화면에서 확인하며 이메일로도 안내됩니다.</p>
 	<div class="foot"><button onclick={closeModal}>취소</button><button class="pri" onclick={() => act.submitCS(cid, type, msg, order)}>문의 접수</button></div>
 </Modal>
