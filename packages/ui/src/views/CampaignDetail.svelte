@@ -56,7 +56,7 @@
 				{#if V === 'seller'}<ActionCard wait h="브랜드 승인 대기 중" hint="샘플 요청이 접수됐어요. 브랜드가 프로필을 검토 중입니다 — 보통 24시간 내 응답해요." />
 				{:else}<ActionCard h={'샘플 요청 검토 <span class="chip brand">브랜드 액션</span>'} hint={`${platIcon(s)} ${s.name} ${s.handle} · 팔로워 ${fmt(s.followers)} · 등급 ${gname(s)}. 승인 시 배송지가 브랜드에 전달됩니다.`}><button class="pri" onclick={() => act.approveSample(cid)}>승인</button><button class="danger" onclick={() => act.rejectSample(cid)}>거절</button></ActionCard>{/if}
 			{:else if c.status === 'INVITED'}
-				{#if V === 'seller'}<ActionCard h={'브랜드 직접 제안 <span class="chip seller">인플루언서 액션</span>'} hint={`<b>${b.name}</b>가 <b>${p.name}</b> 판매를 제안했어요 · 수수료 ${(p.rate * 100).toFixed(0)}%${gradeBonusOf(s) ? ` + 등급 보너스 ${(gradeBonusOf(s) * 100).toFixed(1)}%p` : ''} · 수락 시 샘플 발송 단계부터 시작됩니다 (무상 · 이달 한도 미차감).`}><button class="pri" onclick={() => act.acceptInvite(cid)}>수락 → 샘플 받기</button><button onclick={() => act.declineInvite(cid)}>거절</button></ActionCard>
+				{#if V === 'seller'}<ActionCard h={'브랜드 직접 제안 <span class="chip seller">인플루언서 액션</span>'} hint={`<b>${b.name}</b>가 <b>${p.name}</b> 판매를 제안했어요 · 수수료 ${(p.rate * 100).toFixed(0)}%${gradeBonusOf(s) ? ` + 등급 보너스 ${(gradeBonusOf(s) * 100).toFixed(1)}%p` : ''} · 수락 시 샘플 발송 단계부터 시작됩니다 (무상 · 상품당 무상 1회 미차감).`}><button class="pri" onclick={() => act.acceptInvite(cid)}>수락 → 샘플 받기</button><button onclick={() => act.declineInvite(cid)}>거절</button></ActionCard>
 				{:else}<ActionCard wait h="인플루언서 수락 대기 중" hint="제안을 보냈어요. 인플루언서가 수락하면 샘플 발송 단계로 넘어갑니다 — 보통 48시간 내 응답해요." />{/if}
 			{:else if c.status === 'DECLINED'}<ActionCard h="제안 거절됨" hint={'인플루언서가 이번 제안을 수락하지 않았습니다.' + (c.celRefunded ? ` 제안권 ${CEL} ${c.celRefunded} 환급 완료.` : '')} />
 			{:else if c.status === 'SAMPLE_PURCHASED' || c.status === 'SAMPLE_APPROVED'}

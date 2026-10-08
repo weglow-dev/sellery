@@ -97,10 +97,7 @@ export function spendData(bid: string, s: Seller, memo: string): number | false 
 	const pr = dataPrice(s); return celSpend(bid, pr, memo) ? pr : false;
 }
 
-/* ---- 샘플 정책 ---- */
-export function sampleQuota(s: Seller) { const i = tierIdx(gname(s)); return i <= tierIdx('플래티넘') ? 5 : (i <= tierIdx('실버') ? 2 : 1); }
-export function sampleUsed(s: Seller) { const ym = ymd(today()).slice(0, 7); return D_().campaigns.filter((c) => c.sellerId === s.id && !c.invited && !c.purchased && (c.createdAt || '').slice(0, 7) === ym).length; }
-export function sampleLeft(s: Seller) { const q = sampleQuota(s); return Math.max(0, q + (s.sampleExtra || 0) - sampleUsed(s)); }
+/* ---- 샘플 정책 — 무상 조건은 등급(freeEligible) + 상품당 1회(hadFreeSample) 뿐. 등급별 월 한도(sampleQuota/sampleUsed/sampleLeft)는 2026-10-08 대표 결정으로 폐지(0047) ---- */
 export function spOf(p: Product) { if (p.samplePolicy) return p.samplePolicy; const g: Grade = p.gp < 30000 ? '브론즈' : p.gp < 80000 ? '실버' : '골드'; return { freeGrade: g, buyMode: 'auto' as const, fixedPrice: 0, refund: false }; }
 export function samplePrice(p: Product) { const sp = spOf(p); return sp.buyMode === 'fixed' && sp.fixedPrice ? sp.fixedPrice : Math.round(p.gp * (1 - p.rate) / 10) * 10; }
 export function sampleSplit(price: number) { const cel = Math.floor(price / SAMPLE_CEL_WON); return { cel, cash: price - cel * SAMPLE_CEL_WON }; }
@@ -114,9 +111,9 @@ export function sampleBtn(p: Product, sid: string): SampleBtn | null {
 	if (p.exclusiveSellerId && p.exclusiveSellerId !== sid) return { kind: 'locked', label: '독점 잠김' };
 	const already = D_().campaigns.some((c) => c.sellerId === sid && c.productId === p.id && !ACTIVE_BLOCKERS.includes(c.status));
 	if (already) return { kind: 'already', label: '진행 중' };
-	const canFree = freeEligible(p, me) && !hadFreeSample(p, me) && sampleLeft(me) > 0;
+	const canFree = freeEligible(p, me) && !hadFreeSample(p, me);
 	if (canFree) return { kind: 'free', label: '무상 샘플 요청' };
-	return { kind: 'buy', label: `샘플 구매 ₩${fmt(samplePrice(p))}`, price: samplePrice(p), title: !freeEligible(p, me) ? '무상 기준 등급 미달' : hadFreeSample(p, me) ? '무상 샘플은 상품당 1회' : '이달 무상 한도 소진' };
+	return { kind: 'buy', label: `샘플 구매 ₩${fmt(samplePrice(p))}`, price: samplePrice(p), title: !freeEligible(p, me) ? '무상 기준 등급 미달' : '무상 샘플은 상품당 1회' };
 }
 /** 외부 판매 크롤링 추정 (가계산) */
 export function estExternal(s: Seller, item: ExternalSale) { const eng = s.likesAvg / s.followers; const orders = s.followers * eng * 6 * 0.015; const mid = orders * item.price; return { lo: mid * 0.75, hi: mid * 1.25, orders: Math.round(orders) }; }

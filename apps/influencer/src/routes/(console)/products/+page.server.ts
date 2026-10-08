@@ -1,13 +1,13 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { quotaLine, sampleButton, sampleLine, sampleStatus } from '@sellery/db/partner/sample-rules';
+import { sampleButton, sampleLine, sampleStatus } from '@sellery/db/partner/sample-rules';
 import { listProductsForSeller, requireSeller, sellerPath } from '$lib/server/partner';
 
 /**
  * `/products` — 상품 갤러리 3단계 (docs/inf-console-plan.md §6 `/products` · 프로토타입 js/20-seller.js vExplore · prodCard).
  * 읽기: `listProductsForSeller(seller.id)` — listed 상품 + 브랜드 요약 + 상품별 견적(`app_sample_quotes` 1회) + 카테고리 목록.
  * 카드 문구(`sampleLine` · `sampleButton`)는 순수 규칙이라 여기서 만들어 넘긴다 — 화면은 표시만. `?cat=` 은 카테고리 칩(전체 = 없음).
- * 이달 무상 한도(상단 "이번 달 샘플 요청 N회 남음")는 첫 견적의 quota/left — 인플루언서 기준이라 상품마다 같다.
+ * 월 무상 한도 안내는 없다 — 0047(대표 결정 2026-10-08)로 폐지. 무상 조건은 등급 + 상품당 1회뿐.
  */
 export const load: PageServerLoad = async (event) => {
 	const r = await requireSeller(event, { next: '/products' });
@@ -20,7 +20,7 @@ export const load: PageServerLoad = async (event) => {
 	const catParam = event.url.searchParams.get('cat') ?? '';
 	const cat = categories.includes(catParam) ? catParam : '전체';
 
-	const free = event.url.searchParams.get('free') === '1'; // 🎁 무상 샘플 제공 필터 — 내 등급·한도로 지금 무상 요청이 가능한 상품만 (대표 결정 2026-10-08)
+	const free = event.url.searchParams.get('free') === '1'; // 🎁 무상 샘플 제공 필터 — 내 등급으로 지금 무상 요청이 가능한(아직 안 받은) 상품만 (대표 결정 2026-10-08)
 	const cards = products
 		.filter((p) => cat === '전체' || p.category === cat)
 		.filter((p) => !free || p.quote?.mode === 'free')
@@ -46,8 +46,5 @@ export const load: PageServerLoad = async (event) => {
 			hasCode: !!p.code
 		}));
 
-	const firstQuote = products.find((p) => p.quote && p.quote.mode !== 'unlisted')?.quote ?? null;
-	const quota = firstQuote ? { left: firstQuote.left, total: firstQuote.quota + firstQuote.extra, line: quotaLine(firstQuote) } : null;
-
-	return { seller, cat, free, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
+	return { seller, cat, free, categories, cards, total: products.length, listPath: sellerPath('/products') };
 };

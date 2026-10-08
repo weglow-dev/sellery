@@ -1,9 +1,10 @@
 /**
  * 인플루언서 콘솔 홈 3위젯 — 지금 할 일 · 진행 중(LIVE) · 내 자산 (docs/inf-console-plan.md §6 `/home` · §7 3단계).
- * 프로토타입 원본: js/20-seller.js vSellerHome (할 일 카드 · LIVE 카드 · 자산), helpers.ts sampleQuota · sampleLeft · gradeOf.
+ * 프로토타입 원본: js/20-seller.js vSellerHome (할 일 카드 · LIVE 카드 · 자산), helpers.ts gradeOf.
+ * 내 자산의 "이달 무상 샘플" 칸은 0047(월 한도 폐지 · 대표 결정 2026-10-08)로 없앴다 — 🥬 · 등급 · 다음 등급까지 · 정산 정보만.
  *
  * service role + seller_id 필터. DB 왕복은 테이블당 1회: seller_channels · campaigns(+product) · orders(LIVE 캠페인만) · grade_tiers.
- * 인플루언서 요약(`SellerSummary` — grade · m3_sales · sample_extra · has_bank_info)은 `requireSeller()` 가 이미 읽었으므로 다시 읽지 않는다.
+ * 인플루언서 요약(`SellerSummary` — grade · m3_sales · has_bank_info)은 `requireSeller()` 가 이미 읽었으므로 다시 읽지 않는다.
  *   getHomeWidgets(seller, balance) → { todos, live, assets }
  */
 import type { Status } from "@sellery/core/types";
@@ -61,7 +62,6 @@ export type HomeAssets = {
   m3_sales: number;
   /** 다음 등급 (블랙이면 null) */
   next: { grade: string; min: number; remaining: number } | null;
-  sample: { quota: number; extra: number; used: number; left: number };
 };
 
 export type HomeWidgets = { todos: HomeTodo[]; live: HomeLive[]; assets: HomeAssets };
@@ -87,11 +87,6 @@ type RawHomeCampaign = {
   product: { name: string; emoji: string; thumb_url: string | null; sale_price: number } | null;
 };
 
-/** 이달 1일 00:00 KST 의 ISO — sampleUsed 의 달력월 하한 (0011 app_sample_quote 와 같은 기준) */
-export function kstMonthStartIso(today = kstToday()): string {
-  return new Date(`${today.slice(0, 7)}-01T00:00:00+09:00`).toISOString();
-}
-
 export async function getHomeWidgets(seller: SellerSummary, balance: number, admin: Admin = createAdminClient()): Promise<HomeWidgets> {
   const today = kstToday();
   const [chRes, cRes, tiersRes] = await Promise.all([
@@ -102,7 +97,7 @@ export async function getHomeWidgets(seller: SellerSummary, balance: number, adm
       .eq("seller_id", seller.id)
       .order("created_at", { ascending: false })
       .overrideTypes<RawHomeCampaign[], { merge: false }>(),
-    admin.from("grade_tiers").select("name, sort_order, min_m3_sales, sample_quota").order("sort_order", { ascending: true }),
+    admin.from("grade_tiers").select("name, sort_order, min_m3_sales").order("sort_order", { ascending: true }),
   ]);
   if (chRes.error) throw new Error(`seller_channels read failed: ${chRes.error.message}`);
   if (cRes.error) throw new Error(`campaigns read failed: ${cRes.error.message}`);
@@ -232,16 +227,11 @@ export async function getHomeWidgets(seller: SellerSummary, balance: number, adm
   const mine = tiers.find((t) => t.name === grade) ?? null;
   const nextTier = mine ? (tiers.find((t) => t.sort_order === mine.sort_order - 1) ?? null) : null;
   const m3 = seller.m3_sales;
-  const monthStart = Date.parse(kstMonthStartIso(today));
-  const used = campaigns.filter((c) => !c.invited && !c.purchased && Date.parse(c.created_at) >= monthStart).length;
-  const quota = mine?.sample_quota ?? 1;
-  const extra = seller.sample_extra;
   const assets: HomeAssets = {
     balance,
     grade,
     m3_sales: m3,
     next: nextTier ? { grade: nextTier.name, min: Number(nextTier.min_m3_sales), remaining: Math.max(0, Number(nextTier.min_m3_sales) - m3) } : null,
-    sample: { quota, extra, used, left: Math.max(0, quota + extra - used) },
   };
 
   return { todos, live, assets };

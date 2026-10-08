@@ -365,7 +365,7 @@ Supabase → Authentication → Providers → **Email ON · Confirm email ON · 
 | 단계 | 규칙 | 프로토타입 원본 |
 |---|---|---|
 | 잠김 | 상품이 listed 아님 → `NOT_LISTED`. 독점 확정(다른 인플루언서 exclusive) → `EXCLUSIVE_LOCKED`. 같은 seller×product 진행 중 캠페인(DECLINED/REJECTED/PASSED/SETTLED 제외) → `ALREADY_ACTIVE` | `sampleBtnHtml` 분기 순서 |
-| 무상 판정 | `freeEligible`(등급 ≥ `sample_free_grade`, 미지정 시 gp<30,000 브론즈 / <80,000 실버 / 그 외 골드) **and** `!hadFreeSample`(= 같은 seller×product 캠페인 중 `purchased=false and invited=false and status not in ('REJECTED','DECLINED')` 인 행이 없음 — 구매·브랜드 제안으로 받은 샘플은 무상 1회에 포함하지 않는다, 프로토타입 `hadFreeSample` 동일) **and** `sampleLeft>0`(`grade.sample_quota + sellers.sample_extra − 이달 createdAt 캠페인 중 invited·purchased 아닌 건수`) → `{free:true}` → 결제 대신 `app_request_free_sample` | `spOf`·`freeEligible`·`hadFreeSample`·`sampleQuota` |
+| 무상 판정 | `freeEligible`(등급 ≥ `sample_free_grade`, 미지정 시 gp<30,000 브론즈 / <80,000 실버 / 그 외 골드) **and** `!hadFreeSample`(= 같은 seller×product 캠페인 중 `purchased=false and invited=false and status not in ('REJECTED','DECLINED')` 인 행이 없음 — 구매·브랜드 제안으로 받은 샘플은 무상 1회에 포함하지 않는다, 프로토타입 `hadFreeSample` 동일) → `{free:true}` → 결제 대신 `app_request_free_sample`. **월 한도(`sampleLeft>0`) 조건은 0047(2026-10-08 대표 결정)로 폐지** — 무상 = 등급 + 상품당 1회 | `spOf`·`freeEligible`·`hadFreeSample` |
 | 가격 | `price = sample_buy_mode='fixed' ? sample_fixed_price : round(sale_price × (1 − (rate + grade_bonus)) / 10) × 10` — 등급 보너스 반영은 결정 항목(권장 반영). | `samplePrice` (p.rate 만) |
 | 분할 | `p_use_cel=false` → `cel=0, cash=price`. `true` → `cel = min(floor(price / sample_cel_won), balance)`, `cash = price − cel×20000`; **`0 < cash < 100` 이면 `cel −= 1`**(토스 최소 금액) `[graft 안 3]`; `cel=0` 이 되면 `use_cel=false` 로 취급 | `sampleSplit` |
 | 응답 | `{ free, reason?, price, cel, cash, balance, method: cel>0 ? 'cel' : 'cash' }` | — |
@@ -421,7 +421,7 @@ Supabase → Authentication → Providers → **Email ON · Confirm email ON · 
 | 함수 | 역할 |
 |---|---|
 | `app_sample_quote(p_seller_id, p_product_id, p_use_cel)` | §5.3 |
-| `app_request_free_sample(p_seller_id, p_product_id, p_shipping jsonb)` | quote 가 free 일 때만 `campaigns(SAMPLE_REQUESTED, sample_shipping)` + `campaign_events('sample_requested')`. 월 한도·상품당 1회·등급을 함수 안에서 재검사. |
+| `app_request_free_sample(p_seller_id, p_product_id, p_shipping jsonb)` | quote 가 free 일 때만 `campaigns(SAMPLE_REQUESTED, sample_shipping)` + `campaign_events('sample_requested')`. 상품당 1회·등급을 함수 안에서 재검사(월 한도는 0047 로 폐지). |
 | `app_begin_sample_purchase(p_seller_id, p_user_id, p_product_id, p_use_cel, p_shipping, p_toss_order_id)` | quote 재계산 → 같은 seller 의 PENDING 을 SUPERSEDED → `partner_payments` insert(PENDING). **🥬 는 건드리지 않는다.** 반환 `{id, toss_order_id, amount_cash, amount_cel, price_total, order_name}` |
 | `app_claim_partner_payment(p_toss_order_id, p_payment_key, p_stale interval)` | 0008 `app_claim_checkout` 복제: `for update` → CONFIRMED 면 `{already:true}` / PENDING→CONFIRMING + payment_key / 고착 CONFIRMING 재선점 |
 | `app_confirm_sample_purchase(p_payment_id, p_payment jsonb)` | §5.5. `p_payment=null` 은 `amount_cash=0`(🥬 전액) 경로 |

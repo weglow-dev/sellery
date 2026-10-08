@@ -31,7 +31,7 @@
 			</div>
 		</div>
 		<p class="meta" style="margin-top:10px">
-			{#if data.amountCel > 0}🥬 {data.amountCel}개는 잔액에서 바로 차감됐어요. {/if}브랜드는 일반 판매 1건과 동일하게 정산받고, 이달 무상 샘플 한도는 쓰지 않았습니다.{#if data.product?.refund}{' '}<b>판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
+			{#if data.amountCel > 0}🥬 {data.amountCel}개는 잔액에서 바로 차감됐어요. {/if}브랜드는 일반 판매 1건과 동일하게 정산받고, 이 상품의 무상 샘플 1회는 그대로 남아 있어요.{#if data.product?.refund}{' '}<b>판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
 			브랜드가 발송하기 전에는 고객센터로 취소를 요청할 수 있어요.
 		</p>
 		<div class="btnrow" style="justify-content:flex-end;margin-top:18px">

@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* 인플루언서 홈 (js/20-seller.js vSellerHome) */
-	import { S, D_, seller, prod, brand, calc, campOrders, soldQty, sellerWht, gradeOf, gname, gfull, celBal, sampleLeft, exGradeOf, demoVisible, realFirst, platIcon, fmt, md, P, ymd, today, daysLeft, daysUntil, CEL, CELERY_PER, GRADES, ST, ACTIVE_BLOCKERS, act, openModal, go } from '@sellery/core';
+	import { S, D_, seller, prod, brand, calc, campOrders, soldQty, sellerWht, gradeOf, gname, gfull, celBal, exGradeOf, demoVisible, realFirst, platIcon, fmt, md, P, ymd, today, daysLeft, daysUntil, CEL, CELERY_PER, GRADES, ST, ACTIVE_BLOCKERS, act, openModal, go } from '@sellery/core';
 	import { HeroBand, Sec, PIcon, StChip, CampRow, Pyramid, ProdCard } from '@sellery/ui';
 	const me = $derived(S.actingSeller);
 	const sl = $derived(seller(me));
@@ -19,7 +19,7 @@
 	const todayStr = ymd(today());
 	const doneN = $derived(mine.filter((c) => ['SETTLED', 'CLEARING', 'LIVE'].includes(c.status)));
 	const resell = $derived((() => { const pids = doneN.map((c) => c.productId); const rep = pids.filter((x, i) => pids.indexOf(x) !== i).length; return doneN.length ? Math.round(rep / doneN.length * 100) : 0; })());
-	const left = $derived(sampleLeft(sl)), toNext = $derived(CELERY_PER - (sl.m3Sales % CELERY_PER));
+	const toNext = $derived(CELERY_PER - (sl.m3Sales % CELERY_PER));
 	const listed = $derived(D_().products.filter((p) => p.status === 'listed' && demoVisible(p)));
 	const hot = $derived(listed.filter((p) => p.t).sort((a, b) => parseInt(b.t!.g.replace(/\D/g, '')) - parseInt(a.t!.g.replace(/\D/g, '')))[0]);
 	const exclOpen = $derived(listed.filter((p) => p.exclusive && !p.exclusiveSellerId).slice(0, 1));
@@ -97,7 +97,6 @@
 		<div class="mini-stats" style="margin-top:10px">
 			<div><span class="ms-l">셀러리</span><span class="ms-v flex items-center gap-1">{@html CEL} {celBal(me)}</span></div>
 			<div><span class="ms-l">다음 1🥬까지</span><span class="ms-v">₩{fmt(toNext)}</span></div>
-			<div><span class="ms-l">이달 샘플 요청</span><span class="ms-v">{left}회 남음</span></div>
 			<div><span class="ms-l">등급 보너스</span><span class="ms-v">+{g.bonus}%p</span></div>
 		</div>
 		<div class="btnrow" style="margin-top:12px"><button class="sm ghost" onclick={(e) => { e.stopPropagation(); go.screen('shop'); }}>셀러리 샵</button><button class="sm ghost" onclick={(e) => { e.stopPropagation(); go.screen('ref'); }}>친구 초대 · 2% 리워드</button></div>

@@ -42,7 +42,7 @@
 		<table class="stmt" style="min-width:0;width:100%;font-size:13px;margin-top:10px">
 			<tbody>
 				{#if qCash.buy_mode === 'fixed'}
-					<!-- "(1회 한정)" 제거 — 지정가는 가격만 바꾼다(0011:174). 횟수 한도는 무상 샘플에만 있다 -->
+					<!-- "(1회 한정)" 제거 — 지정가는 가격만 바꾼다(0011:174). 횟수 제한은 무상 샘플(상품당 1회)에만 있다 -->
 					<tr><td>브랜드 지정 샘플가</td><td class="num"><b>₩{fmtNum(price)}</b></td></tr>
 				{:else}
 					<tr><td>판매가</td><td class="num">₩{fmtNum(p.sale_price)}</td></tr>
@@ -91,7 +91,7 @@
 	<section class="card static" style="margin-top:14px">
 		<p class="meta" style="margin:0">
 			{data.notices.cancel}.{#if qCash.refund}{' '}<b>이 상품은 판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
-			구매 샘플은 브랜드 승인 없이 바로 발송 단계로 넘어가고, 이달 무상 한도를 쓰지 않습니다.
+			구매 샘플은 브랜드 승인 없이 바로 발송 단계로 넘어가고, 무상 샘플(상품당 1회)에는 포함되지 않습니다.
 		</p>
 		<div class="btnrow" style="justify-content:flex-end;margin-top:12px">
 			<a href={data.productHref} class="btn ghost sm">취소</a>

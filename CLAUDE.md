@@ -73,7 +73,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 단 **플래티넘 이상**(`PRIORITY_TIER`)이 확정한 기간에는 플래티넘 이상만 진입할 수 있습니다 (`periodBlock()`, helpers.ts).
 과거의 "기간 완전 독점"은 폐기됐습니다. 상품 독점권은 별개 기능 — 상품별 기준 등급(`exGradeOf`, 브랜드가 등록 폼에서 골드~블랙 중 선택, 자격 판정은 `exEligible`). 다이아 전용이 아니며 시드에도 플래티넘 기준 상품(p4)이 있습니다. → docs/period-policy.md
 
-**샘플** 상품별 무상 기준 등급 이상 · 상품당 무상 1회(`hadFreeSample`) · 월 한도 등급별 1/2/5회(`sampleQuota`). 셋 중 하나라도 미달이면 유상 구매 — 현금, 또는 🥬 우선 + 잔액 현금(`sampleSplit`, 1🥬=₩20,000 `SAMPLE_CEL_WON`; 현금/🥬 택일이 아님). 브랜드 직접 제안은 한도 미차감. → docs/sample-policy.md
+**샘플** 상품별 무상 기준 등급 이상 · 상품당 무상 1회(`hadFreeSample`) — **두 조건뿐**(등급별 월 한도 1/2/5회는 2026-10-08 대표 결정으로 폐지 · 0047 · `sampleQuota` 삭제). 하나라도 미달이면 유상 구매 — 현금, 또는 🥬 우선 + 잔액 현금(`sampleSplit`, 1🥬=₩20,000 `SAMPLE_CEL_WON`; 현금/🥬 택일이 아님). 브랜드 직접 제안은 상품당 1회 미차감. → docs/sample-policy.md
 
 **셀러리 포인트** 확정 매출 ₩500만당 1🥬 (`CELERY_PER`), 1🥬 ≈ ₩20,000 상당. 데이터 열람 가격은 `DATA_PRICE`. → docs/points-policy.md
 

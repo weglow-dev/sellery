@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* 상품 상세 · 익명 판매 실적 (js/20-seller.js productDetailModal) */
-	import { S, D_, prod, brand, seller, calc, gname, bgname, gfull, exGradeOf, exEligible, sampleLine, sampleLeft, sampleBtn, fmt, md, P, CEL, GRADES, DONE_STATES, act, openModal, closeModal, go } from '@sellery/core';
+	import { S, D_, prod, brand, seller, calc, gname, bgname, gfull, exGradeOf, exEligible, sampleLine, sampleBtn, fmt, md, P, CEL, GRADES, DONE_STATES, act, openModal, closeModal, go } from '@sellery/core';
 	import Modal from '../components/Modal.svelte';
 	import PIcon from '../components/PIcon.svelte';
 	import GradeBox from '../components/GradeBox.svelte';
@@ -20,7 +20,7 @@
 <Modal wide>
 	<h3 class="flex items-center gap-2"><PIcon {p} sz={30} /> {p.name}</h3>
 	<div style="font-size:12.5px;color:var(--mute);margin:-8px 0 12px">{#if logo}<img src={logo} alt="" style="width:20px;height:20px;vertical-align:-6px;border:1.5px solid var(--soft-line);margin-right:2px" />{/if}<span class="chip brand">{b.name}</span> <GradeBox g={bgname(b)} /> {p.cat} · 판매가 ₩{fmt(p.gp)} <s style="opacity:.6">₩{fmt(p.cp)}</s> {#if p.cp > p.gp}<span class="disc">-{Math.round((1 - p.gp / p.cp) * 100)}%</span>{/if} · 수수료 {(p.rate * 100).toFixed(0)}~{(p.rate * 100 + GRADES[0].bonus).toFixed(0)}% (등급 보너스 포함) · 샘플 {p.sample}{#if p.t} · <b style="color:var(--danger)">▲{p.t.g} {p.t.note}</b>{/if}</div>
-	<div class="notice" style="margin:0 0 10px;font-size:12.5px">🎁 <b>샘플 정책</b> — {@html sampleLine(p)}{#if me} · 내 등급 <GradeBox g={gname(me)} /> · 이달 무상 한도 {sampleLeft(me)}회 남음{/if}</div>
+	<div class="notice" style="margin:0 0 10px;font-size:12.5px">🎁 <b>샘플 정책</b> — {@html sampleLine(p)}{#if me} · 내 등급 <GradeBox g={gname(me)} />{/if}</div>
 	{#if p.exclusive}
 		<div class="exclbox">
 			<div class="lbl-sm">👑 브랜드 독점권 오퍼</div>

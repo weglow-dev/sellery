@@ -1,10 +1,13 @@
 /**
  * 샘플 요청 · 캠페인 표시 규칙 — 순수 모듈 (브라우저 `.svelte` 와 서버 양쪽에서 import). DB 호출은 `../server/partner/{products,campaigns}.server.ts`.
  *
- * 숫자·판정은 **DB 함수 `app_sample_quote`(0011)** 가 한다(표시 금액 = 청구 금액, docs/inf-console-plan.md §5.3). 여기서는 그 jsonb 를
+ * 숫자·판정은 **DB 함수 `app_sample_quote`(0011 · 0047)** 가 한다(표시 금액 = 청구 금액, docs/inf-console-plan.md §5.3). 여기서는 그 jsonb 를
  * 타입으로 좁히고(`parseSampleQuote`), 버튼 문구로 바꾸고(`sampleButton` — 프로토타입 helpers.ts `sampleBtn` 의 분기 순서 그대로),
  * 배송지 폼 입력을 검증한다(`parseShippingInput` — 0011 `app_request_free_sample` 과 같은 조건·상한). 상태 칩은 `@sellery/core/constants` 의
  * `ST`(라벨·색·차례) 를 그대로 쓰고 색 이름만 콘솔 칩 톤으로 매핑한다.
+ *
+ * **월 한도 없음(0047 · 대표 결정 2026-10-08)** — 무상 조건은 (1) 내 등급 ≥ 상품 무상 기준 등급 (2) 같은 상품은 1회만, 둘뿐이다.
+ * quote 의 `quota · extra · used · left` 는 DB 가 호환용 중립값(null · 0 · 0 · null)으로 돌려주며 어떤 문구에도 쓰지 않는다.
  *
  * 4단계 PR-B 부터 [샘플 구매 ₩N] 은 활성 링크 — `samplePayHref(code)` = `/influencer/pay/new?product=<code>`(결제 화면). `SAMPLE_BUY_ENABLED` 는
  * 결제 화면을 잠시 닫아야 할 때(토스 장애 등) false 로 돌리는 스위치로 남긴다(버튼 비활성 + `BUY_COMING_SOON` 안내).
@@ -25,13 +28,12 @@ export type SampleMode = "free" | "buy" | "locked" | "active" | "unlisted";
 export type SampleReason =
   | "GRADE_BELOW"
   | "HAD_FREE"
-  | "QUOTA_EXHAUSTED"
   | "EXCLUSIVE_LOCKED"
   | "ALREADY_ACTIVE"
   | "NOT_LISTED"
   | "NOT_FOUND";
 
-/** 0011 `app_sample_quote` 반환 키 1:1 (unlisted 면 가격·한도 필드는 null) */
+/** 0011 `app_sample_quote` 반환 키 1:1 (unlisted 면 가격 필드는 null). quota·extra·used·left 는 0047 뒤 호환용 — 항상 중립값, 표시에 쓰지 않는다. */
 export type SampleQuote = {
   mode: SampleMode;
   reason: SampleReason | null;
@@ -47,10 +49,14 @@ export type SampleQuote = {
   seller_grade: string | null;
   free_eligible: boolean;
   had_free: boolean;
-  quota: number;
+  /** @deprecated 0047 — 월 한도 폐지. DB 는 null 을 돌려준다(옛 응답은 숫자) */
+  quota: number | null;
+  /** @deprecated 0047 */
   extra: number;
+  /** @deprecated 0047 */
   used: number;
-  left: number;
+  /** @deprecated 0047 */
+  left: number | null;
   buy_mode: "auto" | "fixed";
   fixed_price: number;
   refund: boolean;
@@ -66,7 +72,6 @@ const MODES: readonly SampleMode[] = ["free", "buy", "locked", "active", "unlist
 const REASONS: readonly SampleReason[] = [
   "GRADE_BELOW",
   "HAD_FREE",
-  "QUOTA_EXHAUSTED",
   "EXCLUSIVE_LOCKED",
   "ALREADY_ACTIVE",
   "NOT_LISTED",
@@ -102,10 +107,10 @@ export function parseSampleQuote(json: unknown): SampleQuote | null {
     seller_grade: strOrNull(o.seller_grade),
     free_eligible: o.free_eligible === true,
     had_free: o.had_free === true,
-    quota: int(o.quota),
+    quota: intOrNull(o.quota),
     extra: int(o.extra),
     used: int(o.used),
-    left: int(o.left),
+    left: intOrNull(o.left),
     buy_mode: o.buy_mode === "fixed" ? "fixed" : "auto",
     fixed_price: int(o.fixed_price),
     refund: o.refund === true,
@@ -146,7 +151,6 @@ export type SampleButton = {
 export const BUY_REASON_TITLES: Record<Exclude<SampleReason, "EXCLUSIVE_LOCKED" | "ALREADY_ACTIVE" | "NOT_LISTED" | "NOT_FOUND">, string> = {
   GRADE_BELOW: "무상 기준 등급 미달",
   HAD_FREE: "무상 샘플은 상품당 1회",
-  QUOTA_EXHAUSTED: "이달 무상 한도 소진",
 };
 
 export const BUY_COMING_SOON = "샘플 구매는 잠시 닫혀 있어요 (결제 준비 중)";
@@ -197,8 +201,8 @@ export function sampleLine(q: SampleQuote | null, celIcon = "🥬"): string {
 /**
  * 카드·상세의 샘플 안내 두 줄 (대표 QA 2026-10-08 — 한 줄짜리 `sampleLine` 은 인플루언서가 봐도 헷갈림):
  *   rule: 브랜드가 정한 조건 — "무상 샘플 · 실버 이상 · 상품당 1회 · 제공 무상 3개"
- *   mine: 내 상태와 그 결과 — "내 등급 스타터 → 기준 미달 · 샘플 구매 ₩24,880 (🥬 1 + ₩4,880)" / "내 등급 골드 → 무상 요청 가능 · 이달 1/2회 남음"
- * 상품당 무상 1회는 정책 상수(`hadFreeSample`) — 브랜드가 횟수를 정하지는 않는다.
+ *   mine: 내 상태와 그 결과 — "내 등급 스타터 → 기준 미달 · 샘플 구매 ₩24,880 (🥬 1 + ₩4,880)" / "내 등급 골드 → 무상 요청 가능"
+ * 상품당 무상 1회는 정책 상수(`hadFreeSample`) — 브랜드가 횟수를 정하지는 않는다. 월 한도는 없다(0047).
  */
 export function sampleStatus(q: SampleQuote | null, sampleText?: string | null, celIcon = "🥬"): { rule: string; mine: string } {
   if (!q || !q.free_grade) return { rule: "", mine: "" };
@@ -215,7 +219,7 @@ export function sampleStatus(q: SampleQuote | null, sampleText?: string | null, 
   const me = q.seller_grade ? `내 등급 ${q.seller_grade}` : "내 등급";
   switch (q.mode) {
     case "free":
-      return { rule, mine: `${me} → 무상 요청 가능 · 이달 ${q.left}/${q.quota + q.extra}회 남음` };
+      return { rule, mine: `${me} → 무상 요청 가능` };
     case "active":
       return { rule, mine: q.campaign_code ? `이 상품은 이미 진행 중 (${q.campaign_code})` : "이 상품은 이미 진행 중" };
     case "locked":
@@ -225,16 +229,10 @@ export function sampleStatus(q: SampleQuote | null, sampleText?: string | null, 
     default: {
       const why =
         q.reason === "GRADE_BELOW" ? `${me} → 기준(${q.free_grade}) 미달` :
-        q.reason === "HAD_FREE" ? "이미 무상으로 받은 상품" :
-        q.reason === "QUOTA_EXHAUSTED" ? `${me} → 이달 무상 한도 소진 (${q.quota + q.extra}회)` : me;
+        q.reason === "HAD_FREE" ? "이미 무상으로 받은 상품" : me;
       return { rule, mine: `${why} · ${buy}` };
     }
   }
-}
-
-/** 이달 무상 한도 안내 — "이달 무상 샘플 1/2회 남음" */
-export function quotaLine(q: Pick<SampleQuote, "quota" | "extra" | "left">): string {
-  return `이달 무상 샘플 ${q.left}/${q.quota + q.extra}회 남음`;
 }
 
 /* ---------------- app_request_free_sample 결과 ---------------- */
@@ -266,15 +264,13 @@ export const REQUEST_FREE_SAMPLE_MESSAGES: Record<RequestFreeSampleCode, string>
   DB_ERROR: "요청 중 문제가 생겼어요 — 잠시 후 다시 시도해주세요.",
 };
 
-/** NOT_FREE 의 reason 별 문구 (reqSample 원문 — 무상 기준 등급 · 상품당 1회 · 월 한도) */
-export function notFreeMessage(reason: SampleReason | null, freeGrade: string | null, quota: number): string {
+/** NOT_FREE 의 reason 별 문구 (reqSample 원문 — 무상 기준 등급 · 상품당 1회. 월 한도는 없다 · 0047) */
+export function notFreeMessage(reason: SampleReason | null, freeGrade: string | null): string {
   switch (reason) {
     case "GRADE_BELOW":
       return `무상 샘플은 ${freeGrade ?? "기준"} 등급 이상 — 샘플 구매로 진행할 수 있어요`;
     case "HAD_FREE":
       return "이 상품의 무상 샘플은 이미 받았어요 (상품당 1회) — 샘플 구매로 진행";
-    case "QUOTA_EXHAUSTED":
-      return `이번 달 무상 샘플 한도를 모두 사용했어요 (한도 ${quota}회) — 샘플 구매로 진행`;
     default:
       return REQUEST_FREE_SAMPLE_MESSAGES.NOT_FREE;
   }
