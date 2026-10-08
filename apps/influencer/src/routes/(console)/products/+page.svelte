@@ -53,19 +53,24 @@
 				{#if p.boosted}<span class="trendbadge feat">★ 부스트</span>{/if}
 				{#if p.exclusive_label}<span class="exclbadge">독점권 오퍼</span>{/if}
 			</a>
-			<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-				<span class="chip brand">{p.brand.name}</span>
-				<span class="sub" style="font-size:11px;color:var(--color-mute)">{p.category}</span>
+			<div class="brandline">
+				{#if p.brand.logo_url}<img src={imageSrc(p.brand.logo_url)} alt="" class="brandlogo" />{/if}
+				<span class="brandname">{p.brand.name}</span>
+				<span class="sub" style="font-size:11px;color:var(--color-mute)">· {p.category}</span>
 			</div>
 			<a href={p.href} class="nm">{p.name}</a>
-			<div class="meta">{p.description ?? ''}{p.description && p.sample_text ? ' · ' : ''}{p.sample_text ? `샘플 ${p.sample_text}` : ''}</div>
-			{#if p.line}<div class="meta" style="font-size:11px">🎁 {p.line}</div>{/if}
-			<div class="prices">
-				<span class="gp">₩{fmtNum(p.sale_price)}</span>
-				<span class="cp">₩{fmtNum(p.consumer_price)}</span>
-				{#if disc !== null}<span class="disc">-{disc}%</span>{/if}
-				<span class="rate">수수료 {pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</span>
+			{#if p.description}<div class="meta">{p.description}</div>{/if}
+			<div class="pricegrid">
+				<div><span class="pl">셀러 판매가</span><span class="gp">₩{fmtNum(p.sale_price)}</span>{#if disc !== null}<span class="disc">-{disc}%</span>{/if}</div>
+				<div><span class="pl">브랜드 시중가</span><span class="cp">₩{fmtNum(p.consumer_price)}</span></div>
+				<div><span class="pl">수수료</span><span class="rate">{pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</span></div>
 			</div>
+			{#if p.status.rule}
+				<div class="samplebox">
+					<div class="rule">🎁 {p.status.rule}</div>
+					<div class="mine">{p.status.mine}</div>
+				</div>
+			{/if}
 			<div class="meta">
 				건당 예상 수수료 ₩{fmtNum(Math.round(p.sale_price * p.commission_rate))}{#if b.kind === 'locked'}{' '}· <b style="color:var(--color-danger)">독점 인플루언서 확정 상품</b>{/if}
 			</div>

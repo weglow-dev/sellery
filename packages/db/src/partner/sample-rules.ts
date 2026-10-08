@@ -194,6 +194,42 @@ export function sampleLine(q: SampleQuote | null, celIcon = "🥬"): string {
   return s;
 }
 
+/**
+ * 카드·상세의 샘플 안내 두 줄 (대표 QA 2026-10-08 — 한 줄짜리 `sampleLine` 은 인플루언서가 봐도 헷갈림):
+ *   rule: 브랜드가 정한 조건 — "무상 샘플 · 실버 이상 · 상품당 1회 · 제공 무상 3개"
+ *   mine: 내 상태와 그 결과 — "내 등급 스타터 → 기준 미달 · 샘플 구매 ₩24,880 (🥬 1 + ₩4,880)" / "내 등급 골드 → 무상 요청 가능 · 이달 1/2회 남음"
+ * 상품당 무상 1회는 정책 상수(`hadFreeSample`) — 브랜드가 횟수를 정하지는 않는다.
+ */
+export function sampleStatus(q: SampleQuote | null, sampleText?: string | null, celIcon = "🥬"): { rule: string; mine: string } {
+  if (!q || !q.free_grade) return { rule: "", mine: "" };
+  const rule = `무상 샘플 · ${q.free_grade} 이상 · 상품당 1회${sampleText ? ` · 제공 ${sampleText}` : ""}${q.refund ? " · 판매 확정 시 구매액 환급" : ""}`;
+  const buy = (() => {
+    if (q.price === null) return "";
+    const celWon = q.cel_won > 0 ? q.cel_won : SAMPLE_CEL_WON_DEFAULT;
+    const cel = Math.floor(q.price / celWon);
+    const cash = q.price - cel * celWon;
+    return `샘플 구매 ₩${fmtNum(q.price)}${cel > 0 ? ` (${celIcon} ${cel}${cash ? ` + ₩${fmtNum(cash)}` : ""})` : ""}${q.buy_mode === "fixed" ? " · 브랜드 지정가" : ""}`;
+  })();
+  const me = q.seller_grade ? `내 등급 ${q.seller_grade}` : "내 등급";
+  switch (q.mode) {
+    case "free":
+      return { rule, mine: `${me} → 무상 요청 가능 · 이달 ${q.left}/${q.quota + q.extra}회 남음` };
+    case "active":
+      return { rule, mine: q.campaign_code ? `이 상품은 이미 진행 중 (${q.campaign_code})` : "이 상품은 이미 진행 중" };
+    case "locked":
+      return { rule, mine: "독점 인플루언서가 확정된 상품 — 지금은 신청할 수 없어요" };
+    case "unlisted":
+      return { rule, mine: "판매 준비 중인 상품" };
+    default: {
+      const why =
+        q.reason === "GRADE_BELOW" ? `${me} → 기준(${q.free_grade}) 미달` :
+        q.reason === "HAD_FREE" ? "이미 무상으로 받은 상품" :
+        q.reason === "QUOTA_EXHAUSTED" ? `${me} → 이달 무상 한도 소진 (${q.quota + q.extra}회)` : me;
+      return { rule, mine: `${why} · ${buy}` };
+    }
+  }
+}
+
 /** 이달 무상 한도 안내 — "이달 무상 샘플 1/2회 남음" */
 export function quotaLine(q: Pick<SampleQuote, "quota" | "extra" | "left">): string {
   return `이달 무상 샘플 ${q.left}/${q.quota + q.extra}회 남음`;

@@ -65,13 +65,12 @@
 		<div class="t">{p.name} <small>{p.code.toUpperCase()}</small></div>
 		<div class="meta">
 			{#if logo}<img src={logo} alt="" style="width:20px;height:20px;vertical-align:-6px;box-shadow:var(--shadow-frame-soft);margin-right:2px" />{/if}
-			<span class="chip brand">{p.brand.name}</span>
-			{p.category}
+			<span class="brandname">{p.brand.name}</span>
+			· {p.category}
 		</div>
-		<div class="prices">
-			<span class="gp">₩{fmtNum(p.sale_price)}</span>
-			<span class="cp">₩{fmtNum(p.consumer_price)}</span>
-			{#if disc !== null}<span class="disc">-{disc}%</span>{/if}
+		<div class="pricegrid">
+			<div><span class="pl">셀러 판매가</span><span class="gp">₩{fmtNum(p.sale_price)}</span>{#if disc !== null}<span class="disc">-{disc}%</span>{/if}</div>
+			<div><span class="pl">브랜드 시중가</span><span class="cp">₩{fmtNum(p.consumer_price)}</span></div>
 		</div>
 		<div class="meta">
 			수수료 <b>{pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</b> (등급 보너스 포함) · 건당 예상 수수료 ₩{fmtNum(Math.round(p.sale_price * p.commission_rate))}{#if p.sample_text}{' '}· 샘플 {p.sample_text}{/if}
@@ -80,9 +79,10 @@
 	</div>
 </section>
 
-{#if data.line}
-	<div class="notice">
-		🎁 <b>샘플 정책</b> — {data.line}{#if data.seller.grade}{' '}· 내 등급 <b>{data.seller.grade}</b>{/if}{#if data.quotaText}{' '}· {data.quotaText}{/if}
+{#if data.status?.rule}
+	<div class="notice samplebox">
+		<div class="rule">🎁 {data.status.rule}</div>
+		<div class="mine">{data.status.mine}</div>
 	</div>
 {/if}
 

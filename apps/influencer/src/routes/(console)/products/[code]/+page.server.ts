@@ -8,6 +8,7 @@ import {
 	quotaLine,
 	sampleButton,
 	sampleLine,
+	sampleStatus,
 	samplePayHref,
 	type ShippingField
 } from '@sellery/db/partner/sample-rules';
@@ -92,6 +93,7 @@ export const load: PageServerLoad = async (event) => {
 		quote: q,
 		button: sampleButton(q),
 		line: sampleLine(q),
+		status: sampleStatus(q, product.sample_text ?? null),
 		quotaText: q && q.mode !== 'unlisted' ? quotaLine(q) : null,
 		shipping: parseStoredShipping(seller.sample_address),
 		campaignHref: q?.campaign_code ? sellerPath(`/campaigns/${encodeURIComponent(q.campaign_code)}`) : null,
