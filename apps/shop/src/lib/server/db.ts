@@ -5,6 +5,7 @@
  * 파트너 가입 생성(`createSellerFromSignup` · `linkSellerIdOf`)은 `/auth/{callback,confirm}` 의 파트너 분기가 쓴다 (결정 15).
  * 비회원 주문(`createGuestCustomer` · `lookupGuestOrder` · `issueGuestToken` · `verifyGuestOrder` · `fetchGuestOrder` — 0021 · `/checkout` `/orders/lookup` `/orders/g/[code]` · 결제 API 비회원 분기)도 여기서.
  * 고객 문의(`openCs` · `getCsThread` · `customerReplyCs` · `listCsForUser` — 0018 · `/cs/new` `/cs/[code]` · `/account/orders`)와 캠페인 스케줄러(`runCampaignTick` — `/api/cron/campaign-tick`)도 여기서.
+ * 오픈 알림(`subscribeCampaignAlert` · `cancelCampaignAlert` · `campaignAlertState` · `unsubscribeCampaignAlert` · `sendDueCampaignAlerts` — 0043 · `/s/[handle]/[code]` · `/alerts/off` · 틱)도 여기서.
  */
 import './env';
 
@@ -21,6 +22,7 @@ export * from '@sellery/db/server/orders';
 export * from '@sellery/db/server/guest-order';
 export * from '@sellery/db/server/cs';
 export * from '@sellery/db/server/campaign-tick';
+export * from '@sellery/db/server/campaign-alerts';
 export * from '@sellery/db/server/grade-tick';
 export { createSellerFromSignup, linkSellerIdOf } from '@sellery/db/server/partner/signup';
 // 고객 문의 접수 · 추가 문의 레이트리밋(IP · 회원) — 파트너 콘솔과 같은 메모리 버킷 (docs/brand-console-plan.md §8 "CS 접수 레이트리밋")

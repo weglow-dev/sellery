@@ -2516,6 +2516,21 @@ export type Database = {
       }
       app_campaign_tick: { Args: never; Returns: Json }
       app_campaign_tick_one: { Args: { p_campaign_id: string }; Returns: Json }
+      app_campaign_alert_subscribe: {
+        Args: { p_campaign_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_campaign_alert_cancel: {
+        Args: { p_campaign_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_campaign_alert_unsubscribe: { Args: { p_token: string }; Returns: Json }
+      app_campaign_alert_state: {
+        Args: { p_campaign_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_campaign_alerts_due: { Args: { p_limit?: number }; Returns: Json }
+      app_campaign_alert_sent: { Args: { p_ids: string[] }; Returns: Json }
       app_checkout_reserved: {
         Args: { p_campaign_id: string }
         Returns: number

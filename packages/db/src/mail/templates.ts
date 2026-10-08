@@ -14,6 +14,7 @@
  * 발송 자체(Resend · 멱등 키 · 비활성)는 `./resend.ts` + `../server/mail.server.ts`, 이벤트별 행 조회는 `../server/mail-events.server.ts`.
  */
 import { trackingUrlOf, carrierName } from "../carriers";
+import { storeUrl } from "../campaign";
 import { addDays, md } from "../dates";
 import { won } from "../order-status";
 import type { Shipping } from "../types";
@@ -256,4 +257,55 @@ export function csOpenedBrandMail(cs: MailCs, message: { messageId: string; body
     mailIdempotencyKey(message.followUp ? "cs_followup" : "cs_opened", message.messageId),
     message.followUp ? "cs_followup" : "cs_opened",
   );
+}
+
+/* ---------------- 캠페인 오픈 알림 (0043) ---------------- */
+
+/**
+ * 메일이 보는 오픈 알림 1건 — `app_campaign_alerts_due` 가 돌려주는 행 + 수신거부 토큰.
+ * 신청한 **회원 본인**에게만 간다(이메일이 등록된 계정 · 0043 범위 결정).
+ */
+export type MailCampaignAlert = {
+  campaignCode: string;
+  sellerHandle: string;
+  productName: string;
+  brandName: string;
+  salePrice: number | null;
+  consumerPrice: number | null;
+  endDate: string | null;
+  /** 1클릭 수신거부 토큰 — 메일 하단 링크 */
+  unsubToken: string;
+  /** 멱등키용 — campaign_alerts.id */
+  alertId: string;
+};
+
+/**
+ * 오픈 알림 — 고객이 직접 신청한 캠페인이 판매를 시작했을 때 한 통.
+ * 거래 메일(주문·배송·환불)과 달리 **수신거부 링크를 반드시 넣는다** — 고객이 신청해서 받는 메일이라
+ * 끊을 방법이 메일 안에 있어야 한다(0043 · docs/launch-checklist.md §5 결정 3).
+ */
+export function campaignOpenMail(a: MailCampaignAlert, ctx: MailCtx): MailTemplate {
+  // `storeUrl` 로 정식 경로를 만든다 — DB 의 handle 은 '@' 를 포함해서 그대로 쓰면 308 리다이렉트를 한 번 탄다
+  const store = url(ctx, storeUrl(a.sellerHandle, a.campaignCode));
+  const rows = [
+    { label: "상품", value: a.productName },
+    { label: "브랜드", value: a.brandName },
+  ];
+  if (a.salePrice !== null) {
+    const base = a.consumerPrice !== null && a.consumerPrice > a.salePrice ? ` (정가 ${won(a.consumerPrice)})` : "";
+    rows.push({ label: "판매가", value: `${won(a.salePrice)}${base}` });
+  }
+  if (a.endDate) rows.push({ label: "판매 종료", value: md(a.endDate) });
+  const doc: MailDoc = {
+    title: "신청하신 판매가 열렸어요",
+    preheader: `${a.productName} · ${a.brandName}`,
+    intro: `오픈 알림을 신청하신 ${a.productName} 판매가 시작됐어요. 기간 한정 판매라 종료일이 지나면 정가로 돌아갑니다.`,
+    rows,
+    button: { label: "판매 페이지 보기", url: store },
+    notes: [
+      `이 메일은 고객님이 셀러리 판매 페이지에서 오픈 알림을 신청해서 보내드렸어요.`,
+      `더 받고 싶지 않으면 ${url(ctx, `/alerts/off?t=${encodeURIComponent(a.unsubToken)}`)} 에서 한 번에 해지할 수 있어요.`,
+    ],
+  };
+  return finish(doc, `[셀러리] ${a.productName} 판매가 시작됐어요`, mailIdempotencyKey("campaign_open", a.alertId), "campaign_open");
 }
