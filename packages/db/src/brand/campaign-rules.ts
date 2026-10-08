@@ -11,6 +11,7 @@
  *   초대(0016 app_brand_invite_*)는 ./invite-rules.ts · 채팅은 ../partner/chat-rules.ts.
  */
 import { ST } from "@sellery/core/constants";
+import type { TrackingFields } from "../tracking/sweettracker";
 import type { Status } from "@sellery/core/types";
 import { COURIERS, isCourier, type Courier } from "../carriers";
 import { md } from "../dates";
@@ -175,6 +176,8 @@ export type BrandCampaignDetail = {
   campaign: BrandCampaignRow;
   /** 샘플 배송지 원문 — 발송 목적으로만 노출 (0011 헤더) */
   sample_shipping: Shipping | null;
+  /** 0049 샘플 송장 자동 추적 스냅샷 — getBrandCampaign 이 덧붙인다(brand_campaign_json 밖) · 조회 전·없음은 null */
+  tracking?: TrackingFields | null;
   events: BrandCampaignEvent[];
 };
 

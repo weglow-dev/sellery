@@ -28,6 +28,12 @@ export function cronSecret(): string | null {
 	return typeof v === 'string' && v.trim() ? v.trim() : null;
 }
 
+/** 스마트택배(SweetTracker) API 키 — `/api/cron/tracking` 택배 자동 추적(0049 · docs/deploy.md §5.8). 비어 있으면 null — 스윕이 NO_KEY 로 건너뛴다. */
+export function sweettrackerApiKey(): string | null {
+	const v = env.SWEETTRACKER_API_KEY;
+	return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
 /** 절대 URL 의 오리진 (og · canonical · 메일 링크). 형식이 어긋나면 로컬 dev 주소 — web (customer)/layout.tsx siteUrl() 와 같은 폴백 규칙. */
 export const SITE_URL: string = (() => {
 	try {

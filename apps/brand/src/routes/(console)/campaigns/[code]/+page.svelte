@@ -10,6 +10,7 @@
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
+	import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
 	import { COURIERS, ENDED_STATUSES, periodLine, REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
 	import { campaignTopic } from '@sellery/db/realtime';
 	import { CampaignStepper, CopyButton, GradeBox, LiveRefresh, PlatformHandle, ProductIcon, SellerAvatar, StatusChip, ThreadComposer, ThreadMessages } from '@sellery/ui/site';
@@ -19,6 +20,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const c = $derived(data.campaign);
+	/** 0049 택배 자동 추적 스냅샷 한 줄 · 자동 수령 전이 여부 */
+	const trackingLine = $derived(trackingStatusLine(data.tracking));
+	const autoReceived = $derived(data.autoReceived);
 	const p = $derived(c.product);
 	const s = $derived(c.seller);
 	const sh = $derived(data.sample_shipping);
@@ -124,7 +128,9 @@
 		{:else if c.status === 'SAMPLE_SHIPPED'}
 			<div class="card static">
 				<h4>인플루언서 수령 대기 중 ⏳</h4>
-				<p class="hint">운송장 <b>{c.sample_courier ?? ''} {c.tracking_no || '—'}</b>{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">배송 조회 ↗</a>{/if} · 인플루언서가 수령을 확인하면 테스트가 시작됩니다.</p>
+				<p class="hint">운송장 <b>{c.sample_courier ?? ''} {c.tracking_no || '—'}</b>{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">배송 조회 ↗</a>{/if}</p>
+				{#if trackingLine}<p class="hint">배송 상태: {trackingLine}</p>{/if}
+				<p class="hint">택배 배송 완료가 확인되면(매시 자동 조회) 테스트가 자동으로 시작됩니다 — 인플루언서가 먼저 [수령 확인]을 눌러도 같습니다.</p>
 			</div>
 		{:else if c.status === 'TESTING'}
 			<div class="card static">
@@ -244,7 +250,7 @@
 				</dd>
 				{#if c.tracking_no}
 					<dt>운송장</dt>
-					<dd>{c.sample_courier ?? ''} {c.tracking_no}{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">조회 ↗</a>{/if}{#if c.sample_shipped_at}<br /><span style="color:var(--color-mute)">발송 {md(c.sample_shipped_at)}</span>{/if}</dd>
+					<dd>{c.sample_courier ?? ''} {c.tracking_no}{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">조회 ↗</a>{/if}{#if c.sample_shipped_at}<br /><span style="color:var(--color-mute)">발송 {md(c.sample_shipped_at)}</span>{/if}{#if trackingLine}<br /><span style="color:var(--color-mute)">{trackingLine}{autoReceived ? ' · 자동으로 테스트 단계로 넘어갔어요' : ''}</span>{/if}</dd>
 				{/if}
 				{#if c.received_at}<dt>수령 확인</dt><dd>{md(c.received_at)}</dd>{/if}
 				{#if c.test_due}<dt>테스트 기한</dt><dd>{md(c.test_due)}</dd>{/if}

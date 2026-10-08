@@ -15,6 +15,7 @@
     "./legal/*": "./src/legal/*.ts",
     "./shop/*": "./src/shop/*.ts",
     "./mail/*": "./src/mail/*.ts",
+    "./tracking/*": "./src/tracking/*.ts",
     "./server/*": "./src/server/*.server.ts",
     "./server/partner/*": "./src/server/partner/*.server.ts",
     "./server/brand/*": "./src/server/brand/*.server.ts",

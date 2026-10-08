@@ -25,6 +25,7 @@ export * from '@sellery/db/server/shop';
 export * from '@sellery/db/server/brand/schedule';
 export * from '@sellery/db/server/brand/invite';
 export * from '@sellery/db/server/brand/orders';
+export { fetchOrdersTracking } from '@sellery/db/server/tracking'; // 0049 주문 표의 배송 완료·추적 스냅샷
 export * from '@sellery/db/server/brand/cs';
 export * from '@sellery/db/server/brand/sales';
 export * from '@sellery/db/server/brand/settle';

@@ -12,6 +12,7 @@
 	import { sampleRefundReadyLine, sampleShipDeadlineLine } from '@sellery/db/partner/sample-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
+	import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
 	import { ENDED_STATUSES, payLine, samplePaidLine } from '@sellery/db/partner/sample-rules';
 	import { DECLINE_REASON_MAX, endOfPeriod, PERIOD_LEN_CHOICES } from '@sellery/db/partner/schedule-rules';
 	import { campaignTopic } from '@sellery/db/realtime';
@@ -22,6 +23,9 @@
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	const c = $derived(data.campaign);
+	/** 0049 택배 자동 추적 스냅샷 한 줄 · 자동 수령 전이 여부(sample_received{auto}) */
+	const trackingLine = $derived(trackingStatusLine(c.tracking));
+	const autoReceived = $derived(data.autoReceived);
 	const p = $derived(c.product);
 	const sh = $derived(data.sample_shipping);
 	const ctx = $derived(data.schedule);
@@ -150,7 +154,9 @@
 		{:else if c.status === 'SAMPLE_SHIPPED'}
 			<div class="card static">
 				<h4>샘플 수령 확인 <span class="chip seller">인플루언서 액션</span></h4>
-				<p class="hint">운송장 <b>{c.sample_courier ?? ''} {c.tracking_no || '—'}</b> · 수령 확인 시 테스트 기한 {data.testDays}일이 시작됩니다.</p>
+				<p class="hint">운송장 <b>{c.sample_courier ?? ''} {c.tracking_no || '—'}</b>{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">배송 조회 ↗</a>{/if}</p>
+				{#if trackingLine}<p class="hint">배송 상태: {trackingLine}</p>{/if}
+				<p class="hint">배송 완료가 확인되면 자동으로 테스트 단계로 넘어가요(매시 확인 · 테스트 기한 {data.testDays}일) — 먼저 받았다면 [수령 확인]을 눌러주세요.</p>
 				<form method="post" action="?/receive" class="btnrow">
 					<button type="submit" class="pri">수령 확인</button>
 				</form>
@@ -278,7 +284,7 @@
 				<dt>요청일</dt>
 				<dd>{md(c.created_at)}{c.invited ? ' · 브랜드 제안' : c.purchased ? ' · 샘플 구매' : ' · 무상 샘플'}</dd>
 				{#if paidLine}<dt>샘플 결제</dt><dd>{payLine({ amount_total: c.sample_price ?? 0, amount_cel: c.sample_cel, amount_cash: c.sample_cash })}</dd>{/if}
-				{#if c.tracking_no}<dt>운송장</dt><dd>{c.sample_courier ?? ''} {c.tracking_no}</dd>{/if}
+				{#if c.tracking_no}<dt>운송장</dt><dd>{c.sample_courier ?? ''} {c.tracking_no}{#if data.trackingUrl}{' '}<a href={data.trackingUrl} target="_blank" rel="noopener">조회 ↗</a>{/if}{#if trackingLine}<br /><span style="color:var(--color-mute)">{trackingLine}{autoReceived ? ' · 자동으로 테스트 단계로 넘어갔어요' : ''}</span>{/if}</dd>{/if}
 				{#if c.received_at}<dt>수령 확인</dt><dd>{md(c.received_at)}</dd>{/if}
 				{#if c.test_due}<dt>테스트 기한</dt><dd>{md(c.test_due)}</dd>{/if}
 				{#if c.proposed_start && !c.start_date}<dt>제안 기간</dt><dd>{md(c.proposed_start)}–{c.proposed_end ? md(c.proposed_end) : '—'} · 재고 {fmtNum(c.proposed_qty ?? 0)}개</dd>{/if}

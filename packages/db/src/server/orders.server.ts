@@ -28,6 +28,12 @@ export type MyOrder = {
   courier: string | null;
   tracking_no: string | null;
   shipped_at: string | null;
+  /** 택배 배송 완료 시각 (0049 자동 추적 · shipLabel '배송 완료') */
+  delivered_at: string | null;
+  /** 마지막 추적 스냅샷 (0049 · ShipInfo 의 trackingStatusLine) */
+  tracking_status: string | null;
+  tracking_last: unknown;
+  tracking_checked_at: string | null;
   paid_at: string;
   refunded_at: string | null;
   refund_amount: number | null;
@@ -51,7 +57,7 @@ const ORDER_STATUSES: readonly OrderStatus[] = ["PAID", "REFUNDED", "CANCELED"];
  * 한 줄·공백 없음: supabase-js 의 타입 레벨 select 파서와 PostgREST 파서 양쪽에 안전한 형태.
  */
 const SELECT =
-  "id,code,status,qty,unit_price,amount,option_name,order_name,courier,tracking_no,shipped_at,paid_at,refunded_at,refund_amount,refund_reason,payment_method,is_sample,shipping," +
+  "id,code,status,qty,unit_price,amount,option_name,order_name,courier,tracking_no,shipped_at,delivered_at,tracking_status,tracking_last,tracking_checked_at,paid_at,refunded_at,refund_amount,refund_reason,payment_method,is_sample,shipping," +
   "campaign:campaigns!orders_campaign_id_fkey(id,code,status,end_date," +
   "product:products!campaigns_product_id_fkey(name,thumb_url,emoji)," +
   "seller:sellers!campaigns_seller_id_fkey(name,handle)," +
@@ -69,6 +75,10 @@ type RawOrder = {
   courier: string | null;
   tracking_no: string | null;
   shipped_at: string | null;
+  delivered_at: string | null;
+  tracking_status: string | null;
+  tracking_last: unknown;
+  tracking_checked_at: string | null;
   paid_at: string;
   refunded_at: string | null;
   refund_amount: number | null;
@@ -105,6 +115,10 @@ function toMyOrder(r: RawOrder): MyOrder | null {
     courier: r.courier,
     tracking_no: r.tracking_no,
     shipped_at: r.shipped_at,
+    delivered_at: r.delivered_at ?? null,
+    tracking_status: r.tracking_status ?? null,
+    tracking_last: r.tracking_last ?? null,
+    tracking_checked_at: r.tracking_checked_at ?? null,
     paid_at: r.paid_at,
     refunded_at: r.refunded_at,
     refund_amount: r.refund_amount,

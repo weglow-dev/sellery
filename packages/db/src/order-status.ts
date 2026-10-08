@@ -5,6 +5,8 @@
  *   정산 후·샘플이라 REFUNDED 로 둘 수 없는 주문, app-plan §5)도 고객에게는 '환불 완료'.
  * ship 파생(프로토타입 js/60-customer.js L314): status!=='PAID' → 없음 · 캠페인 LIVE → '브랜드 발송 준비 중'
  *   · CLEARING → '교환·환불 {md(end_date+clear_days)}까지' · 그 외 → '배송 완료'.
+ *   **배송 완료(0049 `orders.delivered_at` — 스마트택배 자동 추적)**: PAID 이고 송장 + delivered_at 이 있으면 캠페인 단계와 무관하게 '배송 완료'
+ *   (CLEARING 이면 뒤에 ' · 교환·환불 …까지' 를 이어 환불 창을 잃지 않는다).
  *   확장(ux-spec §3.6 [신규]): tracking_no 가 있으면 앞에 '{courier} {tracking_no} · '. LIVE 인데 송장이 있으면 '발송 준비 중' 은
  *   사실과 어긋나므로 그 자리만 '배송 중'(브랜드 탭 파생 규칙)으로 바꾼다.
  * 환불 가능(§0-8 · §7.4): PAID · 비샘플 · 캠페인 ≠ SETTLED · tracking_no null(발송 전). 서버 app_refund_precheck 와 같은 순서·같은 코드.
@@ -20,6 +22,8 @@ export type OrderLike = {
   tracking_no: string | null;
   courier: string | null;
   is_sample?: boolean;
+  /** 택배 배송 완료 시각 (0049 · 자동 추적) — 없으면 캠페인 단계로 파생 */
+  delivered_at?: string | null;
 };
 
 export type CampaignLike = {
@@ -46,12 +50,14 @@ export function orderStatusLabel(o: OrderLike, c: CampaignLike): { label: string
 export function shipLabel(o: OrderLike, c: CampaignLike, settings: { clear_days: number }): string | null {
   if (o.status !== "PAID") return null;
   const shipped = !!o.tracking_no;
+  const delivered = shipped && !!o.delivered_at;
   let base: string;
   if (c.status === "LIVE") {
-    base = shipped ? "배송 중" : "브랜드 발송 준비 중";
+    base = delivered ? "배송 완료" : shipped ? "배송 중" : "브랜드 발송 준비 중";
   } else if (c.status === "CLEARING") {
     const days = Number.isFinite(settings.clear_days) ? settings.clear_days : DEFAULT_CLEAR_DAYS;
-    base = c.end_date ? `교환·환불 ${md(addDays(c.end_date, days))}까지` : "교환·환불 신청 가능";
+    const window = c.end_date ? `교환·환불 ${md(addDays(c.end_date, days))}까지` : "교환·환불 신청 가능";
+    base = delivered ? `배송 완료 · ${window}` : window;
   } else {
     base = "배송 완료";
   }

@@ -23,6 +23,7 @@ import {
 import type { Courier } from "../../carriers";
 import { createAdminClient, type Admin } from "../admin.server";
 import { notifyCampaignChanged } from "../realtime.server";
+import { fetchCampaignTracking } from "../tracking.server";
 
 export type { BrandCampaignRow, BrandCampaignDetail, BrandCampaignEvent, BrandSellerSummary, SampleActionResult } from "../../brand/campaign-rules";
 
@@ -61,7 +62,10 @@ export async function getBrandCampaign(brandId: string, code: string, admin: Adm
   if (!id) return null;
   const { data, error } = await admin.rpc("app_brand_campaign", { p_brand_id: brandId, p_campaign_id: id });
   if (error) throw new Error(`app_brand_campaign failed: ${error.message}`);
-  return parseBrandCampaignDetail(data);
+  const detail = parseBrandCampaignDetail(data);
+  if (!detail || !detail.campaign.tracking_no) return detail;
+  // 0049 샘플 송장 자동 추적 스냅샷 — brand_campaign_json(0016) 은 이 컬럼을 모른다
+  return { ...detail, tracking: await fetchCampaignTracking(admin, id) };
 }
 
 type SampleFn = "app_brand_approve_sample" | "app_brand_reject_sample" | "app_brand_ship_sample";

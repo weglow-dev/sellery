@@ -6,6 +6,7 @@ import {
 } from '@sellery/db/partner/sample-rules';
 import { storeUrl } from '@sellery/db/campaign';
 import { addDays, kstToday } from '@sellery/db/dates';
+import { trackingUrlOf } from '@sellery/db/carriers';
 import { chatFailMessage, parseChatInput } from '@sellery/db/partner/chat-rules';
 import { parseShippingInput, parseStoredShipping } from '@sellery/db/partner/sample-rules';
 import {
@@ -110,6 +111,9 @@ export const load: PageServerLoad = async (event) => {
 		settleDue: c.end_date ? addDays(c.end_date, CLEAR_DAYS) : null,
 		clearDays: CLEAR_DAYS,
 		testDays: TEST_DAYS,
+		trackingUrl: trackingUrlOf(c.sample_courier, c.tracking_no),
+		/** 0049 — 택배 배송 완료로 자동 수령 처리된 캠페인(campaign_events sample_received{auto:true}) */
+		autoReceived: events.some((e) => e.event_type === 'sample_received' && !!e.payload && typeof e.payload === 'object' && (e.payload as { auto?: unknown }).auto === true),
 		listPath: sellerPath('/campaigns'),
 		productHref: c.product.code ? sellerPath(`/products/${encodeURIComponent(c.product.code)}`) : null
 	};

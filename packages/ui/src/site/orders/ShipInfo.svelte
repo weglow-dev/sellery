@@ -2,15 +2,18 @@
 	/**
 	 * 배송 정보 조각 — 주문 상세의 택배사·송장·조회 링크·발송일 (reuse-map §1.5 glo 배송 조회 블록 개작 · web components/orders/ship-info.tsx).
 	 * 송장이 없으면 파생 배송 문구(shipLabel)만.
+	 * 0049 자동 추적 스냅샷(tracking_status · tracking_last)이 있으면 "배송 중 · 간선상차 · 서울집중 (10/8 14:00)" 한 줄을 더 — 실시간 호출 없음(매시 크론).
 	 */
 	import { carrierName, trackingUrlOf } from '@sellery/db/carriers';
 	import { md } from '@sellery/db/dates';
 	import { shipLabel } from '@sellery/db/order-status';
+	import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
 	import type { OrderSettings, OrderView } from './types';
 
 	let { order, settings }: { order: OrderView; settings: OrderSettings } = $props();
 	const ship = $derived(shipLabel(order, order.campaign, settings));
 	const url = $derived(trackingUrlOf(order.courier, order.tracking_no));
+	const tracking = $derived(order.status === 'PAID' ? trackingStatusLine(order) : null);
 </script>
 
 {#if !order.tracking_no}
@@ -28,5 +31,6 @@
 			<span class="meta">택배사 정보가 없어 조회 링크를 제공할 수 없어요 — 고객센터로 문의해주세요</span>
 		{/if}
 		{#if ship}<span class="meta" style="flex-basis:100%">{ship}</span>{/if}
+		{#if tracking}<span class="meta" style="flex-basis:100%">배송 상태: {tracking}</span>{/if}
 	</div>
 {/if}
