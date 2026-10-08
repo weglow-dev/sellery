@@ -30,6 +30,8 @@ export const load: PageServerLoad = async (event) => {
 		seller: detail.seller,
 		channels: detail.channels,
 		celery: detail.celery,
+		// 정지 버튼의 영향 범위 — 셀러를 정지하면 이 건들의 판매 링크가 즉시 닫힌다(campaign_card 의 s.active 가드)
+		liveCampaigns: detail.liveCampaigns,
 		msg,
 		msgTone: key.startsWith('err') ? ('danger' as const) : ('ok' as const),
 		self: `${adminPath('/sellers')}/${encodeURIComponent(event.params.code)}`,

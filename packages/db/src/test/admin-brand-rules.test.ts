@@ -100,7 +100,10 @@ describe("문구", () => {
     }
   });
   it("정지 경고는 listed 상품이 내려가지 않는다는 사실을 담는다 (brand-console-plan §8)", () => {
-    expect(SUSPEND_BRAND_NOTE).toContain("판매 중");
-    expect(SUSPEND_BRAND_NOTE).toContain("내려가지 않습니다");
+    // 2026-10-08 정정: 정지하면 판매 링크가 **닫힌다**(campaign_card 의 b.active 가드 · 0008:233).
+    // 이전 문구("내려가지 않습니다")는 운영자가 영향 범위를 과소평가하게 했다.
+    expect(SUSPEND_BRAND_NOTE).toContain("즉시 닫히고");
+    expect(SUSPEND_BRAND_NOTE).toContain("결제도 막힙니다");
+    expect(SUSPEND_BRAND_NOTE).not.toContain("내려가지 않습니다");
   });
 });

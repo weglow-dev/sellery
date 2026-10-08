@@ -192,15 +192,36 @@
 	<div class="console-actions">
 		<div class="card static">
 			<h4>콘솔 입장</h4>
+			<!--
+				정지 영향 범위를 사실대로 적는다(2026-10-08 정정). 이전 문구는 "진행 중인 캠페인은 그대로
+				남습니다" 였는데 **반대**다 — `campaign_card()` 의 `s.active` 가드(0008:233) 때문에 그 셀러의
+				판매 링크가 전부 즉시 404 가 되고, 결제 게이트도 같은 RPC 를 쓰므로 진행 중 결제까지 막힌다.
+				운영자가 영향 범위를 모르고 누르지 않도록 LIVE 건수를 함께 보여준다.
+			-->
 			<p class="hint">
 				{#if s.active}
-					정지하면 다음 요청부터 콘솔에 들어올 수 없고 <code>/influencer/suspended</code> 로 보내집니다. 진행 중인 캠페인은 그대로 남습니다.
+					정지하면 다음 요청부터 콘솔에 들어올 수 없고 <code>/influencer/suspended</code> 로 보내집니다.
+					<b>진행 중인 판매 링크도 즉시 닫힙니다</b> — 고객에게는 "판매 페이지를 찾을 수 없습니다"로 보이고 결제도 막힙니다.
+					{#if data.liveCampaigns > 0}
+						지금 <b>{data.liveCampaigns}건</b>이 판매 중입니다.
+					{:else}
+						지금 판매 중인 건은 없습니다.
+					{/if}
 				{:else}
-					정지 상태입니다. 풀면 바로 콘솔에 들어올 수 있습니다.
+					정지 상태입니다. 풀면 바로 콘솔에 들어올 수 있고 판매 링크도 함께 다시 열립니다.
 				{/if}
 			</p>
 			{#if s.active}
-				<form method="post" action="?/active" class="seller-suspend" onsubmit={ask(`${s.name} 을 정지할까요? 다음 요청부터 콘솔에 들어올 수 없습니다.`)}>
+				<form
+					method="post"
+					action="?/active"
+					class="seller-suspend"
+					onsubmit={ask(
+						data.liveCampaigns > 0
+							? `${s.name} 을 정지할까요? 진행 중인 판매 ${data.liveCampaigns}건의 링크가 즉시 닫히고 결제가 막힙니다.`
+							: `${s.name} 을 정지할까요? 다음 요청부터 콘솔에 들어올 수 없습니다.`
+					)}
+				>
 					<input type="hidden" name="active" value="false" />
 					<input type="text" name="reason" placeholder="사유 (Slack 알림에만 · 저장 안 됨)" maxlength="200" aria-label="정지 사유" />
 					<button type="submit" class="danger sm">정지</button>

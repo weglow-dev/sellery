@@ -99,6 +99,14 @@ export type AdminSellerDetail = {
   seller: AdminSellerBase;
   channels: AdminChannelRow[];
   celery: number;
+  /**
+   * 지금 열려 있는 판매 수(`LIVE`) — **정지 버튼의 영향 범위**다.
+   *
+   * `campaign_card()` 의 `s.active` 가드(0008:233) 때문에 셀러를 정지하면 그 셀러의 판매 링크가
+   * **전부 즉시 404** 가 되고 결제도 막힌다(같은 RPC 를 결제 게이트가 쓴다). 화면이 이 숫자를
+   * 보여주지 않으면 운영자가 영향 범위를 모르고 누른다.
+   */
+  liveCampaigns: number;
 };
 
 /** 쓰기 결과 — 화면이 `?msg=` 로 바꿔 띄운다. `code` 는 seller-rules 의 SELLER_ACTION_MESSAGES 키 */
@@ -253,15 +261,20 @@ export async function listSellers(
 export async function getSeller(ref: string, admin: Admin = createAdminClient()): Promise<AdminSellerDetail | null> {
   const seller = await findSeller(admin, ref);
   if (!seller || seller === "error") return null;
-  const [ch, cel] = await Promise.all([
+  const [ch, cel, live] = await Promise.all([
     admin.from("seller_channels").select(CHANNEL_COLUMNS).eq("seller_id", seller.id).order("created_at", { ascending: true }),
     celeryBalances(admin),
+    // 정지 영향 범위 — 실패하면 0 이 아니라 null 로 두지 않고(화면이 "확인 불가" 를 구분하지 못한다)
+    // 로그만 남기고 0 으로 둔다. 숫자가 틀리는 것보다 안내 문구가 조건부로 바뀌는 쪽이 낫다.
+    admin.from("campaigns").select("id", { head: true, count: "exact" }).eq("seller_id", seller.id).eq("status", "LIVE"),
   ]);
+  if (live.error) console.error("[admin/sellers] live count failed:", live.error.message);
+  const liveCampaigns = live.count ?? 0;
   if (ch.error) {
     console.error("[admin/sellers] channels failed:", ch.error.message);
-    return { seller, channels: [], celery: cel.get(seller.id) ?? 0 };
+    return { seller, channels: [], celery: cel.get(seller.id) ?? 0, liveCampaigns };
   }
-  return { seller, channels: (ch.data ?? []) as AdminChannelRow[], celery: cel.get(seller.id) ?? 0 };
+  return { seller, channels: (ch.data ?? []) as AdminChannelRow[], celery: cel.get(seller.id) ?? 0, liveCampaigns };
 }
 
 /**
