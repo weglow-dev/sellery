@@ -89,7 +89,9 @@ export function parseKeyUsage(json: unknown): KeyUsage {
   const limit = pick(/^(limit|max|total|quota|allow|한도|total_count)/i);
   let remaining = pick(/^(remain|left|rest|잔여|available)/i);
   if (remaining === null && used !== null && limit !== null) remaining = limit - used;
-  return { used, remaining, limit, raw: json, error: null };
+  // 실측(2026-10-08): 응답은 { key, totalAmount, leftAmount, startDate, endDate } — used 는 total − left 로 만든다
+  const usedFinal = used !== null ? used : limit !== null && remaining !== null ? limit - remaining : null;
+  return { used: usedFinal, remaining, limit, raw: json, error: null };
 }
 
 /** DB `tracking_status` (0049 check 제약과 같은 집합 — TIMEOUT 은 DB 가 붙인다) */
