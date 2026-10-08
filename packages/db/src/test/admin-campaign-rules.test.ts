@@ -3,6 +3,7 @@ import {
   CAMPAIGN_FLOW,
   CAMPAIGN_STATUS_LABELS,
   adminCampaignAction,
+  adminCampaignIdleReason,
   adminSaleControl,
   campaignPeriodLabel,
   campaignStatusChip,
@@ -128,5 +129,62 @@ describe("adminSaleControl", () => {
       const both = adminSaleControl(s).kind !== "none" && adminCampaignAction(s).kind !== "none";
       expect(both, s).toBe(false);
     }
+  });
+});
+
+/**
+ * 대행 액션이 뜨는 상태는 **그 RPC 가 실제로 받는 상태**여야 한다 (2026-10-08 회귀).
+ *
+ * `INVITED` 가 `approve_sample` 에 묶여 있어 관리자 [샘플 요청 검토] 승인·거절이 항상
+ * `WRONG_STATUS` 로 실패했다 — `INVITED` 는 인플루언서가 수락·거절하는 상태이고
+ * (`app_accept_invite` · `app_decline_invite` · 0016) 브랜드 RPC `app_brand_approve_sample` 은
+ * `SAMPLE_REQUESTED` 만 통과시킨다(0015:563).
+ */
+describe("adminCampaignAction — RPC 가 받는 상태와 일치하는가", () => {
+  /** 각 대행 액션이 부르는 브랜드 RPC 가 통과시키는 상태(마이그레이션 가드와 같은 목록) */
+  const RPC_ACCEPTS: Record<Exclude<ReturnType<typeof adminCampaignAction>["kind"], "none">, string[]> = {
+    // app_brand_approve_sample / app_brand_reject_sample (0015) — SAMPLE_REQUESTED 만
+    approve_sample: ["SAMPLE_REQUESTED"],
+    // app_brand_ship_sample (0015) — 승인·구매 뒤
+    ship_sample: ["SAMPLE_APPROVED", "SAMPLE_PURCHASED"],
+    // app_brand_confirm_schedule / reject (0016)
+    confirm_schedule: ["SCHEDULE_PROPOSED"],
+  };
+
+  it("버튼이 뜨는 상태는 전부 그 RPC 가 받는 상태다", () => {
+    for (const s of CAMPAIGN_FLOW) {
+      const a = adminCampaignAction(s);
+      if (a.kind === "none") continue;
+      expect(RPC_ACCEPTS[a.kind], `${s} → ${a.kind}`).toContain(s);
+    }
+  });
+
+  it("INVITED 에는 대행 액션을 주지 않는다 — 인플루언서가 수락할 상태다", () => {
+    expect(adminCampaignAction("INVITED").kind).toBe("none");
+  });
+
+  it("SAMPLE_REQUESTED 는 그대로 샘플 검토다", () => {
+    expect(adminCampaignAction("SAMPLE_REQUESTED").kind).toBe("approve_sample");
+  });
+});
+
+describe("adminCampaignIdleReason", () => {
+  it("액션이 없는 모든 상태에 설명이 있다", () => {
+    for (const s of CAMPAIGN_FLOW) {
+      if (adminCampaignAction(s).kind !== "none") continue;
+      const r = adminCampaignIdleReason(s);
+      expect(r.what, s).not.toBe("");
+      expect(r.who, s).not.toBe("");
+    }
+  });
+
+  it("INVITED 는 인플루언서를 기다린다고 알려준다", () => {
+    const r = adminCampaignIdleReason("INVITED");
+    expect(r.who).toBe("인플루언서");
+    expect(r.what).toMatch(/수락/);
+  });
+
+  it("모르는 상태에도 터지지 않는다", () => {
+    expect(adminCampaignIdleReason("WAT").what).not.toBe("");
   });
 });
