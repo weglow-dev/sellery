@@ -8,7 +8,7 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
-	import { adminCampaignAction, adminSaleControl, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
+	import { adminCampaignAction, adminCampaignIdleReason, adminSaleControl, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
 	import { COURIERS } from '@sellery/db/brand/campaign-rules';
 	import { CampaignStepper, PlatformHandle, ProductIcon, StatusChip, ThreadComposer } from '@sellery/ui/site';
 	import type { ActionData, PageData } from './$types';
@@ -20,6 +20,7 @@
 	const chip = $derived(campaignStatusChip(c.status));
 	const action = $derived(adminCampaignAction(c.status));
 	const sale = $derived(adminSaleControl(c.status));
+	const idle = $derived(adminCampaignIdleReason(c.status));
 	const ask = (msg: string) => (e: SubmitEvent) => {
 		if (!confirm(msg)) e.preventDefault();
 	};
@@ -215,8 +216,12 @@
 		{:else}
 			<div class="card static">
 				<h4>지금 할 일 없음</h4>
+				<!--
+					왜 없는지 상태별로 적는다(0046 기). `INVITED` 처럼 기다림이 길어지는 상태에서
+					"내가 밀어줄 수 있나" 를 운영자가 다시 찾아보지 않도록.
+				-->
 				<p class="hint">
-					이 단계에서는 브랜드 대행 액션이 없습니다. 인플루언서 차례(수령·일정 제안)이거나 이미 끝난 단계입니다.
+					{#if idle.who !== '—'}기다리는 쪽: <b>{idle.who}</b> — {/if}{idle.what}
 				</p>
 			</div>
 		{/if}

@@ -144,13 +144,19 @@ export type AdminCampaignActionKind = "approve_sample" | "ship_sample" | "confir
  * 브랜드가 응답하지 않아 흐름이 멈출 때 운영이 대신 진행시키는 용도이고, 쓰기는 브랜드 RPC
  * (`app_brand_*`)를 그대로 부른다 — 상태 전이·이벤트 문구를 두 번 구현하지 않는다.
  *
- * 인플루언서 차례(샘플 배송중 · 테스트 중)나 이미 끝난 단계에는 아무 것도 주지 않는다 —
- * 관리자가 인플루언서를 대행하지는 않는다(샘플 수령·일정 제안은 본인만).
+ * 인플루언서 차례(샘플 배송중 · 테스트 중 · **브랜드 제안 수락 대기**)나 이미 끝난 단계에는 아무 것도
+ * 주지 않는다 — 관리자가 인플루언서를 대행하지는 않는다(샘플 수령·일정 제안·제안 수락은 본인만).
+ *
+ * ⚠ `INVITED` 를 `approve_sample` 에 묶어 두면 **버튼이 항상 실패한다**(2026-10-08 수정).
+ * `INVITED` 는 브랜드가 제안하고 **인플루언서의 수락을 기다리는** 상태라 그 상태를 받는 RPC 는
+ * `app_accept_invite` · `app_decline_invite`(둘 다 `p_seller_id` · 0016)뿐이고, 브랜드 RPC
+ * `app_brand_approve_sample` 은 `SAMPLE_REQUESTED` 만 통과시킨다(0015:563 → `WRONG_STATUS`).
+ * 라우트는 그 코드를 "현재 상태에서는 할 수 없는 동작입니다 — 화면을 새로 고쳐주세요" 로 바꿔
+ * 일시적 충돌처럼 보이게 했다. 상태가 바뀌지 않으니 새로 고쳐도 같다.
  */
 export function adminCampaignAction(status: string): { kind: AdminCampaignActionKind; label: string; hint: string } {
   switch (status) {
     case "SAMPLE_REQUESTED":
-    case "INVITED":
       return { kind: "approve_sample", label: "샘플 요청 검토", hint: "승인 시 배송지가 브랜드에 전달됩니다" };
     case "SAMPLE_APPROVED":
     case "SAMPLE_PURCHASED":
@@ -162,8 +168,42 @@ export function adminCampaignAction(status: string): { kind: AdminCampaignAction
   }
 }
 
-/** 반려·거절 사유 — 공백 정리 후 200자. 비면 null(브랜드 RPC 와 같은 규칙) */
-export function normalizeRejectReason(raw: string | null | undefined): string | null {
+/**
+ * 대행 액션이 **없는** 이유 — 화면의 "지금 할 일 없음" 카드가 상태별로 설명한다.
+ *
+ * 뭉뚱그려 "인플루언서 차례이거나 이미 끝난 단계" 라고만 하면, 운영자는 `INVITED` 처럼
+ * 기다림이 길어지는 상태에서 "내가 밀어줄 수 있나" 를 다시 찾아보게 된다. 누가 무엇을
+ * 기다리는지 적어 둔다.
+ */
+export function adminCampaignIdleReason(status: string): { who: string; what: string } {
+  switch (status) {
+    case "INVITED":
+      return {
+        who: "인플루언서",
+        what: "브랜드 제안을 수락·거절하기를 기다립니다. 수락은 본인만 할 수 있어 운영이 대행하지 않습니다 — 응답이 없으면 스레드로 연락하세요.",
+      };
+    case "SAMPLE_SHIPPED":
+      return { who: "인플루언서", what: "샘플 수령을 확인하기를 기다립니다. 수령 확인은 본인만 할 수 있습니다." };
+    case "TESTING":
+      return { who: "인플루언서", what: "테스트를 마치고 판매 일정을 제안하기를 기다립니다. 일정 제안은 본인만 할 수 있습니다." };
+    case "LIVE":
+      return { who: "고객", what: "판매가 진행 중입니다. 당장 멈춰야 하면 아래 [판매 중단] 을 쓰세요." };
+    case "CLEARING":
+      return { who: "운영", what: "교환·환불 기간입니다. 지급 기일이 되면 정산 화면에서 실행합니다." };
+    case "SETTLED":
+      return { who: "—", what: "정산까지 끝난 캠페인입니다." };
+    case "DECLINED":
+      return { who: "—", what: "인플루언서가 제안을 거절해 종결됐습니다." };
+    case "REJECTED":
+      return { who: "—", what: "브랜드가 거절해 종결됐습니다." };
+    case "PASSED":
+      return { who: "—", what: "인플루언서가 패스해 종결됐습니다." };
+    default:
+      return { who: "—", what: "이 단계에는 브랜드 대행 액션이 없습니다." };
+  }
+}
+
+/** 반려·거절 사유 — 공백 정리 후 200자. 비면 null(브랜드 RPC 와 같은 규칙) */export function normalizeRejectReason(raw: string | null | undefined): string | null {
   const v = (raw ?? "").replace(/\s+/g, " ").trim().slice(0, REJECT_REASON_MAX);
   return v === "" ? null : v;
 }
