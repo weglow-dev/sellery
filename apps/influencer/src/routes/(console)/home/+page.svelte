@@ -54,7 +54,7 @@
 			{#if t.action}<span class="btn pri sm">{t.action}</span>{:else}<span class="btn ghost sm">보기</span>{/if}
 		</a>
 	{:else}
-		<div class="empty" style="padding:14px">지금 응답할 일이 없어요 — 진행 중 판매를 확인하세요 ✓</div>
+		<div class="empty" style="padding:14px">지금 응답할 일이 없어요.</div>
 	{/each}
 </div>
 
@@ -86,7 +86,7 @@
 		{/each}
 	</div>
 {:else}
-	<div class="listcard"><div class="empty">진행 중인 판매가 없습니다 — <a href={data.productsPath} style="text-decoration:underline">상품 갤러리</a>에서 시작해보세요</div></div>
+	<div class="listcard"><div class="empty">진행 중인 판매가 없습니다.<br /><a href={data.productsPath} style="text-decoration:underline">상품 갤러리</a>에서 시작해보세요.</div></div>
 {/if}
 
 <div class="sec" style="margin-top:22px">내 자산</div>
