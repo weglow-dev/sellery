@@ -1,8 +1,9 @@
 import type { PageServerLoad } from './$types';
 import { CATS, DEFAULT_SETTINGS, isCat, isHomeFeat, type HomeCard } from '@sellery/db/campaign';
+import { followRank } from '@sellery/db/follows';
 import { custVisible } from '@sellery/db/linkctx';
 import { kstToday } from '@sellery/db/dates';
-import { fetchCampaignCard, fetchHomeCampaigns, fetchPublicSellers, fetchPublicStats, readLinkCtx } from '$lib/server/db';
+import { fetchCampaignCard, fetchHomeCampaigns, fetchPublicSellers, fetchPublicStats, followedSellerIds, readLinkCtx } from '$lib/server/db';
 
 /**
  * 고객 홈 `/` 데이터 — web (customer)/page.tsx 1:1 (프로토타입 vCustHome · ux-spec §3.2 · app-plan §6.1 최소판 · docs/monorepo-migration.md §4.1).
@@ -16,12 +17,13 @@ export const load: PageServerLoad = async (event) => {
 	const cat = isCat(catParam) ? catParam : '전체';
 	const sellerCode = event.url.searchParams.get('seller')?.trim() || null;
 
-	const [all, pubSellers, stats, L, parentData] = await Promise.all([
+	const [all, pubSellers, stats, L, parentData, followed] = await Promise.all([
 		fetchHomeCampaigns(event),
 		fetchPublicSellers(event),
 		fetchPublicStats(),
 		readLinkCtx(event).catch(() => null),
-		event.parent()
+		event.parent(),
+		event.locals.safeGetSession().then(({ user }) => followedSellerIds(user?.id ?? null))
 	]);
 	// 보호 중인 링크의 정책값(link_protect_days · home_feature_days) — campaign_card 는 요청당 메모라 readLinkCtx 와 중복 비용이 작다
 	const linkCard = L ? await fetchCampaignCard(event, L.code) : null;
@@ -36,13 +38,19 @@ export const load: PageServerLoad = async (event) => {
 	/** 링크 보호 중 정렬 키: 타 인플루언서의 ★ 추천은 상단 고정하지 않는다 (제안서 "다른 브랜드의 추천·배너 ✕") — web page.tsx featOf */
 	const allowFeat = (c: HomeCard) => !protectedSellerId || c.seller_id === protectedSellerId;
 	const feat = (c: HomeCard) => (allowFeat(c) && isHomeFeat(c, today, settings.home_feature_days) ? 1 : 0);
+	/**
+	 * 팔로우 우대(0045 · `/about` "팔로우하면 다음 판매 일정이 홈에 먼저 표시") — **★ 추천 다음** 순위다.
+	 * 유료 상단 노출이 "가장 먼저" 를 약속했으므로(제안서 p.8 · docs/points-policy.md:148) 그 위에 두지 않는다.
+	 * 링크 보호 중에는 `allowFeat` 와 같은 가드 — 팔로우한 **다른** 셀러의 판매가 위로 오면 보호의 뜻이 사라진다.
+	 */
+	const fol = (c: HomeCard) => followRank(c.seller_id, followed, allowFeat(c));
 
 	const live = visible
 		.filter((c) => c.status === 'LIVE' && inSel(c) && inCat(c))
-		.sort((a, b) => feat(b) - feat(a) || b.sold_qty - a.sold_qty);
+		.sort((a, b) => feat(b) - feat(a) || fol(b) - fol(a) || b.sold_qty - a.sold_qty);
 	const soon = visible
 		.filter((c) => c.status === 'SCHEDULE_CONFIRMED' && inSel(c) && inCat(c))
-		.sort((a, b) => feat(b) - feat(a) || (a.start_date ?? '').localeCompare(b.start_date ?? ''));
+		.sort((a, b) => feat(b) - feat(a) || fol(b) - fol(a) || (a.start_date ?? '').localeCompare(b.start_date ?? ''));
 	const allLiveCodes = visible.filter((c) => c.status === 'LIVE').map((c) => c.code);
 	const catCounts = Object.fromEntries(
 		CATS.map((k) => [k, visible.filter((c) => (c.status === 'LIVE' || c.status === 'SCHEDULE_CONFIRMED') && (k === '전체' || c.product.category === k)).length])

@@ -2531,6 +2531,15 @@ export type Database = {
       }
       app_campaign_alerts_due: { Args: { p_limit?: number }; Returns: Json }
       app_campaign_alert_sent: { Args: { p_ids: string[] }; Returns: Json }
+      app_follow_seller: {
+        Args: { p_seller_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_unfollow_seller: {
+        Args: { p_seller_id: string; p_user_id: string }
+        Returns: Json
+      }
+      app_followed_seller_ids: { Args: { p_user_id: string }; Returns: Json }
       app_checkout_reserved: {
         Args: { p_campaign_id: string }
         Returns: number

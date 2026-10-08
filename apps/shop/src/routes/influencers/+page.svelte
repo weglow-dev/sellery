@@ -3,13 +3,20 @@
 	 * /influencers — 인플루언서 목록 (프로토타입 vCustInfluencers 마크업 1:1 + 플랫폼·카테고리 칩 필터 · LIVE 판매 링크). 데이터는 +page.server.ts.
 	 *   1 제목 · 2 링크 보호 안내 · 3 플랫폼 칩(?platform=) · 4 카테고리 칩(?cat=) · 5 카드 3열(아바타 · 이름 · 등급 · 플랫폼 핸들 · 팔로워 · 채널 인증 ✓ · 소개 · 카테고리 · 건수 · LIVE 링크)
 	 * 카드의 "판매 보기" 는 홈 `?seller={code}` (프로토타입 custSel → 홈 이동과 동일).
+	 * 카드의 팔로우 토글(0045)은 서버 폼 액션 — 효과는 홈 정렬 우대뿐이고 메일은 나가지 않는다.
+	 *   카드에 보이는 "팔로워 {n}" 은 **SNS 채널 팔로워 수**(`sellers.followers`)다 — 셀러리 내 팔로우 수가 아니고, 그 수치는 노출하지 않는다.
 	 */
 	import { CATS, fmtNum, storeUrl } from '@sellery/db/campaign';
+	import { followButtonView, followMessage } from '@sellery/db/follows';
 	import { SELLER_PLATFORMS } from '@sellery/db/sellers';
 	import { GradeBox, PLATFORM_NAMES, PlatIcon, ProductIcon, SellerAvatar } from '@sellery/ui/site';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	/** 로그인 뒤 돌아올 주소 — 필터를 유지한다 */
+	const loginNext = $derived(`/influencers${data.platform || data.cat ? `?${new URLSearchParams({ ...(data.platform ? { platform: data.platform } : {}), ...(data.cat ? { cat: data.cat } : {}) }).toString()}` : ''}`);
+	const followMsg = $derived(followMessage(data.followMsg));
 
 	const TITLE = '인플루언서 — 셀러리';
 	const DESCRIPTION = '셀러리 인증 인플루언서 — 채널 소유 인증과 판매 실적 등급을 확인하고, 진행 중·오픈 예정 판매를 살펴보세요.';
@@ -63,8 +70,12 @@
 </div>
 
 <!-- 5. 카드 -->
+{#if followMsg}
+	<p class="notice ok" role="status" style="margin:0 0 12px">{followMsg}</p>
+{/if}
 <div class="grid g3">
-	{#each data.list as { s, stats } (s.id)}
+	{#each data.list as { s, stats, following } (s.id)}
+		{@const fv = followButtonView({ signedIn: data.signedIn, following })}
 		<div class="card infl">
 			<div class="infl-head">
 				<SellerAvatar avatarUrl={s.avatar_url} size={52} />
@@ -88,7 +99,21 @@
 				</div>
 			{/if}
 			{#if s.code}
-				<div class="btnrow" style="margin-top:12px"><a href="/?seller={encodeURIComponent(s.code)}" class="btn sm ghost">판매 보기 →</a></div>
+				<div class="btnrow" style="margin-top:12px">
+				<a href="/?seller={encodeURIComponent(s.code)}" class="btn sm ghost">판매 보기 →</a>
+				<!--
+					팔로우 토글(0045) — 효과는 **홈 정렬 우대 하나**다(`/about` 약속). 메일은 나가지 않는다.
+					해제도 같은 버튼으로 한다(`/account` 에 팔로우 목록 화면이 없다).
+				-->
+				{#if fv.kind === 'login'}
+					<a href="/login?next={encodeURIComponent(loginNext)}" class="btn sm ghost" title={fv.title}>{fv.label}</a>
+				{:else}
+					<form method="POST" action={fv.kind === 'follow' ? '?/follow' : '?/unfollow'}>
+						<input type="hidden" name="code" value={s.code} />
+						<button type="submit" class={fv.kind === 'follow' ? 'btn sm ghost' : 'btn sm'} title={fv.title}>{fv.label}</button>
+					</form>
+				{/if}
+			</div>
 			{/if}
 		</div>
 	{:else}
