@@ -1439,6 +1439,7 @@
   /* ---- 콘솔 3단계 (docs/brand-console-plan.md §6 "3. 일정 확정/반려 · 스레드 · 초대" — 두 콘솔 공용): 스레드 답글 폼(ThreadComposer) · 감지 행 강조 · 일정 제안 폼(시작일 · 기간 칩 · 수량 · 잡힌 기간 슬롯)
      · 제안 카드(브랜드 승인·반려) · 초대 후보 카드(라디오 선택). 프로토타입 CampaignDetail composer · ScheduleModal(.slots/.slot) · SellerCard 의 이식 — 색은 site 토큰. 375px: 폼 1열 · 카드 1열 · 가로 스크롤 없음. ---- */
   .console-composer { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-body); font-size: 13px; color: var(--color-ink); }
+  .console-composer .sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
   .console-composer .as { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-mute); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 700; }
   .console-composer .row { display: flex; gap: 8px; align-items: flex-end; }
   .console-composer textarea { flex: 1; min-width: 0; width: auto; margin: 0; resize: none; font-size: 13.5px; line-height: 1.5; min-height: 44px; }

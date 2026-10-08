@@ -92,7 +92,7 @@
 <div class="console-det-body">
 	<section class="card static console-thread" aria-label="캠페인 스레드" id="thread">
 		<ThreadMessages events={data.events} names={{ seller: data.seller.name, brand: c.brand.name }} />
-		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드에게 메시지… (일정·수락은 오른쪽 카드의 버튼으로)" />
+		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드사 담당자에게 메시지를 보내보세요." />
 	</section>
 
 	<div class="console-actions">

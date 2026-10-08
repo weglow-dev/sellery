@@ -70,7 +70,8 @@
 			};
 		}}
 	>
-		<label class="as" for="thread-body">{as}로 발신</label>
+		<!-- "인플루언서로 발신" 라벨은 화면에서 뺌(대표 QA 2026-10-08) — 스크린리더용으로만 유지 -->
+		<label class="sr-only" for="thread-body">{as}로 발신</label>
 		<div class="row">
 			<textarea id="thread-body" name="body" rows="2" maxlength={max} {placeholder} required aria-invalid={error ? true : undefined} onkeydown={onKeydown}>{value}</textarea>
 			<button type="submit" class="pri sm" disabled={busy}>{busy ? '전송 중…' : '전송'}</button>
