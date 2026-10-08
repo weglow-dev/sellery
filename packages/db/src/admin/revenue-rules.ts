@@ -141,6 +141,18 @@ export type RevenueTotals = {
   brand_payout: number;
   paid_count: number;
   refund_count: number;
+  /**
+   * 정산 후 환불 (0049) — 정산이 끝난 뒤 들어온 환불의 합계. 주문은 `CANCELED` 가 되고
+   * 정산 스냅샷에는 반영될 수 없다(스냅샷은 지급액의 계약 · 0008:544).
+   * `net`·`platform_net` 은 스냅샷 그대로이고 **실제 금액은 `*_adjusted`** 다 —
+   * 환불액은 플랫폼 몫에서 빠진다(브랜드·인플루언서 지급액은 확정이라 줄지 않는다).
+   */
+  post_refunds: number;
+  post_refund_count: number;
+  /** `net − post_refunds` */
+  net_adjusted: number;
+  /** `platform_net − post_refunds` */
+  platform_net_adjusted: number;
 };
 
 export type RevenueRow = RevenueTotals & {
@@ -202,6 +214,11 @@ const TOTAL_KEYS: (keyof RevenueTotals)[] = [
   "brand_payout",
   "paid_count",
   "refund_count",
+  // 정산 후 환불 조정 (0049) — RPC 가 조정분이 있을 때만 채우므로 없으면 num() 이 0 으로 둔다
+  "post_refunds",
+  "post_refund_count",
+  "net_adjusted",
+  "platform_net_adjusted",
 ];
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
@@ -215,6 +232,10 @@ function parseTotals(raw: unknown): RevenueTotals {
   const o = obj(raw) ?? {};
   const out = {} as RevenueTotals;
   for (const k of TOTAL_KEYS) out[k] = num(o[k]);
+  // 정산 후 환불 조정(0049)은 RPC 가 **조정분이 있는 행에만** 넣는다 — 없으면 조정 전과 같다.
+  // 그대로 두면 일반 캠페인의 `net_adjusted` 가 0 으로 보인다(num() 기본값).
+  if (o.net_adjusted === undefined || o.net_adjusted === null) out.net_adjusted = out.net;
+  if (o.platform_net_adjusted === undefined || o.platform_net_adjusted === null) out.platform_net_adjusted = out.platform_net;
   return out;
 }
 

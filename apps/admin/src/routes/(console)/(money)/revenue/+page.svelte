@@ -30,7 +30,13 @@
 	let draft = $state<Opex>({ ...(data.view?.opex ?? OPEX_FALLBACK) });
 
 	const bd = $derived(v ? opexBreakdown({ opex: draft, ...v.basis, celCover: v.celCover }) : null);
-	const pf = $derived(v && bd ? profitSummary(v.totals.net, v.totals.platform_net, bd.total) : null);
+	/**
+	 * 최종 순이익은 **정산 후 환불을 반영한 값**으로 계산한다(0049).
+	 * 정산이 끝난 뒤 환불이 들어오면 주문은 `CANCELED` 가 되고 스냅샷(`net`·`platform_net`)에는
+	 * 반영될 수 없다 — 브랜드·인플루언서 지급액은 확정이라 줄지 않으므로 환불액은 플랫폼 몫에서 빠진다.
+	 * 조정분이 없으면 `*_adjusted` 는 조정 전과 같다(파서가 보정).
+	 */
+	const pf = $derived(v && bd ? profitSummary(v.totals.net_adjusted, v.totals.platform_net_adjusted, bd.total) : null);
 	/** 저장된 값과 다르면 "저장 전" 표시 */
 	const dirty = $derived(!!v && OPEX_ROWS.some((r) => draft[r.key] !== v.opex[r.key]));
 
@@ -122,6 +128,19 @@
 					<tr><td>수수료 매출 (VAT 포함)</td><td class="num">{won(v.totals.platform_fee)}</td></tr>
 					<tr><td class="in">− 부가세 10%</td><td class="num">−{won(v.totals.vat)}</td></tr>
 					<tr class="tot"><td>플랫폼 순수익</td><td class="num accent">{won(v.totals.platform_net)}</td></tr>
+					<!--
+						정산 후 환불(0049) — 스냅샷은 지급 계약이라 바뀌지 않는다. 그 뒤 들어온 환불은
+						브랜드·인플루언서 지급액을 줄이지 못하므로 플랫폼이 흡수한다. 조정분이 있을 때만 보여준다.
+					-->
+					{#if v.totals.post_refunds > 0}
+						<tr>
+							<td class="in">
+								− 정산 후 환불 <small>{v.totals.post_refund_count}건 · 스냅샷 확정 뒤 들어온 환불 (플랫폼 흡수)</small>
+							</td>
+							<td class="num">−{won(v.totals.post_refunds)}</td>
+						</tr>
+						<tr class="tot"><td>플랫폼 순수익 (환불 조정 후)</td><td class="num accent">{won(v.totals.platform_net_adjusted)}</td></tr>
+					{/if}
 				</tbody>
 			</table>
 		</section>
