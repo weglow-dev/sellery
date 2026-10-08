@@ -39,5 +39,8 @@ jobs:
         run: npm test
       - name: 패키지 경계 검사 (scripts/check-boundaries.mjs)
         run: node scripts/check-boundaries.mjs
+      # 번호가 같아도 파일명이 다르면 git 이 충돌로 알려주지 않는다 — 병합 뒤 db push 가 터진다(0043 · 0047 에서 두 번)
+      - name: 마이그레이션 번호 검사 (scripts/check-migrations.mjs)
+        run: node scripts/check-migrations.mjs
       - name: build (apps/*/.vercel/output)
         run: npm run build

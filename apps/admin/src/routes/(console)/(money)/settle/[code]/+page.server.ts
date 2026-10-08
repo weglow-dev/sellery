@@ -97,7 +97,7 @@ export const actions: Actions = {
 	},
 
 	/**
-	 * 미지급 정산 취소 (0047) — `payouts` 가 전부 `pending` 일 때만. 하나라도 지급 완료면 RPC 가
+	 * 미지급 정산 취소 (0048) — `payouts` 가 전부 `pending` 일 때만. 하나라도 지급 완료면 RPC 가
 	 * `HAS_PAID` 로 막는다(이중 지급 방지). 이미 보낸 뒤의 정정은 만들지 않았다.
 	 */
 	cancelSettle: async (event) => {
