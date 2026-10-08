@@ -34,7 +34,7 @@
 		<div class="meta">
 			<b>{p.name}</b> · {p.category} · 판매가 ₩{fmtNum(p.sale_price)} · 수수료 {pct(p.commission_rate)}% <StatusChip tone={p.chip.tone}>{p.chip.label}</StatusChip>
 		</div>
-		<p class="hint" style="margin:8px 0 0;font-size:12.5px;color:var(--color-mute)">제안을 받은 인플루언서가 수락하면 샘플 요청·승인 없이 바로 샘플 발송 단계로 넘어가요(무상 · 인플루언서 월 한도 미차감). 거절하면 캠페인이 종료됩니다.</p>
+		<p class="hint" style="margin:8px 0 0;font-size:12.5px;color:var(--color-mute)">제안을 받은 인플루언서가 수락하면 샘플 요청·승인 없이 바로 샘플 발송 단계로 넘어가요(무상 · 인플루언서의 상품당 무상 1회 미차감). 거절하면 캠페인이 종료됩니다.</p>
 	</div>
 </section>
 

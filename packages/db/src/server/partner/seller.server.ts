@@ -45,7 +45,7 @@ export type SellerSummary = {
   ref_code: string | null;
   /** 최근 3개월 확정 매출 (등급 기준) — 홈 "내 자산" 다음 등급까지 남은 금액 */
   m3_sales: number;
-  /** 월 무상 샘플 한도 추가분 (sampleExtra) */
+  /** (0047 미사용) 옛 월 한도 추가분 — 월 한도 폐지로 읽는 곳 없음 */
   sample_extra: number;
   created_at: string;
 };

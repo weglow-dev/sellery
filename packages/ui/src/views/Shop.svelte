@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* 셀러리 샵 (js/30-shared.js vShop) */
-	import { S, D_, brand, seller, bGmv, celBal, celEarned, passActive, sampleLeft, fmt, md, P, today, DAY, CEL, CELERY_PER, SHOP, TOPUP, act } from '@sellery/core';
+	import { S, D_, brand, seller, bGmv, celBal, celEarned, passActive, fmt, md, P, today, DAY, CEL, CELERY_PER, SHOP, TOPUP, act } from '@sellery/core';
 	import Sec from '../components/Sec.svelte';
 	const isBrand = $derived(S.role === 'brand');
 	const who = $derived(isBrand ? S.actingBrand : S.actingSeller);

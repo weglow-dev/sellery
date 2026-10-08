@@ -113,7 +113,7 @@
 		{:else if c.status === 'INVITED'}
 			<div class="card static">
 				<h4>브랜드 직접 제안 <span class="chip seller">인플루언서 액션</span></h4>
-				<p class="hint"><b>{c.brand.name}</b>가 <b>{p.name}</b> 판매를 제안했어요 · 수수료 {pct(p.commission_rate)}% · 수락 시 샘플 발송 단계부터 시작됩니다 (무상 · 이달 한도 미차감). 브랜드 메시지는 왼쪽 스레드에서 확인하세요.</p>
+				<p class="hint"><b>{c.brand.name}</b>가 <b>{p.name}</b> 판매를 제안했어요 · 수수료 {pct(p.commission_rate)}% · 수락 시 샘플 발송 단계부터 시작됩니다 (무상 · 상품당 무상 1회 미차감). 브랜드 메시지는 왼쪽 스레드에서 확인하세요.</p>
 				{#if af?.message}<p class="notice danger" role="alert">{af.message}</p>{/if}
 				<form method="post" action="?/accept" class="console-form">
 					{#if needAddress}

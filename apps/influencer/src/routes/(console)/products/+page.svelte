@@ -23,15 +23,9 @@
 
 <div class="console-head">
 	<h2>상품 갤러리</h2>
-	{#if data.quota}
-		<span class="meta" style="margin-left:auto" title="등급별 월 한도 — 스타터·브론즈 1회 · 실버·골드 2회 · 플래티넘 이상 5회. [무상 샘플 요청]을 누를 때 1회씩 차감되고 매월 1일 다시 채워져요. 브랜드 초대는 차감하지 않아요.">
-			이달 무상 샘플 한도 <b>{data.quota.left}/{data.quota.total}회 남음</b>{#if data.quota.left === 0}{' '}— <span style="color:var(--color-danger)">다 쓰면 샘플 구매로 진행</span>{/if}
-			<br /><span style="font-size:11px">등급 조건 충족 제품에 한함.</span>
-		</span>
-	{/if}
 </div>
 
-<!-- 무상 필터 — 카테고리와 별개의 체크 토글 (대표 결정 2026-10-08): 켜면 내 등급·이달 한도로 지금 무상 요청이 되는 상품만 -->
+<!-- 무상 필터 — 카테고리와 별개의 체크 토글 (대표 결정 2026-10-08): 켜면 내 등급으로 지금 무상 요청이 되는(아직 안 받은) 상품만. 월 한도 없음(0047) -->
 <a href={freeHref} class="filtertoggle {data.free ? 'on' : ''}" role="checkbox" aria-checked={data.free} data-sveltekit-noscroll>
 	<span class="box" aria-hidden="true">{data.free ? '✓' : ''}</span>
 	<span>내 등급으로 무상 샘플 가능한 상품만 보기</span>

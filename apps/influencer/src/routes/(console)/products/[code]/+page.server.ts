@@ -5,7 +5,6 @@ import {
 	notFreeMessage,
 	parseShippingInput,
 	parseStoredShipping,
-	quotaLine,
 	sampleButton,
 	sampleLine,
 	sampleStatus,
@@ -33,7 +32,7 @@ import {
  *   · locked → 독점 안내 · active → 진행 중 캠페인 링크.
  * action requestFree: requireSeller → rateLimit → `parseShippingInput(FormData)` → `requestFreeSample` RPC → 성공 `redirect(303, /campaigns/<code>)`.
  *   실패는 `fail(400, { message, field, values, campaignCode })` — 평범한 POST 라 입력값을 `form` 으로 되돌려 다시 그린다(JS 불필요).
- *   ALREADY_ACTIVE 는 그 캠페인 링크, NOT_FREE 는 `notFreeMessage(reason)`(그 사이 한도·등급이 바뀐 경우).
+ *   ALREADY_ACTIVE 는 그 캠페인 링크, NOT_FREE 는 `notFreeMessage(reason)`(그 사이 등급·상품당 1회가 바뀐 경우).
  * 실적 표(0039): `getProductPerformance(seller.id, product_id)` — 캠페인별 팔로워·참여율·기간·확정 매출.
  *   **확인권(🥬 2 · `shop_items.seller[].datapass`)이 없으면 첫 행과 내 캠페인만 지표가 오고** 나머지는 null 이다.
  *   인플루언서 이름·핸들은 아예 오지 않는다(익명). 구매는 샵(`/shop`)에서 하고 영구·계정 단위다.
@@ -94,7 +93,6 @@ export const load: PageServerLoad = async (event) => {
 		button: sampleButton(q),
 		line: sampleLine(q),
 		status: sampleStatus(q, product.sample_text ?? null),
-		quotaText: q && q.mode !== 'unlisted' ? quotaLine(q) : null,
 		shipping: parseStoredShipping(seller.sample_address),
 		campaignHref: q?.campaign_code ? sellerPath(`/campaigns/${encodeURIComponent(q.campaign_code)}`) : null,
 		payHref: q?.mode === 'buy' ? samplePayHref(product.code ?? code) : null,
@@ -128,10 +126,10 @@ export const actions: Actions = {
 			if (res.code === 'BAD_SHIPPING') return bad(REQUEST_FREE_SAMPLE_MESSAGES.BAD_SHIPPING, (res.field as ShippingField | undefined) ?? 'shipping');
 			if (res.code === 'ALREADY_ACTIVE') return bad(REQUEST_FREE_SAMPLE_MESSAGES.ALREADY_ACTIVE, null, res.campaignCode ?? null);
 			if (res.code === 'NOT_FREE') {
-				// 그 사이 등급·한도가 바뀐 경우 — 최신 견적으로 기준 등급·한도를 채워 안내
+				// 그 사이 등급이 바뀌었거나 같은 상품을 이미 무상으로 받은 경우 — 최신 견적으로 기준 등급을 채워 안내
 				const again = await getProductForSeller(r.ctx.seller.id, code);
 				const q = again?.product.quote ?? null;
-				return bad(notFreeMessage(res.reason ?? q?.reason ?? null, q?.free_grade ?? null, q ? q.quota + q.extra : 0));
+				return bad(notFreeMessage(res.reason ?? q?.reason ?? null, q?.free_grade ?? null));
 			}
 			return bad(REQUEST_FREE_SAMPLE_MESSAGES[res.code]);
 		}

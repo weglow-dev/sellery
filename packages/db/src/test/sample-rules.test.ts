@@ -11,9 +11,9 @@ import {
   parseSampleQuote,
   parseShippingInput,
   parseStoredShipping,
-  quotaLine,
   sampleButton,
   sampleLine,
+  sampleStatus,
   stepIndex,
   type SampleQuote,
   parseSampleRefundRequest,
@@ -23,7 +23,7 @@ import {
   sampleShipDeadlineLine,
 } from "../partner/sample-rules";
 
-/** 0011 app_sample_quote 의 실제 응답 (s101 스타터 × p2 치팅온 ₩26,900 · rate 0.2 · use_cel=true) */
+/** 0047 app_sample_quote 의 실제 응답 (s101 스타터 × p2 치팅온 ₩26,900 · rate 0.2 · use_cel=true) — quota·left 는 호환용 중립값(null) */
 const RAW_BUY = {
   mode: "buy",
   reason: "GRADE_BELOW",
@@ -39,10 +39,10 @@ const RAW_BUY = {
   seller_grade: "스타터",
   free_eligible: false,
   had_free: false,
-  quota: 1,
+  quota: null,
   extra: 0,
   used: 0,
-  left: 1,
+  left: null,
   buy_mode: "auto",
   fixed_price: 0,
   refund: false,
@@ -68,7 +68,16 @@ describe("parseSampleQuote — 0011 jsonb 계약", () => {
     expect(p!.method).toBe("cel");
     expect(p!.free).toBe(false);
     expect(p!.free_grade).toBe("브론즈");
-    expect(p!.left).toBe(1);
+    expect(p!.quota).toBeNull();
+    expect(p!.left).toBeNull();
+  });
+  it("옛 응답(0011 · 숫자 quota)도 그대로 좁히되 문구에는 쓰지 않는다 · QUOTA_EXHAUSTED 는 더 이상 사유가 아니다(0047)", () => {
+    const old = parseSampleQuote({ ...RAW_BUY, reason: "QUOTA_EXHAUSTED", quota: 1, extra: 0, used: 1, left: 0 });
+    expect(old?.quota).toBe(1);
+    expect(old?.left).toBe(0);
+    expect(old?.reason).toBeNull();
+    expect(sampleButton(old).title).toBeNull();
+    expect(sampleStatus(old).mine).not.toContain("한도");
   });
   it("unlisted 는 가격이 null 이어도 통과", () => {
     const p = parseSampleQuote({ mode: "unlisted", reason: "NOT_LISTED", free: false, price: null, cel: null, cash: null });
@@ -106,11 +115,8 @@ describe("sampleButton — 프로토타입 sampleBtn 분기 · 문구", () => {
     expect(samplePayHref("p4")).toBe("/influencer/pay/new?product=p4");
     expect(samplePayHref("p 4/x")).toBe("/influencer/pay/new?product=p%204%2Fx");
   });
-  it.each([
-    ["HAD_FREE", "무상 샘플은 상품당 1회"],
-    ["QUOTA_EXHAUSTED", "이달 무상 한도 소진"],
-  ] as const)("buy 사유 %s → %s", (reason, title) => {
-    expect(sampleButton(q({ reason })).title).toContain(title);
+  it("buy 사유 HAD_FREE → 무상 샘플은 상품당 1회", () => {
+    expect(sampleButton(q({ reason: "HAD_FREE" })).title).toContain("무상 샘플은 상품당 1회");
   });
   it("locked → 독점 잠김 (비활성)", () => {
     const b = sampleButton(q({ mode: "locked", reason: "EXCLUSIVE_LOCKED", exclusive_locked: true }));
@@ -126,7 +132,7 @@ describe("sampleButton — 프로토타입 sampleBtn 분기 · 문구", () => {
   });
 });
 
-describe("sampleLine · quotaLine — 카드 안내 (프로토타입 sampleLine 원문)", () => {
+describe("sampleLine · sampleStatus — 카드 안내 (프로토타입 sampleLine 원문 · 월 한도 없음)", () => {
   it("최대 🥬 분할은 잔액과 무관", () => {
     // quote.cel 은 잔액(3)으로 잘린 값 · 안내는 floor(21520/20000)=1 + ₩1,520
     expect(sampleLine(q({ cel: 0, use_cel: false }))).toBe("브론즈 이상 무상 1회 · 미달 시 ₩21,520 구매 (🥬 1 + ₩1,520)");
@@ -143,8 +149,14 @@ describe("sampleLine · quotaLine — 카드 안내 (프로토타입 sampleLine 
     expect(sampleLine(null)).toBe("");
     expect(sampleLine(q({ price: null }))).toBe("");
   });
-  it("quotaLine", () => {
-    expect(quotaLine({ quota: 2, extra: 1, left: 1 })).toBe("이달 무상 샘플 1/3회 남음");
+  it("sampleStatus — free 는 '무상 요청 가능' 으로 끝난다(이달 N회 남음 없음 · 0047)", () => {
+    const st = sampleStatus(q({ mode: "free", reason: null, free: true, free_eligible: true, seller_grade: "골드" }), "무상 3개");
+    expect(st.rule).toBe("브론즈 이상 무상 제공 3개(1회)");
+    expect(st.mine).toBe("내 등급 골드 → 무상 요청 가능");
+  });
+  it("sampleStatus — HAD_FREE 는 '이미 무상으로 받은 상품 · 샘플 구매 ₩N'", () => {
+    const st = sampleStatus(q({ reason: "HAD_FREE", had_free: true, free_eligible: true, seller_grade: "골드" }));
+    expect(st.mine).toBe("이미 무상으로 받은 상품 · 샘플 구매 ₩21,520 (🥬 1 + ₩1,520)");
   });
 });
 
@@ -152,9 +164,11 @@ describe("notFreeMessage · isRequestFreeSampleCode", () => {
   it.each([
     ["GRADE_BELOW", "무상 샘플은 브론즈 등급 이상 — 샘플 구매로 진행할 수 있어요"],
     ["HAD_FREE", "이 상품의 무상 샘플은 이미 받았어요 (상품당 1회) — 샘플 구매로 진행"],
-    ["QUOTA_EXHAUSTED", "이번 달 무상 샘플 한도를 모두 사용했어요 (한도 1회) — 샘플 구매로 진행"],
   ] as const)("%s", (reason, text) => {
-    expect(notFreeMessage(reason, "브론즈", 1)).toBe(text);
+    expect(notFreeMessage(reason, "브론즈")).toBe(text);
+  });
+  it("알 수 없는 사유는 NOT_FREE 기본 문구 — 월 한도 문구는 없다(0047)", () => {
+    expect(notFreeMessage(null, "브론즈")).toBe("무상 샘플 조건에 맞지 않아요 — 샘플 구매로 진행할 수 있어요.");
   });
   it("코드 판별", () => {
     expect(isRequestFreeSampleCode("ALREADY_ACTIVE")).toBe(true);

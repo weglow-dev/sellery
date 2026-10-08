@@ -193,7 +193,7 @@
 		</div>
 		<div class="lbl-sm" style="margin-top:12px">배송지</div>
 		<p class="meta" style="margin:6px 0 12px">
-			브랜드가 승인하면 이 주소로 샘플이 발송돼요. 무상 샘플은 <b>같은 상품은 1회만</b> 받을 수 있고, 요청하면 <b>이달 무상 한도에서 1회</b>가 차감됩니다{#if data.quotaText}{' '}({data.quotaText}){/if}. 배송지는 <a href={data.myPath} style="text-decoration:underline">내 정보</a> 에 기본값으로 저장돼요.
+			브랜드가 승인하면 이 주소로 샘플이 발송돼요. 무상 샘플은 <b>같은 상품은 한 번만</b> 받을 수 있어요. 두 번째부터는 샘플 구매로 진행돼요. 배송지는 <a href={data.myPath} style="text-decoration:underline">내 정보</a> 에 기본값으로 저장돼요.
 		</p>
 		<form method="post" action="?/requestFree">
 			<ShippingFields value={shippingValue} invalid={form?.field ?? null} idPrefix="sample" />
@@ -207,12 +207,12 @@
 	<section class="card static">
 		<div class="lbl-sm">샘플 구매{why ? ` — ${why}` : ''}</div>
 		<p class="meta" style="margin:6px 0 10px">
-			무상 기준 <b>{q?.free_grade ?? '—'}</b> 이상{#if data.seller.grade}{' '}· 내 등급 <b>{data.seller.grade}</b>{/if}{#if data.quotaText}{' '}· {data.quotaText}{/if}
+			무상 기준 <b>{q?.free_grade ?? '—'}</b> 이상{#if data.seller.grade}{' '}· 내 등급 <b>{data.seller.grade}</b>{/if}
 		</p>
 		<table class="stmt" style="min-width:0;width:100%;font-size:13px">
 			<tbody>
 				{#if q?.buy_mode === 'fixed'}
-					<!-- "(1회 한정)" 제거 — 지정가는 가격만 바꾼다(0011:174). 횟수 한도는 무상 샘플에만 있다 -->
+					<!-- "(1회 한정)" 제거 — 지정가는 가격만 바꾼다(0011:174). 횟수 제한은 무상 샘플(상품당 1회)에만 있다 -->
 					<tr><td>브랜드 지정 샘플가</td><td class="num"><b>₩{fmtNum(price)}</b></td></tr>
 				{:else}
 					<tr><td>판매가</td><td class="num">₩{fmtNum(p.sale_price)}</td></tr>
@@ -227,7 +227,7 @@
 				(₩{fmtNum(celWon)} 미만이라 🥬 사용 불가){/if} — 다음 화면에서 고르고 배송지를 확인한 뒤 결제합니다.
 		</p>
 		<p class="meta" style="margin-top:8px">
-			구매 샘플은 브랜드 승인 없이 바로 발송 단계로 넘어가고, 이달 무상 한도를 쓰지 않습니다. 브랜드는 일반 판매 1건과 동일하게 정산받습니다(플랫폼 수수료 10% 동일).{#if q?.refund}{' '}<b>이 상품은 판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
+			구매 샘플은 브랜드 승인 없이 바로 발송 단계로 넘어가고, 무상 샘플(상품당 1회)에는 포함되지 않습니다. 브랜드는 일반 판매 1건과 동일하게 정산받습니다(플랫폼 수수료 10% 동일).{#if q?.refund}{' '}<b>이 상품은 판매 확정 시 샘플 구매액을 환급합니다.</b>{/if}
 		</p>
 		<div class="btnrow" style="justify-content:flex-end;margin-top:12px">
 			{#if !b.disabled && data.payHref}

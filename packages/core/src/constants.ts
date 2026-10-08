@@ -45,7 +45,7 @@ export const TOPUP = [{ n: 5, won: 100000 }, { n: 10, won: 190000 }, { n: 30, wo
 export interface ShopItem { id: string; name: string; price: number | string; desc: string; auto?: boolean; days?: number; repeat?: boolean }
 export const SHOP: { seller: ShopItem[]; brand: ShopItem[] } = {
 	seller: [
-		{ id: 'samplepay', name: '샘플 구매 셀러리 결제', price: '1 = ₩20,000', desc: '무상 기준 등급 미달·상품당 1회 소진·이달 한도 소진 시 샘플을 구매합니다(판매가 − 내 수수료, 또는 브랜드 지정가). 결제 시 셀러리를 1🥬=₩20,000으로 사용, 부족분은 현금 — 구매 화면에서 자동 안내', auto: true },
+		{ id: 'samplepay', name: '샘플 구매 셀러리 결제', price: '1 = ₩20,000', desc: '무상 기준 등급 미달·상품당 1회 소진 시 샘플을 구매합니다(판매가 − 내 수수료, 또는 브랜드 지정가). 결제 시 셀러리를 1🥬=₩20,000으로 사용, 부족분은 현금 — 구매 화면에서 자동 안내', auto: true },
 		{ id: 'datapass', name: '매출 데이터 확인권', price: 2, desc: '상품별 익명 판매 실적(팔로워·참여율·매출) 전체 열람 — 1회 구매로 계정에 영구 적용' },
 		{ id: 'featured', name: '프로필 상단 노출 (7일)', price: 3, desc: '브랜드 인플루언서 갤러리 추천 카드 최상단 고정 + 추천 뱃지' },
 		{ id: 'homefeature', name: '고객 홈 상단 노출 (7일)', price: 3, desc: 'sellery.co.kr 고객 홈 "진행 중인 판매" 최상단에 내 진행 중·예정 판매 고정 + 추천 뱃지' },
@@ -65,13 +65,13 @@ export const SHOP: { seller: ShopItem[]; brand: ShopItem[] } = {
 /* ---- 등급 ---- */
 export interface Tier { g: Grade; min: number; bonus: number; pct: number; perk: string }
 export const GRADES: Tier[] = [
-	{ g: '블랙', min: 100000000, bonus: 3, pct: 1, perk: '수수료 +3%p · 샘플 월 5회 · 전담 매니저 · 판매 기간 우선권 · 독점권 우선 협상' },
-	{ g: '다이아', min: 50000000, bonus: 2, pct: 3, perk: '수수료 +2%p · 샘플 월 5회 · 독점권 신청 · 판매 기간 우선권 · 스카우트 최상단' },
-	{ g: '플래티넘', min: 30000000, bonus: 1.5, pct: 8, perk: '수수료 +1.5%p · 샘플 월 5회 · 신상품 우선 제안권 · 판매 기간 우선권' },
-	{ g: '골드', min: 15000000, bonus: 1, pct: 18, perk: '수수료 +1%p · 샘플 월 2회' },
-	{ g: '실버', min: 8000000, bonus: 0.5, pct: 35, perk: '수수료 +0.5%p · 샘플 월 2회' },
-	{ g: '브론즈', min: 3000000, bonus: 0.3, pct: 60, perk: '수수료 +0.3%p · 샘플 월 1회' },
-	{ g: '스타터', min: 0, bonus: 0, pct: 100, perk: '기본 수수료율 · 샘플 월 1회' }
+	{ g: '블랙', min: 100000000, bonus: 3, pct: 1, perk: '수수료 +3%p · 전담 매니저 · 판매 기간 우선권 · 독점권 우선 협상' },
+	{ g: '다이아', min: 50000000, bonus: 2, pct: 3, perk: '수수료 +2%p · 독점권 신청 · 판매 기간 우선권 · 스카우트 최상단' },
+	{ g: '플래티넘', min: 30000000, bonus: 1.5, pct: 8, perk: '수수료 +1.5%p · 신상품 우선 제안권 · 판매 기간 우선권' },
+	{ g: '골드', min: 15000000, bonus: 1, pct: 18, perk: '수수료 +1%p' },
+	{ g: '실버', min: 8000000, bonus: 0.5, pct: 35, perk: '수수료 +0.5%p' },
+	{ g: '브론즈', min: 3000000, bonus: 0.3, pct: 60, perk: '수수료 +0.3%p' },
+	{ g: '스타터', min: 0, bonus: 0, pct: 100, perk: '기본 수수료율' }
 ];
 export interface BTier { g: Grade; min: number; pct: number; perk: string }
 export const BGRADES: BTier[] = [

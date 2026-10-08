@@ -138,7 +138,7 @@ Sellery/
 | 정산 (PG 1.9% · 플랫폼 10% · 원천징수 3.3% · D+21) | `docs/settlement-policy.md` | `js/00-core.js` — `PG_RATE=0.019`, `PLAT_RATE=0.10`, `WHT=0.033`, `CLEAR_DAYS=21` · 추천 보상은 `js/02-state.js` — 인플루언서 추천 `REF_RATE=0.02`, `REF_BOOST=0.01`, `REF_TIMES=5` / 브랜드 추천 `BREF_RATE`, `BREF_DISC`, `BREF_TIMES` |
 | 등급 (인플루언서 7등급 · 브랜드 7등급 · 등급 보너스/할인) | `docs/grade-policy.md` | `js/02-state.js` — `GRADES`(min · bonus · perk), `BGRADES`, `BG_DISC`, `DATA_PRICE` |
 | 판매 기간 (기간 우선권 · 겹침 판정) | `docs/period-policy.md` | `js/02-state.js` — `GRADES[].perk` 문구 + `periodBlock()` 판정 로직 |
-| 샘플 (등급별 월 한도 · 무상 기준 · 구매가 · 🥬 결제) | `docs/sample-policy.md` | `js/02-state.js` — `sampleQuota()`, `spOf()`, `samplePrice()`, `SAMPLE_CEL_WON=20000` |
+| 샘플 (무상 기준 등급 · 상품당 1회 · 구매가 · 🥬 결제 — 월 한도 없음) | `docs/sample-policy.md` | `js/02-state.js` — `spOf()`, `hadFreeSample()`, `samplePrice()`, `SAMPLE_CEL_WON=20000` |
 | 셀러리 포인트 🥬 (적립 · 샵 · 충전 · 데이터 열람가) | `docs/points-policy.md` | `js/02-state.js` — `CELERY_PER=5000000`(적립 기준), `DATA_PRICE`(열람가), `SHOP`(샵 상품 목록), `TOPUP`(충전 패키지) |
 
 > 브랜드 정산 화면·관리자 매출 화면·캠페인 정산 표는 상수를 참조해 자동으로 바뀝니다(예: `${(PLAT_RATE*100).toFixed(0)}%`). 하지만 **숫자가 직접 적힌 문구도 많습니다** — 고객 소개(`60-customer.js` "플랫폼 수수료는 10%로 고정"), 캠페인 모달(`70-campaign.js` "플랫폼 10%p … 최대 23%" · "플랫폼 10% 동일" · "1🥬=₩20,000" · "원천징수 3.3% 후"), 인플루언서 정산·마이페이지(`20-seller.js` "원천징수 3.3%" · "D+21"), 관리자 순수익(`50-admin.js` "플랫폼 10% 동일" · "PG 1.9%"), 추천 프로그램(`20-seller.js` "+1%p" · "2%"), 셀러리 샵(`30-shared.js` "₩20,000"). 상수를 바꿀 때는 `grep -n '10%\|1.9%\|3.3%\|D+21\|20,000' js/*.js` 로 찾아 **같은 PR에서 함께 고치고**, 브랜드 정산 화면·고객 FAQ·캠페인 정산 미리보기에서 숫자가 맞는지 눈으로 확인하세요.

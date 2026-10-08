@@ -2,7 +2,7 @@
 import { S, D_, save, resetData } from './state.svelte';
 import { toast, openModal, closeModal, go } from './ui.svelte';
 import {
-	brand, camp, campOrders, celBal, celSpend, gname, hadFreeSample, freeEligible, sampleLeft, sampleQuota, samplePrice, sampleSplit, spOf, seller, prod,
+	brand, camp, campOrders, celBal, celSpend, gname, hadFreeSample, freeEligible, samplePrice, sampleSplit, spOf, seller, prod,
 	passActive, periodBlock, stockLeft, pushSys, pushChat, settleDue, calc, sellerWht, spendData, freeRefLeft, bgname, autoMatches, optsOf, soldQty, leftOf,
 	cartLines, csList, myProductIds, dataPrice
 } from './helpers';
@@ -27,7 +27,6 @@ export function reqSample(pid: string) {
 	if (p.exclusiveSellerId && p.exclusiveSellerId !== S.actingSeller) { toast('이 상품은 독점 인플루언서가 확정되어 샘플 요청이 제한됩니다'); return; }
 	if (!freeEligible(p, me)) { toast(`무상 샘플은 ${spOf(p).freeGrade} 등급 이상 — 샘플 구매로 진행할 수 있어요`); openModal('sampleBuy', { pid }); return; }
 	if (hadFreeSample(p, me)) { toast('이 상품의 무상 샘플은 이미 받았어요 (상품당 1회) — 샘플 구매로 진행'); openModal('sampleBuy', { pid }); return; }
-	if (sampleLeft(me) <= 0) { toast(`이번 달 무상 샘플 한도를 모두 사용했어요 (한도 ${sampleQuota(me)}회) — 샘플 구매로 진행`); openModal('sampleBuy', { pid }); return; }
 	const id = nextId('c');
 	D_().campaigns.push({ id, sellerId: S.actingSeller, productId: pid, status: 'SAMPLE_REQUESTED', createdAt: ymd(today()) });
 	pushSys(id, `인플루언서 <b>${me.name}(${me.handle})</b>가 샘플을 요청했습니다`);
