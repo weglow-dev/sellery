@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { quotaLine, sampleButton, sampleLine } from '@sellery/db/partner/sample-rules';
+import { quotaLine, sampleButton, sampleLine, sampleStatus } from '@sellery/db/partner/sample-rules';
 import { listProductsForSeller, requireSeller, sellerPath } from '$lib/server/partner';
 
 /**
@@ -40,6 +40,7 @@ export const load: PageServerLoad = async (event) => {
 			boosted: !!p.boosted_at,
 			brand: { name: p.brand.name, grade: p.brand.grade, logo_url: p.brand.logo_url },
 			line: sampleLine(p.quote),
+			status: sampleStatus(p.quote, p.sample_text),
 			button: sampleButton(p.quote),
 			href: sellerPath(`/products/${encodeURIComponent(p.code ?? '')}`),
 			hasCode: !!p.code

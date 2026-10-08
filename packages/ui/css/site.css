@@ -1798,3 +1798,14 @@
 .ref-banner .grow { flex:1; min-width:0; }
 @media (max-width:640px) { .ref-banner { flex-direction:column; align-items:flex-start; } }
 
+/* 인플루언서 상품 카드 — 브랜드 로고/이름 · 가격 라벨 · 샘플 두 줄 (2026-10-08 대표 QA) */
+.brandline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.brandlogo { width:18px; height:18px; object-fit:contain; box-shadow:var(--shadow-frame-soft); background:#fff; }
+.brandname { font-weight:700; font-size:13px; }
+.pricegrid { display:flex; flex-direction:column; gap:2px; margin-top:8px; }
+.pricegrid > div { display:flex; align-items:baseline; gap:8px; }
+.pricegrid .pl { font-size:11px; color:var(--color-mute); min-width:76px; }
+.pricegrid .cp { text-decoration:line-through; color:var(--color-mute); }
+.samplebox { margin-top:8px; padding:8px 10px; background:var(--color-bg); border:1px solid var(--color-line); font-size:12px; line-height:1.55; }
+.samplebox .rule { font-weight:700; }
+.samplebox .mine { margin-top:2px; }
