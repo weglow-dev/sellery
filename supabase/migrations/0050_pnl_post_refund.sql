@@ -1,5 +1,5 @@
 -- ============================================================
--- 0049 — 매출·순수익에 정산 후 환불 반영
+-- 0050 — 매출·순수익에 정산 후 환불 반영
 --
 -- 배경: 정산이 끝난 캠페인에 환불이 들어오면 주문은 `CANCELED` + 이벤트 `refund_needs_adjust` 가
 --   된다(0008:544-546 — `REFUNDED` 로 둘 수 없다. 정산 스냅샷이 확정이고 `orders_sample_not_refunded`
@@ -59,10 +59,10 @@ revoke all on function public.campaign_post_settle_refunds(uuid) from public, an
 grant execute on function public.campaign_post_settle_refunds(uuid) to service_role;
 
 comment on function public.campaign_post_settle_refunds(uuid) is
-  '정산 후 환불 합계 (0049) — CANCELED 주문의 refund_amount. 스냅샷에 반영될 수 없는 금액이라 매출 화면이 따로 더한다';
+  '정산 후 환불 합계 (0050) — CANCELED 주문의 refund_amount. 스냅샷에 반영될 수 없는 금액이라 매출 화면이 따로 더한다';
 
 -- ------------------------------------------------------------
--- app_admin_revenue — 0022 본문 **그대로** + 정산 후 환불 조정 3곳만 삽입 (0049)
+-- app_admin_revenue — 0022 본문 **그대로** + 정산 후 환불 조정 3곳만 삽입 (0050)
 --   집계 로직(필드 30여 개)을 손으로 옮기지 않았다 — 0022 정의를 복사하고
 --   ① 누적 변수 ② 캠페인별 조정 필드 ③ totals 조정 합계만 더했다.
 -- ------------------------------------------------------------
@@ -86,7 +86,7 @@ declare
   a_pfg numeric := 0; a_costs numeric := 0; a_pf numeric := 0; a_vat numeric := 0; a_pfnet numeric := 0;
   a_sftot numeric := 0; a_brand numeric := 0;
   a_paid integer := 0; a_refund_cnt integer := 0;
-  -- 정산 후 환불 (0049) — 스냅샷에 들어갈 수 없는 금액
+  -- 정산 후 환불 (0050) — 스냅샷에 들어갈 수 없는 금액
   a_post numeric := 0; a_post_cnt integer := 0; v_post jsonb;
   -- 셀러리
   v_cel_won   numeric := 0;
@@ -110,7 +110,7 @@ begin
       continue;
     end if;
     v_scope := v_scope + 1;
-    -- 정산 후 환불(0049) — `CANCELED` 주문은 스냅샷에 반영될 수 없다(0008:544). 기존 필드는 그대로 두고 조정값만 덧붙인다.
+    -- 정산 후 환불(0050) — `CANCELED` 주문은 스냅샷에 반영될 수 없다(0008:544). 기존 필드는 그대로 두고 조정값만 덧붙인다.
     v_post := public.campaign_post_settle_refunds(r.id);
     if coalesce((v_post ->> 'amount')::numeric, 0) > 0 then
       j := j || jsonb_build_object(
@@ -177,7 +177,7 @@ begin
     'vat', round(a_vat), 'platform_net', round(a_pfnet), 'seller_fee_total', round(a_sftot),
     'brand_payout', round(a_brand),
     'paid_count', a_paid, 'refund_count', a_refund_cnt,
-    -- 정산 후 환불 조정 (0049) — net·platform_net 은 그대로. 플랫폼이 흡수한 뒤 금액을 따로 준다
+    -- 정산 후 환불 조정 (0050) — net·platform_net 은 그대로. 플랫폼이 흡수한 뒤 금액을 따로 준다
     'post_refunds', a_post, 'post_refund_count', a_post_cnt,
     'net_adjusted', a_net - a_post, 'platform_net_adjusted', a_pfnet - a_post);
 
