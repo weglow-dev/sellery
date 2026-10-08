@@ -2363,6 +2363,19 @@ export type Database = {
         Returns: Json
       }
       app_admin_save_opex: { Args: { p_opex: Json }; Returns: Json }
+      app_admin_settle_cancel: {
+        Args: { p_actor_user_id?: string; p_campaign_id: string; p_reason: string }
+        Returns: Json
+      }
+      app_admin_settle_run_v2: {
+        Args: {
+          p_actor_user_id?: string
+          p_campaign_id: string
+          p_force?: boolean
+          p_force_reason?: string
+        }
+        Returns: Json
+      }
       app_admin_settle_sample: {
         Args: { p_actor_user_id?: string; p_campaign_id: string }
         Returns: Json

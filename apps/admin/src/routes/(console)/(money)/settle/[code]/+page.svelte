@@ -17,12 +17,14 @@
 	const fmtTime = (iso: string | null) => (iso ? `${md(iso)} ${iso.length >= 16 ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }) : ''}`.trim() : '—');
 	const today = $derived(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }));
 	const canRun = $derived(!!p && p.source === 'live' && p.campaign_status === 'CLEARING');
-	const notDue = $derived(!!p && p.source === 'live' && p.campaign_status === 'CLEARING' && !p.eligible && p.reason === 'NOT_DUE');
-	let force = $state(false);
+	/** 지급 완료가 하나라도 있으면 취소할 수 없다 — 나간 돈은 되돌릴 수 없다(0047) */
+	const paidCount = $derived(
+		[p?.payouts.seller, p?.payouts.brand, p?.payouts.referrer].filter((po) => po?.status === 'paid').length
+	);
+	const canCancel = $derived(!!p && p.campaign_status === 'SETTLED' && paidCount === 0);
 	const confirmRun = (e: SubmitEvent) => {
 		if (!p) return e.preventDefault();
-		const head = notDue ? `기준일(${p.due_on ? md(p.due_on) : '미정'}) 전 강제 실행입니다.\n` : '';
-		if (!confirm(`${head}${p.campaign_code.toUpperCase()} 정산을 실행할까요?\n순매출 ${money(p.net)} → 브랜드 ${money(p.brand_payout)} · 인플루언서 ${money(p.seller_payout)}\n스냅샷 · 지급 2건 · 등급 · 🥬 · 추천 보상이 한 번에 기록되며 되돌릴 수 없어요.`)) e.preventDefault();
+		if (!confirm(`${p.campaign_code.toUpperCase()} 정산을 실행할까요?\n순매출 ${money(p.net)} → 브랜드 ${money(p.brand_payout)} · 인플루언서 ${money(p.seller_payout)}\n스냅샷 · 지급 2건 · 등급 · 🥬 · 추천 보상이 한 번에 기록됩니다.\n지급 전이면 취소할 수 있지만, 한 건이라도 지급하면 되돌릴 수 없어요.`)) e.preventDefault();
 	};
 	const EVENT_LABEL: Record<string, string> = {
 		ended: '판매 종료',
@@ -136,13 +138,55 @@
 					<div class="card static">
 						<h4>정산 실행</h4>
 						{#if canRun}
-							<p class="hint">{#if p.eligible}기준일이 도래했어요 — 실행하면 위 명세가 스냅샷으로 고정되고 지급 2건이 만들어집니다.{:else}기준일 <b>{p.due_on ? md(p.due_on) : '미정'}</b> 전이에요. 교환·환불 기간이 끝나기 전 실행은 운영 예외입니다(스냅샷 메모에 남아요).{/if}</p>
-							<form method="post" action="?/run" onsubmit={confirmRun}>
-								{#if notDue}
-									<label class="admin-check"><input type="checkbox" name="force" value="1" bind:checked={force} /> 기준일 전 강제 실행 (운영 예외)</label>
-								{/if}
-								<div class="btnrow"><button type="submit" class="{notDue ? 'danger' : 'pri'} sm" disabled={notDue && !force}>{notDue ? '강제 실행' : '정산 실행'}</button></div>
-							</form>
+							<!--
+								기일 전 강제 실행 체크박스를 **제거했다**(2026-10-08 · 운영 결정).
+								D+21 은 교환·환불 기간이고 정책에 예외 조항이 없다(docs/settlement-policy.md §8) —
+								그 전에 정산하면 고객이 환불할 수 있는 돈을 지급하게 되고, 환불이 들어오면
+								`refund_needs_adjust` 가 서는데 그걸 처리하는 조정 액션이 아직 없다.
+								프로토타입에도 강제 실행은 없었다 — 데모는 시뮬레이션 블록의 "⏩ 3주 경과" 로
+								`end_date` 를 당겼다(`core/actions.ts` ffwd). 그걸 실서비스로 옮길 때 가드를 끄는
+								플래그가 된 것이고, 설계 결정으로 기록된 적은 없다.
+								지급 리허설(launch-checklist §8-13)은 운영 스크립트로 한다 —
+								`partner-admin.mjs settle-run <c> --force --reason "지급 리허설"`(사유가 명세에 남는다).
+							-->
+							{#if p.eligible}
+								<p class="hint">기준일이 도래했어요 — 실행하면 위 명세가 스냅샷으로 고정되고 지급 2건이 만들어집니다.</p>
+								<form method="post" action="?/run" onsubmit={confirmRun}>
+									<div class="btnrow"><button type="submit" class="pri sm">정산 실행</button></div>
+								</form>
+							{:else}
+								<p class="hint">
+									기준일 <b>{p.due_on ? md(p.due_on) : '미정'}</b> 전이에요 — 교환·환불 기간이 끝나기 전에는 정산할 수 없습니다.
+									고객이 환불할 수 있는 돈이라 기일까지 셀러리가 보관합니다.
+								</p>
+							{/if}
+						{:else if p.campaign_status === 'SETTLED'}
+							<!--
+								미지급 정산 취소(0047) — 돈이 한 푼도 안 나갔을 때만. 지급 완료가 있으면 버튼을 두지 않는다
+								(RPC 도 HAS_PAID 로 막는다). 이미 보낸 뒤의 정정은 만들지 않았다 — 회계 정책 결정이 필요하다.
+							-->
+							{#if canCancel}
+								<p class="hint">
+									정산이 확정됐지만 <b>아직 지급된 돈이 없어</b> 취소할 수 있어요. 취소하면 명세·지급 건이 지워지고
+									교환/환불 기간으로 돌아갑니다 — 기일이 되면 다시 실행하면 됩니다.
+								</p>
+								<form
+									method="post"
+									action="?/cancelSettle"
+									class="console-form"
+									onsubmit={(e) => {
+										if (!confirm('정산을 취소할까요?\n명세와 지급 건이 지워지고 교환/환불 기간으로 돌아갑니다.')) e.preventDefault();
+									}}
+								>
+									<input type="text" name="reason" required maxlength="200" placeholder="취소 사유 (필수 · 캠페인 스레드에 남아요)" aria-label="취소 사유" />
+									<div class="btnrow"><button type="submit" class="danger sm">정산 취소</button></div>
+								</form>
+							{:else}
+								<p class="hint">
+									지급이 <b>{paidCount}건</b> 완료돼 정산을 취소할 수 없어요 — 이미 나간 돈은 되돌릴 수 없습니다.
+									금액이 잘못됐다면 운영팀과 조정 절차로 처리해주세요.
+								</p>
+							{/if}
 						{:else}
 							<p class="hint">판매 중(LIVE) 캠페인은 종료 후 교환·환불 기간(D+21)이 지나야 정산할 수 있어요. 스케줄러가 종료일 다음 날 CLEARING 으로 옮깁니다.</p>
 						{/if}
@@ -222,3 +266,12 @@
 		{/each}
 	</div>
 {/if}
+
+<style>
+	/* 기준일 전 강제 실행 사유 (0047) */
+	.settle-force-reason {
+		display: block;
+		width: 100%;
+		margin: 8px 0 0;
+	}
+</style>

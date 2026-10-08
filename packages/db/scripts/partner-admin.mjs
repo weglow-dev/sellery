@@ -43,7 +43,10 @@
 //
 //   ── 관리자 콘솔 "정산 · 돈" PR-A (0020 — docs/admin-console-plan.md · settlement-policy §8 · 화면(PR-B) 전까지 여기서) ──
 //   settle-preview <campaign>               app_admin_settle_preview — calc() 전체 라인 · 보류 예고 · 실행 가능 여부 (LIVE/CLEARING 실시간 · SETTLED 스냅샷)
-//   settle-run <campaign> [--force]         app_admin_settle_run — CLEARING · 기준일(D+21) 도래분만. --force 는 기준일 전 강제(운영 예외). 한 트랜잭션 · SETTLED 면 already
+//   settle-run <campaign> [--force --reason "…"]   app_admin_settle_run_v2 — CLEARING · 기준일(D+21) 도래분만.
+//                                           --force 는 기준일 전 강제 — **사유 필수**(settlements.memo 에 남는다).
+//                                           관리자 화면에서는 강제 실행을 할 수 없다(0047) — 지급 리허설 전용.
+//                                           한 트랜잭션 · SETTLED 면 already
 //   settle-due                              app_admin_settle_run_due — 기준일 도래 CLEARING 전부 (runSettleAll · 크론 후보)
 //   settlements [--status pending|held|paid] [--limit N]   app_admin_settlements — 대기 큐(CLEARING) + 스냅샷 표 + 카운트
 //   payouts [--status pending|held|paid|all]               지급 표(payouts · 계좌는 마스킹 스냅샷) — 이체 파일은 payouts-export
@@ -122,7 +125,7 @@ function usage(code = 2) {
       "  products [--pending] [--brand <brand>] [--limit N] | review-product <product> approve|reject|pause [\"사유\"]",
       "  campaign <campaign>",
       "  tick | tick-campaign <campaign> | orders [--campaign c] [--brand b] [--unshipped|--shipped|--refunded] [--limit N] | cs [--open] [--brand b] [--limit N]",
-      "  settle-preview <campaign> | settle-run <campaign> [--force] | settle-due | settlements [--status pending|held|paid] [--limit N]",
+      "  settle-preview <campaign> | settle-run <campaign> [--force --reason \"사유\"] | settle-due | settlements [--status pending|held|paid] [--limit N]",
       "  payouts [--status pending|held|paid|all] | payouts-export [--status pending] --purpose \"…\" [--out file.csv] | payout-paid <id> [\"메모\"] | payout-hold <id> [\"사유\"] | payout-release <id>",
       "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
       "  payout-mode [manual|toss] | payout-cap [<원>] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
@@ -805,8 +808,20 @@ function printRun(r) {
 
 async function cmdSettleRun() {
   const c = await campaignIdOf(positional[0]);
-  const { data, error } = await admin.rpc("app_admin_settle_run", { p_campaign_id: c.id, p_force: !!flags.force });
-  if (error) throw new Error(`app_admin_settle_run failed: ${error.message}`);
+  // 기준일 전 강제 실행은 **스크립트에서만** 가능하고 사유가 필수다(0047 · 관리자 화면에서는 제거).
+  //   실제 업무는 지급 리허설(docs/launch-checklist.md §8-13). 사유는 settlements.memo 에 남는다.
+  const force = !!flags.force;
+  const reason = typeof flags.reason === "string" ? flags.reason.trim() : "";
+  if (force && !reason) {
+    console.error('[partner-admin] --force 에는 --reason "사유" 가 필요합니다 (정산 명세에 남습니다 — 예: 지급 리허설)');
+    process.exit(1);
+  }
+  const { data, error } = await admin.rpc("app_admin_settle_run_v2", {
+    p_campaign_id: c.id,
+    p_force: force,
+    ...(force ? { p_force_reason: reason } : {}),
+  });
+  if (error) throw new Error(`app_admin_settle_run_v2 failed: ${error.message}`);
   if (!printRun(data)) process.exit(1);
   if (data?.ok && !data.already) await notifySlack(`[셀러리] 정산 실행 · ${data.campaign_code} · 브랜드 ${won(data.brand_payout)} · 인플루언서 ${won(data.seller_payout)}${data.holds?.seller || data.holds?.brand ? " · 지급 보류 있음" : ""}`);
 }

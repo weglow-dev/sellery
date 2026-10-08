@@ -78,20 +78,86 @@ export async function previewSettlement(campaignRef: string, admin: Admin = crea
   return { ok: false, code: typeof o?.code === "string" ? o.code : "DB_ERROR", status: typeof o?.status === "string" ? o.status : null };
 }
 
+/**
+ * 정산 실행. `force`(기일 전 강제)면 **사유가 필수**다 — 0047 `app_admin_settle_run_v2` 가
+ * `FORCE_REASON_REQUIRED` 를 돌려주고, 통과하면 사유를 `settlements.memo` 에 남긴다.
+ * 정산 로직 자체는 0020 `app_admin_settle_run` 그대로다(v2 가 그걸 호출한다).
+ *
+ * 실제 업무: 지급 리허설(docs/launch-checklist.md §8-13 `settle-run <c> --force`).
+ */
 export async function runSettlement(
   campaignRef: string,
-  opts: { actorUserId?: string | null; force?: boolean } = {},
+  opts: { actorUserId?: string | null; force?: boolean; forceReason?: string | null } = {},
   admin: Admin = createAdminClient(),
 ): Promise<SettleRunResult> {
   const id = await campaignIdOf(admin, campaignRef);
   if (id === "error") return { ok: false, code: "DB_ERROR" };
   if (!id) return { ok: false, code: "NOT_FOUND" };
-  const { data, error } = await admin.rpc("app_admin_settle_run", { p_campaign_id: id, p_actor_user_id: opts.actorUserId ?? undefined, p_force: opts.force ?? false });
+  const { data, error } = await admin.rpc("app_admin_settle_run_v2", {
+    p_campaign_id: id,
+    p_actor_user_id: opts.actorUserId ?? undefined,
+    p_force: opts.force ?? false,
+    ...(opts.forceReason ? { p_force_reason: opts.forceReason } : {}),
+  });
   if (error) {
-    console.error("[admin/settle] app_admin_settle_run failed:", error.message);
+    console.error("[admin/settle] app_admin_settle_run_v2 failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
   return parseSettleRunResult(data);
+}
+
+export type SettleCancelResult =
+  | { ok: true; campaignCode: string; deleted: { payouts: number; referralEarnings: number } }
+  | { ok: false; code: "NOT_FOUND" | "BAD_REASON" | "WRONG_STATUS" | "NO_SETTLEMENT" | "HAS_PAID" | "DB_ERROR"; paidCount?: number; status?: string | null };
+
+/**
+ * 미지급 정산 취소 (0047) — **`payouts` 가 전부 `pending` 일 때만.**
+ *
+ * 하나라도 `paid` 면 `HAS_PAID` 로 막는다. `paid` 는 "실제로 보냈다" 는 기록이고(이체 파일·토스
+ * 지급대행) DB 를 되돌려도 나간 돈은 돌아오지 않는다 — 되돌리면 다음 배치에서 **이중 지급**이 된다.
+ * 보류(`held`)는 지급 전이라 허용한다.
+ *
+ * 이미 보낸 뒤의 정정(과지급 회수·추가 지급)은 **만들지 않았다** — 회계 정책이 걸린 별건이다.
+ */
+export async function cancelSettlement(
+  campaignRef: string,
+  reason: string,
+  actorUserId?: string | null,
+  admin: Admin = createAdminClient(),
+): Promise<SettleCancelResult> {
+  const id = await campaignIdOf(admin, campaignRef);
+  if (id === "error") return { ok: false, code: "DB_ERROR" };
+  if (!id) return { ok: false, code: "NOT_FOUND" };
+  const { data, error } = await admin.rpc("app_admin_settle_cancel", {
+    p_campaign_id: id,
+    p_reason: reason,
+    p_actor_user_id: actorUserId ?? undefined,
+  });
+  if (error) {
+    console.error("[admin/settle] app_admin_settle_cancel failed:", error.message);
+    return { ok: false, code: "DB_ERROR" };
+  }
+  const o = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+  if (!o) return { ok: false, code: "DB_ERROR" };
+  if (o.ok !== true) {
+    const code = typeof o.code === "string" ? o.code : "DB_ERROR";
+    const known = ["NOT_FOUND", "BAD_REASON", "WRONG_STATUS", "NO_SETTLEMENT", "HAS_PAID"] as const;
+    return {
+      ok: false,
+      code: (known as readonly string[]).includes(code) ? (code as SettleCancelResult extends { ok: false; code: infer C } ? C : never) : "DB_ERROR",
+      paidCount: typeof o.paid_count === "number" ? o.paid_count : undefined,
+      status: typeof o.status === "string" ? o.status : null,
+    };
+  }
+  const d = o.deleted && typeof o.deleted === "object" ? (o.deleted as Record<string, unknown>) : {};
+  return {
+    ok: true,
+    campaignCode: typeof o.campaign_code === "string" ? o.campaign_code : campaignRef,
+    deleted: {
+      payouts: typeof d.payouts === "number" ? d.payouts : 0,
+      referralEarnings: typeof d.referral_earnings === "number" ? d.referral_earnings : 0,
+    },
+  };
 }
 
 export async function runDueSettlements(actorUserId?: string | null, admin: Admin = createAdminClient()): Promise<SettleRunDueResult> {
