@@ -202,7 +202,9 @@ export function sampleLine(q: SampleQuote | null, celIcon = "🥬"): string {
  */
 export function sampleStatus(q: SampleQuote | null, sampleText?: string | null, celIcon = "🥬"): { rule: string; mine: string } {
   if (!q || !q.free_grade) return { rule: "", mine: "" };
-  const rule = `무상 샘플 · ${q.free_grade} 이상 · 상품당 1회${sampleText ? ` · 제공 ${sampleText}` : ""}${q.refund ? " · 판매 확정 시 구매액 환급" : ""}`;
+  // "실버 이상 무상 제공 3통(1회)" — 브랜드가 적은 샘플 내용(예 "무상 3개")에서 앞의 "무상" 은 뺀다 (대표 문구 결정 2026-10-08)
+  const what = (sampleText ?? "").replace(/^\s*무상\s*/, "").trim();
+  const rule = `${q.free_grade} 이상 무상 제공${what ? ` ${what}` : ""}(1회)${q.refund ? " · 판매 확정 시 구매액 환급" : ""}`;
   const buy = (() => {
     if (q.price === null) return "";
     const celWon = q.cel_won > 0 ? q.cel_won : SAMPLE_CEL_WON_DEFAULT;

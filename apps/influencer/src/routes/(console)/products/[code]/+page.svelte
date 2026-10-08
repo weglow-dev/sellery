@@ -64,7 +64,7 @@
 	<div class="grow">
 		<div class="t">{p.name} <small>{p.code.toUpperCase()}</small></div>
 		<div class="meta">
-			{#if logo}<img src={logo} alt="" style="width:20px;height:20px;vertical-align:-6px;box-shadow:var(--shadow-frame-soft);margin-right:2px" />{/if}
+			{#if logo}<img src={logo} alt="" class="brandlogo lg" />{/if}
 			<span class="brandname">{p.brand.name}</span>
 			· {p.category}
 		</div>
@@ -80,10 +80,7 @@
 </section>
 
 {#if data.status?.rule}
-	<div class="notice samplebox">
-		<div class="rule">🎁 {data.status.rule}</div>
-		<div class="mine">{data.status.mine}</div>
-	</div>
+	<div class="notice samplebox"><div class="rule">🎁 {data.status.rule}</div></div>
 {/if}
 
 {#if p.exclusive_label}
