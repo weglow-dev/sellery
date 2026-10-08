@@ -51,8 +51,10 @@
 	const endDate = $derived(start && start.length === 10 ? endOfPeriod(start, len) : '');
 	/** 내가 고른 기간과 겹치는 우선권 기간 — 폼 위 안내 (판정은 DB) */
 	const clash = $derived(endDate ? data.priorityHolders.filter((h) => !(endDate < h.start || start > h.end)) : []);
-	// 기본은 접힘(대표 결정 2026-10-08) — 제안 제출이 실패해 오류를 보여줘야 할 때만 펼친다
-	const showForm = $derived(!!pf);
+	// 기본은 접힘(대표 결정 2026-10-08) — 제안 제출이 실패해 오류를 보여줘야 할 때만 펼친다.
+	// 사용자가 연 상태는 로컬 $state 로 들고 있어 LiveRefresh 폴링(10초)으로 데이터가 갱신돼도 다시 접히지 않는다.
+	let schedOpen = $state(!!pf);
+	$effect(() => { if (pf) schedOpen = true; });
 
 	const confirmPass = (e: SubmitEvent) => {
 		if (!confirm('이번 상품은 진행하지 않고 패스할까요? 이 캠페인은 종료되고, 이 상품의 무상 샘플 1회는 사용한 것으로 남아요.')) e.preventDefault();
@@ -186,7 +188,7 @@
 
 				{#if ctx}
 					<!-- 아코디언: 헤더 바를 누르면 폼이 펼쳐진다 (대표 QA 2026-10-08) -->
-					<details class="console-sched-wrap accordion" open={showForm}>
+					<details class="console-sched-wrap accordion" bind:open={schedOpen}>
 						<summary class="acc-head"><span class="acc-title">{c.status === 'TESTING' ? '진행할게요 — 판매 일정 제안' : '다른 기간으로 다시 제안'}</span><span class="acc-sub">시작일 · 기간 · 배정 재고</span><span class="acc-chev" aria-hidden="true">▾</span></summary>
 						<form method="post" action="?/propose" class="console-form console-sched" style="margin-top:12px">
 							{#if pf?.message}<p class="notice danger" role="alert">{pf.message}</p>{/if}
