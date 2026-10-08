@@ -24,17 +24,22 @@
 <div class="console-head">
 	<h2>상품 갤러리</h2>
 	{#if data.quota}
-		<span class="meta" style="margin-left:auto">
-			이번 달 샘플 요청 <b>{data.quota.left}회 남음</b>{#if data.quota.left === 0}{' '}— <span style="color:var(--color-danger)">한도 소진 시 샘플 구매로 진행</span>{/if}
+		<span class="meta" style="margin-left:auto" title="등급별 월 한도 — 스타터·브론즈 1회 · 실버·골드 2회 · 플래티넘 이상 5회. [무상 샘플 요청]을 누를 때 1회씩 차감되고 매월 1일 다시 채워져요. 브랜드 초대는 차감하지 않아요.">
+			이달 무상 샘플 한도 <b>{data.quota.left}/{data.quota.total}회 남음</b>{#if data.quota.left === 0}{' '}— <span style="color:var(--color-danger)">다 쓰면 샘플 구매로 진행</span>{/if}
 		</span>
 	{/if}
 </div>
+
+<!-- 무상 필터 — 카테고리와 별개의 체크 토글 (대표 결정 2026-10-08): 켜면 내 등급·이달 한도로 지금 무상 요청이 되는 상품만 -->
+<a href={freeHref} class="filtertoggle {data.free ? 'on' : ''}" role="checkbox" aria-checked={data.free} data-sveltekit-noscroll>
+	<span class="box" aria-hidden="true">{data.free ? '✓' : ''}</span>
+	<span>내 등급으로 무상 샘플 가능한 상품만 보기</span>
+</a>
 
 <div class="cats" role="tablist" aria-label="카테고리">
 	{#each chips as c (c)}
 		<a href={c === '전체' ? (data.free ? `${data.listPath}?free=1` : data.listPath) : `${data.listPath}?cat=${encodeURIComponent(c)}${data.free ? '&free=1' : ''}`} class="catchip {c === data.cat ? 'on' : ''}" role="tab" aria-selected={c === data.cat} title={CAT_INFO[c] ? `${CAT_INFO[c].desc} · ${CAT_INFO[c].ex}` : '건강·웰니스 전 카테고리'} data-sveltekit-noscroll>{c}</a>
 	{/each}
-	<a href={freeHref} class="catchip {data.free ? 'on' : ''}" role="tab" aria-selected={data.free} title="지금 내 등급·한도로 무상 샘플을 받을 수 있는 상품만" data-sveltekit-noscroll>🎁 무상 샘플 제공</a>
 </div>
 {#if info}
 	<div class="catguide"><b>{data.cat}</b> <span class="en">{info.en}</span> — {info.desc} · 예: {info.ex}</div>

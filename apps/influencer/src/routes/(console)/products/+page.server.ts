@@ -47,7 +47,7 @@ export const load: PageServerLoad = async (event) => {
 		}));
 
 	const firstQuote = products.find((p) => p.quote && p.quote.mode !== 'unlisted')?.quote ?? null;
-	const quota = firstQuote ? { left: firstQuote.left, line: quotaLine(firstQuote) } : null;
+	const quota = firstQuote ? { left: firstQuote.left, total: firstQuote.quota + firstQuote.extra, line: quotaLine(firstQuote) } : null;
 
 	return { seller, cat, free, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
 };
