@@ -152,3 +152,48 @@ describe("parseAdminRevenue", () => {
     expect(parseAdminRevenue({ ...raw, rows: "x" })!.rows).toEqual([]);
   });
 });
+
+/**
+ * 정산 후 환불 조정 (0049) — 정산이 끝난 뒤 들어온 환불은 스냅샷에 반영될 수 없다(주문은 `CANCELED`).
+ * RPC 는 **조정분이 있는 행에만** `*_adjusted` 를 넣으므로, 없으면 조정 전 값과 같아야 한다.
+ */
+describe("parseAdminRevenue — 정산 후 환불 조정", () => {
+  const payload = (totals: Record<string, number>, rows: Record<string, unknown>[] = []) => ({
+    ok: true,
+    today: "2026-10-08",
+    rows,
+    opex: {},
+    totals,
+    celery: {},
+  });
+
+  it("조정분이 있으면 그대로 읽는다", () => {
+    const r = parseAdminRevenue(
+      payload({ net: 1000, platform_net: 100, post_refunds: 30, post_refund_count: 1, net_adjusted: 970, platform_net_adjusted: 70 }),
+    )!;
+    expect(r.totals.post_refunds).toBe(30);
+    expect(r.totals.post_refund_count).toBe(1);
+    expect(r.totals.net_adjusted).toBe(970);
+    expect(r.totals.platform_net_adjusted).toBe(70);
+  });
+
+  it("조정분이 없으면 조정 전과 같다 — 0 으로 보이면 안 된다", () => {
+    const r = parseAdminRevenue(payload({ net: 1000, platform_net: 100 }))!;
+    expect(r.totals.post_refunds).toBe(0);
+    expect(r.totals.net_adjusted).toBe(1000);
+    expect(r.totals.platform_net_adjusted).toBe(100);
+  });
+
+  it("캠페인 행도 같은 규칙", () => {
+    const r = parseAdminRevenue(
+      payload({ net: 1000, platform_net: 100 }, [
+        { campaign_id: "x1", campaign_code: "c1", campaign_status: "SETTLED", source: "snapshot", net: 500, platform_net: 50 },
+        { campaign_id: "x2", campaign_code: "c2", campaign_status: "SETTLED", source: "snapshot", net: 500, platform_net: 50, post_refunds: 20, net_adjusted: 480, platform_net_adjusted: 30 },
+      ]),
+    )!;
+    expect(r.rows[0].net_adjusted).toBe(500);
+    expect(r.rows[0].post_refunds).toBe(0);
+    expect(r.rows[1].net_adjusted).toBe(480);
+    expect(r.rows[1].platform_net_adjusted).toBe(30);
+  });
+});
