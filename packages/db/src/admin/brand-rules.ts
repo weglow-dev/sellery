@@ -16,7 +16,7 @@
  *   productCountLine — "노출 n · 대기 m" 한 줄
  *   brandSearchHit — 검색(상호 · 담당자 · 이메일 · code · 카테고리) 클라이언트측 판정
  *   BRAND_ACTION_MESSAGES — 액션 결과 문구
- *   SUSPEND_BRAND_NOTE — 정지해도 listed 상품이 내려가지 않는다는 경고(스크립트와 같은 동작 · 계획서 §8)
+ *   SUSPEND_BRAND_NOTE — 정지하면 판매 링크가 즉시 닫힌다는 경고(campaign_card 의 b.active 가드 · 2026-10-08 정정)
  */
 import type { StatusTone } from "../order-status";
 
@@ -65,11 +65,17 @@ export function autoProposeLabel(on: boolean): string {
 }
 
 /**
- * 브랜드를 정지해도 **판매 중(listed) 상품은 자동으로 내려가지 않는다** — 운영 스크립트가 경고만 출력하는 것과 같은 동작
- * (docs/brand-console-plan.md §8). 필요하면 상품 검수 화면에서 개별로 일시중지한다.
+ * 브랜드 정지의 **실제 영향** (2026-10-08 정정).
+ *
+ * `products.status` 는 그대로 `listed` 로 남는다 — 그 점에서 "상품이 내려가지 않는다" 는 참이다.
+ * 그런데 고객이 보는 결과는 반대다: `campaign_card()` 의 `b.active` 가드(0008:233) 때문에 그 브랜드
+ * 상품의 **판매 링크가 전부 즉시 404** 가 되고, 결제 게이트도 같은 RPC 를 쓰므로 진행 중 결제까지 막힌다.
+ *
+ * 이전 문구("정지해도 판매 중인 상품은 내려가지 않습니다")는 운영자에게 "판매가 계속된다" 로 읽혀
+ * 영향 범위를 과소평가하게 했다. 한 건만 멈추려면 브랜드 정지가 아니라 캠페인의 [판매 중단](0040)을 쓴다.
  */
 export const SUSPEND_BRAND_NOTE =
-  "정지해도 판매 중인 상품은 내려가지 않습니다 — 필요하면 상품 검수에서 일시중지하세요.";
+  "진행 중인 판매 링크가 즉시 닫히고 결제도 막힙니다 (상품 상태는 '노출 중'으로 남습니다). 한 건만 멈추려면 캠페인의 [판매 중단]을 쓰세요.";
 
 export const BRAND_ACTION_MESSAGES: Record<string, string> = {
   suspended: "정지했습니다. 다음 요청부터 브랜드 콘솔에 들어올 수 없습니다.",

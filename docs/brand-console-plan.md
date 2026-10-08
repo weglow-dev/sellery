@@ -126,7 +126,7 @@ docs/{deploy,data-model,app-plan}.md  EDIT  §1.2 env(sellery-brand 에 SUPABASE
 | `/brand/apply` | guest 보완 폼(프리필) — `BIZ_NO_TAKEN`(다른 계정이 같은 사업자번호 — **자동 병합 없음**, 고객센터 안내) · `INVALID_INPUT` 만 온다. |
 | 시드 브랜드 연결 | `brands.user_id` 는 시드에서 null(seed.sql:97 insert 열 목록에 없음). `partner-admin.mjs invite-brand <email> --link b1`(`inviteUserByEmail(data:{partner_role:'brand'}, redirectTo: SITE_URL + '/brand/auth/confirm?next=/brand/password/new')` + `app_metadata.link_brand_id`) 또는 로컬 `dev-brand.mjs --email … --brand b1`. 시드 이메일은 `partner@vyneherb.example` · `official@glohealth.example`(seed.sql — CLAUDE.md 의 데모 계정 `.co/.biz` 는 localStorage 데모 값) 이라 실제 메일은 못 받는다 → production 은 실제 담당자 메일로 초대. |
 | `foreign` 전환 | 한 사람이 인플루언서·브랜드 둘 다면 `auth.users` 2행(이메일 2개). 같은 이메일로 두 역할은 지원하지 않는다(`brands.user_id unique` · `profiles.role` 단일값, inf §4.6). |
-| 정지 · 복귀 | `partner-admin.mjs suspend-brand` / `reactivate-brand`. 정지된 브랜드의 `listed` 상품은 자동으로 내리지 않는다 — §8. |
+| 정지 · 복귀 | `partner-admin.mjs suspend-brand` / `reactivate-brand`. 정지된 브랜드의 `listed` 상품은 자동으로 내리지 않는다 — **다만 고객이 보는 결과는 다르다(2026-10-08 정정)**: `campaign_card()` 의 `b.active` 가드(0008:233) 때문에 그 브랜드 상품의 **판매 링크가 전부 즉시 404** 가 되고 결제 게이트도 같은 RPC 라 진행 중 결제까지 막힌다. 관리자 화면 문구를 그 사실로 고쳤고(`SUSPEND_BRAND_NOTE`) 진행 중 판매 건수를 함께 보여준다. 한 건만 멈추려면 캠페인의 [판매 중단](0040). 셀러 정지(`s.active`)도 같다 — §8. |
 
 ```mermaid
 sequenceDiagram

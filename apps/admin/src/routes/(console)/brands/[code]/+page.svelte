@@ -125,12 +125,22 @@
 			<p class="hint">
 				{#if b.active}
 					정지하면 다음 요청부터 브랜드 콘솔에 들어올 수 없습니다. {SUSPEND_BRAND_NOTE}
+					{#if b.campaigns_live > 0}지금 <b>{b.campaigns_live}건</b>이 판매 중입니다.{/if}
 				{:else}
 					정지 상태입니다. 풀면 바로 콘솔에 들어올 수 있습니다.
 				{/if}
 			</p>
 			{#if b.active}
-				<form method="post" action="?/active" class="brand-suspend" onsubmit={ask(`${b.name} 을 정지할까요? ${SUSPEND_BRAND_NOTE}`)}>
+				<form
+					method="post"
+					action="?/active"
+					class="brand-suspend"
+					onsubmit={ask(
+						b.campaigns_live > 0
+							? `${b.name} 을 정지할까요? 진행 중인 판매 ${b.campaigns_live}건의 링크가 즉시 닫히고 결제가 막힙니다.`
+							: `${b.name} 을 정지할까요? 다음 요청부터 브랜드 콘솔에 들어올 수 없습니다.`
+					)}
+				>
 					<input type="hidden" name="active" value="false" />
 					<input type="text" name="reason" placeholder="사유 (Slack 알림에만 · 저장 안 됨)" maxlength="200" aria-label="정지 사유" />
 					<button type="submit" class="danger sm">정지</button>
