@@ -79,7 +79,7 @@ export async function previewSettlement(campaignRef: string, admin: Admin = crea
 }
 
 /**
- * 정산 실행. `force`(기일 전 강제)면 **사유가 필수**다 — 0047 `app_admin_settle_run_v2` 가
+ * 정산 실행. `force`(기일 전 강제)면 **사유가 필수**다 — 0048 `app_admin_settle_run_v2` 가
  * `FORCE_REASON_REQUIRED` 를 돌려주고, 통과하면 사유를 `settlements.memo` 에 남긴다.
  * 정산 로직 자체는 0020 `app_admin_settle_run` 그대로다(v2 가 그걸 호출한다).
  *
@@ -111,7 +111,7 @@ export type SettleCancelResult =
   | { ok: false; code: "NOT_FOUND" | "BAD_REASON" | "WRONG_STATUS" | "NO_SETTLEMENT" | "HAS_PAID" | "DB_ERROR"; paidCount?: number; status?: string | null };
 
 /**
- * 미지급 정산 취소 (0047) — **`payouts` 가 전부 `pending` 일 때만.**
+ * 미지급 정산 취소 (0048) — **`payouts` 가 전부 `pending` 일 때만.**
  *
  * 하나라도 `paid` 면 `HAS_PAID` 로 막는다. `paid` 는 "실제로 보냈다" 는 기록이고(이체 파일·토스
  * 지급대행) DB 를 되돌려도 나간 돈은 돌아오지 않는다 — 되돌리면 다음 배치에서 **이중 지급**이 된다.

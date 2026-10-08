@@ -45,7 +45,7 @@
 //   settle-preview <campaign>               app_admin_settle_preview — calc() 전체 라인 · 보류 예고 · 실행 가능 여부 (LIVE/CLEARING 실시간 · SETTLED 스냅샷)
 //   settle-run <campaign> [--force --reason "…"]   app_admin_settle_run_v2 — CLEARING · 기준일(D+21) 도래분만.
 //                                           --force 는 기준일 전 강제 — **사유 필수**(settlements.memo 에 남는다).
-//                                           관리자 화면에서는 강제 실행을 할 수 없다(0047) — 지급 리허설 전용.
+//                                           관리자 화면에서는 강제 실행을 할 수 없다(0048) — 지급 리허설 전용.
 //                                           한 트랜잭션 · SETTLED 면 already
 //   settle-due                              app_admin_settle_run_due — 기준일 도래 CLEARING 전부 (runSettleAll · 크론 후보)
 //   settlements [--status pending|held|paid] [--limit N]   app_admin_settlements — 대기 큐(CLEARING) + 스냅샷 표 + 카운트
@@ -808,7 +808,7 @@ function printRun(r) {
 
 async function cmdSettleRun() {
   const c = await campaignIdOf(positional[0]);
-  // 기준일 전 강제 실행은 **스크립트에서만** 가능하고 사유가 필수다(0047 · 관리자 화면에서는 제거).
+  // 기준일 전 강제 실행은 **스크립트에서만** 가능하고 사유가 필수다(0048 · 관리자 화면에서는 제거).
   //   실제 업무는 지급 리허설(docs/launch-checklist.md §8-13). 사유는 settlements.memo 에 남는다.
   const force = !!flags.force;
   const reason = typeof flags.reason === "string" ? flags.reason.trim() : "";

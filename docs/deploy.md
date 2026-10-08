@@ -469,6 +469,22 @@ npx supabase db reset       # migrations 0001~ + seed.sql 적용 (sellers 8 · b
 
 테스트 계정은 §8.1 의 `dev-{admin,seller,brand,user}.mjs`(모두 production 거부). `db reset` 으로 계정이 사라지면 같은 한 줄로 복구된다.
 
+**새 마이그레이션을 만들 때 — 번호는 `git fetch` 뒤 `origin/main` 기준으로 고른다.**
+
+```bash
+git fetch origin && git ls-tree --name-only origin/main supabase/migrations/ | tail -3
+npm run check:migrations     # 같은 번호가 둘 이상이면 실패 (CI 도 같은 검사를 돌린다)
+```
+
+번호가 같아도 **파일명이 다르면 git 이 충돌로 알려주지 않는다.** 두 사람이 각자 같은 번호를 쓰면
+양쪽 브랜치가 조용히 병합되고, 병합 뒤 `db push` 에서 터진다 —
+`duplicate key value violates unique constraint "schema_migrations_pkey"`.
+그때는 **SQL 이 이미 실행된 뒤** 버전 기록만 실패하므로 클라우드 상태와 기록이 어긋난다
+(다시 올리려면 번호를 옮긴다 — 전부 `create or replace` 면 재실행은 안전하다).
+실제로 두 번 났다: **0043**(팀원 `purge_demo_data` × `campaign_alerts` → 0044) ·
+**0047**(팀원 `no_monthly_sample_quota` × `settle_cancel` → 0048). 그래서
+`scripts/check-migrations.mjs` 를 CI 에 넣었다.
+
 **새 마이그레이션이 들어오면(`git pull` 로 `supabase/migrations/` 가 늘면) 로컬을 다시 맞춘다.**
 
 ```bash

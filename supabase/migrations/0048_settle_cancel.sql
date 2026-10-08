@@ -1,5 +1,5 @@
 -- ============================================================
--- 0047 — 미지급 정산 취소 + 기일 전 강제 실행 사유 필수
+-- 0048 — 미지급 정산 취소 + 기일 전 강제 실행 사유 필수
 --
 -- 배경: 정산 실행을 되돌릴 경로가 **하나도 없었다**. `unsettle`·`revert`·`undo` 어느 이름으로도
 --   함수가 없고, `payouts` 는 `paid` 가 종착점이다(`app_admin_payout_hold`·`release` 가 전부
@@ -117,10 +117,10 @@ revoke all on function public.app_admin_settle_cancel(uuid, text, uuid) from pub
 grant execute on function public.app_admin_settle_cancel(uuid, text, uuid) to service_role;
 
 comment on function public.app_admin_settle_cancel(uuid, text, uuid) is
-  '미지급 정산 취소 (0047) — payouts 전부 pending 일 때만. 지급 완료가 있으면 HAS_PAID. 사유 필수 · 이벤트 settle_canceled';
+  '미지급 정산 취소 (0048) — payouts 전부 pending 일 때만. 지급 완료가 있으면 HAS_PAID. 사유 필수 · 이벤트 settle_canceled';
 
 -- ------------------------------------------------------------
--- app_admin_settle_run — 기일 전 강제 실행에 **사유를 받는다** (0020 → 0047)
+-- app_admin_settle_run — 기일 전 강제 실행에 **사유를 받는다** (0020 → 0048)
 --   `p_force = true` 인데 사유가 없으면 `FORCE_REASON_REQUIRED`. 사유는 `settlements.memo` 에 남는다
 --   (전에는 `'기준일 전 강제 실행'` 고정 문구라 누가 왜 당겼는지 알 수 없었다).
 --   실제 업무: 지급 리허설(docs/launch-checklist.md §8-13 · `settle-run <c> --force`).
@@ -172,4 +172,4 @@ revoke all on function public.app_admin_settle_run_v2(uuid, uuid, boolean, text)
 grant execute on function public.app_admin_settle_run_v2(uuid, uuid, boolean, text) to service_role;
 
 comment on function public.app_admin_settle_run_v2(uuid, uuid, boolean, text) is
-  '정산 실행 + 기일 전 강제 실행 사유 필수 (0047). 정산 로직은 0020 app_admin_settle_run 그대로 · force 면 사유를 settlements.memo 에 남긴다';
+  '정산 실행 + 기일 전 강제 실행 사유 필수 (0048). 정산 로직은 0020 app_admin_settle_run 그대로 · force 면 사유를 settlements.memo 에 남긴다';

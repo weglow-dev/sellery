@@ -17,7 +17,7 @@
 	const fmtTime = (iso: string | null) => (iso ? `${md(iso)} ${iso.length >= 16 ? new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }) : ''}`.trim() : '—');
 	const today = $derived(new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }));
 	const canRun = $derived(!!p && p.source === 'live' && p.campaign_status === 'CLEARING');
-	/** 지급 완료가 하나라도 있으면 취소할 수 없다 — 나간 돈은 되돌릴 수 없다(0047) */
+	/** 지급 완료가 하나라도 있으면 취소할 수 없다 — 나간 돈은 되돌릴 수 없다(0048) */
 	const paidCount = $derived(
 		[p?.payouts.seller, p?.payouts.brand, p?.payouts.referrer].filter((po) => po?.status === 'paid').length
 	);
@@ -162,7 +162,7 @@
 							{/if}
 						{:else if p.campaign_status === 'SETTLED'}
 							<!--
-								미지급 정산 취소(0047) — 돈이 한 푼도 안 나갔을 때만. 지급 완료가 있으면 버튼을 두지 않는다
+								미지급 정산 취소(0048) — 돈이 한 푼도 안 나갔을 때만. 지급 완료가 있으면 버튼을 두지 않는다
 								(RPC 도 HAS_PAID 로 막는다). 이미 보낸 뒤의 정정은 만들지 않았다 — 회계 정책 결정이 필요하다.
 							-->
 							{#if canCancel}
@@ -268,7 +268,7 @@
 {/if}
 
 <style>
-	/* 기준일 전 강제 실행 사유 (0047) */
+	/* 기준일 전 강제 실행 사유 (0048) */
 	.settle-force-reason {
 		display: block;
 		width: 100%;
