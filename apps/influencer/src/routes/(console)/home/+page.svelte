@@ -36,7 +36,7 @@
 		<div class="grow">
 			<div class="lbl-sm">추천 프로그램</div>
 			<div class="nm">인플루언서 친구를 추천하면 <b>첫 5회 판매 확정 매출의 2%</b>를 받아요 — 친구는 <b>수수료 +1%p</b></div>
-			<div class="sub">둘 다 셀러리가 부담해요 · 내 추천 코드 <span class="console-code">{seller.ref_code}</span></div>
+			<div class="sub">둘 다 셀러리가 부담해요 · 내 추천 코드 <span class="console-code sm">{seller.ref_code}</span></div>
 		</div>
 		<span class="btn sm pri" aria-hidden="true">자세히 →</span>
 	</a>

@@ -23,7 +23,8 @@ export const load: PageServerLoad = async (event) => {
 	return {
 		seller,
 		balance,
-		todos: widgets.todos,
+		// 갤러리를 한 번 본 뒤에는 "첫 상품 둘러보기" 를 숨긴다 (products/+page.server.ts 가 쿠키를 심는다)
+		todos: event.cookies.get('slry_seen_products') === '1' ? widgets.todos.filter((t) => t.kind !== 'first_product') : widgets.todos,
 		live,
 		assets: widgets.assets,
 		toNextCel: CELERY_PER - (m3 % CELERY_PER),

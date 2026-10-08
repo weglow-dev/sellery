@@ -1113,6 +1113,7 @@
     user-select: all;
   }
   .console-code.lg { font-size: 26px; letter-spacing: 0.15em; padding: 6px 20px; }
+  .console-code.sm { font-size: 14px; letter-spacing: 0.08em; padding: 1px 8px; box-shadow: none; vertical-align: baseline; }
   .console-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
   .console-methods { display: grid; gap: 10px; grid-template-columns: 1fr; margin-top: 14px; }
   .console-methods .card { margin: 0; padding: 14px 16px; box-shadow: var(--shadow-frame-soft); }
