@@ -26,6 +26,7 @@
 	{#if data.quota}
 		<span class="meta" style="margin-left:auto" title="등급별 월 한도 — 스타터·브론즈 1회 · 실버·골드 2회 · 플래티넘 이상 5회. [무상 샘플 요청]을 누를 때 1회씩 차감되고 매월 1일 다시 채워져요. 브랜드 초대는 차감하지 않아요.">
 			이달 무상 샘플 한도 <b>{data.quota.left}/{data.quota.total}회 남음</b>{#if data.quota.left === 0}{' '}— <span style="color:var(--color-danger)">다 쓰면 샘플 구매로 진행</span>{/if}
+			<br /><span style="font-size:11px">등급 조건 충족 제품에 한함.</span>
 		</span>
 	{/if}
 </div>
