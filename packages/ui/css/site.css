@@ -1842,3 +1842,9 @@
 @media (prefers-reduced-motion: reduce) { .liveclock .lc-time.lc-live::after { animation:none; } }
 @media (max-width:640px) { .home-meta { align-items:flex-start; } }
 
+/* 일정 제안 접기/펼치기 라벨 (details 상태별) */
+.console-sched-wrap > summary .when-open { display:none; }
+.console-sched-wrap[open] > summary .when-closed { display:none; }
+.console-sched-wrap[open] > summary .when-open { display:inline; }
+.console-sched-wrap[open] > summary { background:var(--color-surface); color:var(--color-ink); }
+
