@@ -181,7 +181,7 @@
 		display: block;
 		margin-top: 4px;
 	}
-	/* 오픈 알림 신청·취소 결과 (0043) — 폼 POST 뒤 `?alert=` 로 돌아온다 */
+	/* 오픈 알림 신청·취소 결과 (0044) — 폼 POST 뒤 `?alert=` 로 돌아온다 */
 	.store-alert-msg {
 		margin: 0 0 10px;
 		border: 2px solid var(--color-line);

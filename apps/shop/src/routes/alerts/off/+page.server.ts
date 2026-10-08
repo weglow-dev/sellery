@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { unsubscribeCampaignAlert } from '$lib/server/db';
 
 /**
- * `/alerts/off?t=<토큰>` — 오픈 알림 메일 하단의 **1클릭 수신거부** 착지점 (0043).
+ * `/alerts/off?t=<토큰>` — 오픈 알림 메일 하단의 **1클릭 수신거부** 착지점 (0044).
  *
  * 로그인을 요구하지 않는다 — 메일을 받은 사람이 곧 본인이고, 토큰은 추측 불가한 uuid 다
  * (`campaign_alerts.unsub_token` · 유니크). 로그인을 요구하면 메일에서 끊기 어려워져 수신거부의 의미가 없다.

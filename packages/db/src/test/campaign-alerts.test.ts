@@ -10,7 +10,7 @@ import {
 } from "../campaign-alerts";
 
 /**
- * 오픈 알림 순수 규칙 (0043) — 발송 창과 버튼 문구.
+ * 오픈 알림 순수 규칙 (0044) — 발송 창과 버튼 문구.
  * DB·메일을 타는 `server/campaign-alerts.server.ts` 는 결정 E 에 따라 여기서 테스트하지 않고 DB 스모크로 확인한다.
  */
 

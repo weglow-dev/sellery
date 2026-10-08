@@ -13,7 +13,7 @@
 	import { GRADES, SAMPLE_CEL_WON } from '@sellery/core/constants';
 	import { discountPct, fmtNum, imageSrc } from '@sellery/db/campaign';
 	import { BUY_COMING_SOON, BUY_REASON_TITLES, campaignChip } from '@sellery/db/partner/sample-rules';
-	import { GradeBox, ProductIcon, ShippingFields, StatusChip } from '@sellery/ui/site';
+	import { ProductIcon, ShippingFields, StatusChip } from '@sellery/ui/site';
 	import { page } from '$app/state';
 	import {
 		PERFORMANCE_EMPTY,
@@ -66,7 +66,6 @@
 		<div class="meta">
 			{#if logo}<img src={logo} alt="" style="width:20px;height:20px;vertical-align:-6px;box-shadow:var(--shadow-frame-soft);margin-right:2px" />{/if}
 			<span class="chip brand">{p.brand.name}</span>
-			<GradeBox grade={p.brand.grade} sm />
 			{p.category}
 		</div>
 		<div class="prices">

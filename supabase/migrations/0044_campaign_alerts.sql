@@ -1,5 +1,5 @@
 -- ============================================================
--- 0043 — 오픈 알림 신청 (campaign_alerts) · 이메일 발송
+-- 0044 — 오픈 알림 신청 (campaign_alerts) · 이메일 발송
 --
 -- 배경: 판매 페이지와 홈 카드에 "🔔 오픈 알림 받기" 버튼이 있었지만 신청을 저장하는 테이블도
 --   발송 경로도 없이 토스트만 띄웠다 — 고객에게 "신청 완료" 라고 말하고 DB 에는 한 줄도 남지 않았다.
@@ -70,7 +70,7 @@ revoke all on public.campaign_alerts from anon, authenticated;
 -- 정책 없음 — 전부 service_role(아래 함수)로만 접근한다. 신청 여부는 app_campaign_alert_state 가 돌려준다.
 
 comment on table public.campaign_alerts is
-  '캠페인 오픈 알림 신청 (0043) — 이메일이 등록된 회원만. 이메일은 저장하지 않고 발송 시점에 계정에서 읽는다';
+  '캠페인 오픈 알림 신청 (0044) — 이메일이 등록된 회원만. 이메일은 저장하지 않고 발송 시점에 계정에서 읽는다';
 
 -- ------------------------------------------------------------
 -- app_campaign_alert_subscribe(p_campaign_id, p_user_id) — 신청

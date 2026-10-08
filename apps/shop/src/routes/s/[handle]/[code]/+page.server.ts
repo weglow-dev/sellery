@@ -10,7 +10,7 @@ import { absoluteUrl, cancelCampaignAlert, campaignAlertState, fetchCampaignCard
  *   · URL 핸들이 정식 핸들(normalizeHandle(seller.handle) — '@' 없음)과 다르면 308 canonicalStoreUrl (정식 URL 재요청은 raw 세그먼트 === 정식 핸들이라 200 — 무한 리다이렉트 없음)
  *   · 쿠키·재고를 읽으므로 캐시하지 않는다(SSR 기본). 링크 쿠키는 hooks.server.ts 가 이 경로에서 세팅한다.
  *   · 메타(generateMetadata 대체)는 데이터로 넘기고 +page.svelte 의 <svelte:head> 가 렌더한다 (§3.4).
- *   · **오픈 알림(0043)**: 오픈 전(`SCHEDULE_CONFIRMED`)이면 알림 신청 상태를 함께 넘긴다. 이메일이 등록된
+ *   · **오픈 알림(0044)**: 오픈 전(`SCHEDULE_CONFIRMED`)이면 알림 신청 상태를 함께 넘긴다. 이메일이 등록된
  *     회원만 신청할 수 있어 비로그인·이메일 없는 계정은 버튼 대신 안내가 뜬다(`alertButtonView`).
  */
 export const load: PageServerLoad = async (event) => {
@@ -56,7 +56,7 @@ function done(event: RequestEvent, key: string): never {
 }
 
 export const actions: Actions = {
-	/** 오픈 알림 신청 — 이메일이 등록된 회원만(0043). 비로그인은 로그인 화면으로 보낸다(돌아올 주소 유지) */
+	/** 오픈 알림 신청 — 이메일이 등록된 회원만(0044). 비로그인은 로그인 화면으로 보낸다(돌아올 주소 유지) */
 	alertOn: async (event) => {
 		const { user } = await event.locals.safeGetSession();
 		if (!user) redirect(303, `/login?next=${encodeURIComponent(event.url.pathname)}`);

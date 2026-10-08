@@ -259,11 +259,11 @@ export function csOpenedBrandMail(cs: MailCs, message: { messageId: string; body
   );
 }
 
-/* ---------------- 캠페인 오픈 알림 (0043) ---------------- */
+/* ---------------- 캠페인 오픈 알림 (0044) ---------------- */
 
 /**
  * 메일이 보는 오픈 알림 1건 — `app_campaign_alerts_due` 가 돌려주는 행 + 수신거부 토큰.
- * 신청한 **회원 본인**에게만 간다(이메일이 등록된 계정 · 0043 범위 결정).
+ * 신청한 **회원 본인**에게만 간다(이메일이 등록된 계정 · 0044 범위 결정).
  */
 export type MailCampaignAlert = {
   campaignCode: string;
@@ -282,7 +282,7 @@ export type MailCampaignAlert = {
 /**
  * 오픈 알림 — 고객이 직접 신청한 캠페인이 판매를 시작했을 때 한 통.
  * 거래 메일(주문·배송·환불)과 달리 **수신거부 링크를 반드시 넣는다** — 고객이 신청해서 받는 메일이라
- * 끊을 방법이 메일 안에 있어야 한다(0043 · docs/launch-checklist.md §5 결정 3).
+ * 끊을 방법이 메일 안에 있어야 한다(0044 · docs/launch-checklist.md §5 결정 3).
  */
 export function campaignOpenMail(a: MailCampaignAlert, ctx: MailCtx): MailTemplate {
   // `storeUrl` 로 정식 경로를 만든다 — DB 의 handle 은 '@' 를 포함해서 그대로 쓰면 308 리다이렉트를 한 번 탄다

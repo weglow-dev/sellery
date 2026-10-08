@@ -1,5 +1,5 @@
 /**
- * 캠페인 오픈 알림 (0043) — 신청 · 취소 · 수신거부 · 발송.
+ * 캠페인 오픈 알림 (0044) — 신청 · 취소 · 수신거부 · 발송.
  *
  * 판매 페이지의 "🔔 오픈 알림 받기" 버튼은 원래 토스트만 띄우고 아무것도 저장하지 않았다(허위 안내 ·
  * 2026-10-08 제거). 이 모듈이 실제 구현이다. 채널은 이메일(Resend) — 운영 결정 2026-09-22 ·
@@ -44,7 +44,7 @@ async function campaignIdOf(admin: Admin, code: string): Promise<string | null |
   return data?.id ?? null;
 }
 
-/** 오픈 알림 신청 — `SCHEDULE_CONFIRMED` 이고 이메일이 등록된 회원만(0043 `app_campaign_alert_subscribe`). */
+/** 오픈 알림 신청 — `SCHEDULE_CONFIRMED` 이고 이메일이 등록된 회원만(0044 `app_campaign_alert_subscribe`). */
 export async function subscribeCampaignAlert(
   campaignCode: string,
   userId: string,

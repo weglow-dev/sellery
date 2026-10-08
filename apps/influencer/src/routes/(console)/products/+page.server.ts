@@ -13,13 +13,17 @@ export const load: PageServerLoad = async (event) => {
 	const r = await requireSeller(event, { next: '/products' });
 	if (!r.ok) redirect(303, r.location);
 	const { seller } = r.ctx;
+	// 홈 "첫 상품 둘러보기" 할 일은 갤러리를 한 번 본 뒤 사라진다 (대표 결정 2026-10-08) — 브라우저 쿠키 1년, DB 변경 없음
+	event.cookies.set('slry_seen_products', '1', { path: '/', httpOnly: true, sameSite: 'lax', secure: event.url.protocol === 'https:', maxAge: 60 * 60 * 24 * 365 });
 
 	const { products, categories } = await listProductsForSeller(seller.id);
 	const catParam = event.url.searchParams.get('cat') ?? '';
 	const cat = categories.includes(catParam) ? catParam : '전체';
 
+	const free = event.url.searchParams.get('free') === '1'; // 🎁 무상 샘플 제공 필터 — 내 등급·한도로 지금 무상 요청이 가능한 상품만 (대표 결정 2026-10-08)
 	const cards = products
 		.filter((p) => cat === '전체' || p.category === cat)
+		.filter((p) => !free || p.quote?.mode === 'free')
 		.map((p) => ({
 			code: p.code,
 			name: p.name,
@@ -44,5 +48,5 @@ export const load: PageServerLoad = async (event) => {
 	const firstQuote = products.find((p) => p.quote && p.quote.mode !== 'unlisted')?.quote ?? null;
 	const quota = firstQuote ? { left: firstQuote.left, line: quotaLine(firstQuote) } : null;
 
-	return { seller, cat, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
+	return { seller, cat, free, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
 };

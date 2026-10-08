@@ -10,7 +10,7 @@
 	 * 상태별 CTA 블록 (ux-spec §3.1.3 원문 · web store/buy-cta.tsx).
 	 *   LIVE:   [구매하기 (pri buy)] — left ≤ 0 → '품절' disabled · isBuyable 실패 → disabled
 	 *           .meta: {md(start)}–{md(end)} 한정 · 잔여 {n}개 · {sold}개 판매됨 · 결제 시 셀러리 안전결제로 이동
-	 *   예정:   "{md(start)} 오픈 예정"(비활성) + **오픈 알림 폼**(0043) — 이메일이 등록된 회원만 신청할 수 있다.
+	 *   예정:   "{md(start)} 오픈 예정"(비활성) + **오픈 알림 폼**(0044) — 이메일이 등록된 회원만 신청할 수 있다.
 	 *           `alert` prop 이 없으면(관리자 미리보기 등) 버튼 없이 안내만 보여준다.
 	 *   종료:   [판매가 종료되었습니다 (disabled)] · .meta: 교환·환불은 종료 후 {clear_days}일까지 셀러리 고객센터에서 처리됩니다
 	 * 🛒 장바구니 버튼은 슬라이스 1 에서 숨김 (구매하기 full width).
@@ -55,7 +55,7 @@
 {:else if c.status === 'SCHEDULE_CONFIRMED'}
 	<button type="button" class="buy" disabled style="opacity:0.6">{c.start_date ? md(c.start_date) : ''} 오픈 예정</button>
 	<!--
-		오픈 알림(0043) — 이메일이 등록된 회원만. 신청은 서버 폼 액션(`?/alertOn` · `?/alertOff`)이고
+		오픈 알림(0044) — 이메일이 등록된 회원만. 신청은 서버 폼 액션(`?/alertOn` · `?/alertOff`)이고
 		JS 없이도 동작한다. `alert` 가 null 이면(관리자 미리보기) 버튼을 두지 않는다.
 	-->
 	{#if alertView && alertView.kind !== 'none'}

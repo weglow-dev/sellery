@@ -13,7 +13,7 @@ import { rejectCron } from '$lib/server/cron';
  * 동작: 0018 `app_campaign_tick()` — SCHEDULE_CONFIRMED · start_date ≤ 오늘 → LIVE(went_live) · LIVE · end_date < 오늘 → CLEARING(ended{due_on}). 멱등.
  * 정산(CLEARING → SETTLED)은 관리자 단계 — 여기서 하지 않는다.
  *
- * **오픈 알림 발송(0043)** 은 전이와 **분리**한다. 전이는 KST 00:05 에 일어나는데 그때 메일을 보내면
+ * **오픈 알림 발송(0044)** 은 전이와 **분리**한다. 전이는 KST 00:05 에 일어나는데 그때 메일을 보내면
  * 새벽에 도착한다 — `inAlertSendWindow`(KST 8~22시) 안에서만 보낸다. 매시 도는 크론이라 창에 들어온
  * 첫 틱에서 그날 신청자 전원이 처리되고, `sent_at` 으로 멱등이라 이후 틱은 0건이다.
  * 발송 실패는 응답에 숫자로만 남기고 전이 결과를 막지 않는다(`sendDueCampaignAlerts` 는 throw 하지 않는다).
