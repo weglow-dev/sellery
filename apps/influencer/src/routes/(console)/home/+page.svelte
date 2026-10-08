@@ -34,7 +34,6 @@
 	<div class="home-chips">
 		<span class="hchip"><PlatformHandle platform={seller.platform} handle={seller.handle} /></span>
 		<span class="hchip"><span class="k">팔로워</span><b>{fmtNum(seller.followers)}</b></span>
-		<span class="hchip"><span class="k">등급</span><b>{a.grade}</b></span>
 		{#if data.todos.length}
 			<span class="hchip todo"><span class="k">할 일</span><b>{data.todos.length}건</b></span>
 		{:else if data.live.length}
