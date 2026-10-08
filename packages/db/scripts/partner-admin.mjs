@@ -59,7 +59,9 @@
 //   toss-queue                              app_admin_payouts_toss_queue — 지급 대기·보류·최근 지급 행 + 셀러 상태 · requestable · reason
 //   toss-seller-sync <seller> [--brand]     정산 정보 → 토스 셀러 등록/수정(JWE) → app_partner_seller_sync. 계좌 원문을 읽으므로 sensitive_access_log 1행
 //   toss-seller-delete <seller> [--brand]   토스 셀러 삭제 + 로컬 toss_seller_* 비움(테스트 정리)
+//   payout-cap [<원>]                       platform_settings.payout_daily_cap 보기/바꾸기 — 하루(KST) 토스 지급 요청 상한(기본 5,000,000 · 공유 잔액 보호, 2026-10-08)
 //   toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD]   requestable 행을 100건씩 POST /v2/payouts(JWE · Idempotency-Key) → app_payout_mark_requested. 기본 --express
+//                                           보내기 전에 공유 잔액 가드(토스 잔액 · 셀러리 지급 대기 합계 · 오늘 요청 + 이번 ≤ payout_daily_cap)를 검사해 걸리면 한 건도 보내지 않는다(앱 requestDuePayouts 와 같은 규칙)
 //   toss-payout-refresh <payout id>         GET /v2/payouts/{toss id} → app_payout_sync_status (웹훅을 놓쳤을 때)
 //   toss-payout-cancel <payout id>          POST /v2/payouts/{toss id}/cancel (REQUESTED 만) → app_payout_sync_status
 //
@@ -123,7 +125,7 @@ function usage(code = 2) {
       "  settle-preview <campaign> | settle-run <campaign> [--force] | settle-due | settlements [--status pending|held|paid] [--limit N]",
       "  payouts [--status pending|held|paid|all] | payouts-export [--status pending] --purpose \"…\" [--out file.csv] | payout-paid <id> [\"메모\"] | payout-hold <id> [\"사유\"] | payout-release <id>",
       "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
-      "  payout-mode [manual|toss] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
+      "  payout-mode [manual|toss] | payout-cap [<원>] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
       "  toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD] | toss-payout-refresh <payout id> | toss-payout-cancel <payout id>",
     ].join("\n"),
   );
@@ -1061,10 +1063,73 @@ async function cmdPayoutMode() {
   console.log(JSON.stringify(data));
 }
 
+/* 공유 잔액 가드(2026-10-08) — packages/payments/src/payout-rules.ts checkPayoutGuard 와 같은 규칙을 스크립트용으로 인라인. 숫자의 정답은 그 파일. */
+const PAYOUT_DAILY_CAP_DEFAULT = 5_000_000;
+const PAYOUT_DAILY_CAP_KEY = "payout_daily_cap";
+const normalizeDailyCap = (v) => {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : Number.NaN;
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : PAYOUT_DAILY_CAP_DEFAULT;
+};
+const countsTowardDailyCap = (st) => st === "REQUESTED" || st === "IN_PROGRESS" || st === "COMPLETED";
+const kstDayStartIso = (now = new Date()) => new Date(`${new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)}T00:00:00+09:00`).toISOString();
+const sumAmounts = (rows) => rows.reduce((a, r) => a + (Number.isFinite(Number(r.amount)) ? Math.round(Number(r.amount)) : 0), 0);
+
+async function readDailyCap() {
+  const { data, error } = await admin.from("platform_settings").select("value").eq("key", PAYOUT_DAILY_CAP_KEY).maybeSingle();
+  if (error) throw new Error(`platform_settings read failed: ${error.message}`);
+  return normalizeDailyCap(data?.value);
+}
+
+async function cmdPayoutCap() {
+  const want = positional[0];
+  if (!want) {
+    console.log(`payout_daily_cap = ${won(await readDailyCap())} (하루 KST 토스 지급 요청 상한 · 없으면 기본 ${won(PAYOUT_DAILY_CAP_DEFAULT)})`);
+    return;
+  }
+  const n = Number(String(want).replace(/[,_₩\s]/g, ""));
+  if (!Number.isFinite(n) || n <= 0 || n !== Math.round(n)) usage();
+  const { error } = await admin
+    .from("platform_settings")
+    .upsert({ key: PAYOUT_DAILY_CAP_KEY, value: n, description: "하루(KST) 토스 지급 요청 상한(원) — 지급대행 상점 잔액이 다른 서비스와 공유되므로 셀러리 쪽 버그가 남의 돈을 쓰지 못하게. partner-admin.mjs payout-cap · 앱 requestDuePayouts 가드" }, { onConflict: "key" });
+  if (error) throw new Error(`platform_settings upsert failed: ${error.message}`);
+  await admin.from("payout_events").insert({ source: "mode", event_type: "daily_cap", payload: { daily_cap: n, actor: adminActor() }, handled: true, result: `payout_daily_cap=${n}` });
+  console.log(`payout_daily_cap = ${won(n)}`);
+}
+
+/** 가드 값 — { queueTotal, inFlightTotal, requestedToday, dailyCap, available } (앱 payoutGuardSnapshot 과 같은 정의) */
+async function payoutGuardSnapshot(rows) {
+  const dayStart = kstDayStartIso();
+  const dailyCap = await readDailyCap();
+  const { data: today, error } = await admin.from("payouts").select("amount, toss_payout_status").gte("toss_requested_at", dayStart);
+  if (error) throw new Error(`payouts read failed: ${error.message}`);
+  const bal = await tossPayoutApi("/v2/balances");
+  return {
+    queueTotal: sumAmounts(rows.filter((r) => r.requestable)),
+    inFlightTotal: sumAmounts(rows.filter((r) => r.toss_payout_status === "REQUESTED" || r.toss_payout_status === "IN_PROGRESS")),
+    requestedToday: sumAmounts((today ?? []).filter((r) => countsTowardDailyCap(r.toss_payout_status))),
+    dailyCap,
+    available: bal.ok ? (bal.body.availableAmount?.value ?? null) : null,
+    balanceError: bal.ok ? null : `${bal.body.code} ${bal.body.message}`,
+  };
+}
+
+function checkPayoutGuard({ batchTotal, queueTotal, available, requestedToday, dailyCap }) {
+  const cap = normalizeDailyCap(dailyCap);
+  const remaining = Math.max(0, cap - requestedToday);
+  if (batchTotal > queueTotal) return { ok: false, code: "QUEUE_EXCEEDED", message: `요청 합계 ${won(batchTotal)} 가 셀러리 지급 대기 합계 ${won(queueTotal)} 를 넘습니다` };
+  if (available === null || available === undefined || !Number.isFinite(available)) return { ok: false, code: "BALANCE_UNKNOWN", message: "토스 잔액을 읽지 못했습니다 — 공유 잔액이라 확인 없이는 요청하지 않습니다" };
+  if (batchTotal > available) return { ok: false, code: "BALANCE_EXCEEDED", message: `요청 합계 ${won(batchTotal)} 가 토스 지급 가능 잔액 ${won(available)} 을 넘습니다(잔액은 다른 서비스와 공유)` };
+  if (requestedToday + batchTotal > cap) return { ok: false, code: "DAILY_CAP_EXCEEDED", message: `오늘 요청 ${won(requestedToday)} + 이번 ${won(batchTotal)} 가 하루 상한 ${won(cap)} 을 넘습니다 — 남은 한도 ${won(remaining)} (payout-cap <원> 으로 변경)` };
+  return { ok: true, remaining: remaining - batchTotal };
+}
+
 async function cmdTossBalance() {
   const r = await tossPayoutApi("/v2/balances");
   if (!r.ok) throw new Error(`balance failed: ${r.body.code} ${r.body.message}`);
   console.log(`지급 가능 ${won(r.body.availableAmount?.value ?? 0)} · 정산 대기 ${won(r.body.pendingAmount?.value ?? 0)}`);
+  const { data } = await admin.rpc("app_admin_payouts_toss_queue");
+  const g = await payoutGuardSnapshot(data?.rows ?? []);
+  console.log(`셀러리 지급 대기 ${won(g.queueTotal)} · 진행 중 ${won(g.inFlightTotal)} · 오늘 요청 ${won(g.requestedToday)} / 상한 ${won(g.dailyCap)} (공유 잔액 — 셀러리 몫만 요청)`);
 }
 
 async function cmdTossQueue() {
@@ -1189,6 +1254,21 @@ async function cmdTossPayoutRequest() {
     console.log("요청 가능한 지급 건이 없습니다 (toss-queue 로 사유 확인)");
     return;
   }
+  // 공유 잔액 가드(2026-10-08) — 한 건이라도 보내기 전에 배치 전체를 검사. 걸리면 payout_events 'request.refused' 만 남기고 종료.
+  const g = await payoutGuardSnapshot(data.rows ?? []);
+  const batchTotal = sumAmounts(rows);
+  const guard = checkPayoutGuard({ batchTotal, queueTotal: g.queueTotal, available: g.available, requestedToday: g.requestedToday, dailyCap: g.dailyCap });
+  console.log(`가드: 이번 ${won(batchTotal)} · 셀러리 지급 대기 ${won(g.queueTotal)} · 토스 잔액 ${g.available === null ? `? (${g.balanceError})` : won(g.available)} · 오늘 요청 ${won(g.requestedToday)} / 상한 ${won(g.dailyCap)}`);
+  if (!guard.ok) {
+    await admin.from("payout_events").insert({
+      source: "request",
+      event_type: "request.refused",
+      payload: { code: guard.code, message: guard.message, batch_total: batchTotal, queue_total: g.queueTotal, available: g.available, requested_today: g.requestedToday, daily_cap: g.dailyCap, payout_ids: rows.map((r) => r.payout_id), actor: adminActor() },
+      handled: true,
+      result: `refused: ${guard.code}`,
+    });
+    throw new Error(`${guard.code} — ${guard.message}`);
+  }
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100);
     const items = chunk.map((r) => ({
@@ -1242,6 +1322,9 @@ try {
   switch (cmd) {
     case "payout-mode":
       await cmdPayoutMode();
+      break;
+    case "payout-cap":
+      await cmdPayoutCap();
       break;
     case "toss-balance":
       await cmdTossBalance();

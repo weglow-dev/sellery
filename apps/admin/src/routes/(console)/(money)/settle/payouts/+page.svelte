@@ -3,7 +3,7 @@
 	 * 지급 관리 — 지급 건 표(상태 칩 · 합계) + 행별 [지급 완료](메모) [보류](사유) [보류 해제] + 파일 두 개:
 	 *   [이체 파일 CSV] `GET export.csv?status=&purpose=` — 계좌 **원문**이 실린다(콘솔 화면엔 없음). purpose 필수 · 건마다 sensitive_access_log 가 남는다는 안내.
 	 *   [원천징수 자료 CSV] `GET rrn.csv?ids=&purpose=` — 표에서 체크한 인플루언서 지급건의 정산 id. RRN_ENC_KEY 가 없으면 서버가 안내 문구로 응답.
-	 * 토스 지급대행(0040 · `data.payoutMode === 'toss'`): 상단 카드(토스 잔액 · 요청 가능/진행 중 건수 · 지급 방식 토글) + 표의 체크박스로 고른 건을 `?/tossRequest`(즉시 EXPRESS 또는 예약일) ·
+	 * 토스 지급대행(0040 · `data.payoutMode === 'toss'`): 상단 카드(토스 잔액 · 요청 가능/진행 중 건수 · **셀러리 지급 대기 합계 · 오늘 요청 / 하루 상한(공유 잔액 가드 · 2026-10-08)** · 지급 방식 토글) + 표의 체크박스로 고른 건을 `?/tossRequest`(즉시 EXPRESS 또는 예약일) ·
 	 *   행마다 셀러 상태 칩(tossSellerChip) · 지급 상태 칩(tossPayoutChip) · [취소](REQUESTED) · [재조회] · [셀러 동기화]. 결과(요청/건너뜀/오류)는 ActionData 로 표 위에.
 	 *   'manual' 에서는 토스 블록·칩이 없고 기존 이체 파일 흐름 그대로(지급 방식 토글만).
 	 * 375px: `.admin-table` 카드 모드 · 폼은 줄바꿈.
@@ -29,6 +29,14 @@
 	};
 	const inFlight = (st: string | null | undefined) => st === 'REQUESTED' || st === 'IN_PROGRESS';
 	const money = (n: number) => `₩${fmtNum(n)}`;
+	/** 공유 잔액 가드 사전 안내 — 서버(`requestDuePayouts`)가 최종 거절하지만, 누르기 전에 왜 거절될지 보여준다 */
+	const guardWarning = $derived.by(() => {
+		const g = data.toss?.guard;
+		if (!g || !data.toss) return null;
+		if (data.toss.balance && g.queueTotal > data.toss.balance.available) return `지급 대기 합계가 토스 잔액을 넘어요 — 잔액은 다른 서비스와 공유되므로 셀러리 몫만 요청됩니다(전체 요청은 BALANCE_EXCEEDED 로 거절)`;
+		if (g.queueTotal > g.remainingToday) return `지급 대기 합계가 오늘 남은 한도 ${money(g.remainingToday)} 를 넘어요 — 나눠서 요청하거나 payout-cap 을 올리세요(넘는 배치는 DAILY_CAP_EXCEEDED 로 거절)`;
+		return null;
+	});
 	const detail = (code: string) => `${data.settlePath}/${encodeURIComponent(code)}`;
 	let purpose = $state('');
 	let rrnPurpose = $state('');
@@ -66,6 +74,11 @@
 			{#if data.toss?.configured}
 				<span>토스 잔액 <b>{data.toss.balance ? money(data.toss.balance.available) : '—'}</b>{#if data.toss.balance?.pending}{' '}<span class="meta">(정산 대기 {money(data.toss.balance.pending)})</span>{/if}{#if data.toss.balanceError}{' '}<span class="console-danger">{data.toss.balanceError}</span>{/if}</span>
 				<span class="meta">· 요청 가능 {data.toss.requestable}건 · 진행 중 {data.toss.inFlight}건</span>
+				<span class="meta" title="지급대행 상점(peerkeamf5)의 잔액은 다른 서비스와 공유됩니다 — 셀러리는 지급 대기 합계와 하루 상한 안에서만 요청합니다 (partner-admin.mjs payout-cap <원>)">
+					· 셀러리 지급 대기 <b>{money(data.toss.guard.queueTotal)}</b>{#if data.toss.guard.inFlightTotal}{' '}(진행 중 {money(data.toss.guard.inFlightTotal)}){/if}
+					· 오늘 요청 <b>{money(data.toss.guard.requestedToday)}</b> / 상한 {money(data.toss.guard.dailyCap)}
+				</span>
+				{#if guardWarning}<span class="console-danger">{guardWarning}</span>{/if}
 			{:else}
 				<span class="console-danger">지급대행 키(TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY)가 없어요 — 잔액 조회·지급 요청이 되지 않아요. 이체 파일로 지급하세요.</span>
 			{/if}

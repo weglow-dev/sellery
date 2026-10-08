@@ -7,8 +7,10 @@
  *   getPayeeTossStatus(payeeType, id)       파트너 /settle 가 보여주는 상태 { toss_seller_id, status, error, synced_at, phone_set, configured }
  *   syncPayeeWithToss(payeeType, id, opts)  정산 정보 → 토스 셀러 등록/수정 → app_partner_seller_sync. 키가 없으면 NOT_CONFIGURED(조용히). 저장을 막지 않는다.
  *                                           계좌 원문을 읽을 때 sensitive_access_log(bank_info · actor 'toss-payouts') 를 남긴다.
- *   payoutTossOverview()                    관리자 화면 — { mode, configured, balance | null, rows(app_admin_payouts_toss_queue) }
- *   requestDuePayouts({ ids?, scheduleType, payoutDate?, actor })  requestable 행 → 100건씩 토스 요청 → app_payout_mark_requested. { requested, skipped, errors }
+ *   payoutTossOverview()                    관리자 화면 — { mode, configured, balance | null, rows(app_admin_payouts_toss_queue), guard(payoutGuardSnapshot) }
+ *   payoutGuardSnapshot(rows) · getPayoutDailyCap()   공유 잔액 가드 값 — { queueTotal, inFlightTotal, requestedToday, dailyCap } (payout-rules checkPayoutGuard · platform_settings.payout_daily_cap)
+ *   requestDuePayouts({ ids?, scheduleType, payoutDate?, actor })  requestable 행 → **가드 검사(잔액 · 큐 합계 · 하루 상한 — 걸리면 아무것도 보내지 않고 payout_events 'request.refused')**
+ *                                           → 100건씩 토스 요청 → app_payout_mark_requested. { requested, skipped, errors, guard }
  *   cancelTossPayout(payoutId) · refreshTossPayout(payoutId)   취소(REQUESTED 만) · 재조회 → app_payout_sync_status
  *   handleSellerChanged(data) · handlePayoutChanged(data)      웹훅 — 본문은 id 만 쓰고 **재조회 결과로만** 적는다(서명 없음)
  *   deleteTossSeller(payeeType, id)         운영 스크립트 — 토스 셀러 삭제 + 로컬 id/상태 비움
@@ -18,11 +20,19 @@ import { createAdminClient, type Admin } from "@sellery/db/server/admin";
 import {
   buildTossPayoutItem,
   buildTossSellerPayload,
+  checkPayoutGuard,
   chunkPayouts,
+  countsTowardDailyCap,
   isTossPayoutStatus,
   isTossSellerStatus,
+  kstDayStartIso,
   nextBusinessDay,
+  normalizeDailyCap,
+  PAYOUT_DAILY_CAP_DEFAULT,
+  PAYOUT_DAILY_CAP_KEY,
+  payoutInFlight,
   payoutRequestable,
+  sumAmounts,
   todayKst,
   tossRefId,
   tossSellerReady,
@@ -292,7 +302,41 @@ export type TossQueueRow = {
   reason: string | null;
 };
 
-export type PayoutTossOverview = { mode: PayoutMode; configured: boolean; balance: TossBalance | null; balanceError: string | null; rows: TossQueueRow[] };
+/**
+ * 공유 잔액 가드 스냅샷(2026-10-08 · payout-rules `checkPayoutGuard`) — 관리자 화면 한 줄 "토스 잔액 · 셀러리 지급 대기 · 오늘 요청 / 상한" 과 요청 전 검사가 같은 값을 쓴다.
+ *   queueTotal      requestable 행 합계 = 셀러리가 토스에 요청할 수 있는 최대치(셀러리 몫)
+ *   inFlightTotal   REQUESTED · IN_PROGRESS 합계(토스가 처리 중 — 잔액에서 곧 빠질 돈)
+ *   requestedToday  오늘(KST) `toss_requested_at` 이 찍힌 행 중 REQUESTED · IN_PROGRESS · COMPLETED 합계(취소·거절·실패·삭제 제외)
+ *   dailyCap        platform_settings.payout_daily_cap(없으면 5,000,000 · partner-admin.mjs payout-cap)
+ */
+export type PayoutGuardSnapshot = { queueTotal: number; inFlightTotal: number; requestedToday: number; dailyCap: number; dayStart: string };
+
+export async function getPayoutDailyCap(admin: Admin = createAdminClient()): Promise<number> {
+  const { data, error } = await admin.from("platform_settings").select("value").eq("key", PAYOUT_DAILY_CAP_KEY).maybeSingle();
+  if (error) {
+    console.error("[payouts] payout_daily_cap read failed:", error.message);
+    return PAYOUT_DAILY_CAP_DEFAULT;
+  }
+  const v = data?.value;
+  return normalizeDailyCap(typeof v === "number" || typeof v === "string" ? v : undefined);
+}
+
+export async function payoutGuardSnapshot(rows: readonly TossQueueRow[], admin: Admin = createAdminClient(), now: Date = new Date()): Promise<PayoutGuardSnapshot> {
+  const dayStart = kstDayStartIso(now);
+  const [dailyCap, today] = await Promise.all([getPayoutDailyCap(admin), admin.from("payouts").select("amount, toss_payout_status").gte("toss_requested_at", dayStart)]);
+  if (today.error) console.error("[payouts] requestedToday read failed:", today.error.message);
+  // 읽기 실패면 0 이 아니라 상한을 다 쓴 것으로 본다(가드가 막는 쪽으로)
+  const requestedToday = today.error ? dailyCap : sumAmounts((today.data ?? []).filter((r) => countsTowardDailyCap(r.toss_payout_status)));
+  return {
+    queueTotal: sumAmounts(rows.filter((r) => r.requestable && payoutRequestable(r.toss_payout_status) && tossSellerReady(r.toss_seller_status))),
+    inFlightTotal: sumAmounts(rows.filter((r) => payoutInFlight(r.toss_payout_status))),
+    requestedToday,
+    dailyCap,
+    dayStart,
+  };
+}
+
+export type PayoutTossOverview = { mode: PayoutMode; configured: boolean; balance: TossBalance | null; balanceError: string | null; rows: TossQueueRow[]; guard: PayoutGuardSnapshot };
 
 export function parseTossQueue(raw: unknown): { mode: PayoutMode; rows: TossQueueRow[] } | null {
   const o = obj(raw);
@@ -347,7 +391,8 @@ export async function payoutTossOverview(opts: { admin?: Admin; api?: TossPayout
     if (b.ok) balance = b.body;
     else balanceError = `${b.body.message} (${b.body.code})`;
   }
-  return { mode: q.mode, configured, balance, balanceError, rows: q.rows };
+  const guard = await payoutGuardSnapshot(q.rows, admin);
+  return { mode: q.mode, configured, balance, balanceError, rows: q.rows, guard };
 }
 
 /* ---------------- 관리자: 지급 요청 ---------------- */
@@ -367,6 +412,8 @@ export type RequestPayoutsResult = {
   requested: { payout_id: string; toss_payout_id: string; status: string; amount: number; payee_name: string | null }[];
   skipped: { payout_id: string; reason: string }[];
   errors: { code: string; message: string; payout_ids: string[] }[];
+  /** 가드 검사 값(검사까지 간 경우) — 관리자 화면 안내용 */
+  guard: (PayoutGuardSnapshot & { batchTotal: number; available: number | null }) | null;
 };
 
 async function idempotencyKeyOf(ids: readonly string[], scheduleType: string, date: string | null): Promise<string> {
@@ -378,7 +425,7 @@ async function idempotencyKeyOf(ids: readonly string[], scheduleType: string, da
 export async function requestDuePayouts(input: RequestPayoutsInput, opts: { admin?: Admin; api?: TossPayoutsApi } = {}): Promise<RequestPayoutsResult> {
   const admin = opts.admin ?? createAdminClient();
   const api = opts.api ?? defaultApi;
-  const out: RequestPayoutsResult = { ok: false, mode: "manual", requested: [], skipped: [], errors: [] };
+  const out: RequestPayoutsResult = { ok: false, mode: "manual", requested: [], skipped: [], errors: [], guard: null };
   if (!payoutsConfigured() && !opts.api) {
     out.errors.push({ code: "NOT_CONFIGURED", message: "지급대행 키(TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY)가 없어요", payout_ids: [] });
     return out;
@@ -424,6 +471,26 @@ export async function requestDuePayouts(input: RequestPayoutsInput, opts: { admi
   }
   if (!items.length) {
     out.ok = out.errors.length === 0;
+    return out;
+  }
+
+  // 공유 잔액 가드(2026-10-08) — 토스에 한 건이라도 보내기 전에 배치 전체를 검사한다. 걸리면 아무것도 보내지 않는다.
+  const snapshot = await payoutGuardSnapshot(q.rows, admin);
+  const balanceRes = await api.getPayoutBalance();
+  const available = balanceRes.ok ? balanceRes.body.availableAmount : null;
+  const batchTotal = sumAmounts(items.map((c) => ({ amount: c.row.amount })));
+  out.guard = { ...snapshot, batchTotal, available };
+  const guard = checkPayoutGuard({ batchTotal, queueTotal: snapshot.queueTotal, available, requestedToday: snapshot.requestedToday, dailyCap: snapshot.dailyCap });
+  if (!guard.ok) {
+    const ids = items.map((c) => c.row.payout_id);
+    out.errors.push({ code: guard.code, message: guard.message, payout_ids: ids });
+    await admin.from("payout_events").insert({
+      source: "request",
+      event_type: "request.refused",
+      payload: { code: guard.code, message: guard.message, batch_total: batchTotal, queue_total: snapshot.queueTotal, available, requested_today: snapshot.requestedToday, daily_cap: snapshot.dailyCap, payout_ids: ids, actor: input.actor ?? null },
+      handled: true,
+      result: `refused: ${guard.code}`,
+    });
     return out;
   }
 
