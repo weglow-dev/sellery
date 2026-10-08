@@ -30,6 +30,18 @@
 	<PlatformHandle platform={seller.platform} handle={seller.handle} /> · 팔로워 <b>{fmtNum(seller.followers)}</b> · 등급 <b>{a.grade}</b> · {now.getMonth() + 1}월 {now.getDate()}일{#if data.todos.length}{' '}· 기다리는 할 일이 <b>{data.todos.length}건</b> 있어요.{:else if data.live.length}{' '}· 지금 판매 <b>{data.live.length}건</b>이 진행 중이에요.{:else}{' '}· 오늘은 어떤 상품을 골라볼까요?{/if}
 </p>
 
+{#if seller.ref_code}
+	<!-- 추천 프로그램 배너 — 대표 결정 2026-10-08: 버튼 대신 할 일 위에 혜택을 강조해 바이럴을 유도한다 (수치는 constants REF_RATE/REF_BOOST/REF_TIMES) -->
+	<a href={data.referralPath} class="card static ref-banner">
+		<div class="grow">
+			<div class="lbl-sm">추천 프로그램</div>
+			<div class="nm">인플루언서 친구를 추천하면 <b>첫 5회 판매 확정 매출의 2%</b>를 받아요 — 친구는 <b>수수료 +1%p</b></div>
+			<div class="sub">둘 다 셀러리가 부담해요 · 내 추천 코드 <span class="console-code">{seller.ref_code}</span></div>
+		</div>
+		<span class="btn sm pri" aria-hidden="true">자세히 →</span>
+	</a>
+{/if}
+
 <div class="sec">지금 할 일 {#if data.todos.length}<span class="badge">{data.todos.length}</span>{/if}</div>
 <div class="listcard console-rows">
 	{#each data.todos as t (t.kind + (t.campaignCode ?? ''))}
@@ -79,7 +91,7 @@
 
 <div class="sec" style="margin-top:22px">내 자산</div>
 <div class="card static">
-	<div class="lbl-sm">내 등급 — {a.grade}</div>
+	<div class="lbl-sm" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>내 등급 — {a.grade}</span><a href={data.rankingPath} class="meta" style="text-decoration:underline">랭킹·등급 가이드 →</a></div>
 	{#if a.next}
 		<div class="meter" style="margin-top:10px"><span style="width:{pct}%"></span></div>
 		<div class="meta" style="margin-top:7px">3개월 확정 매출 <b>₩{fmtNum(a.m3_sales)}</b> · <b>{a.next.grade}</b>까지 <b style="color:var(--color-accent)">₩{fmtNum(a.next.remaining)}</b></div>
@@ -93,14 +105,4 @@
 		<div><span class="ms-l">정산 정보</span><span class="ms-v">{seller.has_bank_info ? '등록 완료' : '미등록'}</span><span class="ms-s">{seller.has_bank_info ? 'D+21 지급' : '정산 화면에서 등록'}</span></div>
 	</div>
 	<p class="meta" style="margin-top:10px">등급은 최근 3개월 확정 매출로 <b>매월 1일</b> 다시 계산돼요 — 판매가 없으면 등급이 내려갈 수 있어요. 정산은 실행 시점 등급으로 지급되고, 🥬 는 확정 매출 ₩500만당 1개씩 쌓여요.</p>
-	<div class="btnrow" style="margin-top:10px">
-		<a href={data.productsPath} class="btn sm ghost">상품 갤러리</a>
-		<a href={data.campaignsPath} class="btn sm ghost">내 캠페인</a>
-		<a href={data.salesPath} class="btn sm ghost">실시간 매출</a>
-		<!-- 등급·추천을 궁금해하는 사람은 이 카드를 본다 — 두 화면의 주 진입로다(탭 6개로 늘리지 않은 이유).
-		     라벨은 프로토타입 사이드바와 같다: '랭킹·등급' · '추천 프로그램' -->
-		<a href={data.rankingPath} class="btn sm ghost">랭킹·등급</a>
-		<a href={data.referralPath} class="btn sm ghost">추천 프로그램</a>
-		<a href={data.myPath} class="btn sm ghost">내 정보</a>
-	</div>
 </div>
