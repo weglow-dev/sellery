@@ -8,6 +8,7 @@
  */
 import { createAdminClient, type Admin } from "./admin.server";
 import { parseTrackingFields, type TrackingFields } from "../tracking/sweettracker";
+import { notifyCampaignChanged } from "./realtime.server";
 import { listTrackingDue, sweepTracking, type SweepOptions, type SweepResult, type TrackingDb, type TrackingDue } from "../tracking/sweep";
 
 export type { SweepItem, SweepOptions, SweepResult, TrackingDue, DueParcel } from "../tracking/sweep";
@@ -20,7 +21,9 @@ export function trackingDb(admin: Admin): TrackingDb {
 
 /** 매시 스윕 — 크론 라우트·운영 스크립트가 부른다. DB 오류(due 조회)는 throw(크론 500) · 소포별 오류는 카운트. */
 export function runTrackingSweep(admin: Admin = createAdminClient(), opts: SweepOptions): Promise<SweepResult> {
-  return sweepTracking(trackingDb(admin), opts);
+  // 자동 전이(SAMPLE_SHIPPED → TESTING)는 양쪽 콘솔 화면에 실시간 반영 (#126 LiveRefresh — 실패해도 스윕은 계속)
+  const onCampaignChanged = opts.onCampaignChanged ?? ((campaignId: string) => notifyCampaignChanged(campaignId, "status").then(() => undefined));
+  return sweepTracking(trackingDb(admin), { ...opts, onCampaignChanged });
 }
 
 /** 조회 대상 미리보기(운영) — API 호출 없음 · 14일 경과분은 TIMEOUT 으로 닫는다 */
