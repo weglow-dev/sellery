@@ -20,8 +20,10 @@ export const load: PageServerLoad = async (event) => {
 	const catParam = event.url.searchParams.get('cat') ?? '';
 	const cat = categories.includes(catParam) ? catParam : '전체';
 
+	const free = event.url.searchParams.get('free') === '1'; // 🎁 무상 샘플 제공 필터 — 내 등급·한도로 지금 무상 요청이 가능한 상품만 (대표 결정 2026-10-08)
 	const cards = products
 		.filter((p) => cat === '전체' || p.category === cat)
+		.filter((p) => !free || p.quote?.mode === 'free')
 		.map((p) => ({
 			code: p.code,
 			name: p.name,
@@ -46,5 +48,5 @@ export const load: PageServerLoad = async (event) => {
 	const firstQuote = products.find((p) => p.quote && p.quote.mode !== 'unlisted')?.quote ?? null;
 	const quota = firstQuote ? { left: firstQuote.left, line: quotaLine(firstQuote) } : null;
 
-	return { seller, cat, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
+	return { seller, cat, free, categories, cards, total: products.length, quota, listPath: sellerPath('/products') };
 };

@@ -4,13 +4,14 @@
 	 * 카테고리 칩(전체 + 상품이 있는 카테고리 · `?cat=`) · 카테고리 안내(CAT_POLICY · CAT_INFO) · 카드(누끼/이모지 · 브랜드 · 판매가 · 수수료 · 🎁 샘플 한 줄 · 버튼).
 	 * 버튼은 서버가 만든 `sampleButton` — 무상 요청·구매·진행 중은 전부 상세(`/products/<code>`)로 간다(배송지 입력은 상세에서). 샘플 구매는 4단계 예고로 비활성.
 	 */
-	import { CAT_INFO, CAT_POLICY, GRADES } from '@sellery/core/constants';
+	import { CAT_INFO, GRADES } from '@sellery/core/constants';
 	import { discountPct, fmtNum, imageSrc } from '@sellery/db/campaign';
-	import { GradeBox, Tilt } from '@sellery/ui/site';
+	import { Tilt } from '@sellery/ui/site';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	const chips = $derived(['전체', ...data.categories]);
+	const freeHref = $derived((() => { const u = new URLSearchParams(); if (data.cat !== '전체') u.set('cat', data.cat); if (!data.free) u.set('free', '1'); const q = u.toString(); return q ? `${data.listPath}?${q}` : data.listPath; })());
 	const info = $derived(data.cat !== '전체' ? (CAT_INFO as Record<string, { en: string; desc: string; ex: string }>)[data.cat] : null);
 	const topBonus = GRADES[0]?.bonus ?? 3;
 	const pct = (r: number) => (r * 100).toFixed(0);
@@ -28,20 +29,16 @@
 		</span>
 	{/if}
 </div>
-<p class="meta" style="margin:-8px 3px 14px">브랜드가 판매가·수수료율을 공개 책정 · 무상 샘플 조건에 맞으면 [무상 샘플 요청], 아니면 샘플 구매로 진행해요.</p>
 
 <div class="cats" role="tablist" aria-label="카테고리">
 	{#each chips as c (c)}
-		<a href={c === '전체' ? data.listPath : `${data.listPath}?cat=${encodeURIComponent(c)}`} class="catchip {c === data.cat ? 'on' : ''}" role="tab" aria-selected={c === data.cat} title={CAT_INFO[c] ? `${CAT_INFO[c].desc} · ${CAT_INFO[c].ex}` : '건강·웰니스 전 카테고리'} data-sveltekit-noscroll>{c}</a>
+		<a href={c === '전체' ? (data.free ? `${data.listPath}?free=1` : data.listPath) : `${data.listPath}?cat=${encodeURIComponent(c)}${data.free ? '&free=1' : ''}`} class="catchip {c === data.cat ? 'on' : ''}" role="tab" aria-selected={c === data.cat} title={CAT_INFO[c] ? `${CAT_INFO[c].desc} · ${CAT_INFO[c].ex}` : '건강·웰니스 전 카테고리'} data-sveltekit-noscroll>{c}</a>
 	{/each}
+	<a href={freeHref} class="catchip {data.free ? 'on' : ''}" role="tab" aria-selected={data.free} title="지금 내 등급·한도로 무상 샘플을 받을 수 있는 상품만" data-sveltekit-noscroll>🎁 무상 샘플 제공</a>
 </div>
-<div class="catguide">
-	{#if info}
-		<b>{data.cat}</b> <span class="en">{info.en}</span> — {info.desc} · 예: {info.ex}
-	{:else}
-		<b>건강·웰니스 전용 갤러리</b> — {CAT_POLICY}
-	{/if}
-</div>
+{#if info}
+	<div class="catguide"><b>{data.cat}</b> <span class="en">{info.en}</span> — {info.desc} · 예: {info.ex}</div>
+{/if}
 
 <div class="console-prods">
 	{#each data.cards as p (p.code ?? p.name)}
@@ -58,7 +55,6 @@
 			</a>
 			<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
 				<span class="chip brand">{p.brand.name}</span>
-				<GradeBox grade={p.brand.grade} sm />
 				<span class="sub" style="font-size:11px;color:var(--color-mute)">{p.category}</span>
 			</div>
 			<a href={p.href} class="nm">{p.name}</a>
