@@ -5,7 +5,7 @@
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, kstToday, md } from '@sellery/db/dates';
-	import { CopyButton, GradeBox, LiveRefresh, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { CopyButton, GradeBox, LiveClock, LiveRefresh, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
 	import { invalidate } from '$app/navigation';
 	import type { PageData } from './$types';
 
@@ -14,7 +14,6 @@
 	const a = $derived(data.assets);
 	const today = kstToday();
 	const pct = $derived(a.next ? Math.min(100, Math.round((a.m3_sales / Math.max(1, a.next.min)) * 100)) : 100);
-	const now = new Date();
 	const TODO_ICON: Record<string, string> = { channel_verify: '✅', channel_pending: '⏳', bank_info: '🏦', invited: '📩', receive_sample: '📦', testing: '🧪', schedule_proposed: '📅', first_product: '🛍' };
 </script>
 
@@ -30,9 +29,22 @@
 	<GradeBox grade={seller.grade} sm />
 	<span class="cel" title="셀러리 포인트 잔액">🥬 {data.balance}</span>
 </div>
-<p class="meta" style="margin:-8px 3px 14px">
-	<PlatformHandle platform={seller.platform} handle={seller.handle} /> · 팔로워 <b>{fmtNum(seller.followers)}</b> · 등급 <b>{a.grade}</b> · {now.getMonth() + 1}월 {now.getDate()}일{#if data.todos.length}{' '}· 기다리는 할 일이 <b>{data.todos.length}건</b> 있어요.{:else if data.live.length}{' '}· 지금 판매 <b>{data.live.length}건</b>이 진행 중이에요.{:else}{' '}· 오늘은 어떤 상품을 골라볼까요?{/if}
-</p>
+<!-- 상단 요약 — 칩 한 줄 + 실시간 시계 (대표 요청 2026-10-08) -->
+<div class="home-meta">
+	<div class="home-chips">
+		<span class="hchip"><PlatformHandle platform={seller.platform} handle={seller.handle} /></span>
+		<span class="hchip"><span class="k">팔로워</span><b>{fmtNum(seller.followers)}</b></span>
+		<span class="hchip"><span class="k">등급</span><b>{a.grade}</b></span>
+		{#if data.todos.length}
+			<span class="hchip todo"><span class="k">할 일</span><b>{data.todos.length}건</b></span>
+		{:else if data.live.length}
+			<span class="hchip live"><span class="k">판매 중</span><b>{data.live.length}건</b></span>
+		{:else}
+			<span class="hchip"><span class="k">오늘</span><b>어떤 상품을 골라볼까요?</b></span>
+		{/if}
+	</div>
+	<LiveClock />
+</div>
 
 {#if seller.ref_code}
 	<!-- 추천 프로그램 배너 — 대표 결정 2026-10-08: 버튼 대신 할 일 위에 혜택을 강조해 바이럴을 유도한다 (수치는 constants REF_RATE/REF_BOOST/REF_TIMES) -->

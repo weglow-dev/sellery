@@ -95,4 +95,5 @@ export { default as CampaignStepper } from './console/CampaignStepper.svelte';
 export { default as ThreadComposer } from './console/ThreadComposer.svelte';
 // 실시간 갱신(2026-10-08 · 대표 "DM 이 실시간이 아니라 불편") — 폴링 + Realtime 브로드캐스트 · 스레드 목록(새 메시지 따라가기)
 export { default as LiveRefresh } from './console/LiveRefresh.svelte';
+export { default as LiveClock } from './console/LiveClock.svelte';
 export { default as ThreadMessages } from './console/ThreadMessages.svelte';
