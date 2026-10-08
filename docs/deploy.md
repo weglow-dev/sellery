@@ -202,6 +202,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
   - Redirect URLs (전부 있어야 한다): `https://sellery.life/**` · `https://sellery-shop.vercel.app/**` · `https://*-weglow-team.vercel.app/**`(Preview) · `http://localhost:5176/**`(shop dev).
   - 여기 없는 `redirectTo` 는 Site URL 로 떨어져 `next` 를 잃는다 — Preview 브랜치 도메인도 와일드카드로 포함시킬 것. Next 시절의 `http://localhost:3000/**` · `https://inf.sellery.life/**` 는 더 쓰지 않는다.
 - **키**: Settings → API 의 URL · anon · service_role 을 §1.2 표대로. service_role 은 서버 전용.
+- **Realtime (2026-10-08 · 콘솔 실시간 갱신)**: Project Settings → Realtime 에서 **"Allow public access"(공개 채널 허용) 이 켜져 있어야 한다**(새 프로젝트 기본값 ON — "private channels only" 로 바꾸면 구독이 `CHANNEL_ERROR` 로 끝나고 콘솔은 폴링만 쓴다 · 기능이 멈추지는 않는다). 캠페인 상세는 공개 Broadcast 채널 `campaign:<campaigns.id>` 를 anon 키로 구독하고, 서버가 쓰기 직후 `POST <url>/realtime/v1/api/broadcast`(service role · `{kind, at}` 만 · 본문 없음) 로 신호를 보낸다 — `packages/db/src/realtime.ts` 헤더. 새 환경변수·마이그레이션·RLS 는 없다(`PUBLIC_SUPABASE_URL` · `SUPABASE_SERVICE_ROLE_KEY` 그대로). 로컬 CLI(`supabase start`)는 `[realtime] enabled = true` 기본값으로 바로 된다.
 - 스키마·권한: §6.
 
 ### 5.2 카카오 개발자 앱

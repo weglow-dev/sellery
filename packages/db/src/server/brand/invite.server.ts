@@ -10,6 +10,7 @@
 import { CAMPAIGN_CODE_RE } from "../../campaign";
 import { parseInviteCandidates, parseInviteResult, type InviteCandidates, type InviteResult } from "../../brand/invite-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type { InviteCandidates, InviteCandidate, InviteResult } from "../../brand/invite-rules";
 
@@ -52,5 +53,7 @@ export async function inviteSeller(
     console.error("[brand/invite] app_brand_invite_seller failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseInviteResult(data);
+  const result = parseInviteResult(data);
+  if (result.ok) await notifyCampaignChanged(result.campaignId, "status");
+  return result;
 }

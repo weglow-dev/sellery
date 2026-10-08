@@ -11,6 +11,7 @@
 import { CAMPAIGN_CODE_RE } from "../../campaign";
 import { parseChatResult, type ChatResult } from "../../partner/chat-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type { ChatResult, ChatEvent } from "../../partner/chat-rules";
 
@@ -56,5 +57,8 @@ export async function sendCampaignChat(
     console.error("[partner/chat] app_campaign_chat failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseChatResult(data);
+  const result = parseChatResult(data);
+  // 상대 콘솔의 스레드가 바로 갱신되도록 — 실패해도 메시지는 이미 저장됐다(폴링이 받친다)
+  if (result.ok) await notifyCampaignChanged(id, "chat");
+  return result;
 }

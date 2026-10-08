@@ -7,14 +7,17 @@
 	 *         · SCHEDULE_PROPOSED → 제안 내용 + 브랜드 확인 중 + [다시 제안](같은 폼 · proposed_* 프리필) · SCHEDULE_CONFIRMED → 확정 기간 · 잠긴 가격/요율 · 판매 링크 미리보기
 	 *         · INVITED → 제안 메시지 + [수락](저장 배송지가 있으면 바로, 없으면 ShippingFields) [거절](사유) · LIVE → 판매 링크 · 나머지는 안내 문구(원문).
 	 *   실패한 제출은 `form`(fail 400 · kind 별)으로 값 유지 · 필드 강조.
+	 *   실시간(2026-10-08): `LiveRefresh`(폴링 10초 + Realtime `campaign:<id>` 브로드캐스트 → `invalidate('campaign:<code>')`) — 브랜드의 답글·승인·발송·일정 확정이 새로고침 없이 반영된다. 스레드는 `ThreadMessages`(두 콘솔 공용).
 	 */
 	import { sampleRefundReadyLine, sampleShipDeadlineLine } from '@sellery/db/partner/sample-rules';
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, md } from '@sellery/db/dates';
-	import { LEAK_WARNING, isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
 	import { ENDED_STATUSES, payLine, samplePaidLine } from '@sellery/db/partner/sample-rules';
 	import { DECLINE_REASON_MAX, endOfPeriod, PERIOD_LEN_CHOICES } from '@sellery/db/partner/schedule-rules';
-	import { CampaignStepper, CopyButton, PlatformHandle, ProductIcon, ShippingFields, StatusChip, ThreadComposer } from '@sellery/ui/site';
+	import { campaignTopic } from '@sellery/db/realtime';
+	import { CampaignStepper, CopyButton, LiveRefresh, PlatformHandle, ProductIcon, ShippingFields, StatusChip, ThreadComposer, ThreadMessages } from '@sellery/ui/site';
+	import { enhance } from '$app/forms';
+	import { invalidate } from '$app/navigation';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -24,7 +27,6 @@
 	const ctx = $derived(data.schedule);
 	const pct = (r: number) => (r * 100).toFixed(0);
 	const dday = (iso: string) => daysBetween(data.today, iso);
-	const who = (sender: string) => senderLabel(sender, { seller: data.seller.name, brand: c.brand.name });
 	const ended = $derived((ENDED_STATUSES as readonly string[]).includes(c.status));
 	/** "샘플 결제 ₩75,650 (🥬 3 + ₩15,650)" — 구매 캠페인만 (4단계 · sample-rules samplePaidLine) */
 	const paidLine = $derived(samplePaidLine(c));
@@ -58,6 +60,8 @@
 	<title>{p.name} 캠페인 — 셀러리 파트너</title>
 </svelte:head>
 
+<LiveRefresh refresh={() => invalidate(`campaign:${c.code}`)} topic={campaignTopic(c.id)} intervalMs={10_000} />
+
 <a href={data.listPath} class="btn ghost sm" style="margin:0 3px 12px">← 목록으로</a>
 
 {#if data.msg}
@@ -82,29 +86,8 @@
 
 <div class="console-det-body">
 	<section class="card static console-thread" aria-label="캠페인 스레드" id="thread">
-		<div class="msgs">
-			{#each data.events as e (e.id)}
-				{#if e.kind === 'system'}
-					{#if e.event_type === 'leak_warned'}
-						<div class="warnline">⚠ {e.body || LEAK_WARNING}</div>
-					{:else}
-						<div class="sysline">{e.body} · {md(e.created_at)}</div>
-					{/if}
-				{:else}
-					<div class="msg {e.sender}" class:leak={e.leak_flag}>
-						<div class="who">
-							{who(e.sender)}
-							{#if isOfficialSender(e.sender)}<span class="official" title="셀러리 관리자 공식 발신">✓ 셀러리 인증</span>{/if}
-						</div>
-						{e.body}
-						<div class="tm">{md(e.created_at)}</div>
-					</div>
-				{/if}
-			{:else}
-				<div class="sysline">대화가 없습니다</div>
-			{/each}
-		</div>
-		<ThreadComposer action="?/chat" disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드에게 메시지… (일정·수락은 오른쪽 카드의 버튼으로)" />
+		<ThreadMessages events={data.events} names={{ seller: data.seller.name, brand: c.brand.name }} />
+		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드에게 메시지… (일정·수락은 오른쪽 카드의 버튼으로)" />
 	</section>
 
 	<div class="console-actions">

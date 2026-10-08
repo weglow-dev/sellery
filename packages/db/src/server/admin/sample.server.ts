@@ -8,6 +8,7 @@
  * 운영 스크립트가 순서를 지킨다. 화면은 대상을 보여주고 그 사실을 안내한다.
  */
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 import {
   parseSampleRefundDue,
   parseSampleSettleResult,
@@ -64,5 +65,7 @@ export async function settleSampleAsAdmin(
     console.error("[admin/sample] app_admin_settle_sample 실패:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseSampleSettleResult(data);
+  const result = parseSampleSettleResult(data);
+  if (result.ok) await notifyCampaignChanged(id, "settle");
+  return result;
 }

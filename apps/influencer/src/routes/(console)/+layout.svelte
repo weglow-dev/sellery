@@ -8,10 +8,13 @@
 	import '../../app.css';
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
-	import { PartnerShell } from '@sellery/ui/site';
+	import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
+	import { PartnerShell, setSiteEnv } from '@sellery/ui/site';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
+	// 콘솔 화면의 실시간 갱신(LiveRefresh — Realtime 공개 채널 구독)이 브라우저에서 쓰는 Supabase 공개값 — shop 레이아웃과 같은 컨텍스트
+	setSiteEnv({ supabaseUrl: PUBLIC_SUPABASE_URL, supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY });
 </script>
 
 <PartnerShell role="seller" me={data.me} pathname={page.url.pathname}>

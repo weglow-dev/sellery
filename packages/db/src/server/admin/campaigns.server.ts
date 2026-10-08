@@ -18,6 +18,7 @@
  * 쓰기는 모두 **ref(code) → id 를 서버에서 먼저 해석**한 뒤 id 로 처리한다(파트너 관리 공통 규칙).
  */
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 import { parseSettlePreview, type SettlePreview } from "../../admin/settle-rules";
 import { normalizeRejectReason } from "../../admin/campaign-rules";
 import { CHAT_MAX, parseChatInput } from "../../partner/chat-rules";
@@ -247,7 +248,10 @@ async function callBrandRpc(
   }
   const r = parseBrandRpc(data);
   // 이미 처리된 건(already)에는 남기지 않는다 — 누른 사람만 늘어난다
-  if (r.ok && !r.already) await logProxyAction(admin, t.id, actorUserId, logged);
+  if (r.ok && !r.already) {
+    await logProxyAction(admin, t.id, actorUserId, logged);
+    await notifyCampaignChanged(t.id, "status");
+  }
   return r;
 }
 
@@ -348,7 +352,9 @@ async function callAdminCampaignRpc(
     console.error(`[admin/campaigns] ${label} 실패:`, error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseBrandRpc(data);
+  const r = parseBrandRpc(data);
+  if (r.ok && !r.already) await notifyCampaignChanged(t.id, "status");
+  return r;
 }
 
 /**
@@ -419,5 +425,6 @@ export async function postAdminChat(
     return { ok: false, code: "DB_ERROR" };
   }
   const o = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : null;
+  await notifyCampaignChanged(t.id, "chat");
   return { ok: true, leak: o?.leak_flag === true };
 }

@@ -5,7 +5,8 @@
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, kstToday, md } from '@sellery/db/dates';
-	import { CopyButton, GradeBox, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { CopyButton, GradeBox, LiveRefresh, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { invalidate } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -20,6 +21,9 @@
 <svelte:head>
 	<title>홈 — 셀러리 파트너</title>
 </svelte:head>
+
+<!-- 할 일(승인 · 발송 · 일정 확정)은 브랜드 쪽 행동으로 생긴다 — 탭이 보이는 동안 20초마다 다시 읽는다 -->
+<LiveRefresh refresh={() => invalidate('console:home')} intervalMs={20_000} />
 
 <div class="console-head">
 	<h2>{seller.name} 님, 반가워요.</h2>

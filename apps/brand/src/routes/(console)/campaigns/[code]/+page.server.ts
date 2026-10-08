@@ -22,6 +22,8 @@ export type CampaignMessage = { tone: 'ok' | 'danger' | 'info'; text: string };
 
 export const load: PageServerLoad = async (event) => {
 	const code = event.params.code;
+	// 실시간 갱신(LiveRefresh) 이 `invalidate('campaign:<code>')` 로 이 load 만 다시 돌린다 — 레이아웃 load 는 건드리지 않는다
+	event.depends(`campaign:${code}`);
 	const r = await requireBrand(event, { next: `/campaigns/${encodeURIComponent(code)}` });
 	if (!r.ok) redirect(303, r.location);
 	const { brand } = r.ctx;

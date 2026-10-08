@@ -30,6 +30,7 @@ import {
   type SettleRunResult,
 } from "../../admin/settle-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 import { dbConfig } from "../config.server";
 
 export type {
@@ -103,7 +104,9 @@ export async function runSettlement(
     console.error("[admin/settle] app_admin_settle_run_v2 failed:", error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseSettleRunResult(data);
+  const result = parseSettleRunResult(data);
+  if (result.ok) await notifyCampaignChanged(id, "settle");
+  return result;
 }
 
 export type SettleCancelResult =
@@ -150,6 +153,7 @@ export async function cancelSettlement(
     };
   }
   const d = o.deleted && typeof o.deleted === "object" ? (o.deleted as Record<string, unknown>) : {};
+  await notifyCampaignChanged(id, "settle");
   return {
     ok: true,
     campaignCode: typeof o.campaign_code === "string" ? o.campaign_code : campaignRef,

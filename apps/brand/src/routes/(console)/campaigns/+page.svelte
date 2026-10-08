@@ -6,7 +6,8 @@
 	 */
 	import { fmtNum } from '@sellery/db/campaign';
 	import { daysBetween, kstToday, md } from '@sellery/db/dates';
-	import { PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { LiveRefresh, PlatformHandle, ProductIcon, StatusChip } from '@sellery/ui/site';
+	import { invalidate } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -19,6 +20,8 @@
 <svelte:head>
 	<title>캠페인 — 셀러리 파트너</title>
 </svelte:head>
+
+<LiveRefresh refresh={() => invalidate('console:campaigns')} intervalMs={20_000} />
 
 <div class="console-head">
 	<h2>내 캠페인</h2>

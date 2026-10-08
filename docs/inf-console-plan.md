@@ -513,6 +513,8 @@ URL 은 inf 호스트 기준(접두 없음). 내부 경로는 `/influencer` + UR
 | `/my` | `vMy`(프로필 · 채널 목록 3칩 인증됨/인증 대기/미인증 · 추천 코드) · `channelModal` · `verifyModal`(코드 + 방법 1 bio / 방법 2 DM) | `sellers` · `seller_channels`(`verified`·`vcode`·`vcode_confirmed_at`) · `ref_code` | `addChannel`/`saveChannel`(핸들·플랫폼 변경 시 `verified=false, vcode=null, vcode_confirmed_at=null`) · `issueVerifyCode`(`SLRY-XXXX` 저장만) · `confirmVerify`(`vcode_confirmed_at=now()` 만 — verified 는 운영자, §4.7) · `setPrimaryCh`(verified 채널만 · `sellers.platform/handle/followers` 동기화) · `deleteChannel`(primary 불가) · `saveSampleAddress` | 3 |
 | (하단 탭) | `js/10-render.js:SCREENS.seller` 9탭 → 5탭: 홈 · 상품 · 캠페인 · 매출 · 내 정보(정산 포함) | — | — | 1 |
 
+**실시간 갱신(2026-10-08 · 대표 "DM 이 실시간이 아니라 불편")**: `/campaigns/[code]` 는 `LiveRefresh`(@sellery/ui/site) — 보이는 동안 10초 폴링 + Supabase Realtime 공개 Broadcast `campaign:<id>` 구독 → `invalidate('campaign:<code>')` 로 이 page load 만 재실행(브랜드 답글·승인·발송·일정 확정이 새로고침 없이 반영 · 스레드는 `ThreadMessages` 가 새 행을 따라 내려가거나 "새 메시지 ↓" 알림). `/home` `/campaigns` 는 20초 폴링. 발신은 서버 `notifyCampaignChanged()`(`@sellery/db/server/realtime` · 쓰기마다 1회 · 본문 없음). 대시보드 설정은 `docs/deploy.md §5.1` Realtime.
+
 1차에서 뺀 프로토타입 화면(**괄호 안은 2026-10-07 현재**): DM(`vDM` — 캠페인 스레드로 대체 ✅ · 익명 스카우트는 0035→0036→0016 로 완결), 랭킹(`vRank` → `/ranking` **0026**), 셀러리 샵(`vShop` → `/shop` **0037·0039** · 충전만 미도입), 추천 프로그램(`vRef` → `/referral` **0026**), 판매 캘린더(`calHtml` — 미구현). 일정 제안(`scheduleModal`)은 브랜드 3단계 짝 PR-B 에서 `/campaigns/[code]` 인라인 폼으로 들어갔다(2026-09-21).
 
 ---

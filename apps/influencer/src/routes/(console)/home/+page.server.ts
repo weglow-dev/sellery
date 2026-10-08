@@ -10,6 +10,7 @@ import { getHomeWidgets, requireSeller, sellerPath } from '$lib/server/partner';
  * 2단계의 "지금 할 일" 3장(채널 인증 · 계좌 등록 · 첫 상품)은 위젯의 todo kind(channel_verify · bank_info · first_product)로 흡수됐다.
  */
 export const load: PageServerLoad = async (event) => {
+	event.depends('console:home'); // LiveRefresh 폴링(20초) 이 이 load 만 다시 돌린다 — 할 일·진행 중 판매
 	const r = await requireSeller(event, { next: '/home' });
 	if (!r.ok) redirect(303, r.location);
 	const { seller, balance } = r.ctx;

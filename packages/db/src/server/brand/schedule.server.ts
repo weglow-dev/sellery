@@ -11,6 +11,7 @@
 import { CAMPAIGN_CODE_RE } from "../../campaign";
 import { parseScheduleActionResult, type ScheduleActionResult } from "../../brand/campaign-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { notifyCampaignChanged } from "../realtime.server";
 
 export type { ScheduleActionResult } from "../../brand/campaign-rules";
 
@@ -36,7 +37,9 @@ async function call(admin: Admin, fn: Fn, brandId: string, code: string, extra: 
     console.error(`[brand/schedule] ${fn} failed:`, error.message);
     return { ok: false, code: "DB_ERROR" };
   }
-  return parseScheduleActionResult(data);
+  const result = parseScheduleActionResult(data);
+  if (result.ok && !result.already) await notifyCampaignChanged(id, "status");
+  return result;
 }
 
 /** 일정 승인 — 성공 시 start · end · qty · priceLocked · rateLocked 가 채워진다. */

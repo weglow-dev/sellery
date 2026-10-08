@@ -93,3 +93,6 @@ export { default as ShippingFields } from './console/ShippingFields.svelte';
 export { default as CampaignStepper } from './console/CampaignStepper.svelte';
 // 콘솔 3단계 짝 · 브랜드 콘솔 3단계 (docs/brand-console-plan.md §5 `?/chat` — 두 콘솔 공용 스레드 답글 폼)
 export { default as ThreadComposer } from './console/ThreadComposer.svelte';
+// 실시간 갱신(2026-10-08 · 대표 "DM 이 실시간이 아니라 불편") — 폴링 + Realtime 브로드캐스트 · 스레드 목록(새 메시지 따라가기)
+export { default as LiveRefresh } from './console/LiveRefresh.svelte';
+export { default as ThreadMessages } from './console/ThreadMessages.svelte';
