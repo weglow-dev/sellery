@@ -135,7 +135,9 @@
 					<td data-l="상태">
 						<StatusChip tone={o.chip.tone}>{o.chip.label}</StatusChip>
 						{#if o.state === 'refunded'}<small>{o.refunded_at ? md(o.refunded_at) : ''}{o.refund_actor ? ` · ${o.refund_actor === 'brand' ? '브랜드' : o.refund_actor === 'customer' ? '고객 신청' : '운영팀'}` : ''}{o.refund_reason ? ` · ${o.refund_reason}` : ''}</small>
+						{:else if o.state === 'shipped' && o.delivered_at}<small>배송 완료 {md(o.delivered_at)}</small>
 						{:else if o.state === 'shipped' && o.shipped_at}<small>{md(o.shipped_at)} 발송</small>{/if}
+						{#if o.state === 'shipped' && o.trackingLine && !o.delivered_at}<small>{o.trackingLine}</small>{/if}
 					</td>
 					<td data-l="운송장" class="console-orders-ship">
 						{#if o.state === 'refunded'}

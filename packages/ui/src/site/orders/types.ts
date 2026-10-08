@@ -17,6 +17,11 @@ export type OrderView = {
 	courier: string | null;
 	tracking_no: string | null;
 	shipped_at: string | null;
+	/** 0049 택배 자동 추적 — 배송 완료 시각 · 마지막 스냅샷 (ShipInfo 가 한 줄로 그린다) */
+	delivered_at: string | null;
+	tracking_status: string | null;
+	tracking_last: unknown;
+	tracking_checked_at: string | null;
 	paid_at: string;
 	refunded_at: string | null;
 	refund_amount: number | null;

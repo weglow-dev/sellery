@@ -25,6 +25,7 @@ export * from '@sellery/db/server/campaign-tick';
 export * from '@sellery/db/server/campaign-alerts';
 export * from '@sellery/db/server/follows';
 export * from '@sellery/db/server/grade-tick';
+export * from '@sellery/db/server/tracking'; // 0049 택배 자동 추적 — /api/cron/tracking
 export { createSellerFromSignup, linkSellerIdOf } from '@sellery/db/server/partner/signup';
 // 고객 문의 접수 · 추가 문의 레이트리밋(IP · 회원) — 파트너 콘솔과 같은 메모리 버킷 (docs/brand-console-plan.md §8 "CS 접수 레이트리밋")
 export { rateLimit, RATE_LIMIT_MESSAGE } from '@sellery/db/server/partner/seller';

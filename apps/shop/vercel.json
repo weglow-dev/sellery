@@ -53,6 +53,10 @@
     {
       "path": "/api/cron/grade-tick",
       "schedule": "5 0 1 * *"
+    },
+    {
+      "path": "/api/cron/tracking",
+      "schedule": "20 * * * *"
     }
   ]
 }

@@ -24,6 +24,7 @@ import {
 import { sellerNextAction, type SellerNextAction } from "../../partner/schedule-rules";
 import { createAdminClient, type Admin } from "../admin.server";
 import { notifyCampaignChanged } from "../realtime.server";
+import { parseTrackingFields, type TrackingFields } from "../../tracking/sweettracker";
 
 export type SellerCampaign = {
   id: string;
@@ -44,6 +45,9 @@ export type SellerCampaign = {
   /** 샘플 발송 택배사 (0015) — trackingUrlOf(sample_courier, tracking_no) 조회 링크 */
   sample_courier: string | null;
   tracking_no: string | null;
+  /** 0049 택배 자동 추적 — 배송 완료 시각 · 마지막 스냅샷(trackingStatusLine) · 조회 전이면 null */
+  sample_delivered_at: string | null;
+  tracking: TrackingFields | null;
   received_at: string | null;
   test_due: string | null;
   proposed_start: string | null;
@@ -94,7 +98,7 @@ export type SellerCampaignDetail = {
 
 const CAMPAIGN_SELECT =
   "id,code,status,created_at,invited,auto_proposed,regongu,purchased,sample_price,sample_cel,sample_cash,sample_method," +
-  "sample_courier,tracking_no,received_at,test_due,proposed_start,proposed_end,proposed_qty,start_date,end_date,qty,sold_qty,price_locked,rate_locked,decision_reason,settled_at,sample_shipping," +
+  "sample_courier,tracking_no,sample_delivered_at,tracking_status,tracking_last,tracking_checked_at,received_at,test_due,proposed_start,proposed_end,proposed_qty,start_date,end_date,qty,sold_qty,price_locked,rate_locked,decision_reason,settled_at,sample_shipping," +
   "product:products!campaigns_product_id_fkey(id,code,name,emoji,thumb_url,category,sale_price,consumer_price,commission_rate,sample_text)," +
   "brand:brands!campaigns_brand_id_fkey(id,code,name,logo_url)";
 
@@ -113,6 +117,10 @@ type RawCampaign = {
   sample_method: string | null;
   sample_courier: string | null;
   tracking_no: string | null;
+  sample_delivered_at?: string | null;
+  tracking_status?: string | null;
+  tracking_last?: unknown;
+  tracking_checked_at?: string | null;
   received_at: string | null;
   test_due: string | null;
   proposed_start: string | null;
@@ -161,6 +169,8 @@ function toCampaign(r: RawCampaign): SellerCampaign | null {
     sample_method: r.sample_method,
     sample_courier: r.sample_courier ?? null,
     tracking_no: r.tracking_no,
+    sample_delivered_at: r.sample_delivered_at ?? null,
+    tracking: r.tracking_no ? parseTrackingFields(r as unknown as Record<string, unknown>, "sample_delivered_at") : null,
     received_at: r.received_at,
     test_due: r.test_due,
     proposed_start: r.proposed_start,

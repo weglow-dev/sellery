@@ -55,6 +55,9 @@ export const load: PageServerLoad = async (event) => {
 		today: kstToday(),
 		paidLine: samplePaidLine(c),
 		trackingUrl: trackingUrlOf(c.sample_courier, c.tracking_no),
+		/** 0049 샘플 송장 자동 추적 스냅샷 · 자동 수령 전이 여부(sample_received{auto:true}) */
+		tracking: found.tracking ?? null,
+		autoReceived: events.some((e) => e.event_type === 'sample_received' && !!e.payload && typeof e.payload === 'object' && (e.payload as { auto?: unknown }).auto === true),
 		storeUrl: `${SITE_URL}${storePath}`,
 		storeDisplay: `${SITE_URL.replace(/^https?:\/\//, '')}${storePath}`,
 		settleDue: c.end_date ? addDays(c.end_date, CLEAR_DAYS) : null,

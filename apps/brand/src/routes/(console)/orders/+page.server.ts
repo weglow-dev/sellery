@@ -18,8 +18,10 @@ import {
 } from '@sellery/db/brand/order-rules';
 import { trackingUrlOf } from '@sellery/db/carriers';
 import { REFUND_REASONS } from '@sellery/db/order-status';
-import { RATE_LIMIT_MESSAGE, brandPath, listBrandCampaigns, listBrandOrders, rateLimit, requireBrand, shipOrder, shipOrdersBulk } from '$lib/server/brand';
+import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
+import { RATE_LIMIT_MESSAGE, brandPath, fetchOrdersTracking, listBrandCampaigns, listBrandOrders, rateLimit, requireBrand, shipOrder, shipOrdersBulk } from '$lib/server/brand';
 import { refundOrderAsBrand } from '$lib/server/payments';
+import { createAdminClient } from '$lib/server/db';
 
 /**
  * `/orders` — 주문 · 발주 · 운송장 4단계 (docs/brand-console-plan.md §5 `/brand/orders` · §6 행 4 PR-B · 프로토타입 데모 demo-orders/+page.svelte + actions.ts saveTrackOne / applyTrackCSV / trackCSVTemplate / poCSV / refund).
@@ -43,6 +45,8 @@ export const load: PageServerLoad = async (event) => {
 	const campaign = (event.url.searchParams.get('campaign') ?? '').trim() || null;
 
 	const [list, campaigns] = await Promise.all([listBrandOrders(brand.id, filter, campaign), listBrandCampaigns(brand.id)]);
+	// 0049 택배 자동 추적 — 발송된 주문의 배송 완료·마지막 스냅샷(app_brand_orders 는 이 컬럼을 모른다 · 실시간 호출 없음)
+	const tracking = await fetchOrdersTracking(createAdminClient(), list.rows.filter((o) => o.tracking_no).map((o) => o.code));
 
 	const key = event.url.searchParams.get('msg') ?? '';
 	const doneCode = (event.url.searchParams.get('code') ?? '').toUpperCase();
@@ -97,6 +101,8 @@ export const load: PageServerLoad = async (event) => {
 				courier: o.courier,
 				tracking_no: o.tracking_no,
 				shipped_at: o.shipped_at,
+				delivered_at: tracking.get(o.code)?.delivered_at ?? null,
+				trackingLine: trackingStatusLine(tracking.get(o.code)),
 				trackingUrl: trackingUrlOf(o.courier, o.tracking_no),
 				paid_at: o.paid_at,
 				payment_method: o.payment_method,
