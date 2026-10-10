@@ -24,7 +24,9 @@
 		value = '',
 		error = null,
 		placeholder = '메시지 입력… (승인·일정은 액션 카드의 버튼으로)',
-		enhance = plainPost
+		enhance = plainPost,
+		oninput,
+		onsent
 	}: {
 		/** form action — 기본 `?/chat` */
 		action?: string;
@@ -39,6 +41,10 @@
 		placeholder?: string;
 		/** `import { enhance } from '$app/forms'` 를 그대로 — 없으면 평범한 POST(전체 새로고침) */
 		enhance?: EnhanceAction;
+		/** 글자가 바뀔 때 — ThreadTyping.typed() ("입력 중" 신호) */
+		oninput?: () => void;
+		/** 전송 성공 직후 — ThreadTyping.sent() */
+		onsent?: () => void;
 	} = $props();
 
 	let busy = $state(false);
@@ -65,6 +71,7 @@
 				if (result.type === 'redirect' || result.type === 'success') {
 					const ta = formElement.elements.namedItem('body');
 					if (ta instanceof HTMLTextAreaElement) ta.value = '';
+					onsent?.();
 				}
 				await update();
 			};
@@ -73,7 +80,7 @@
 		<!-- "인플루언서로 발신" 라벨은 화면에서 뺌(대표 QA 2026-10-08) — 스크린리더용으로만 유지 -->
 		<label class="sr-only" for="thread-body">{as}로 발신</label>
 		<div class="row">
-			<textarea id="thread-body" name="body" rows="2" maxlength={max} {placeholder} required aria-invalid={error ? true : undefined} onkeydown={onKeydown}>{value}</textarea>
+			<textarea id="thread-body" name="body" rows="2" maxlength={max} {placeholder} required aria-invalid={error ? true : undefined} onkeydown={onKeydown} oninput={() => oninput?.()}>{value}</textarea>
 			<button type="submit" class="pri sm" disabled={busy}>{busy ? '전송 중…' : '전송'}</button>
 		</div>
 		{#if error}<div class="console-err" role="alert">{error}</div>{/if}

@@ -97,3 +97,4 @@ export { default as ThreadComposer } from './console/ThreadComposer.svelte';
 export { default as LiveRefresh } from './console/LiveRefresh.svelte';
 export { default as LiveClock } from './console/LiveClock.svelte';
 export { default as ThreadMessages } from './console/ThreadMessages.svelte';
+export { default as ThreadTyping } from './console/ThreadTyping.svelte';

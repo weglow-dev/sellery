@@ -49,3 +49,29 @@ export function broadcastMessages(campaignIds: readonly string[], kind: Campaign
   }
   return messages;
 }
+
+/* ---------- 스레드 "입력 중" (대표 요청 2026-10-10) ----------
+ * 같은 캠페인의 **별도 공개 채널** `campaign:<id>:typing` · 이벤트 `typing` · 브라우저 ↔ 브라우저 순간 신호 — 서버 발신 없음 · DB 에 남지 않음 · 새로고침하면 사라진다.
+ * 보내는 쪽은 TYPING_EVERY_MS 마다 한 번만, 받는 쪽은 TYPING_TTL_MS 안에 다음 신호가 없으면 끈다. 전송을 누르면 `stop` 으로 즉시 끈다.
+ * 페이로드에 본문은 싣지 않는다(누가 치고 있다는 사실뿐). 구독·발신 둘 다 `packages/ui/src/site/console/ThreadTyping.svelte`. */
+export const TYPING_EVENT = "typing";
+export const TYPING_EVERY_MS = 2_000;
+export const TYPING_TTL_MS = 3_500;
+export type ThreadSender = "seller" | "brand";
+export type TypingPayload = { sender: ThreadSender; stop: boolean; at: string };
+
+/** `campaign:<id>:typing` — id 가 uuid 가 아니면 null. */
+export function typingTopic(campaignId: string | null | undefined): string | null {
+  const t = campaignTopic(campaignId);
+  return t ? `${t}:typing` : null;
+}
+
+export function typingPayload(sender: ThreadSender, stop = false, at: Date = new Date()): TypingPayload {
+  return { sender, stop, at: at.toISOString() };
+}
+
+export function parseTypingPayload(json: unknown): TypingPayload | null {
+  const o = json && typeof json === "object" && !Array.isArray(json) ? (json as Record<string, unknown>) : null;
+  if (!o || (o.sender !== "seller" && o.sender !== "brand") || typeof o.at !== "string") return null;
+  return { sender: o.sender, stop: o.stop === true, at: o.at };
+}
