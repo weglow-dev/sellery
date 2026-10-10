@@ -15,8 +15,8 @@
 	import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
 	import { ENDED_STATUSES, payLine, samplePaidLine } from '@sellery/db/partner/sample-rules';
 	import { DECLINE_REASON_MAX, endOfPeriod, PERIOD_LEN_CHOICES } from '@sellery/db/partner/schedule-rules';
-	import { campaignTopic } from '@sellery/db/realtime';
-	import { CampaignStepper, CopyButton, LiveRefresh, PlatformHandle, ProductIcon, ShippingFields, StatusChip, ThreadComposer, ThreadMessages } from '@sellery/ui/site';
+	import { campaignTopic, typingTopic } from '@sellery/db/realtime';
+	import { CampaignStepper, CopyButton, LiveRefresh, PlatformHandle, ProductIcon, ShippingFields, StatusChip, ThreadComposer, ThreadMessages, ThreadTyping } from '@sellery/ui/site';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { ActionData, PageData } from './$types';
@@ -51,6 +51,9 @@
 	const endDate = $derived(start && start.length === 10 ? endOfPeriod(start, len) : '');
 	/** 내가 고른 기간과 겹치는 우선권 기간 — 폼 위 안내 (판정은 DB) */
 	const clash = $derived(endDate ? data.priorityHolders.filter((h) => !(endDate < h.start || start > h.end)) : []);
+	/** 스레드 "입력 중" — 송신 핸들(bind:this) · 브랜드가 치는 중인가(bind:active) */
+	let typingCtl = $state<ReturnType<typeof ThreadTyping> | null>(null);
+	let brandTyping = $state(false);
 	// 기본은 접힘(대표 결정 2026-10-08) — 제안 제출이 실패해 오류를 보여줘야 할 때만 펼친다.
 	// 사용자가 연 상태는 로컬 $state 로 들고 있어 LiveRefresh 폴링(10초)으로 데이터가 갱신돼도 다시 접히지 않는다.
 	let schedOpen = $state(!!pf);
@@ -93,8 +96,9 @@
 
 <div class="console-det-body">
 	<section class="card static console-thread" aria-label="캠페인 스레드" id="thread">
-		<ThreadMessages events={data.events} names={{ seller: data.seller.name, brand: c.brand.name }} />
-		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드사 담당자에게 메시지를 보내보세요." />
+		<ThreadTyping bind:this={typingCtl} bind:active={brandTyping} topic={typingTopic(c.id)} me="seller" />
+		<ThreadMessages events={data.events} names={{ seller: data.seller.name, brand: c.brand.name }} typing={brandTyping} typingAs="brand" />
+		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="인플루언서" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="브랜드사 담당자에게 메시지를 보내보세요." oninput={() => typingCtl?.typed()} onsent={() => typingCtl?.sent()} />
 	</section>
 
 	<div class="console-actions">
