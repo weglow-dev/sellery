@@ -286,6 +286,9 @@
     display: flex;
     gap: 8px;
     padding: 16px 24px 0;
+    /* body 가 세로 flex 라 margin:auto 만 있으면 내용 폭(탭+persona ≈ 600px)으로 줄어들어 모바일에서 페이지가 옆으로 밀렸다 (대표 QA 2026-10-11) — 폭을 고정하고 안에서 가로 스크롤 */
+    width: 100%;
+    box-sizing: border-box;
     max-width: 1200px;
     margin: 0 auto;
     flex-wrap: wrap;
