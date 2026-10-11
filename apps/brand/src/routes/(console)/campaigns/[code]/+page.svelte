@@ -12,8 +12,8 @@
 	import { daysBetween, md } from '@sellery/db/dates';
 	import { trackingStatusLine } from '@sellery/db/tracking/sweettracker';
 	import { COURIERS, ENDED_STATUSES, periodLine, REJECT_REASON_MAX } from '@sellery/db/brand/campaign-rules';
-	import { campaignTopic } from '@sellery/db/realtime';
-	import { CampaignStepper, CopyButton, GradeBox, LiveRefresh, PlatformHandle, ProductIcon, SellerAvatar, StatusChip, ThreadComposer, ThreadMessages } from '@sellery/ui/site';
+	import { campaignTopic, typingTopic } from '@sellery/db/realtime';
+	import { CampaignStepper, CopyButton, GradeBox, LiveRefresh, PlatformHandle, ProductIcon, SellerAvatar, StatusChip, ThreadComposer, ThreadMessages, ThreadTyping } from '@sellery/ui/site';
 	import { enhance } from '$app/forms';
 	import { invalidate } from '$app/navigation';
 	import type { ActionData, PageData } from './$types';
@@ -33,6 +33,9 @@
 	const inv = (k: string) => (form?.kind === 'ship' && form.field === k ? 'invalid' : '');
 	const proposedLen = $derived(c.proposed_start && c.proposed_end ? daysBetween(c.proposed_start, c.proposed_end) + 1 : NaN);
 	const stockShort = $derived((c.proposed_qty ?? 0) > c.stock_left);
+	/** 스레드 "입력 중" — 송신 핸들(bind:this) · 인플루언서가 치는 중인가(bind:active) */
+	let typingCtl = $state<ReturnType<typeof ThreadTyping> | null>(null);
+	let sellerTyping = $state(false);
 	const confirmSchedule = (e: SubmitEvent) => {
 		if (!confirm(`${periodLine(c.proposed_start, c.proposed_end, c.proposed_qty)} 으로 판매를 확정할까요? 확정하면 판매가 ₩${fmtNum(p.sale_price)} · 수수료 ${pct(p.commission_rate)}% 가 잠기고 시작일에 판매 링크가 열려요.`)) e.preventDefault();
 	};
@@ -68,8 +71,9 @@
 
 <div class="console-det-body">
 	<section class="card static console-thread" aria-label="캠페인 스레드" id="thread">
-		<ThreadMessages events={data.events} names={{ seller: s.name, brand: data.brand.name }} />
-		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="브랜드" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="인플루언서에게 메시지를 보내보세요." />
+		<ThreadTyping bind:this={typingCtl} bind:active={sellerTyping} topic={typingTopic(c.id)} me="brand" />
+		<ThreadMessages events={data.events} names={{ seller: s.name, brand: data.brand.name }} typing={sellerTyping} typingAs="seller" />
+		<ThreadComposer action="?/chat" {enhance} disabled={ended} as="브랜드" value={f('chat')?.values.body ?? ''} error={f('chat')?.message ?? null} placeholder="인플루언서에게 메시지를 보내보세요." oninput={() => typingCtl?.typed()} onsent={() => typingCtl?.sent()} />
 	</section>
 
 	<div class="console-actions">
@@ -79,11 +83,16 @@
 				<p class="hint"><PlatformHandle platform={s.platform} handle={s.handle} /> {s.name} · 팔로워 {fmtNum(s.followers)} · 등급 {s.grade ?? '스타터'}. 승인 시 배송지가 브랜드에 전달됩니다.</p>
 				<div class="btnrow">
 					<form method="post" action="?/approve"><button type="submit" class="pri">승인</button></form>
-					<details class="console-reject">
-						<summary class="btn danger">거절</summary>
+				</div>
+				<!-- 거절은 점선으로 구분한 "다른 선택" 아코디언 — 인플루언서 쪽 '진행하지 않을게요' 와 같은 틀 (대표 QA 2026-10-10) -->
+				<div class="console-alt">
+					<div class="lbl-sm">다른 선택</div>
+					<details class="console-reject accordion">
+						<summary class="acc-head"><span class="acc-title">거절</span><span class="acc-sub">사유를 적어 보내요</span><span class="acc-chev">▾</span></summary>
 						<form method="post" action="?/reject" class="console-form console-reject-form">
-							<textarea name="reason" rows="2" maxlength={REJECT_REASON_MAX} placeholder="거절 사유 (선택 · 인플루언서에게 전달돼요 · {REJECT_REASON_MAX}자 이내)">{f('reject')?.values?.reason ?? ''}</textarea>
-							<button type="submit" class="danger sm">거절 확정</button>
+							<label class="lbl-sm" for="reject-reason">거절 사유 <small>(선택 · 인플루언서에게 전달돼요 · {REJECT_REASON_MAX}자 이내)</small></label>
+							<textarea id="reject-reason" name="reason" rows="3" maxlength={REJECT_REASON_MAX} placeholder="예: 이번 달 샘플 재고가 소진됐어요">{f('reject')?.values?.reason ?? ''}</textarea>
+							<button type="submit" class="danger">거절 확정</button>
 						</form>
 					</details>
 				</div>
@@ -168,11 +177,15 @@
 				</p>
 				<div class="btnrow">
 					<form method="post" action="?/confirm" onsubmit={confirmSchedule}><button type="submit" class="pri">일정 확정</button></form>
-					<details class="console-reject">
-						<summary class="btn danger">반려 (재제안 요청)</summary>
+				</div>
+				<div class="console-alt">
+					<div class="lbl-sm">다른 선택</div>
+					<details class="console-reject accordion">
+						<summary class="acc-head"><span class="acc-title">반려 — 재제안 요청</span><span class="acc-sub">사유를 적어 보내요</span><span class="acc-chev">▾</span></summary>
 						<form method="post" action="?/rejectSchedule" class="console-form console-reject-form">
-							<textarea name="reason" rows="2" maxlength={REJECT_REASON_MAX} placeholder="반려 사유 (선택 · 인플루언서에게 전달돼요 · 예: 추석 연휴와 겹쳐요 · {REJECT_REASON_MAX}자 이내)"></textarea>
-							<button type="submit" class="danger sm">반려 확정</button>
+							<label class="lbl-sm" for="reject-sched-reason">반려 사유 <small>(선택 · 인플루언서에게 전달돼요 · {REJECT_REASON_MAX}자 이내)</small></label>
+							<textarea id="reject-sched-reason" name="reason" rows="3" maxlength={REJECT_REASON_MAX} placeholder="예: 추석 연휴와 겹쳐요 — 10/20 이후로 다시 제안해 주세요"></textarea>
+							<button type="submit" class="danger">반려 확정</button>
 						</form>
 					</details>
 				</div>

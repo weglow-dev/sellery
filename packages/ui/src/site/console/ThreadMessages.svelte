@@ -20,11 +20,17 @@
 
 	let {
 		events,
-		names
+		names,
+		typing = false,
+		typingAs = 'brand'
 	}: {
 		events: readonly ThreadEvent[];
 		/** senderLabel 용 이름 — { seller: 인플루언서 활동명, brand: 상호 } */
 		names: { seller: string; brand: string };
+		/** 상대가 입력 중 — 맨 아래에 점 세 개 말풍선 (ThreadTyping 의 `active`) */
+		typing?: boolean;
+		/** 말풍선을 어느 쪽 스타일로 — 상대의 sender */
+		typingAs?: 'seller' | 'brand';
 	} = $props();
 
 	const who = (sender: string) => senderLabel(sender, names);
@@ -49,6 +55,16 @@
 	$effect.pre(() => {
 		void events.length; // 행 수가 바뀔 때마다 — DOM 갱신 전에
 		wasNear = nearBottom();
+	});
+
+	// "입력 중" 말풍선이 켜질 때도 아래를 보고 있었으면 따라 내려간다
+	let typingWasNear = true;
+	$effect.pre(() => {
+		void typing;
+		typingWasNear = nearBottom();
+	});
+	$effect(() => {
+		if (typing && typingWasNear) void tick().then(toBottom);
 	});
 
 	$effect(() => {
@@ -87,6 +103,12 @@
 		{:else}
 			<div class="sysline">대화가 없습니다</div>
 		{/each}
+		{#if typing}
+			<div class="msg typing {typingAs}" aria-live="polite">
+				<div class="who">{who(typingAs)}</div>
+				<span class="dots" role="img" aria-label="입력 중"><i></i><i></i><i></i></span>
+			</div>
+		{/if}
 	</div>
 	{#if fresh}
 		<button type="button" class="console-newmsg" onclick={toBottom} aria-live="polite">새 메시지 ↓</button>
