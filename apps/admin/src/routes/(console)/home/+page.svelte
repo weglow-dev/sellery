@@ -69,14 +69,22 @@
 			// 관리자는 발송을 대신하지 않는다(운송장은 브랜드가 넣는다) — 목록을 보고 독촉하는 용도라 필터까지 걸어 보낸다
 			href: `${data.paths.orders}?f=unshipped`
 		},
+		// 샘플은 orders 가 아니라 campaigns 로 발송을 기록해(0015) 위 "미발송 주문" 에서 빠진다 — 따로 센다.
+		// 미발송 샘플은 5영업일 뒤 환불 대상이라(0024) 방치하면 돈이 움직인다.
+		// 승인분·구매분을 **나눈다**: 링크의 `?status=` 는 한 상태만 담을 수 있어 합치면 도착한 표에
+		// SAMPLE_PURCHASED 가 빠진다(정산정보 미등록을 둘로 나눈 것과 같은 이유).
 		{
-			// 샘플은 orders 가 아니라 campaigns 로 발송을 기록해(0015) 위 "미발송 주문" 에서 빠진다 — 따로 센다.
-			// 미발송 샘플은 5영업일 뒤 환불 대상이라(0024) 방치하면 돈이 움직인다.
-			n: data.todo.sampleToShip,
-			label: '샘플 발송 대기',
+			n: data.todo.sampleApprovedToShip,
+			label: '샘플 발송 대기 (승인)',
 			href: statusHref('SAMPLE_APPROVED')
 		},
 		{
+			n: data.todo.samplePurchasedToShip,
+			label: '샘플 발송 대기 (구매)',
+			href: statusHref('SAMPLE_PURCHASED')
+		},
+		{
+			// 인플루언서 수 — 도착지가 사람 단위 목록이다(채널 행으로 세면 어긋난다 · dashboard.server.ts)
 			n: data.todo.channelsAwaitingApproval,
 			label: '채널 인증 대기',
 			href: `${data.paths.sellers}?filter=pending_channel`
