@@ -2283,6 +2283,8 @@ export type Database = {
         Returns: Json
       }
       app_admin_payout_release: { Args: { p_payout_id: string }; Returns: Json }
+      /** 0051 — 정산 후 환불이 있는 정산 건 (지급 화면 과지급 경고) */
+      app_admin_post_settle_refunds: { Args: { p_limit?: number }; Returns: Json }
       app_admin_payouts_toss_queue: { Args: never; Returns: Json }
       app_partner_seller_sync: {
         Args: { p_payee_id: string; p_payee_type: string; p_raw?: Json; p_status?: string | null; p_toss_seller_id?: string | null }

@@ -1662,6 +1662,20 @@
   .admin-row-act .btn { margin: 0; }
   .admin-pick { width: 28px; padding-right: 0; }
   .admin-pick input { width: 16px; height: 16px; margin: 2px 0 0; }
+  /* 정산 후 환불 경고 (0051) — 지급액은 환불 전 금액으로 고정돼 그만큼 과지급된다.
+     조정이 수동이므로(app-plan.md:625) 운영자가 누르기 전에 보이는 것이 유일한 방어다. */
+  .admin-overpay {
+    display: block; margin: 4px 0 0; padding: 4px 7px;
+    background: var(--color-danger-soft); color: var(--color-danger);
+    border-radius: 6px; font-weight: 700; line-height: 1.45; white-space: normal;
+  }
+  .admin-overpay b { text-decoration: underline; }
+  .admin-overpay-band {
+    margin: 10px 3px 0; padding: 9px 11px;
+    background: var(--color-danger-soft); color: var(--color-danger);
+    border-radius: 8px; font-weight: 700; line-height: 1.5;
+  }
+
   .admin-act { display: inline-block; margin: 0 4px 4px 0; vertical-align: top; }
   .admin-act .console-reject-form { min-width: 200px; }
   .admin-det-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }

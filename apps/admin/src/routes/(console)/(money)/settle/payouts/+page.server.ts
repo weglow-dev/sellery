@@ -8,6 +8,8 @@ import {
 	getPayoutMode,
 	holdPayout,
 	listAdminSettlements,
+	listPostSettleRefunds,
+	type PostSettleRefund,
 	markPayoutPaid,
 	payoutTossOverview,
 	rateLimit,
@@ -43,6 +45,12 @@ export type PayoutRow = PayoutView & {
 	settle_type: string | null;
 	/** 토스 모드에서만 — 큐 행(셀러 상태 · requestable · reason) */
 	toss: TossQueueRow | null;
+	/**
+	 * 정산 후 환불 (0051) — 정산 확정 뒤 들어온 환불. **이 금액만큼 과지급된다.**
+	 * 정산은 보관액을 남김없이 쪼개므로 여유분이 없고, 환불하면 보관액만 줄고 지급액은 그대로다.
+	 * 금액을 깎지 않는 이유는 설계가 수동 정산 조정이기 때문(docs/app-plan.md:625 · 0051 헤더).
+	 */
+	post_refund: PostSettleRefund | null;
 };
 
 export type PayoutsMessage = { tone: 'ok' | 'danger' | 'info'; text: string };
@@ -68,7 +76,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const sRaw = event.url.searchParams.get('status');
 	const status: PayoutStatus | 'all' = sRaw === 'all' ? 'all' : sRaw === 'held' || sRaw === 'paid' ? sRaw : 'pending';
-	const [all, payoutMode] = await Promise.all([listAdminSettlements(null, 500), getPayoutMode()]);
+	const [all, payoutMode, postRefunds] = await Promise.all([listAdminSettlements(null, 500), getPayoutMode(), listPostSettleRefunds(500)]);
 	const overview: PayoutTossOverview | null = payoutMode === 'toss' ? await payoutTossOverview({ withBalance: true }) : null;
 	const tossById = new Map<string, TossQueueRow>();
 	for (const r of overview?.rows ?? []) tossById.set(r.payout_id, r);
@@ -85,6 +93,8 @@ export const load: PageServerLoad = async (event) => {
 				campaign_code: r.campaign_code,
 				title: r.product?.name ?? r.title ?? null,
 				settlement_id: r.settlement?.id ?? r.settlement_id,
+				// 정산 후 환불 (0051) — 이 금액만큼 과지급된다. 조정은 운영자가 손으로 한다(app-plan.md:625).
+				post_refund: postRefunds.get(r.settlement?.id ?? r.settlement_id ?? '') ?? null,
 				settled_at: r.settlement?.settled_at ?? null,
 				payee_name: party ? (party.name ?? '—') : (r.brand?.name ?? '—'),
 				payee_sub:

@@ -221,7 +221,29 @@ settleDue(c)  = c.end + CLEAR_DAYS;                                // 정산 기
 
 취소는 **등급·`m3_sales` 를 다시 계산한다.** `m3_sales = m3_sales_base + Σ settlements.net(최근 3개월)` 인데, 0032 의 기저 백필 조건이 `m3_sales_base = 0 and m3_sales > 0 and 정산 스냅샷 없음` 이라 **취소 직후 상태가 정확히 그것이다** — 그대로 두면 다음 월간 재계산이 부풀려진 `m3_sales` 를 기저로 굳혀 영구 오염된다. 그래서 취소 트랜잭션 안에서 `app_seller_grade_recalc` · `app_brand_grade_recalc` 를 불러 되돌린다.
 
-**정산 후 환불 (2026-10-08 · 0050)**: 정산이 끝난 캠페인에 환불이 들어오면 주문은 `REFUNDED` 가 아니라 **`CANCELED`** 가 되고 이벤트 `refund_needs_adjust` 가 남는다(0008 — 스냅샷이 확정값이고 `orders_sample_not_refunded` 제약도 있다). 스냅샷(`settlements.net` · `platform_net`)은 **지급액의 계약이라 바뀌지 않는다.** 그래서 관리자 매출·순수익은 조정값을 **따로** 보여준다 — `post_refunds`(합계) · `post_refund_count` · `net_adjusted`(= `net − post_refunds`) · `platform_net_adjusted`(= `platform_net − post_refunds`). 브랜드·인플루언서 지급액은 환불로 줄지 않으므로 **환불액은 플랫폼 몫에서 빠진다**(PG 수수료 환급분은 토스 정산에 따라 달라 1차 근사). 최종 순이익(`profitSummary`)은 조정값으로 계산한다. 조정 **처리**(과지급 회수·다음 정산 차감)는 아직 없다 — 회계 정책 결정이 필요한 별건이고, 관리자는 `/admin/payments` 의 "정산 후 환불 조정 큐" 숫자로 확인한다.
+**정산 후 환불 (2026-10-08 · 0050)**: 정산이 끝난 캠페인에 환불이 들어오면 주문은 `REFUNDED` 가 아니라 **`CANCELED`** 가 되고 이벤트 `refund_needs_adjust` 가 남는다(0008 — 스냅샷이 확정값이고 `orders_sample_not_refunded` 제약도 있다). 스냅샷(`settlements.net` · `platform_net`)은 **지급액의 계약이라 바뀌지 않는다.** 그래서 관리자 매출·순수익은 조정값을 **따로** 보여준다 — `post_refunds`(합계) · `post_refund_count` · `net_adjusted`(= `net − post_refunds`) · `platform_net_adjusted`(= `platform_net − post_refunds`). 브랜드·인플루언서 지급액은 환불로 줄지 않으므로 **환불액은 플랫폼 몫에서 빠진다**(PG 수수료 환급분은 토스 정산에 따라 달라 1차 근사). 최종 순이익(`profitSummary`)은 조정값으로 계산한다. **지급액은 깎지 않는다 — 플랫폼이 흡수하고 화면이 경고한다 (2026-10-08 · 0051)**
+
+왜 과지급이 되나. 정산은 보관액을 **남김없이** 쪼갠다(실측):
+
+```
+보관액(net) 13,221,900 = PG 251,216 + 브랜드 9,334,661 + 인플(세전) 2,578,271
+                         + 추천 264,438 + 플랫폼 순수익 721,195 + VAT 72,119   → 차이 0
+```
+
+여유분이 없다. 환불 ₩24,900 을 실행하면 **보관액만** 13,197,000 으로 줄고 `payouts.amount` 는 그대로다(실측: 환불 전후 `브랜드=9,334,661 · 추천=264,438 · 인플=2,493,188` 동일). 약속한 금액을 다 보내면 ₩24,900 이 모자라고 그 차액을 **플랫폼이 자기 돈으로 메운다.** 깎을 수 있는 대상이 플랫폼뿐이다 — 파트너 지급액은 `payouts` 에 확정돼 있고(깎는 함수 없음) PG 수수료·VAT 는 셀러리가 정할 수 없다.
+
+**조정은 운영자가 손으로 한다 — 설계가 그렇다.** `docs/app-plan.md:625` · `docs/deploy.md:228` 이 "정산 완료 캠페인 · 샘플 주문의 콘솔 취소도 같은 큐(`orders.status='CANCELED'`)로 간다 — **수동 정산 조정**" 으로 정하고 있고, `0020:47` 과 `admin-refund.server.ts:6` 도 "정산 스냅샷은 그대로 · **조정은 운영자**" 로 적었다. 관리자 콘솔 계획도 `SETTLED` 면 "정산 조정으로 기록" 안내만 둔다(`admin-console-plan.md:123`). 자동 차감 RPC 는 **설계에 없다.**
+
+데모에는 이 상황이 없다. 프로토타입은 정산 후 환불을 **아예 막는다**(`core/actions.ts:222` · period-policy.md:220 · 위 §8). 실서비스가 허용한 이유는 약관 제14조의 법정 기간이 D+21 을 넘기기 때문이다(표시·광고 상이 **3개월** · 하자 30일 — `terms.ts:237`). 데모가 `CLEARING` 중 환불을 "정산 기준액에서 차감"(`actions.ts:224`)하는 것은 **정산 전** 이야기라 여기에 적용되지 않는다.
+
+그래서 **운영자가 알도록 경고만 띄운다**(0051 `app_admin_post_settle_refunds`):
+- `/admin/settle/payouts` — 상단 띠(정산 건수 · 합계)와 지급 건마다 "⚠ 정산 후 환불 ₩N(M건) — 이 금액만큼 **과지급**" · [지급 완료] confirm 에도 경고
+- `/admin/settle/[code]` — `SETTLED` 분기에 경고 + 지급 전이면 "정산을 취소하고 다시 실행하면 환불이 반영된다" 안내(지급된 건이 있으면 그 사실을 말한다) · 취소 confirm 에 반영 금액
+- `/admin/payments` — "정산 후 환불" 숫자의 설명을 **"누적 집계(처리해도 줄지 않아요)"** 로 바로잡았다. 이전 문구 "조정 큐" 는 처리 수단이 있다는 오해를 줬다
+
+**지급 전이면 되돌릴 수 있다** — 정산 취소(0048)로 명세·지급 건을 지우고 기일에 다시 실행하면 주문에서 다시 계산되므로 환불이 빠진 금액으로 정산된다(실측: `net` 13,221,900 → 13,197,000 · 브랜드 9,334,661 → 9,317,082 · 등급·수수료율은 그대로). 이미 있는 두 기능의 조합이고 전용 버튼은 두지 않았다 — 설계가 수동 조정이다. 지급이 하나라도 나갔으면 취소가 막힌다(`HAS_PAID`) → 파트너와 협의해 다음 정산에서 조정한다.
+
+> **시드 데이터 주의**: `app_seller_grade_recalc` 는 `m3_sales = m3_sales_base + 정산 스냅샷 합계` 로 다시 센다(0032:116). `seed.sql` 은 `m3_sales` 에 값을 직접 넣고 `m3_sales_base` 를 0으로 둬서 이 불변식을 깨므로, 시드 셀러의 정산을 취소하면 `m3_sales` 가 0이 되고 등급이 떨어진다(실측: 실버 → 스타터). 프로덕션은 시드를 지우고 0에서 시작하므로 해당 없다(§2) — **리허설에 시드가 남아 있으면 보게 되는 데이터 결함**이다.
 
 **적용 기록(2026-09-22 · 0020 관리자 콘솔 PR-A)**: 위 1~6 은 `supabase/migrations/0020_admin_settlement.sql` `app_admin_settle_run`(한 트랜잭션 · CLEARING · D+21 도래분 · `p_force` 예외) 이 그대로 한다 — `settlements` 스냅샷(0013/0019 pending 행과 같은 식 · 라인 독립 반올림) · `payouts` 2행 · 🥬 `earned` 차분 · `referral_earnings` · `sellers.m3_sales`(롤링 3개월 + 이관 기저) · `brands.grade` · `campaign_events`(settled · payout_held · ref_reward · brand_ref_reward · sample_refunded). 2 의 "시드 id ≥ 100 만 누적" 은 재현하지 않는다. TS 는 `@sellery/db` `admin/settle-rules` `calcSettlement` · 운영은 `partner-admin.mjs settle-*`. 지급 보류(8.3)는 계좌 외에 **개인 주민번호 미등록 · 사업자 사업자등록증 미등록(0030 — 전에는 세금계산서 정보의 상호) · 브랜드 정산 정보 4개 미완비**도 사유다(inf-console-plan §5.9) — 해제는 `app_admin_payout_release`(완비 재검사). 상세 docs/admin-console-plan.md.
 

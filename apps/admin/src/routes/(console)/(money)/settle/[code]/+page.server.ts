@@ -8,6 +8,7 @@ import {
 	holdPayout,
 	listSettleEvents,
 	markPayoutPaid,
+	listPostSettleRefunds,
 	previewSettlement,
 	rateLimit,
 	releasePayout,
@@ -43,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 	const gate = await requireAdmin(event);
 	if (!gate.ok) redirect(303, gate.location);
 
-	const [res, events] = await Promise.all([previewSettlement(code), listSettleEvents(code)]);
+	const [res, events, postRefunds] = await Promise.all([previewSettlement(code), listSettleEvents(code), listPostSettleRefunds(500)]);
 	if (!res.ok && res.code === 'NOT_FOUND') error(404, { message: '캠페인을 찾을 수 없습니다' });
 
 	const key = event.url.searchParams.get('msg') ?? '';
@@ -56,6 +57,8 @@ export const load: PageServerLoad = async (event) => {
 		preview: res.ok ? res.preview : null,
 		previewError: res.ok ? null : { code: res.code, status: res.status ?? null, message: adminSettleFailMessage(res.code) },
 		events,
+		// 정산 후 환불 (0051) — 지급액은 환불 전 금액이라 그만큼 과지급된다. 지급 전이면 취소해 다시 실행할 수 있다.
+		postRefund: res.ok && res.preview.settlement?.id ? (postRefunds.get(res.preview.settlement.id) ?? null) : null,
 		msg,
 		holdLabels: HOLD_LABELS,
 		listPath: adminPath('/settle'),

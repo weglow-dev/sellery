@@ -161,6 +161,24 @@
 								</p>
 							{/if}
 						{:else if p.campaign_status === 'SETTLED'}
+							{#if data.postRefund}
+								<!--
+									정산 후 환불 (0051) — 정산은 보관액을 남김없이 쪼개므로 환불이 들어오면 보관액만 줄고
+									지급액은 그대로다 → 그만큼 과지급된다. 조정은 **운영자가 손으로** 한다
+									(docs/app-plan.md:625 "수동 정산 조정" · 0020:47) — 화면은 알리는 일만 한다.
+								-->
+								<p class="admin-overpay-band">
+									⚠ 정산이 확정된 뒤 환불 <b>{money(data.postRefund.amount)}</b>({data.postRefund.count}건)이 들어왔어요.
+									지급액은 환불 전 금액이라 지금 지급하면 <b>이 금액만큼 과지급</b>돼요.
+									{#if data.postRefund.paid_payouts === 0}
+										아직 지급된 돈이 없어요 — 아래에서 정산을 취소하면 교환/환불 기간으로 돌아가고, 기일에 다시 실행하면
+										환불이 반영된 금액으로 정산됩니다.
+									{:else}
+										이미 지급된 건이 {data.postRefund.paid_payouts}건 있어 취소할 수 없어요 — 파트너와 협의해 다음 정산에서
+										조정해주세요.
+									{/if}
+								</p>
+							{/if}
 							<!--
 								미지급 정산 취소(0048) — 돈이 한 푼도 안 나갔을 때만. 지급 완료가 있으면 버튼을 두지 않는다
 								(RPC 도 HAS_PAID 로 막는다). 이미 보낸 뒤의 정정은 만들지 않았다 — 회계 정책 결정이 필요하다.
@@ -175,7 +193,7 @@
 									action="?/cancelSettle"
 									class="console-form"
 									onsubmit={(e) => {
-										if (!confirm('정산을 취소할까요?\n명세와 지급 건이 지워지고 교환/환불 기간으로 돌아갑니다.')) e.preventDefault();
+										if (!confirm(`정산을 취소할까요?\n명세와 지급 건이 지워지고 교환/환불 기간으로 돌아갑니다.${data.postRefund ? `\n\n정산 후 환불 ${money(data.postRefund.amount)} 이 있어, 다시 실행하면 그만큼 빠진 금액으로 정산됩니다.` : ''}`)) e.preventDefault();
 									}}
 								>
 									<input type="text" name="reason" required maxlength="200" placeholder="취소 사유 (필수 · 캠페인 스레드에 남아요)" aria-label="취소 사유" />
@@ -268,10 +286,4 @@
 {/if}
 
 <style>
-	/* 기준일 전 강제 실행 사유 (0048) */
-	.settle-force-reason {
-		display: block;
-		width: 100%;
-		margin: 8px 0 0;
-	}
 </style>
