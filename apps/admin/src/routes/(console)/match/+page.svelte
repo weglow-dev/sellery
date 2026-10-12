@@ -8,10 +8,9 @@
 	 *     상품 초대 화면으로 직접 제안한다(0035·0036). 자동 제안은 브랜드를 대신 고르므로 익명을 넣지 않는다.
 	 *   · 0036: **다이아·블랙도 후보에 든다** — 제안권 🥬 10(`grade_tiers.invite_cost_cel`)이 들고,
 	 *     브랜드 잔액이 모자라면 `affordable:false` 로 와서 발송 대상에서 빠진다(표에 "셀러리 부족" 표시).
-	 *   · 우선권 등급(플래티넘 · 다이아 · 블랙)도 빠진다 — 🥬 제안권이 6단계.
-	 *     데모 안내문 "다이아·블랙 대상은 브랜드 🥬 10 자동 차감" 이 그 게이트다.
 	 *   · 메인 채널 인증이 필요하다.
-	 * 뜨는 인플루언서 목록에는 **전원**이 나오고 적격이 아니면 사유를 적는다 — 왜 후보에 없는지 보이게.
+	 * 뜨는 인플루언서 목록은 성장세 상위 **6명**이고(`risingSellers(rising, 6)`) 적격이 아니면 사유를 적는다
+	 * — 왜 후보에 없는지 보이게. 전원 목록은 `/admin/sellers` 다.
 	 */
 	import { enhance } from '$app/forms';
 	import { fmtNum } from '@sellery/db/campaign';
@@ -37,7 +36,7 @@
 	const heldCount = $derived(v ? v.candidates.slice(0, data.batch).filter((c) => !c.affordable).length : 0);
 	const autoOn = $derived(v ? v.brands.filter((b) => b.autoPropose).length : 0);
 	const excludedTotal = $derived(
-		v ? v.excluded.hidden + v.excluded.priority + v.excluded.unverified + v.excluded.suspended : 0
+		v ? v.excluded.hidden + v.excluded.unverified + v.excluded.suspended : 0
 	);
 </script>
 
@@ -153,7 +152,9 @@
 			{/if}
 			<p class="match-foot">
 				ON 이면 카테고리 적합도 × 성장세 × 매출/팔로워 점수로 상위 인플루언서에게 브랜드 명의로 제안합니다.
-				비공개 계정과 우선권 등급(플래티넘 이상)은 제안 대상이 아닙니다 — 갤러리 열람·🥬 제안권이 6단계입니다.
+				비공개 계정은 제안 대상이 아닙니다 — 브랜드가 갤러리에서 레퍼런스를 열람한 뒤 직접 제안합니다.
+				우선권 등급(다이아·블랙)도 제안 대상이며, 브랜드 셀러리에서 제안권 🥬 10 이 차감됩니다(거절 시 환급) —
+				잔액이 모자라면 그 건은 보류됩니다. 플래티넘은 비용이 없습니다.
 			</p>
 		</section>
 	</div>
@@ -172,8 +173,7 @@
 					<span class="match-excl">
 						제외
 						{#if v.excluded.hidden}<span class="st gray">비공개 {v.excluded.hidden}</span>{/if}
-						<!-- 0036 부터 우선권 등급은 제외 사유가 아니다(유료일 뿐) — 0 이면 칩이 안 나온다 -->
-						{#if v.excluded.priority}<span class="st gray">우선권 등급 {v.excluded.priority}</span>{/if}
+						<!-- 우선권 등급 칩은 없다: 0036 부터 제외 사유가 아니다(후보에 들고 🥬 10 이 든다 · 0036:232) -->
 						{#if v.excluded.unverified}<span class="st gray">채널 미인증 {v.excluded.unverified}</span>{/if}
 						{#if v.excluded.suspended}<span class="st gray">정지 {v.excluded.suspended}</span>{/if}
 					</span>
