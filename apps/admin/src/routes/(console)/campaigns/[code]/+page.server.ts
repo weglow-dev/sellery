@@ -12,6 +12,7 @@ import {
 	resumeSaleAsAdmin,
 	shipSampleAsAdmin
 } from '$lib/server/partners';
+import { normalizeRejectReason } from '@sellery/db/admin/campaign-rules';
 import { parseShipInput } from '@sellery/db/brand/campaign-rules';
 
 /**
@@ -55,12 +56,19 @@ export const actions: Actions = {
 		done(event.url, r.ok ? (r.already ? 'sample_already' : 'sample_approved') : `err_${r.code}`);
 	},
 
-	/** 샘플 요청 거절 — 사유는 선택 */
+	/**
+	 * 샘플 요청 거절 — **사유 필수**(긴급 판매 중단과 같은 규칙).
+	 * `REJECTED` 는 종결 상태이고(`campaign-rules.ts` 종결 상태 목록) 화면에 되돌리는 액션이 없다. 사유는
+	 * `campaigns.decision_reason` 에 남고 시스템 이벤트로 스레드에 보이므로(0015 `app_brand_reject_sample`),
+	 * 비어 있으면 RPC 까지 가지 않고 폼 오류로 돌려준다 — 입력값을 잃지 않게 `fail`.
+	 */
 	rejectSample: async (event) => {
 		const gate = await requireAdmin(event);
 		if (!gate.ok) redirect(303, gate.location);
 		const form = await event.request.formData();
-		const r = await rejectSampleAsAdmin(event.params.code, String(form.get('reason') ?? ''), gate.ctx.user.id);
+		const reason = normalizeRejectReason(String(form.get('reason') ?? ''));
+		if (!reason) return fail(400, { sampleRejectError: '거절 사유를 입력해주세요 — 스레드에 남아 인플루언서·브랜드도 보게 됩니다.' });
+		const r = await rejectSampleAsAdmin(event.params.code, reason, gate.ctx.user.id);
 		done(event.url, r.ok ? (r.already ? 'sample_already' : 'sample_rejected') : `err_${r.code}`);
 	},
 
@@ -83,12 +91,14 @@ export const actions: Actions = {
 		done(event.url, r.ok ? (r.already ? 'schedule_already' : 'schedule_confirmed') : `err_${r.code}`);
 	},
 
-	/** 판매 일정 거절 */
+	/** 판매 일정 거절 — **사유 필수**(위 `rejectSample` 과 같은 이유: 종결 상태 · 스레드에 보인다) */
 	rejectSchedule: async (event) => {
 		const gate = await requireAdmin(event);
 		if (!gate.ok) redirect(303, gate.location);
 		const form = await event.request.formData();
-		const r = await rejectScheduleAsAdmin(event.params.code, String(form.get('reason') ?? ''), gate.ctx.user.id);
+		const reason = normalizeRejectReason(String(form.get('reason') ?? ''));
+		if (!reason) return fail(400, { scheduleRejectError: '거절 사유를 입력해주세요 — 스레드에 남아 인플루언서·브랜드도 보게 됩니다.' });
+		const r = await rejectScheduleAsAdmin(event.params.code, reason, gate.ctx.user.id);
 		done(event.url, r.ok ? (r.already ? 'schedule_already' : 'schedule_rejected') : `err_${r.code}`);
 	},
 
