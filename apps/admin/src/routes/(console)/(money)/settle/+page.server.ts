@@ -56,9 +56,12 @@ export const load: PageServerLoad = async (event) => {
 		msg,
 		chips: [
 			{ key: '', label: '전체', href: self },
-			{ key: 'pending', label: '지급 대기', href: `${self}?status=pending` },
+			// `pending`·`held`·`paid` 는 **정산 명세** 상태다 — 명세 상태는 지급 2~3건에서 파생된다
+			// (`admin_settlement_sync_status`: 하나라도 보류면 명세가 `held`). 그래서 라벨을 "지급 대기" 로 두면
+			// 위 띠의 "지급 대기 N건"(지급 건 단위)과 같은 말이 되어, 지급할 돈이 있는데 목록이 비어 보인다.
+			{ key: 'pending', label: '전부 대기', href: `${self}?status=pending` },
 			{ key: 'held', label: '일부 보류', href: `${self}?status=held` },
-			{ key: 'paid', label: '지급 완료', href: `${self}?status=paid` }
+			{ key: 'paid', label: '전부 지급', href: `${self}?status=paid` }
 		],
 		self,
 		payoutsPath: adminPath('/settle/payouts')
