@@ -149,7 +149,7 @@ describe("parseScheduleResult · scheduleFailMessage (app_propose_schedule)", ()
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.by).toBe("서아");
-      expect(scheduleFailMessage(r)).toBe("이 기간은 다이아 등급 인플루언서(서아)가 선점했습니다 · 9/24 – 9/28 — 플래티넘 이상만 함께 판매할 수 있어요. 다른 날짜를 선택해주세요");
+      expect(scheduleFailMessage(r)).toBe("이 기간은 플래티넘 이상 인플루언서가 선점했습니다 · 9/24 – 9/28 — 플래티넘 이상만 함께 판매할 수 있어요. 다른 날짜를 선택해주세요");
     }
   });
   it("QTY_EXCEEDS_STOCK — 잔여를 문구에 · BAD_PERIOD 필드별 · WRONG_STATUS 상태 라벨", () => {

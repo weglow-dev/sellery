@@ -26,7 +26,7 @@ function card(over: Partial<HomeCard> & { category?: string }): HomeCard {
     product_id: rest.product_id ?? "p1",
     brand_id: "b1",
     product: { id: rest.product_id ?? "p1", name: "상품", description: null, emoji: "🥬", thumb_url: null, category, consumer_price: 0, sale_price: 0 },
-    seller: { id: rest.seller_id ?? "s1", code: null, name: "n", handle: "@h", platform: "instagram", avatar_url: null, grade: null },
+    seller: { id: rest.seller_id ?? "s1", code: null, name: "n", handle: "@h", platform: "instagram", avatar_url: null },
     brand: { id: "b1", name: "b" },
   };
 }

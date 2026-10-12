@@ -134,9 +134,7 @@ export type PeriodHolder = {
   end: string;
   qty: number;
   seller_id: string;
-  name: string;
-  handle: string;
-  grade: string | null;
+  /** 이름·핸들·등급은 싣지 않는다 — 인플루언서끼리는 서로 익명(대표 결정 2026-10-12). DB(campaign_period_holders)가 보내도 여기서 버린다. */
   is_priority: boolean;
 };
 
@@ -173,9 +171,6 @@ export function parsePeriodHolder(json: unknown): PeriodHolder | null {
     end,
     qty: int(o.qty),
     seller_id: str(o.seller_id),
-    name: str(o.name),
-    handle: str(o.handle),
-    grade: strOrNull(o.grade),
     is_priority: o.is_priority === true,
   };
 }
@@ -297,7 +292,8 @@ export function scheduleFailMessage(r: Extract<ScheduleResult, { ok: false }>): 
     case "QTY_EXCEEDS_STOCK":
       return `배정 가능한 재고를 초과했어요 (잔여 ${fmtNum(r.left ?? 0)}개) — 수량을 줄여주세요`;
     case "PERIOD_BLOCKED":
-      return `이 기간은 ${r.grade ?? "상위"} 등급 인플루언서${r.by ? `(${r.by})` : ""}가 선점했습니다${r.start && r.end ? ` · ${md(r.start)} – ${md(r.end)}` : ""} — 플래티넘 이상만 함께 판매할 수 있어요. 다른 날짜를 선택해주세요`;
+      // 선점한 인플루언서의 이름·등급은 쓰지 않는다 — 인플루언서끼리는 익명(2026-10-12)
+      return `이 기간은 플래티넘 이상 인플루언서가 선점했습니다${r.start && r.end ? ` · ${md(r.start)} – ${md(r.end)}` : ""} — 플래티넘 이상만 함께 판매할 수 있어요. 다른 날짜를 선택해주세요`;
     case "WRONG_STATUS":
       return r.status && r.status in ST ? `지금 상태(${ST[r.status as Status].l})에서는 일정을 제안할 수 없어요 — 화면을 새로고침해주세요` : SCHEDULE_FAIL_MESSAGES.WRONG_STATUS;
     default:

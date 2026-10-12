@@ -13,7 +13,6 @@
 	import { COMPANY } from '@sellery/db/company';
 	import Cel from '../icons/Cel.svelte';
 	import PlatIcon from '../icons/PlatIcon.svelte';
-	import GradeBox from '../GradeBox.svelte';
 	import TrustBand from '../TrustBand.svelte';
 	import Tilt from '../Tilt.svelte';
 	import SellerAvatar from '../SellerAvatar.svelte';
@@ -78,7 +77,7 @@
 			<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
 				<SellerAvatar avatarUrl={seller.avatar_url} size={40} />
 				<div style="flex:1;min-width:160px">
-					<div><b>{seller.name}</b> <span style="color:var(--color-mute);font-size:12px"><PlatIcon platform={seller.platform} /> {seller.handle}</span> <GradeBox grade={seller.grade} sm /></div>
+					<div><b>{seller.name}</b> <span style="color:var(--color-mute);font-size:12px"><PlatIcon platform={seller.platform} /> {seller.handle}</span></div>
 					<div style="font-size:11.5px;color:var(--color-mute)">셀러리 인증 인플루언서 × {brand.name} 공식 공급</div>
 				</div>
 				{#if others.length && seller.code}

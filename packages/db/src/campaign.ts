@@ -52,14 +52,12 @@ export type CampaignCard = {
     handle: string;
     platform: string;
     avatar_url: string | null;
-    grade: string | null;
   };
   brand: {
     id: string;
     code: string | null;
     name: string;
     logo_url: string | null;
-    grade: string | null;
     biz_no: string | null;
     mail_order_no: string | null;
   };
@@ -106,7 +104,6 @@ export type HomeCard = {
     handle: string;
     platform: string;
     avatar_url: string | null;
-    grade: string | null;
   };
   brand: { id: string; name: string };
 };
@@ -228,14 +225,12 @@ export function parseCampaignCard(json: unknown): CampaignCard | null {
       handle: sHandle,
       platform: str(s.platform) || "",
       avatar_url: strOrNull(s.avatar_url),
-      grade: strOrNull(s.grade),
     },
     brand: {
       id: bId,
       code: strOrNull(b.code),
       name: bName,
       logo_url: strOrNull(b.logo_url),
-      grade: strOrNull(b.grade),
       biz_no: strOrNull(b.biz_no),
       mail_order_no: strOrNull(b.mail_order_no),
     },

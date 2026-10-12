@@ -9,7 +9,6 @@
 	import Modal from './Modal.svelte';
 	import Cel from './icons/Cel.svelte';
 	import PlatIcon from './icons/PlatIcon.svelte';
-	import GradeBox from './GradeBox.svelte';
 	import StatusChip from './StatusChip.svelte';
 	let { card, open, onClose }: { card: CampaignCard | null; open: boolean; onClose: () => void } = $props();
 </script>
@@ -27,7 +26,7 @@
 				</tr>
 				<tr>
 					<td>판매 인플루언서</td>
-					<td class="num" style="white-space:normal"><PlatIcon platform={seller.platform} /> {seller.name} {seller.handle} · <GradeBox grade={seller.grade} sm /></td>
+					<td class="num" style="white-space:normal"><PlatIcon platform={seller.platform} /> {seller.name} {seller.handle}</td>
 				</tr>
 				<tr>
 					<td>인증 채널</td>
@@ -38,7 +37,7 @@
 				<tr>
 					<td>공급 브랜드</td>
 					<!-- ' · 인증 브랜드' 대체 문구 제거 — SellerInfoCard 와 같은 이유(2026-10-02) -->
-					<td class="num" style="white-space:normal">{brand.name} · <GradeBox grade={brand.grade} sm />{brand.biz_no ? ` · 사업자 ${brand.biz_no}` : ''}</td>
+					<td class="num" style="white-space:normal">{brand.name}{brand.biz_no ? ` · 사업자 ${brand.biz_no}` : ''}</td>
 				</tr>
 				<tr>
 					<td>판매 기간</td>

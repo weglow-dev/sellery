@@ -10,7 +10,6 @@
 	import { md } from '@sellery/db/dates';
 	import Cel from './icons/Cel.svelte';
 	import PlatIcon from './icons/PlatIcon.svelte';
-	import GradeBox from './GradeBox.svelte';
 	import Tilt from './Tilt.svelte';
 	import SellerAvatar from './SellerAvatar.svelte';
 	import Viewers from './Viewers.svelte';
@@ -39,7 +38,6 @@
 	<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
 		<SellerAvatar avatarUrl={c.seller.avatar_url} size={28} />
 		<span style="font-size:12.5px"><b>{c.seller.name}</b> <span style="color:var(--color-mute)"><PlatIcon platform={c.seller.platform} /> {c.seller.handle}</span></span>
-		<GradeBox grade={c.seller.grade} sm />
 	</div>
 	<a {href} class="nm">{c.product.name}</a>
 	<div class="meta">{c.product.description ? `${c.product.description} · ` : ''}{c.brand.name}</div>

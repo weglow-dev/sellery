@@ -202,7 +202,7 @@
 									{#each ctx.holders as h (h.campaign_id)}
 										<div class="slot" class:prio={h.is_priority && !ctx.is_priority}>
 											<span class="rng">{md(h.start)} – {md(h.end)}</span>
-											<span>{h.handle} {h.name} <span class="g">{h.grade ?? ''}{h.is_priority ? ' · 우선권' : ''} · 배정 {fmtNum(h.qty)}</span></span>
+											<span>○○○ 인플루언서 <span class="g">{h.is_priority ? '우선권 · ' : ''}배정 {fmtNum(h.qty)}</span></span>
 										</div>
 									{:else}
 										<div class="slot">아직 확정된 기간 없음 — 원하는 날짜를 고르세요</div>
@@ -222,7 +222,7 @@
 								</div>
 								<div class="endline">종료일 <b>{endDate ? md(endDate) : '—'}</b>{#if endDate}{' '}(시작일 포함 {len}일){/if}</div>
 								{#if clash.length}
-									<div class="console-err" role="alert">이 기간은 {clash.map((h) => `${h.name}(${h.grade ?? ''})`).join(', ')}님이 잡은 우선 기간과 겹쳐요 — 플래티넘 이상만 함께 판매할 수 있어 다른 날짜가 필요해요.</div>
+									<div class="console-err" role="alert">이 기간은 플래티넘 이상 인플루언서가 잡은 우선 기간과 겹쳐요 — 플래티넘 이상만 함께 판매할 수 있어 다른 날짜가 필요해요.</div>
 								{/if}
 							</div>
 							<div class="fld {inv('propose', 'qty')}">
