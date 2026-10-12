@@ -1,6 +1,7 @@
 <script lang="ts">
 	/**
 	 * 내 주문 — web account/orders/page.tsx 1:1. 미로그인 카드 / 목록(OrderRow) / 문의 내역(4단계 — 판매자 문의 행 → `/cs/<code>`) / 계정 카드(로그아웃). 환불 뒤 `invalidateAll()` 로 칩 '환불 완료'.
+	 * 목록 아래 **비회원 주문 조회 안내**는 상단 탭을 늘리지 않고 비회원 구매분 입구를 잇는 자리다(0021 · 아래 주석).
 	 */
 	import { invalidateAll } from '$app/navigation';
 	import { md } from '@sellery/db/dates';
@@ -38,6 +39,18 @@
 	{:else}
 		<div class="card static" style="padding:30px;text-align:center;color:var(--color-mute)">아직 주문이 없어요 — <a href="/" class="btn sm ghost">진행 중인 판매 보기</a></div>
 	{/if}
+
+	<!--
+		비회원 구매분 입구 (0021).
+		이 목록은 `user_id` 로만 거르므로(`fetchMyOrders` — orders.server.ts) **로그인 없이 산 주문은 들어오지 않는다.**
+		전화번호·이메일이 같아도 계정에 붙여주는 코드는 없다. 그런데 상단 탭은 로그인하면 `주문 조회` 를
+		`내 주문` 으로 교체하므로(`SubNav`), 이 줄이 없으면 입구가 푸터 한 곳뿐이고 목록이 빈 이유도 알 수 없다.
+		탭을 늘리지 않고 여기서 잇는다 — 주문이 있을 때도 보여준다(회원 주문과 비회원 주문을 함께 가진 고객이 있다).
+	-->
+	<div class="meta" style="margin:10px 3px 0;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap">
+		<span>로그인 없이 구매한 주문은 이 목록에 들어오지 않아요 — 주문번호와 연락처로 확인하세요.</span>
+		<a href="/orders/lookup" class="btn sm ghost">비회원 주문 조회</a>
+	</div>
 
 	<div class="sec" style="margin-top:18px">문의 내역 {#if data.cs.length}<span class="badge" style="position:static;display:inline-block">{data.cs.length}</span>{/if}</div>
 	{#if data.cs.length}
