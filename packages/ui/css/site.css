@@ -479,22 +479,34 @@
   .st.red { background: var(--color-danger); color: #fff; }
   .st.live { background: var(--color-ink); color: var(--color-lime); box-shadow: var(--shadow-frame-bar), var(--shadow-lift-s1); }
   .st.live::before { content: "LIVE"; width: auto; height: auto; background: none; margin-right: 7px; color: var(--color-lime); animation: led 1s steps(1) infinite; }
+  /*
+    등급 배지 — 아이콘 + 등급명. 치수는 전부 em 이라 `.sm` 은 font-size 만 바꾼다.
+    min-width 는 가장 긴 "플래티넘" 기준 — 등급이 달라도 배지 폭이 같다.
+  */
   .gradebox {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+    /* min-width: 7.6em; */
+    padding: 0.25em 0.75em;
+    margin: 2px 4px;
+    vertical-align: middle;
     font-family: var(--font-display);
     font-size: 11px;
-    font-weight: 800;
+    font-weight: 700;
+    line-height: 1.4;
     letter-spacing: 0.04em;
-    padding: 2px 8px;
-    margin: 2px 5px 4px 4px;
     background: var(--color-lime);
     box-shadow: var(--shadow-frame-soft);
     white-space: nowrap;
     flex-shrink: 0;
     user-select: none;
   }
-  .gradebox.sm { font-size: 9.5px; padding: 2px 7px; }
-  .gi { vertical-align: -1.5px; margin-right: 2px; }
+  .gradebox.sm { font-size: 9.5px; }
+  /* 등급 아이콘 — 크기는 `--gi-size`(높이, 폭은 viewBox 비율)로만 조절한다 */
+  .gi { display: inline-block; flex: none; height: var(--gi-size, 1.25em); width: auto; vertical-align: -0.25em; margin-right: 2px; }
+  .gradebox .gi { margin-right: 0; }
   .plic { vertical-align: -2px; margin-right: 1px; }
   .celic { vertical-align: -3px; margin-right: 2px; }
   .who-cell { white-space: nowrap; }
