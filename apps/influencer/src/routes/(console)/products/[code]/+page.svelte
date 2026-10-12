@@ -10,7 +10,7 @@
 	 * 샘플 섹션은 `quote.mode`: free(배송지 폼 → ?/requestFree) · buy(금액 표 + [샘플 구매 ₩N] → /pay/new?product= · 🥬 사용 선택은 결제 화면) · locked(독점 안내) · active(캠페인 링크) · unlisted.
 	 * 실패한 제출은 `form`(fail 400) 으로 돌아온다 — 입력값 유지 · 실패 필드 강조 · 문구는 REQUEST_FREE_SAMPLE_MESSAGES / notFreeMessage 원문.
 	 */
-	import { GRADES, SAMPLE_CEL_WON } from '@sellery/core/constants';
+	import { SAMPLE_CEL_WON } from '@sellery/core/constants';
 	import { discountPct, fmtNum, imageSrc } from '@sellery/db/campaign';
 	import { BUY_COMING_SOON, BUY_REASON_TITLES, campaignChip } from '@sellery/db/partner/sample-rules';
 	import { ProductIcon, ShippingFields, StatusChip } from '@sellery/ui/site';
@@ -41,7 +41,6 @@
 				? EXCLUSIVE_MESSAGES.already
 				: null
 	);
-	const topBonus = GRADES[0]?.bonus ?? 3;
 	const pct = (r: number) => (r * 100).toFixed(0);
 	const logo = $derived(imageSrc(p.brand.logo_url));
 	// 🥬 최대 분할 — 잔액과 무관 (sampleLine 과 같은 규칙)
@@ -73,7 +72,7 @@
 			<div><span class="pl">브랜드 시중가</span><span class="cp">₩{fmtNum(p.consumer_price)}</span></div>
 		</div>
 		<div class="meta">
-			수수료 <b>{pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</b> (등급 보너스 포함) · 건당 예상 수수료 ₩{fmtNum(Math.round(p.sale_price * p.commission_rate))}{#if p.sample_text}{' '}· 샘플 {p.sample_text}{/if}
+			수수료 <b>{pct(p.commission_rate)}%</b> · 건당 예상 수수료 ₩{fmtNum(Math.round(p.sale_price * p.commission_rate))}{#if p.sample_text}{' '}· 샘플 {p.sample_text}{/if}
 		</div>
 		{#if p.description}<p class="meta" style="margin-top:8px">{p.description}</p>{/if}
 	</div>
