@@ -2,6 +2,9 @@
 	/**
 	 * 등급 아이콘 (방패 → 셰브런 → 별 → 날개 → 왕관) — web icons.tsx GICON · GradeIcon.
 	 * RPC `seller.grade` / `brand.grade` 문자열로 렌더 — 모르는 값이면 아무것도 렌더하지 않는다.
+	 *
+	 * 전 등급이 같은 viewBox(가장 넓은 날개 3줄 기준)를 쓴다 — 방패 크기·위치와 아이콘 폭이 등급과 무관하게 같다.
+	 * 표시 크기는 CSS `.gi`(`--gi-size`)가 정한다. width/height 속성은 CSS 가 없을 때의 기본값이다.
 	 */
 	import { isGradeName } from './icons';
 	let { grade }: { grade: string | null | undefined } = $props();
@@ -13,7 +16,7 @@
 </script>
 
 {#if isGradeName(grade)}
-	<svg class="gi" viewBox="0 -2 20 16" width="17" height="13.6" aria-hidden="true">
+	<svg class="gi" viewBox="0.6 -2 18.8 16" width="16" height="13.6" aria-hidden="true">
 		{#if grade === '플래티넘'}<path d={WING2} stroke="#141414" stroke-width="1.3" stroke-linecap="round" />{/if}
 		{#if grade === '다이아' || grade === '블랙'}<path d={WING3} stroke="#141414" stroke-width="1.3" stroke-linecap="round" />{/if}
 		{#if grade === '블랙'}<path d="M7.6 1 8.7-.9 10 .7 11.3-.9 12.4 1z" fill="#f7df3e" stroke="#141414" stroke-width=".9" stroke-linejoin="round" />{/if}
