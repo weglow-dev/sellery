@@ -304,11 +304,11 @@
 						<tr><td>결제 {fmtNum(prev.paid_count)}건</td><td class="num">{money(prev.gross)}</td></tr>
 						<tr><td>환불 {fmtNum(prev.refund_count)}건</td><td class="num">−{money(prev.refunds)}</td></tr>
 						<tr class="tot"><td><b>확정 매출</b></td><td class="num"><b>{money(prev.net)}</b></td></tr>
-						<tr><td>PG {(prev.pg_rate * 100).toFixed(1)}%</td><td class="num">−{money(prev.pg_fee)}</td></tr>
 						<tr><td>인플루언서 {(prev.seller_rate * 100).toFixed(0)}%</td><td class="num">−{money(prev.seller_fee)}</td></tr>
-						<tr><td>플랫폼 {(prev.platform_rate * 100).toFixed(0)}%</td><td class="num">−{money(prev.platform_fee_gross)}</td></tr>
-						<tr class="tot"><td>브랜드 정산액</td><td class="num">{money(prev.brand_payout)}</td></tr>
-						<tr><td>인플루언서 실수령</td><td class="num">{money(prev.seller_payout)}</td></tr>
+						<tr><td>플랫폼 수수료 총액 {(prev.platform_rate * 100).toFixed(0)}% <small>인플 이용 3% + 브랜드 이용 3% + 결제 5% · VAT 포함</small></td><td class="num">{money(prev.platform_fee_gross)}</td></tr>
+						<tr><td>PG 결제 원가 {(prev.pg_rate * 100).toFixed(1)}% <small>셀러리 비용</small></td><td class="num">−{money(prev.pg_fee)}</td></tr>
+						<tr class="tot"><td>브랜드 정산액 <small>매출 − 인플 수수료 − 브랜드 8%</small></td><td class="num">{money(prev.brand_payout)}</td></tr>
+						<tr><td>인플루언서 실수령 <small>수수료 − 원천징수 − 이용 3%</small></td><td class="num">{money(prev.seller_payout)}</td></tr>
 					</tbody>
 				</table>
 				<p class="hint" style="margin-top:10px">

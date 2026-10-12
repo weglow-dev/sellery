@@ -111,20 +111,21 @@
 							<tr><td>취소 · 환불{#if p.partial_refunds}<small>부분취소 {money(p.partial_refunds)} 포함</small>{/if}</td><td class="num">−{money(p.refunds)}</td></tr>
 							<tr class="tot"><td>순매출 (확정 매출)</td><td class="num">{money(p.net)}</td></tr>
 							{#if p.sample_net}<tr><td>└ 인플루언서 본인 샘플 구매분 <small>수수료 · 보너스 계산에서 제외</small></td><td class="num">{money(p.sample_net)}</td></tr>{/if}
-							<tr><td>PG 수수료 <small>{pct(p.pg_rate)} · 브랜드 정산에서 차감</small></td><td class="num">−{money(p.pg_fee)}</td></tr>
 							<tr><td>인플루언서 수수료 <small>{pct(p.seller_rate)}{p.ref_boost_applied ? ' · 추천 부스트 적용' : ''}</small></td><td class="num">−{money(p.seller_fee)}</td></tr>
 							<tr><td>└ 등급 보너스 <small>{p.seller_grade ?? '—'} +{p.seller_bonus_pp}%p · 플랫폼 부담</small></td><td class="num">+{money(p.seller_bonus)}</td></tr>
 							{#if p.ref_boost_applied}<tr><td>└ 추천 부스트 <small>+{pct(p.ref_boost_rate)}p · 첫 5회 · 플랫폼 부담</small></td><td class="num">+{money(p.ref_boost)}</td></tr>{/if}
 							<tr class="tot"><td>인플루언서 수수료 합계 (세전)</td><td class="num">{money(p.seller_fee_total)}</td></tr>
-							<tr><td>플랫폼 수수료 총액 <small>{pct(p.platform_rate)}</small></td><td class="num">{money(p.platform_fee_gross)}</td></tr>
+							<tr><td>플랫폼 수수료 총액 <small>{pct(p.platform_rate)} · VAT 포함 — 인플 이용 {pct(p.seller_platform_rate)} {money(p.seller_platform_fee)} · 브랜드 이용 {pct(p.brand_platform_rate)} {money(p.brand_platform_fee)} · 결제 {pct(p.payment_fee_rate)} {money(p.payment_fee)}</small></td><td class="num">{money(p.platform_fee_gross)}</td></tr>
 							<tr><td>플랫폼 부담 <small>보너스 {money(p.seller_bonus)}{p.ref_boost_applied ? ` · 부스트 ${money(p.ref_boost)} · 추천 보상 ${money(p.ref_reward)}` : ''}{p.brand_ref_applied ? ` · 브랜드 추천 할인 ${money(p.brand_ref_boost)} · 보상 ${money(p.brand_ref_reward)}` : ''}{p.brand_discount ? ` · 브랜드 등급 할인 ${money(p.brand_discount)}(${p.brand_grade ?? ''} −${pct(p.brand_discount_rate)}p)` : ''}</small></td><td class="num">−{money(p.costs)}</td></tr>
 							<tr><td>플랫폼 수익</td><td class="num">{money(p.platform_fee)}</td></tr>
 							<tr><td>└ 부가세</td><td class="num">−{money(p.vat)}</td></tr>
+							<tr><td>└ PG 결제 원가 <small>{pct(p.pg_rate)} · 셀러리 비용 (0053)</small></td><td class="num">−{money(p.pg_fee)}</td></tr>
 							<tr class="tot"><td>플랫폼 순수익</td><td class="num" style="color:var(--color-accent)">{money(p.platform_net)}</td></tr>
-							<tr class="tot"><td>브랜드 지급 <small>순매출 − PG − 인플루언서 수수료 − 플랫폼 수수료 + 할인</small></td><td class="num" style="color:var(--color-plat)">{money(p.brand_payout)}</td></tr>
+							<tr class="tot"><td>브랜드 지급 <small>순매출 − 인플루언서 수수료 − 브랜드 이용 {pct(p.brand_platform_rate)} − 결제 {pct(p.payment_fee_rate)} + 할인</small></td><td class="num" style="color:var(--color-plat)">{money(p.brand_payout)}</td></tr>
 							<tr><td>원천징수 <small>{p.seller?.settle_type === 'biz' ? '사업자 · 세금계산서 (0%)' : `개인 ${pct(p.wht_rate)}`}</small></td><td class="num">−{money(p.seller_wht)}</td></tr>
 							{#if p.sample_refund_cash || p.sample_refund_cel}<tr><td>샘플 환급 <small>상품 환급 옵션 · 🥬{p.sample_refund_cel} 는 원장 복원 · 현금은 지급액 가산</small></td><td class="num">+{money(p.sample_refund_cash)}</td></tr>{/if}
-							{#if p.sample_refund_cash}<tr><td class="in">└ 환급 재원 <small>브랜드 몫·플랫폼 수수료에서 차감 · 카드 수수료와 추천인 보상은 플랫폼 부담 (0023)</small></td><td class="num">브랜드 −{money(p.sample_refund_brand)} · 플랫폼 −{money(p.sample_refund_platform)} · 카드 {money(p.sample_refund_pg)}</td></tr>{/if}
+							{#if p.sample_refund_cash}<tr><td class="in">└ 환급 재원 <small>브랜드 몫·플랫폼 수수료에서 차감 · 카드 원가와 추천인 보상은 셀러리 부담 (0023 · 0053)</small></td><td class="num">브랜드 −{money(p.sample_refund_brand)} · 플랫폼 −{money(p.sample_refund_platform)} · 카드 {money(p.sample_refund_pg)}</td></tr>{/if}
+							<tr><td>플랫폼 이용 수수료 <small>{pct(p.seller_platform_rate)} · 인플루언서 부담 (0053)</small></td><td class="num">−{money(p.seller_platform_fee)}</td></tr>
 							<tr class="tot"><td>인플루언서 지급 (실수령)</td><td class="num" style="color:var(--color-seller)">{money(p.seller_payout)}</td></tr>
 							{#if p.sample_cel_cover}<tr><td>🥬 결제분 브랜드 원화 보전 <small>플랫폼 비용</small></td><td class="num">{money(p.sample_cel_cover)}</td></tr>{/if}
 						</tbody>

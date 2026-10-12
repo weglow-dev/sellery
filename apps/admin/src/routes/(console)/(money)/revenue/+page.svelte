@@ -90,7 +90,7 @@
 		<div class="card static kpi">
 			<div class="lbl">플랫폼 수수료 매출</div>
 			<div class="val">{won(v.totals.platform_fee)}</div>
-			<div class="sub">10% {won(v.totals.platform_fee_gross)} − 보상·할인 {won(v.totals.costs)}</div>
+			<div class="sub">11% {won(v.totals.platform_fee_gross)} − 보상·할인 {won(v.totals.costs)}</div>
 		</div>
 		<div class="card static kpi">
 			<div class="lbl">플랫폼 순수익 (VAT 제외)</div>
@@ -124,17 +124,17 @@
 					<tr><td>총 결제액</td><td class="num">{won(v.totals.gross)}</td></tr>
 					<tr><td>환불</td><td class="num">−{won(v.totals.refunds)}</td></tr>
 					<tr class="sum"><td>확정 매출 (GMV)</td><td class="num">{won(v.totals.net)}</td></tr>
-					<tr><td class="in">└ 인플루언서 샘플 구매분 <small>인플 수수료 0 · 플랫폼 10% 동일</small></td><td class="num">{won(v.totals.sample_net)}</td></tr>
-					<tr><td>PG 수수료 1.9% <small>브랜드 정산에서 차감 · 플랫폼 수익 아님</small></td><td class="num">−{won(v.totals.pg_fee)}</td></tr>
+					<tr><td class="in">└ 인플루언서 샘플 구매분 <small>인플 수수료 0 · 브랜드 플랫폼 수수료 동일</small></td><td class="num">{won(v.totals.sample_net)}</td></tr>
 					<tr><td>인플루언서 지급 <small>기본 + 등급 보너스 + 추천 부스트</small></td><td class="num">−{won(v.totals.seller_fee_total)}</td></tr>
 					<tr><td>브랜드 정산액</td><td class="num">−{won(v.totals.brand_payout)}</td></tr>
-					<tr class="sum"><td>플랫폼 수수료 총액 10%</td><td class="num">{won(v.totals.platform_fee_gross)}</td></tr>
+					<tr class="sum"><td>플랫폼 수수료 총액 11% <small>인플 이용 3% {won(v.totals.seller_platform_fee)} · 브랜드 이용 3% {won(v.totals.brand_platform_fee)} · 결제 5% {won(v.totals.payment_fee)} · VAT 포함</small></td><td class="num">{won(v.totals.platform_fee_gross)}</td></tr>
 					<tr><td class="in">− 인플루언서 등급 보너스</td><td class="num">−{won(v.totals.seller_bonus)}</td></tr>
 					<tr><td class="in">− 인플루언서 추천 보상·부스트</td><td class="num">−{won(v.totals.ref_boost + v.totals.ref_reward)}</td></tr>
 					<tr><td class="in">− 브랜드 추천 보상·할인</td><td class="num">−{won(v.totals.brand_ref_boost + v.totals.brand_ref_reward)}</td></tr>
 					<tr><td class="in">− 브랜드 등급 수수료 할인</td><td class="num">−{won(v.totals.brand_discount)}</td></tr>
 					<tr><td>수수료 매출 (VAT 포함)</td><td class="num">{won(v.totals.platform_fee)}</td></tr>
 					<tr><td class="in">− 부가세 10%</td><td class="num">−{won(v.totals.vat)}</td></tr>
+					<tr><td class="in">− PG 결제 원가 1.9% <small>셀러리 비용 (0053)</small></td><td class="num">−{won(v.totals.pg_fee)}</td></tr>
 					<tr class="tot"><td>플랫폼 순수익</td><td class="num accent">{won(v.totals.platform_net)}</td></tr>
 					<!--
 						정산 후 환불(0050) — 스냅샷은 지급 계약이라 바뀌지 않는다. 그 뒤 들어온 환불은
@@ -234,7 +234,7 @@
 				</table>
 			{/if}
 			<p class="rev-foot">
-				PG 1.9% 는 브랜드 정산에서 차감되는 통과 비용이라 위 순수익에 이미 반영됩니다(플랫폼 부담 아님).
+				PG 1.9% 는 셀러리가 부담하는 결제 원가라 위 순수익에서 뺐습니다(0053 · 브랜드에게는 결제 수수료 5% 를 받습니다).
 				운영비는 월 단위 추정치이고 확정 매출은 누적 기준이라, 실제 월 손익과는 다릅니다.
 			</p>
 		</section>
@@ -255,7 +255,7 @@
 					<th class="num">PG</th>
 					<th class="num">인플루언서</th>
 					<th class="num">브랜드</th>
-					<th class="num">수수료 10%</th>
+					<th class="num">수수료 11%</th>
 					<th class="num">보상·할인</th>
 					<th class="num">VAT</th>
 					<th class="num">순수익</th>

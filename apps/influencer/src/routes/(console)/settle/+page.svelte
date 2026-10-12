@@ -50,7 +50,7 @@
 	<h2>정산</h2>
 	<span class="cel" title="셀러리 포인트 잔액">🥬 {data.balance}</span>
 </div>
-<p class="meta" style="margin:-8px 3px 14px">수수료 = 확정 매출 × 수수료율(+등급 보너스) · 개인 인플루언서는 사업소득 원천징수 <b>3.3%</b> 공제, 사업자는 세금계산서 발행 · 판매 종료 <b>D+21</b> 에 등록 계좌로 지급돼요.</p>
+<p class="meta" style="margin:-8px 3px 14px">수수료 = 확정 매출 × 수수료율(+등급 보너스) · 실수령은 여기서 셀러리 <b>플랫폼 이용 수수료 3%</b>(확정 매출 기준 · VAT 포함)와 개인 인플루언서의 사업소득 원천징수 <b>3.3%</b>를 뺀 금액이에요(사업자는 세금계산서 발행) · 판매 종료 <b>D+21</b> 에 등록 계좌로 지급돼요.</p>
 
 {#if data.msg}
 	<p class={`notice ${data.msg.tone === 'ok' ? 'ok' : data.msg.tone === 'danger' ? 'danger' : ''}`} role="status">{data.msg.text}</p>
@@ -257,7 +257,7 @@
 	<div class="tblw console-settle-table">
 		<table>
 			<thead>
-				<tr><th>판매</th><th>기간</th><th class="num">순매출</th><th class="num">수수료율</th><th class="num">수수료(세전)</th><th class="num">원천징수</th><th class="num">실수령</th><th>상태 · 지급</th></tr>
+				<tr><th>판매</th><th>기간</th><th class="num">순매출</th><th class="num">수수료율</th><th class="num">수수료(세전)</th><th class="num">원천징수</th><th class="num">플랫폼 이용</th><th class="num">실수령</th><th>상태 · 지급</th></tr>
 			</thead>
 			<tbody>
 				{#each list.rows as r (r.campaign_id)}
@@ -274,6 +274,7 @@
 						<td class="num">{rateLine(r.my_rate, r.grade, r.grade_bonus_pp, r.ref_boost_applied)}</td>
 						<td class="num">{money(r.my_fee_total)}</td>
 						<td class="num">{r.wht === null ? '—' : r.wht_rate === 0 ? '0 (세금계산서)' : `−₩${fmtNum(r.wht)}`}</td>
+						<td class="num">{r.my_platform_fee === null ? '—' : `−₩${fmtNum(r.my_platform_fee)}`}</td>
 						<td class="num" style="color:var(--color-plat);font-weight:700">{money(r.my_payout)}{#if r.sample_refund_cash}
 								<small style="display:block;font-weight:400;color:var(--color-mute)">샘플 환급 +₩{fmtNum(r.sample_refund_cash)} 포함</small>{/if}</td>
 						<td>
@@ -282,10 +283,10 @@
 						</td>
 					</tr>
 				{:else}
-					<tr><td colspan="8" class="empty">정산 내역이 없습니다 — 판매가 끝나면 여기서 명세를 볼 수 있어요</td></tr>
+					<tr><td colspan="9" class="empty">정산 내역이 없습니다 — 판매가 끝나면 여기서 명세를 볼 수 있어요</td></tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
-	<p class="meta" style="margin:8px 3px 0">실수령 = 수수료(세전) − 원천징수{list.wht_rate === 0 ? '(사업자 0)' : ` ${whtLine(list.wht_rate, null).replace('원천징수 ', '')}`} · 등급 보너스·추천 부스트는 플랫폼이 부담해요 · 판매 중·교환·환불 기간 행은 지금 기준 예상값이에요.</p>
+	<p class="meta" style="margin:8px 3px 0">실수령 = 수수료(세전) − 원천징수{list.wht_rate === 0 ? '(사업자 0)' : ` ${whtLine(list.wht_rate, null).replace('원천징수 ', '')}`} − 플랫폼 이용 수수료 3%(VAT 포함) · 등급 보너스·추천 부스트는 셀러리가 부담해요 · 판매 중·교환·환불 기간 행은 지금 기준 예상값이에요.</p>
 {/if}
