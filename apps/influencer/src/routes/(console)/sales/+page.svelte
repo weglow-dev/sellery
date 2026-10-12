@@ -48,7 +48,7 @@
 		<div><span class="ms-l">오늘 매출</span><span class="ms-v">₩{fmtNum(t.today_gross)}</span><span class="ms-s">주문 {t.today_orders}건</span></div>
 		<div><span class="ms-l">누적 확정 매출</span><span class="ms-v">₩{fmtNum(t.net)}</span><span class="ms-s">결제 {t.paid_count}건 · 환불 {t.refund_count}건</span></div>
 		<div><span class="ms-l">내 수수료 (세전)</span><span class="ms-v">₩{fmtNum(t.my_fee_total)}</span><span class="ms-s">{isBiz ? '세금계산서 발행' : `원천징수 −₩${fmtNum(t.wht)}`}</span></div>
-		<div><span class="ms-l">실수령 예정</span><span class="ms-v" style="color:var(--color-plat)">₩{fmtNum(t.my_payout_est)}</span><span class="ms-s">{isBiz ? '원천징수 없음' : '원천징수 후 예상'}</span></div>
+		<div><span class="ms-l">실수령 예정</span><span class="ms-v" style="color:var(--color-plat)">₩{fmtNum(t.my_payout_est)}</span><span class="ms-s">플랫폼 이용 수수료 −₩{fmtNum(t.my_platform_fee)}{isBiz ? '' : ' · 원천징수'} 공제 후</span></div>
 	</div>
 {/if}
 
@@ -118,6 +118,8 @@
 						<dd><b>₩{fmtNum(c.my_fee_total)}</b></dd>
 						<dt>원천징수</dt>
 						<dd>{whtLine(data.whtRate ?? 0.033, c.wht)}</dd>
+						<dt>플랫폼 이용 수수료</dt>
+						<dd>−₩{fmtNum(c.my_platform_fee)} <span class="meta">(확정 매출의 {Math.round((data.rates?.seller_platform_rate ?? 0.03) * 1000) / 10}% · VAT 포함)</span></dd>
 						<dt>실수령 예정</dt>
 						<dd><b style="color:var(--color-plat);font-size:15px">₩{fmtNum(c.my_payout_est)}</b></dd>
 						<dt>지급 예정</dt>

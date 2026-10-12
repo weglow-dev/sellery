@@ -4,7 +4,7 @@
 	 *   1 히어로(태그라인 "좋은 브랜드를 만나는 공간, 셀러리") · 2 이름의 유래 스프레드 · 3 세 가지 검증 · 4 에스크로 타임라인 · 5 인증 마크
 	 *   · 6 셀러리가 다른 이유(홈과 같은 6장 — $lib/why) · 7 회원 혜택 · 8 FAQ · 9 브랜드·인플루언서 입점 CTA(/brand/signup · /influencer/signup)
 	 * 데모 수치 띠(누적 판매액·환불률)와 "일반 SNS 공구" 비교 차트는 실데이터가 아니므로 옮기지 않았다.
-	 * 정책 숫자는 DEFAULT_SETTINGS.clear_days(=CLEAR_DAYS) · 플랫폼 수수료 10% 는 PLAT_RATE (숫자는 코드 상수가 정답 — CLAUDE.md).
+	 * 정책 숫자는 DEFAULT_SETTINGS.clear_days(=CLEAR_DAYS) · 셀러리 수수료 11%(3+3+5) 는 PLAT_RATE (숫자는 코드 상수가 정답 — CLAUDE.md).
 	 */
 	import { DEFAULT_SETTINGS } from '@sellery/db/campaign';
 	import { PLAT_RATE } from '@sellery/core/constants';
@@ -105,7 +105,7 @@
 			<span class="tag">ESCROW</span>
 			<h2>결제 대금은 판매자가 아닌<br />셀러리가 보관합니다.</h2>
 			<p>결제 대금은 판매 종료 후 <b>{CLEAR}일</b>의 환불 보호 기간이 지난 뒤에야 브랜드와 인플루언서에게 정산됩니다. 그 전까지는 셀러리가 보관하므로 환불이 지연되거나 판매자와 다툴 일이 생기지 않습니다.</p>
-			<p>수수료 구조도 공개합니다. 브랜드가 정한 판매가와 수수료율은 인플루언서에게 그대로 보이고, 플랫폼 수수료는 <b>{PLAT_PCT}%</b>로 고정되어 있습니다. 숨은 광고비가 가격에 얹히지 않습니다.</p>
+			<p>수수료 구조도 공개합니다. 브랜드가 정한 판매가와 인플루언서 수수료율은 인플루언서에게 그대로 보이고, 셀러리 수수료는 확정 매출의 <b>{PLAT_PCT}%</b>(플랫폼 이용 3%+3% · 결제 5%)로 고정되어 있습니다. 숨은 광고비가 가격에 얹히지 않습니다.</p>
 		</div>
 	</div>
 

@@ -37,7 +37,7 @@
 	<h2>정산</h2>
 	<span class="cel" title="셀러리 포인트 잔액">🥬 {data.balance}</span>
 </div>
-<p class="meta" style="margin:-8px 3px 14px">브랜드 정산액 = 확정 매출 − PG 1.9% − 인플루언서 수수료 − 플랫폼 수수료 10%(등급 할인 반영) · 판매 종료 <b>D+21</b> 에 등록 계좌로 지급돼요. 세금계산서는 정산 명세로 갈음하고 운영팀이 발행해요.</p>
+<p class="meta" style="margin:-8px 3px 14px">브랜드 정산액 = 확정 매출 − 인플루언서 수수료 − 셀러리 플랫폼 이용 수수료 3% − 결제 수수료 5%(VAT 포함 · 등급 할인 반영) · 판매 종료 <b>D+21</b> 에 등록 계좌로 지급돼요. 세금계산서는 정산 명세로 갈음하고 운영팀이 발행해요.</p>
 
 {#if data.msg}
 	<p class={`notice ${data.msg.tone === 'ok' ? 'ok' : data.msg.tone === 'danger' ? 'danger' : ''}`} role="status">{data.msg.text}</p>
@@ -204,7 +204,7 @@
 	<div class="tblw console-settle-table console-brand-settle-table">
 		<table>
 			<thead>
-				<tr><th>판매</th><th>인플루언서</th><th>기간</th><th class="num">순매출</th><th class="num">PG</th><th class="num">인플루언서 수수료</th><th class="num">플랫폼+PG</th><th class="num">브랜드 지급액</th><th>상태 · 지급</th></tr>
+				<tr><th>판매</th><th>인플루언서</th><th>기간</th><th class="num">순매출</th><th class="num">인플루언서 수수료</th><th class="num">플랫폼 수수료</th><th class="num">브랜드 지급액</th><th>상태 · 지급</th></tr>
 			</thead>
 			<tbody>
 				{#each list.rows as r (r.campaign_id)}
@@ -219,9 +219,8 @@
 						<td data-l="인플루언서"><PlatformHandle platform={r.seller.platform} handle={r.seller.handle} name={r.seller.name} /></td>
 						<td class="num" data-l="기간">{r.start_date ? md(r.start_date) : '—'}–{r.end_date ? md(r.end_date) : '—'}</td>
 						<td class="num" data-l="순매출">{money(r.net)}</td>
-						<td class="num" data-l="PG">{r.pg_fee === null ? '—' : `−₩${fmtNum(r.pg_fee)}`}</td>
 						<td class="num" data-l="인플루언서 수수료">{r.seller_fee === null ? '—' : `−₩${fmtNum(r.seller_fee)}`}<small>{brandRateLine(r.seller_rate)}</small></td>
-						<td class="num" data-l="플랫폼+PG">{r.platform_pg === null ? '—' : `−₩${fmtNum(r.platform_pg)}`}{#if r.brand_discount || r.brand_ref_boost}<small>할인 +₩{fmtNum((r.brand_discount ?? 0) + (r.brand_ref_boost ?? 0))}{r.brand_grade ? ` · ${r.brand_grade}` : ''}</small>{/if}</td>
+						<td class="num" data-l="플랫폼 수수료">{r.platform_pg === null ? '—' : `−₩${fmtNum(r.platform_pg)}`}{#if r.brand_discount || r.brand_ref_boost}<small>할인 +₩{fmtNum((r.brand_discount ?? 0) + (r.brand_ref_boost ?? 0))}{r.brand_grade ? ` · ${r.brand_grade}` : ''}</small>{/if}</td>
 						<td class="num" data-l="브랜드 지급액" style="color:var(--color-plat);font-weight:700">{money(r.brand_payout)}</td>
 						<td data-l="상태 · 지급">
 							<StatusChip tone={st.tone}>{st.label}</StatusChip>
@@ -229,10 +228,10 @@
 						</td>
 					</tr>
 				{:else}
-					<tr><td colspan="9" class="empty">정산 내역이 없습니다 — 판매가 끝나면 여기서 명세를 볼 수 있어요</td></tr>
+					<tr><td colspan="8" class="empty">정산 내역이 없습니다 — 판매가 끝나면 여기서 명세를 볼 수 있어요</td></tr>
 				{/each}
 			</tbody>
 		</table>
 	</div>
-	<p class="meta" style="margin:8px 3px 0">브랜드 지급액 = 순매출 − 인플루언서 수수료 − 플랫폼+PG (PG 열은 플랫폼+PG 에 포함된 금액) · 플랫폼+PG 는 플랫폼 10% 에서 브랜드 등급·추천 할인을 뺀 뒤 PG 1.9% 를 더한 브랜드 실제 부담이에요 · 등급 보너스·추천 부스트는 셀러리가 부담해요 · 판매 중·교환·환불 기간 행은 지금 기준 예상값이고, 정산 완료 행은 실행 시점 스냅샷이에요.</p>
+	<p class="meta" style="margin:8px 3px 0">브랜드 지급액 = 순매출 − 인플루언서 수수료 − 플랫폼 수수료 · 플랫폼 수수료 = 셀러리 플랫폼 이용 3% + 결제 5%(VAT 포함)에서 브랜드 등급·추천 할인을 뺀 금액이에요(카드 결제 원가는 셀러리 부담) · 등급 보너스·추천 부스트는 셀러리가 부담해요 · 판매 중·교환·환불 기간 행은 지금 기준 예상값이고, 정산 완료 행은 실행 시점 스냅샷이에요.</p>
 {/if}

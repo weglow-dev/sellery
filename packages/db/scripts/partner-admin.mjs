@@ -902,13 +902,13 @@ function printPreview(k) {
   }
   console.table([
     { 항목: "확정 매출 net", 값: won(k.net), 비고: `gross ${won(k.gross)} − refunds ${won(k.refunds)} · 샘플분 ${won(k.sample_net)} · 결제 ${k.paid_count} / 환불 ${k.refund_count}` },
-    { 항목: "PG", 값: won(k.pg_fee), 비고: `${k.pg_rate}` },
+    { 항목: "PG 원가 (셀러리 비용)", 값: won(k.pg_fee), 비고: `${k.pg_rate}` },
     { 항목: "인플루언서 기본 sf", 값: won(k.seller_fee), 비고: `${k.seller_rate} · ${k.seller_grade ?? ""} +${k.seller_bonus_pp}%p` },
     { 항목: "등급 보너스", 값: won(k.seller_bonus), 비고: "플랫폼 부담" },
     { 항목: "추천 부스트 / 추천인 보상", 값: `${won(k.ref_boost)} / ${won(k.ref_reward)}`, 비고: k.ref_boost_applied ? "적용" : "미적용" },
     { 항목: "브랜드 추천 할인 / 보상", 값: `${won(k.brand_ref_boost)} / ${won(k.brand_ref_reward)}`, 비고: k.brand_ref_applied ? "적용" : "미적용" },
     { 항목: "브랜드 등급 할인", 값: won(k.brand_discount), 비고: `${k.brand_grade ?? ""} ${k.brand_discount_rate}` },
-    { 항목: "플랫폼 10% / costs / pf", 값: `${won(k.platform_fee_gross)} / ${won(k.costs)} / ${won(k.platform_fee)}`, 비고: `vat ${won(k.vat)} · 순수익 ${won(k.platform_net)}` },
+    { 항목: "플랫폼 11% / costs / pf", 값: `${won(k.platform_fee_gross)} / ${won(k.costs)} / ${won(k.platform_fee)}`, 비고: `인플 이용 ${won(k.seller_platform_fee)} · 브랜드 이용 ${won(k.brand_platform_fee)} · 결제 ${won(k.payment_fee)} · vat ${won(k.vat)} · 순수익(PG 차감) ${won(k.platform_net)}` },
     { 항목: "인플루언서 세전 / 원천징수 / 실수령", 값: `${won(k.seller_fee_total)} / ${won(k.seller_wht)} / ${won(k.seller_payout)}`, 비고: `wht ${k.wht_rate} · 샘플 환급 🥬${k.sample_refund_cel} + ${won(k.sample_refund_cash)}` },
     { 항목: "브랜드 정산액", 값: won(k.brand_payout), 비고: `🥬 보전 ${won(k.sample_cel_cover)}` },
     { 항목: "보류 예고", 값: [k.hold_seller ? `인플 ${holdText(k.holds?.seller)}` : "", k.hold_brand ? `브랜드 ${holdText(k.holds?.brand)}` : ""].filter(Boolean).join(" · ") || "없음", 비고: "" },
