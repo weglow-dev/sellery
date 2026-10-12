@@ -46,6 +46,12 @@
 		picked = on ? [...new Set([...picked, id])] : picked.filter((x) => x !== id);
 	};
 	const exportStatus = $derived(data.status === 'all' ? 'all' : data.status);
+	/**
+	 * 이체 파일에 실제로 들어갈 행 수 — **테이블 전체 기준**(`data.counts`).
+	 * CSV 는 `app_admin_payout_export` 가 명세 500건 상한 없이 다시 조회하므로, 화면에 그려진 행 수(`data.rows.length`)를
+	 * 버튼에 적으면 파일 행 수와 어긋난다. 이 숫자를 믿고 은행에 올리는 자리라 전체 기준이어야 한다.
+	 */
+	const exportCount = $derived(exportStatus === 'all' ? data.counts.all : data.counts[exportStatus]);
 
 	// 정산 후 환불 (0051) — 표시 중인 지급 건에 걸린 과지급 총액. 정산 단위로 센다(한 정산에 지급 건 2~3개).
 	const overpay = $derived.by(() => {
@@ -163,7 +169,12 @@
 		<input type="hidden" name="status" value={exportStatus} />
 		<label class="lbl" for="po-purpose">이체 파일 (계좌 원문)</label>
 		<input id="po-purpose" name="purpose" bind:value={purpose} maxlength={80} placeholder="목적 — 예: 지급 배치 2026-10" required />
-		<button type="submit" class="pri sm" disabled={!purpose.trim() || !data.rows.length}>이체 파일 CSV ({data.status === 'all' ? '전체' : data.chips.find((c) => c.key === data.status)?.label} {data.rows.length}건)</button>
+		<!--
+			버튼의 건수는 **테이블 전체 기준**(`counts`)이다 — 화면에 그려진 행 수를 적으면 안 된다.
+			CSV 는 `app_admin_payout_export` 가 상한 없이 다시 조회하므로, 화면 숫자를 적으면 파일 행 수와 어긋난다.
+			이체 파일을 은행에 올리는 운영자가 버튼 숫자를 믿고 올리는 자리라 특히 어긋나면 안 된다.
+		-->
+		<button type="submit" class="pri sm" disabled={!purpose.trim() || !exportCount}>이체 파일 CSV ({data.status === 'all' ? '전체' : data.chips.find((c) => c.key === data.status)?.label} {fmtNum(exportCount)}건)</button>
 		<span class="hint">계좌 원문이 실려요 — 다운로드마다 지급건 수만큼 열람 로그(sensitive_access_log)가 남고, 목적이 함께 기록됩니다.</span>
 	</form>
 	<form method="get" action={data.rrnPath} class="console-form admin-inline-form" target="_blank">
@@ -262,4 +273,15 @@
 		</tbody>
 	</table>
 </div>
-<p class="meta" style="margin:8px 3px 0">표시 {data.rows.length}건 · 합계 <b>{money(data.totalAmount)}</b> · 계좌는 뒤 4자리만 보여요. 정산 정보 미등록 보류는 파트너가 정보를 등록하면 풀려 지급 대기가 되고, 관리자가 확인 후 {tossMode ? '토스 지급대행으로 요청(또는 이체 파일로)' : '이체 파일로'} 지급합니다. [보류 해제]는 운영자 보류용이며, 파트너 정산 정보 완비를 다시 검사합니다(미완비면 해제 불가).{#if tossMode}{' '}토스 모드에서는 파트너의 토스 셀러가 지급 가능 상태(본인인증 완료)여야 지급 대기가 되고, 이체 완료 웹훅이 오면 자동으로 지급 완료가 돼요.{/if} 정산 명세 500건까지 표시돼요.</p>
+<!--
+	건수·합계는 테이블 전체 기준(`counts` · 대기 금액은 RPC 의 payouts_pending_amount)이다.
+	보류·완료·전체 금액만 받아온 행 합계라(PostgREST 집계 금지 · PGRST123) 그 경우에만 기준을 밝힌다.
+	`truncated` = 명세 500건 상한에 걸려 화면 행이 전체보다 적은 상태.
+-->
+<p class="meta" style="margin:8px 3px 0">
+	{data.status === 'all' ? '전체' : data.chips.find((c) => c.key === data.status)?.label}
+	<b>{fmtNum(data.status === 'all' ? data.counts.all : data.counts[data.status])}건</b>
+	· 합계 <b>{money(data.totalAmount)}</b>{#if !data.amountIsExact}<span> (표시 {fmtNum(data.shownCount)}건 기준)</span>{/if}
+	{#if data.truncated}<span> · 화면에는 최근 정산 명세 {fmtNum(data.cap)}건에서 나온 {fmtNum(data.shownCount)}건만 표시돼요 — 이체 파일·건수는 전체 기준입니다.</span>{/if}
+	· 계좌는 뒤 4자리만 보여요. 정산 정보 미등록 보류는 파트너가 정보를 등록하면 풀려 지급 대기가 되고, 관리자가 확인 후 {tossMode ? '토스 지급대행으로 요청(또는 이체 파일로)' : '이체 파일로'} 지급합니다. [보류 해제]는 운영자 보류용이며, 파트너 정산 정보 완비를 다시 검사합니다(미완비면 해제 불가).{#if tossMode}{' '}토스 모드에서는 파트너의 토스 셀러가 지급 가능 상태(본인인증 완료)여야 지급 대기가 되고, 이체 완료 웹훅이 오면 자동으로 지급 완료가 돼요.{/if}
+</p>

@@ -249,6 +249,36 @@ export async function holdPayout(payoutId: string, reason?: string | null, admin
   return parsePayoutActionResult(data);
 }
 
+/**
+ * 지급 건 상태별 **전체 건수** — `payouts` 테이블을 직접 센다.
+ *
+ * 왜 따로 세나: 지급 화면은 정산 명세를 `listAdminSettlements(null, 500)` 로 받아 지급 건으로 펼치므로,
+ * 받아온 행을 세면 명세가 500건을 넘는 순간 모자란 숫자가 된다. 그 숫자를 이체 파일 버튼에 적으면
+ * **버튼의 건수와 실제 CSV 행 수가 어긋난다** — CSV 는 `app_admin_payout_export` 가 상한 없이 다시 조회한다.
+ *
+ * 금액 합계는 여기서 내지 않는다 — PostgREST 가 집계 함수를 막아 두었고(`PGRST123`), `max_rows`(1000) 때문에
+ * 전 행을 받아 더할 수도 없다. 대기분 금액은 `app_admin_settlements` 의 `counts.payouts_pending_amount`
+ * (테이블 전체 sum)를 쓰고, 보류·완료·전체 금액은 RPC 에 집계를 더하는 별도 마이그레이션이 필요하다.
+ */
+export type PayoutStatusCounts = { pending: number; held: number; paid: number; all: number };
+
+export async function countPayoutsByStatus(admin: Admin = createAdminClient()): Promise<PayoutStatusCounts | null> {
+  const head = { count: "exact" as const, head: true };
+  const [pending, held, paid, all] = await Promise.all([
+    admin.from("payouts").select("id", head).eq("status", "pending"),
+    admin.from("payouts").select("id", head).eq("status", "held"),
+    admin.from("payouts").select("id", head).eq("status", "paid"),
+    admin.from("payouts").select("id", head),
+  ]);
+  for (const r of [pending, held, paid, all]) {
+    if (r.error) {
+      console.error("[admin/settle] payouts 상태별 건수 집계 실패:", r.error.message);
+      return null;
+    }
+  }
+  return { pending: pending.count ?? 0, held: held.count ?? 0, paid: paid.count ?? 0, all: all.count ?? 0 };
+}
+
 export async function releasePayout(payoutId: string, admin: Admin = createAdminClient()): Promise<PayoutActionResult> {
   if (!UUID_RE.test(payoutId)) return { ok: false, code: "NOT_FOUND" };
   const { data, error } = await admin.rpc("app_admin_payout_release", { p_payout_id: payoutId });

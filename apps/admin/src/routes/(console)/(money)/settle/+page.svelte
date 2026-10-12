@@ -51,9 +51,14 @@
 {:else}
 	<div class="mini-stats admin-strip" style="margin-top:0">
 		<div><span class="ms-l">기준일 도래 (실행 가능)</span><span class="ms-v" style={d.counts.due_now ? 'color:var(--color-danger)' : ''}>{d.counts.due_now}건</span><span class="ms-s">교환·환불 기간 {d.counts.clearing}건 중 · 오늘 {md(d.today)}</span></div>
-		<div><span class="ms-l">지급 보류</span><span class="ms-v" style={d.counts.payouts_held ? 'color:var(--color-danger)' : ''}>{d.counts.payouts_held}건</span><span class="ms-s">정산 정보 미완비 · 운영자 보류</span></div>
-		<div><span class="ms-l">미지급 합계</span><span class="ms-v" style="color:var(--color-plat)">{money(d.counts.payouts_pending_amount)}</span><span class="ms-s">지급 대기 {d.counts.payouts_pending}건</span></div>
-		<div><span class="ms-l">정산 명세</span><span class="ms-v">{d.counts.pending + d.counts.held + d.counts.paid}건</span><span class="ms-s">대기 {d.counts.pending} · 보류 {d.counts.held} · 완료 {d.counts.paid}</span></div>
+		<div><span class="ms-l">지급 보류</span><span class="ms-v" style={d.counts.payouts_held ? 'color:var(--color-danger)' : ''}>{d.counts.payouts_held}건</span><span class="ms-s">지급 건 기준 · 정산 정보 미완비 · 운영자 보류</span></div>
+		<!--
+			이 띠의 "지급 대기·보류" 는 **지급 건**(정산 1건이 인플루언서·브랜드·추천인으로 쪼개진 것), 오른쪽 "정산 명세" 는
+			**명세** 단위다. 둘이 같은 말("대기")을 쓰면 "₩9,599,099 를 지급해야 하는데 명세 목록이 비었다" 로 읽힌다 —
+			명세 상태는 지급 건에서 파생되고 하나라도 보류면 명세 전체가 `held` 가 되기 때문이다(admin_settlement_sync_status).
+		-->
+		<div><span class="ms-l">미지급 합계</span><span class="ms-v" style="color:var(--color-plat)">{money(d.counts.payouts_pending_amount)}</span><span class="ms-s">지급 건 {d.counts.payouts_pending}건 대기 · <a href={data.payoutsPath}>지급 관리</a></span></div>
+		<div><span class="ms-l">정산 명세</span><span class="ms-v">{d.counts.pending + d.counts.held + d.counts.paid}건</span><span class="ms-s">명세 기준 · 전부 대기 {d.counts.pending} · 일부 보류 {d.counts.held} · 전부 지급 {d.counts.paid}</span></div>
 	</div>
 
 	<!-- ---------------- 도래분 일괄 실행 ---------------- -->

@@ -5,6 +5,7 @@ import { adminPath, requireAdmin } from '$lib/server/admin';
 import {
 	RATE_LIMIT_MESSAGE,
 	cancelTossPayout,
+	countPayoutsByStatus,
 	getPayoutMode,
 	holdPayout,
 	listAdminSettlements,
@@ -70,13 +71,16 @@ const MSG: Record<string, PayoutsMessage> = {
 	err_rate: { tone: 'danger', text: RATE_LIMIT_MESSAGE }
 };
 
+/** 정산 명세 조회 상한 — 화면 행은 이만큼의 명세에서 나온다. 건수·합계·이체 파일은 이 상한과 무관하게 전체 기준이다. */
+const SETTLEMENT_CAP = 500;
+
 export const load: PageServerLoad = async (event) => {
 	const gate = await requireAdmin(event);
 	if (!gate.ok) redirect(303, gate.location);
 
 	const sRaw = event.url.searchParams.get('status');
 	const status: PayoutStatus | 'all' = sRaw === 'all' ? 'all' : sRaw === 'held' || sRaw === 'paid' ? sRaw : 'pending';
-	const [all, payoutMode, postRefunds] = await Promise.all([listAdminSettlements(null, 500), getPayoutMode(), listPostSettleRefunds(500)]);
+	const [all, payoutMode, postRefunds, exact] = await Promise.all([listAdminSettlements(null, SETTLEMENT_CAP), getPayoutMode(), listPostSettleRefunds(SETTLEMENT_CAP), countPayoutsByStatus()]);
 	const overview: PayoutTossOverview | null = payoutMode === 'toss' ? await payoutTossOverview({ withBalance: true }) : null;
 	const tossById = new Map<string, TossQueueRow>();
 	for (const r of overview?.rows ?? []) tossById.set(r.payout_id, r);
@@ -109,9 +113,24 @@ export const load: PageServerLoad = async (event) => {
 			});
 		}
 	}
-	const counts = { pending: rows.filter((x) => x.status === 'pending').length, held: rows.filter((x) => x.status === 'held').length, paid: rows.filter((x) => x.status === 'paid').length };
+	/**
+	 * 건수·합계는 **테이블 전체 기준**을 쓴다 — 받아온 행(`rows`)은 정산 명세 500건 안의 것이라
+	 * 명세가 그 수를 넘으면 모자란 숫자가 되고, 그 숫자를 이체 파일 버튼에 적으면 CSV 행 수와 어긋난다.
+	 *   건수: `countPayoutsByStatus()` (payouts 테이블 count=exact)
+	 *   금액: 대기분만 `counts.payouts_pending_amount`(테이블 전체 sum)가 있다. 보류·완료·전체 금액은
+	 *         PostgREST 가 집계를 막아(PGRST123) 정확한 값을 만들 수 없어 받아온 행 합계를 쓰고 화면에 그 사실을 밝힌다.
+	 * 집계 조회가 실패하면(`exact === null`) 받아온 행으로 되돌린다 — 숫자가 사라지는 것보다 낫다.
+	 */
+	const shown = { pending: rows.filter((x) => x.status === 'pending').length, held: rows.filter((x) => x.status === 'held').length, paid: rows.filter((x) => x.status === 'paid').length };
+	const counts = exact ?? { ...shown, all: rows.length };
 	const filtered = status === 'all' ? rows : rows.filter((x) => x.status === status);
-	const totalAmount = filtered.reduce((a, x) => a + x.amount, 0);
+	const shownAmount = filtered.reduce((a, x) => a + x.amount, 0);
+	/** 이 상태의 합계가 테이블 전체 기준인가 — 대기분만 참 */
+	const amountIsExact = status === 'pending' && all !== null;
+	const totalAmount = amountIsExact ? all.counts.payouts_pending_amount : shownAmount;
+	/** 받아온 행이 전체보다 적은가 — 화면에 "표시 N건" 을 덧붙일지 결정 */
+	const shownCount = status === 'all' ? rows.length : filtered.length;
+	const truncated = shownCount < (status === 'all' ? counts.all : counts[status]);
 
 	const key = event.url.searchParams.get('msg') ?? '';
 	const err = event.url.searchParams.get('err');
@@ -124,6 +143,13 @@ export const load: PageServerLoad = async (event) => {
 		rows: filtered,
 		counts,
 		totalAmount,
+		/** `totalAmount` 가 테이블 전체 기준인가 (대기분만 참) — 화면이 문구로 구분한다 */
+		amountIsExact,
+		/** 지금 화면에 그려진 행 수 — `counts` 보다 적으면 명세 상한에 걸린 것 */
+		shownCount,
+		truncated,
+		/** 명세 조회 상한 — 안내 문구가 이 값을 쓴다(하드코딩하면 상한을 바꿀 때 거짓말이 된다) */
+		cap: SETTLEMENT_CAP,
 		loaded: all !== null,
 		msg,
 		payoutMode,
@@ -148,7 +174,7 @@ export const load: PageServerLoad = async (event) => {
 			{ key: 'pending', label: '지급 대기', n: counts.pending, href: self },
 			{ key: 'held', label: '보류', n: counts.held, href: `${self}?status=held` },
 			{ key: 'paid', label: '지급 완료', n: counts.paid, href: `${self}?status=paid` },
-			{ key: 'all', label: '전체', n: rows.length, href: `${self}?status=all` }
+			{ key: 'all', label: '전체', n: counts.all, href: `${self}?status=all` }
 		],
 		self,
 		exportPath: adminPath('/settle/payouts/export.csv'),
