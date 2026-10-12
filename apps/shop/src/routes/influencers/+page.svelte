@@ -1,13 +1,14 @@
 <script lang="ts">
 	/**
 	 * /influencers — 인플루언서 목록 (프로토타입 vCustInfluencers 마크업 1:1 + 플랫폼·카테고리 칩 필터 · LIVE 판매 링크). 데이터는 +page.server.ts.
-	 *   1 제목 · 2 링크 보호 안내 · 3 플랫폼 칩(?platform=) · 4 카테고리 칩(?cat=) · 5 카드 3열(아바타 · 이름 · 등급 · 플랫폼 핸들 · 팔로워 · 채널 인증 ✓ · 소개 · 카테고리 · 건수 · LIVE 링크)
+	 *   1 제목 · 2 링크 보호 안내 · 3 팔로우 필터(?following=1 · 회원만) · 4 플랫폼 칩(?platform=) · 5 카테고리 칩(?cat=) · 6 카드 3열(아바타 · 이름 · 등급 · 플랫폼 핸들 · 팔로워 · 채널 인증 ✓ · 소개 · 카테고리 · 건수 · LIVE 링크)
 	 * 카드의 "판매 보기" 는 홈 `?seller={code}` (프로토타입 custSel → 홈 이동과 동일).
 	 * 카드의 팔로우 토글(0045)은 서버 폼 액션 — 효과는 홈 정렬 우대뿐이고 메일은 나가지 않는다.
+	 *   팔로우한 사람을 **모아 볼 화면이 여기뿐**이라 `★ 팔로잉` 칩으로 거른다(홈 카드에는 표식이 없다).
 	 *   카드에 보이는 "팔로워 {n}" 은 **SNS 채널 팔로워 수**(`sellers.followers`)다 — 셀러리 내 팔로우 수가 아니고, 그 수치는 노출하지 않는다.
 	 */
 	import { CATS, fmtNum, storeUrl } from '@sellery/db/campaign';
-	import { followButtonView, followMessage } from '@sellery/db/follows';
+	import { followButtonView, followMessage, followMessageTone } from '@sellery/db/follows';
 	import { SELLER_PLATFORMS } from '@sellery/db/sellers';
 	import { PLATFORM_NAMES, PlatIcon, ProductIcon, SellerAvatar } from '@sellery/ui/site';
 	import type { PageData } from './$types';
@@ -17,17 +18,21 @@
 	/** 로그인 뒤 돌아올 주소 — 필터를 유지한다 */
 	const loginNext = $derived(`/influencers${data.platform || data.cat ? `?${new URLSearchParams({ ...(data.platform ? { platform: data.platform } : {}), ...(data.cat ? { cat: data.cat } : {}) }).toString()}` : ''}`);
 	const followMsg = $derived(followMessage(data.followMsg));
+	/** 실패(`err_*`)를 성공 박스로 보여주지 않는다 — 톤과 role 을 함께 바꾼다 */
+	const followTone = $derived(followMessageTone(data.followMsg));
 
 	const TITLE = '인플루언서 — 셀러리';
 	const DESCRIPTION = '셀러리 인증 인플루언서 — 채널 소유 인증과 판매 실적 등급을 확인하고, 진행 중·오픈 예정 판매를 살펴보세요.';
 
 	/** 필터 = URL 상태 (홈 qs 와 같은 규칙) */
-	function qs(next: { platform?: string | null; cat?: string | null }): string {
+	function qs(next: { platform?: string | null; cat?: string | null; following?: boolean }): string {
 		const p = new URLSearchParams();
 		const pl = next.platform === undefined ? data.platform : next.platform;
 		const c = next.cat === undefined ? data.cat : next.cat;
+		const f = next.following === undefined ? data.onlyFollowing : next.following;
 		if (pl) p.set('platform', pl);
 		if (c && c !== '전체') p.set('cat', c);
+		if (f) p.set('following', '1');
 		const q = p.toString();
 		return q ? `/influencers?${q}` : '/influencers';
 	}
@@ -55,23 +60,33 @@
 	</div>
 {/if}
 
-<!-- 3. 플랫폼 칩 -->
+<!-- 3. 팔로우 필터 — 회원만. 팔로우한 사람을 모아 볼 화면이 여기뿐이라, 목록을 훑지 않고 바로 거른다 -->
+{#if data.signedIn}
+	<div class="cats" style="margin:0 0 6px" role="navigation" aria-label="팔로우 필터">
+		<a href={qs({ following: !data.onlyFollowing })} class={data.onlyFollowing ? 'catchip on' : 'catchip'} aria-current={data.onlyFollowing ? 'page' : undefined} title={data.onlyFollowing ? '전체 인플루언서 보기' : '내가 팔로우한 인플루언서만 보기'}>
+			★ 팔로잉 <span class="n">{data.followingCount}</span>
+		</a>
+	</div>
+{/if}
+
+<!-- 4. 플랫폼 칩 -->
 <div class="cats" style="margin:0 0 6px" role="navigation" aria-label="플랫폼">
 	<a href={qs({ platform: null })} class={data.platform ? 'catchip' : 'catchip on'} aria-current={data.platform ? undefined : 'page'}>전체 <span class="n">{data.total}</span></a>
 	{#each SELLER_PLATFORMS as k (k)}
 		<a href={qs({ platform: k })} class={data.platform === k ? 'catchip on' : 'catchip'} aria-current={data.platform === k ? 'page' : undefined}><PlatIcon platform={k} /> {PLATFORM_NAMES[k]} <span class="n">{data.counts.platform[k] ?? 0}</span></a>
 	{/each}
 </div>
-<!-- 4. 카테고리 칩 -->
+<!-- 5. 카테고리 칩 -->
 <div class="cats" style="margin:0 0 14px" role="navigation" aria-label="주력 카테고리">
 	{#each CATS as k (k)}
 		<a href={qs({ cat: k === '전체' ? null : k })} class={(data.cat ?? '전체') === k ? 'catchip on' : 'catchip'} aria-current={(data.cat ?? '전체') === k ? 'page' : undefined}>{k} <span class="n">{k === '전체' ? data.total : (data.counts.cat[k] ?? 0)}</span></a>
 	{/each}
 </div>
 
-<!-- 5. 카드 -->
+<!-- 6. 카드 -->
 {#if followMsg}
-	<p class="notice ok" role="status" style="margin:0 0 12px">{followMsg}</p>
+	<!-- 실패는 빨간 박스 + `role="alert"` — `role="status"`(polite)는 오류를 늦게 읽어준다 -->
+	<p class={followTone === 'danger' ? 'notice danger' : 'notice ok'} role={followTone === 'danger' ? 'alert' : 'status'} style="margin:0 0 12px">{followMsg}</p>
 {/if}
 <div class="grid g3">
 	{#each data.list as { s, stats, following } (s.id)}
@@ -118,7 +133,15 @@
 		</div>
 	{:else}
 		<div class="empty" style="grid-column:1 / -1">
-			{#if data.platform || data.cat}조건에 맞는 인증 인플루언서가 없습니다 — <a href="/influencers">전체 보기</a>{:else}인증 인플루언서를 준비 중입니다{/if}
+			{#if data.onlyFollowing && !data.platform && !data.cat}
+				아직 팔로우한 인플루언서가 없어요 — <a href={qs({ following: false })}>전체 보기</a> 에서 카드의 [☆ 팔로우] 를 눌러보세요
+			{:else if data.onlyFollowing}
+				팔로우한 인플루언서 중에 조건에 맞는 사람이 없어요 — <a href={qs({ platform: null, cat: null })}>팔로잉 전체</a> · <a href="/influencers">전체 보기</a>
+			{:else if data.platform || data.cat}
+				조건에 맞는 인증 인플루언서가 없습니다 — <a href="/influencers">전체 보기</a>
+			{:else}
+				인증 인플루언서를 준비 중입니다
+			{/if}
 		</div>
 	{/each}
 </div>

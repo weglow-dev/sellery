@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FOLLOW_MESSAGES, followButtonView, followMessage, followRank } from "../follows";
+import { FOLLOW_MESSAGES, followButtonView, followMessage, followMessageTone, followRank } from "../follows";
 
 /**
  * 인플루언서 팔로우 순수 규칙 (0045). DB 를 타는 `server/follows.server.ts` 는
@@ -82,5 +82,30 @@ describe("followMessage", () => {
     expect(followMessage("")).toBeNull();
     expect(followMessage(null)).toBeNull();
     expect(followMessage("<script>")).toBeNull();
+  });
+});
+
+describe("followMessageTone", () => {
+  it("err_ 키는 danger — 실패를 성공 박스로 보여주지 않는다", () => {
+    expect(followMessageTone("err_NOT_FOUND")).toBe("danger");
+    expect(followMessageTone("err_DB_ERROR")).toBe("danger");
+  });
+
+  it("성공·이미 상태는 ok", () => {
+    expect(followMessageTone("on")).toBe("ok");
+    expect(followMessageTone("on_already")).toBe("ok");
+    expect(followMessageTone("off")).toBe("ok");
+    expect(followMessageTone("off_already")).toBe("ok");
+  });
+
+  it("문구가 없는 키는 null — 화면이 아무것도 그리지 않는 것과 맞춘다", () => {
+    expect(followMessageTone("wat")).toBeNull();
+    expect(followMessageTone("err_WAT")).toBeNull();
+    expect(followMessageTone("")).toBeNull();
+    expect(followMessageTone(null)).toBeNull();
+  });
+
+  it("FOLLOW_MESSAGES 의 모든 키에 톤이 있다", () => {
+    for (const k of Object.keys(FOLLOW_MESSAGES)) expect(followMessageTone(k)).not.toBeNull();
   });
 });
