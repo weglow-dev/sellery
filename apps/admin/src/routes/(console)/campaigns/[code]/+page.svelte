@@ -8,10 +8,10 @@
 	import { fmtNum } from '@sellery/db/campaign';
 	import { md } from '@sellery/db/dates';
 	import { isOfficialSender, senderLabel } from '@sellery/db/partner/chat-rules';
-	import { adminCampaignAction, adminCampaignIdleReason, adminSaleControl, campaignPeriodLabel, campaignStatusChip } from '@sellery/db/admin/campaign-rules';
+	import { adminCampaignAction, adminCampaignIdleReason, adminSaleControl, campaignPeriodLabel, campaignStatusChip, REJECT_REASON_MAX } from '@sellery/db/admin/campaign-rules';
 	import { COURIERS } from '@sellery/db/brand/campaign-rules';
 	import { CampaignStepper, PlatformHandle, ProductIcon, StatusChip, ThreadComposer } from '@sellery/ui/site';
-	import type { ActionData, PageData } from './$types';
+	import type { ActionData, PageData, SubmitFunction } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -21,9 +21,18 @@
 	const action = $derived(adminCampaignAction(c.status));
 	const sale = $derived(adminSaleControl(c.status));
 	const idle = $derived(adminCampaignIdleReason(c.status));
-	const ask = (msg: string) => (e: SubmitEvent) => {
-		if (!confirm(msg)) e.preventDefault();
-	};
+	/**
+	 * 확인창 — **`use:enhance` 폼에서는 `onsubmit` 의 `preventDefault()` 로 막을 수 없다.**
+	 * enhance 의 submit 리스너는 `event.defaultPrevented` 를 보지 않고 그대로 전송한다
+	 * (@sveltejs/kit 2.70.3 `src/runtime/app/forms.js` handle_submit — method 검사 뒤 바로 `preventDefault()` + fetch).
+	 * 그래서 enhance 가 주는 `cancel()` 로 멈춘다(같은 파일 `if (cancelled) return;`). `onsubmit={ask(…)}` 로 쓰면
+	 * [취소]를 눌러도 요청이 나간다 — 확인창이 장식이 된다.
+	 */
+	const ask =
+		(msg: string): SubmitFunction =>
+		({ cancel }) => {
+			if (!confirm(msg)) cancel();
+		};
 	const names = $derived({ seller: c.seller?.name ?? null, brand: c.brand?.name ?? null });
 	const money = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `₩${fmtNum(n)}`);
 	const pct = (r: number | null | undefined) => (r === null || r === undefined ? '—' : `${(r * 100).toFixed(0)}%`);
@@ -181,11 +190,23 @@
 						<form method="POST" action="?/approveSample" use:enhance>
 							<button type="submit" class="pri sm">승인</button>
 						</form>
-						<form method="POST" action="?/rejectSample" use:enhance class="camp-reason">
-							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" aria-label="거절 사유" />
+						<!--
+							거절은 종결이다 — `REJECTED` 에서 되돌리는 액션이 화면에 없다. 그래서 긴급 판매 중단
+							(`?/endSale`)과 같은 마찰을 둔다: 확인창 + 사유 필수. 사유는 스레드에 보인다(0015).
+						-->
+						<form
+							method="POST"
+							action="?/rejectSample"
+							class="camp-reason"
+							use:enhance={ask(
+								`${names.seller ?? '인플루언서'}님의 샘플 요청을 거절할까요?\n\n거절하면 이 캠페인은 종결되고 화면에서 되돌릴 수 없습니다. 사유는 스레드에 남아 인플루언서·브랜드에게도 보입니다.`
+							)}
+						>
+							<input name="reason" type="text" maxlength={REJECT_REASON_MAX} required placeholder="거절 사유 (필수)" aria-label="거절 사유" />
 							<button type="submit" class="ghost sm">거절</button>
 						</form>
 					</div>
+					{#if form?.sampleRejectError}<p class="notice danger" role="alert">{form.sampleRejectError}</p>{/if}
 				{:else if action.kind === 'ship_sample'}
 					<form method="POST" action="?/shipSample" use:enhance class="camp-ship console-form">
 						<label for="courier">택배사</label>
@@ -206,11 +227,20 @@
 						<form method="POST" action="?/confirmSchedule" use:enhance>
 							<button type="submit" class="pri sm">일정 확정</button>
 						</form>
-						<form method="POST" action="?/rejectSchedule" use:enhance class="camp-reason">
-							<input name="reason" type="text" maxlength="200" placeholder="거절 사유 (선택)" aria-label="거절 사유" />
+						<!-- 샘플 거절과 같은 규칙 — 종결 상태이므로 확인창 + 사유 필수 -->
+						<form
+							method="POST"
+							action="?/rejectSchedule"
+							class="camp-reason"
+							use:enhance={ask(
+								`${names.seller ?? '인플루언서'}님이 제안한 일정(${campaignPeriodLabel(c.start_date, c.end_date)})을 거절할까요?\n\n거절하면 이 캠페인은 종결되고 화면에서 되돌릴 수 없습니다. 사유는 스레드에 남아 인플루언서·브랜드에게도 보입니다.`
+							)}
+						>
+							<input name="reason" type="text" maxlength={REJECT_REASON_MAX} required placeholder="거절 사유 (필수)" aria-label="거절 사유" />
 							<button type="submit" class="ghost sm">거절</button>
 						</form>
 					</div>
+					{#if form?.scheduleRejectError}<p class="notice danger" role="alert">{form.scheduleRejectError}</p>{/if}
 				{/if}
 			</div>
 		{:else}
@@ -236,9 +266,8 @@
 					<form
 						method="POST"
 						action="?/endSale"
-						use:enhance
 						class="console-form camp-endsale"
-						onsubmit={ask(`${p?.name ?? c.code} 판매를 지금 중단할까요? 고객은 즉시 구매할 수 없게 됩니다.`)}
+						use:enhance={ask(`${p?.name ?? c.code} 판매를 지금 중단할까요? 고객은 즉시 구매할 수 없게 됩니다.`)}
 					>
 						<label for="end_reason">중단 사유 (필수)</label>
 						<input
@@ -257,7 +286,7 @@
 					</form>
 					{#if form?.endError}<p class="notice danger" role="alert">{form.endError}</p>{/if}
 				{:else}
-					<form method="POST" action="?/resumeSale" use:enhance onsubmit={ask(`${p?.name ?? c.code} 판매를 다시 열까요?`)}>
+					<form method="POST" action="?/resumeSale" use:enhance={ask(`${p?.name ?? c.code} 판매를 다시 열까요?`)}>
 						<button type="submit" class="ghost sm">판매 재개</button>
 					</form>
 				{/if}
