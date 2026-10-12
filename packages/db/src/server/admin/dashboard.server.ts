@@ -140,7 +140,10 @@ export type AdminDashboard = {
      * (0015:668) 위 `unshippedOrders` 에서는 빠진다 — 그래서 따로 센다. 이게 없으면 샘플 미발송을
      * 아무도 보지 않는다. 미발송 샘플은 5영업일 뒤 환불 대상이다(0024 · docs/sample-policy.md).
      */
-    sampleToShip: number;
+    /** 샘플 승인 후 발송 대기 — 홈 할 일 링크가 `?status=SAMPLE_APPROVED` 로 간다 */
+    sampleApprovedToShip: number;
+    /** 샘플 구매 후 발송 대기 — 링크가 `?status=SAMPLE_PURCHASED` 로 간다(상태별로 나눠야 숫자가 맞는다) */
+    samplePurchasedToShip: number;
     /**
      * 우선 검수권(🥬)으로 관리자 검수를 건너뛴 상품 중 **아직 사후 점검하지 않은** 건 (0046).
      * `pending → listed` 로 바뀌어 "검수 대기" 에서 사라지므로 따로 세지 않으면 아무도 보지 않는다.
@@ -207,6 +210,23 @@ async function count(q: PromiseLike<{ count: number | null; error: { message: st
     return 0;
   }
   return n ?? 0;
+}
+
+/**
+ * 채널 인증 대기 **인플루언서 수** — 채널 행이 아니라 사람 수다.
+ *
+ * 홈 "오늘 할 일" 의 숫자는 눌러서 도착한 목록의 행 수와 같아야 한다. 도착지
+ * `/admin/sellers?filter=pending_channel` 은 대기 채널을 가진 인플루언서를 한 행으로 보여주므로
+ * (`sellers.server.ts` pendingSellerIds) 여기서도 `seller_id` 로 중복을 제거한다.
+ * 조건은 `isChannelPending`(`!verified && vcode_confirmed_at !== null`)과 같다.
+ */
+async function pendingChannelSellers(admin: Admin): Promise<number> {
+  const { data, error } = await admin.from("seller_channels").select("seller_id").eq("verified", false).not("vcode_confirmed_at", "is", null);
+  if (error) {
+    console.error("[admin/dashboard] 채널 승인 대기 집계 실패:", error.message);
+    return 0;
+  }
+  return new Set((data ?? []).map((r) => r.seller_id as string)).size;
 }
 
 /** Asia/Seoul 기준 오늘(YYYY-MM-DD) — 주문일 비교용. 서버 TZ 에 의존하지 않는다 */
@@ -289,7 +309,7 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
   const statusMap = new Map<string, number>();
   for (const c of campaigns) statusMap.set(c.status, (statusMap.get(c.status) ?? 0) + 1);
 
-  const [ordersToday, ordersRefunded, pendingProducts, fastReviewPending, exclusivePending, unshippedOrders, sampleToShip, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
+  const [ordersToday, ordersRefunded, pendingProducts, fastReviewPending, exclusivePending, unshippedOrders, sampleApprovedToShip, samplePurchasedToShip, awaitingApproval, unverified, brandsNoBank, sellersNoBank, staleTesting] =
     await Promise.all([
       count(admin.from("orders").select("id", head).gte("paid_at", `${today}T00:00:00+09:00`).lte("paid_at", `${today}T23:59:59+09:00`), "오늘 주문"),
       count(admin.from("orders").select("id", head).eq("status", "REFUNDED"), "환불 주문"),
@@ -316,11 +336,18 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
         admin.from("orders").select("id", head).eq("status", "PAID").is("tracking_no", null).eq("is_sample", false),
         "미발송 주문",
       ),
-      count(
-        admin.from("campaigns").select("id", head).in("status", ["SAMPLE_APPROVED", "SAMPLE_PURCHASED"]),
-        "샘플 발송 대기",
-      ),
-      count(admin.from("seller_channels").select("id", head).eq("verified", false).not("vcode_confirmed_at", "is", null), "채널 승인 대기"),
+      // 샘플 발송 대기 — **상태별로 나눠 센다.** 둘 다 브랜드가 보내야 하는 건이지만
+      //   (`app_brand_ship_sample` 이 두 상태를 받는다 · docs/sample-policy.md:37 "샘플 구매 · 발송 대기"),
+      //   홈의 할 일 링크는 `?status=` 에 **한 상태만** 담을 수 있다(`parseCampaignStatusFilter`).
+      //   합쳐 세면 눌러서 도착한 표에 `SAMPLE_PURCHASED` 가 빠져 숫자가 어긋난다(실측: 홈 2 · 도착 1).
+      //   정산정보 미등록을 브랜드·인플루언서로 나눈 것과 같은 이유다.
+      count(admin.from("campaigns").select("id", head).eq("status", "SAMPLE_APPROVED"), "샘플 발송 대기(승인)"),
+      count(admin.from("campaigns").select("id", head).eq("status", "SAMPLE_PURCHASED"), "샘플 발송 대기(구매)"),
+      // 채널 인증 대기 — **인플루언서 수**로 센다. 도착지(`/admin/sellers?filter=pending_channel`)가
+      //   대기 채널을 가진 **인플루언서**를 한 행으로 보여주기 때문이다(`sellers.server.ts:204` pendingSellerIds ·
+      //   `counts.pendingChannel` 과 같은 기준). 채널 행으로 세면 한 사람이 채널 2개를 올린 경우
+      //   홈은 2, 목록은 1행이 되어 어긋난다(실측 확인). 조건은 `isChannelPending` 과 같다.
+      pendingChannelSellers(admin),
       count(admin.from("seller_channels").select("id", head).eq("verified", false), "미인증 채널"),
       count(admin.from("brands").select("id", head).is("bank_info", null), "브랜드 정산정보 미등록"),
       count(admin.from("sellers").select("id", head).is("bank_info", null), "인플루언서 정산정보 미등록"),
@@ -351,7 +378,8 @@ export async function getAdminDashboard(admin: Admin = createAdminClient()): Pro
       fastReviewPending,
       exclusivePending,
       unshippedOrders,
-      sampleToShip,
+      sampleApprovedToShip,
+      samplePurchasedToShip,
       channelsAwaitingApproval: awaitingApproval,
       channelsUnverified: unverified,
       noSettleInfoBrands: brandsNoBank,
