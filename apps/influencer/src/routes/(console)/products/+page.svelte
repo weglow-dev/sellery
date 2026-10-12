@@ -4,7 +4,7 @@
 	 * 카테고리 칩(전체 + 상품이 있는 카테고리 · `?cat=`) · 카테고리 안내(CAT_POLICY · CAT_INFO) · 카드(누끼/이모지 · 브랜드 · 판매가 · 수수료 · 🎁 샘플 한 줄 · 버튼).
 	 * 버튼은 서버가 만든 `sampleButton` — 무상 요청·구매·진행 중은 전부 상세(`/products/<code>`)로 간다(배송지 입력은 상세에서). 샘플 구매는 4단계 예고로 비활성.
 	 */
-	import { CAT_INFO, GRADES } from '@sellery/core/constants';
+	import { CAT_INFO } from '@sellery/core/constants';
 	import { discountPct, fmtNum, imageSrc } from '@sellery/db/campaign';
 	import { Tilt } from '@sellery/ui/site';
 	import type { PageData } from './$types';
@@ -13,7 +13,6 @@
 	const chips = $derived(['전체', ...data.categories]);
 	const freeHref = $derived((() => { const u = new URLSearchParams(); if (data.cat !== '전체') u.set('cat', data.cat); if (!data.free) u.set('free', '1'); const q = u.toString(); return q ? `${data.listPath}?${q}` : data.listPath; })());
 	const info = $derived(data.cat !== '전체' ? (CAT_INFO as Record<string, { en: string; desc: string; ex: string }>)[data.cat] : null);
-	const topBonus = GRADES[0]?.bonus ?? 3;
 	const pct = (r: number) => (r * 100).toFixed(0);
 </script>
 
@@ -63,7 +62,7 @@
 			<div class="pricegrid">
 				<div><span class="pl">셀러 판매가</span><span class="gp">₩{fmtNum(p.sale_price)}</span>{#if disc !== null}<span class="disc">-{disc}%</span>{/if}</div>
 				<div><span class="pl">브랜드 시중가</span><span class="cp">₩{fmtNum(p.consumer_price)}</span></div>
-				<div><span class="pl">수수료</span><span class="rate">{pct(p.commission_rate)}~{(p.commission_rate * 100 + topBonus).toFixed(0)}%</span></div>
+				<div><span class="pl">수수료</span><span class="rate">{pct(p.commission_rate)}%</span></div>
 			</div>
 			{#if p.status.rule}
 				<div class="samplebox"><div class="rule">🎁 {p.status.rule}</div></div>

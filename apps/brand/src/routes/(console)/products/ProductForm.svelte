@@ -52,7 +52,6 @@
 
 	const v = (k: string) => values[k] ?? '';
 	const inv = (k: string) => (field === k ? 'invalid' : '');
-	const topBonus = GRADES[0]?.bonus ?? 3;
 	const tiers = sampleTierOptions();
 
 	// 인플루언서 수수료율 문구 (0053: 플랫폼 몫 별도) — 입력 중 실시간. 초기값만 props 에서 (평범한 POST 라 실패 시 페이지가 다시 그려진다).
@@ -171,7 +170,7 @@
 			{#if locked}<input type="hidden" name="total_rate" value={v('total_rate')} />{/if}
 			<div class="hint">
 				{#if totalRate >= MIN_SELLER_RATE * 100}
-					→ 인플루언서 수수료 <b class="console-accent">{sellerPct}%</b> · 등급 보너스 포함 최대 <b>{+(sellerPct + topBonus).toFixed(1)}%</b> (블랙, 보너스는 셀러리 부담)
+					→ 인플루언서 수수료 <b class="console-accent">{sellerPct}%</b> (등급 보너스 +0~3%p 는 셀러리가 따로 부담 — 브랜드 부담 아님)
 					<br />셀러리 플랫폼 이용 수수료 3% + 결제 수수료 5%(VAT 포함)는 이 숫자와 별개로 정산 시 차감돼요.
 					{#if rateClamped}
 						<br /><span class="console-danger">수수료 하한 {MIN_SELLER_RATE * 100}% 가 적용됐어요.</span>
