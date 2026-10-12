@@ -132,6 +132,10 @@ export type RevenueTotals = {
   brand_ref_boost: number;
   brand_ref_reward: number;
   brand_discount: number;
+  /** 0053 — 이용 수수료(인플·브랜드) · 결제 수수료. platform_fee_gross = 셋의 합 */
+  seller_platform_fee: number;
+  brand_platform_fee: number;
+  payment_fee: number;
   platform_fee_gross: number;
   costs: number;
   platform_fee: number;
@@ -205,6 +209,9 @@ const TOTAL_KEYS: (keyof RevenueTotals)[] = [
   "brand_ref_boost",
   "brand_ref_reward",
   "brand_discount",
+  "seller_platform_fee",
+  "brand_platform_fee",
+  "payment_fee",
   "platform_fee_gross",
   "costs",
   "platform_fee",

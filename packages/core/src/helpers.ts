@@ -3,7 +3,7 @@ import { S, D_, save } from './state.svelte';
 import type { Brand, Campaign, CS, Grade, Product, Seller, ExternalSale, Status } from './types';
 import {
 	ACTIVE_BLOCKERS, BG_DISC, BGRADES, BREF_DISC, BREF_RATE, BREF_TIMES, CATMAP, CELERY_PER, CLEAR_DAYS, DATA_PRICE, DEMO_REAL_ONLY,
-	DONE_STATES, GRADES, PG_RATE, PLAT_RATE, PRIORITY_TIER, REF_BOOST, REF_RATE, REF_TIMES, SAMPLE_CEL_WON, WHT
+	DONE_STATES, GRADES, PG_RATE, BRAND_PLAT_RATE, PAY_FEE_RATE, SELLER_PLAT_RATE, PRIORITY_TIER, REF_BOOST, REF_RATE, REF_TIMES, SAMPLE_CEL_WON, WHT
 } from './constants';
 import { CEL, gfull } from './icons';
 import { addD, DAY, fmt, md, P, today, ymd } from './util';
@@ -132,7 +132,7 @@ export function isBrandRefBoost(c: Campaign) {
 }
 export interface Calc {
 	gross: number; refund: number; net: number; sampleNet: number; pg: number; sf: number; gBonus: number; sfTotal: number; boost: number; refReward: number;
-	rb: boolean; bb: boolean; bBoost: number; bReward: number; bDisc: number; pfGross: number; costs: number; pf: number; vat: number; pfNet: number; brandPay: number; paidCnt: number; refCnt: number;
+	rb: boolean; bb: boolean; bBoost: number; bReward: number; bDisc: number; spf: number; bpf: number; pay: number; pfGross: number; costs: number; pf: number; vat: number; pfNet: number; brandPay: number; paidCnt: number; refCnt: number;
 }
 export function calc(c: Campaign): Calc {
 	const os = campOrders(c.id);
@@ -147,13 +147,15 @@ export function calc(c: Campaign): Calc {
 	const boost = rb ? net * REF_BOOST : 0, refReward = rb ? net * REF_RATE : 0;
 	const bBoost = bb ? net * BREF_DISC : 0, bReward = bb ? net * BREF_RATE : 0;
 	const bDisc = net * bDiscOf(b);
-	const pfGross = net * PLAT_RATE;
+	// 0053: 플랫폼 이용 수수료(인플 3% · 브랜드 3%) + 결제 수수료(5%) — PG 는 플랫폼 비용
+	const spf = (net - sampleNet) * SELLER_PLAT_RATE, bpf = net * BRAND_PLAT_RATE, pay = net * PAY_FEE_RATE;
+	const pfGross = spf + bpf + pay;
 	const costs = gBonus + boost + refReward + bBoost + bReward + bDisc;
 	const pf = pfGross - costs;
 	const vat = pf > 0 ? pf - pf / 1.1 : 0;
-	const pfNet = pf - vat;
-	return { gross, refund, net, sampleNet, pg, sf, gBonus, sfTotal: sf + gBonus + boost, boost, refReward, rb, bb, bBoost, bReward, bDisc, pfGross, costs, pf, vat, pfNet,
-		brandPay: net - pg - sf - pfGross + bBoost + bDisc,
+	const pfNet = pf - vat - pg;
+	return { gross, refund, net, sampleNet, pg, sf, gBonus, sfTotal: sf + gBonus + boost, boost, refReward, rb, bb, bBoost, bReward, bDisc, spf, bpf, pay, pfGross, costs, pf, vat, pfNet,
+		brandPay: net - sf - bpf - pay + bBoost + bDisc,
 		paidCnt: os.filter((o) => o.status === 'PAID').length, refCnt: os.filter((o) => o.status === 'REFUNDED').length };
 }
 export function sellerWht(s: Seller) { return s.settleInfo && s.settleInfo.type === 'biz' ? 0 : WHT; }

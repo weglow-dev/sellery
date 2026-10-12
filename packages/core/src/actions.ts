@@ -6,7 +6,7 @@ import {
 	passActive, periodBlock, stockLeft, pushSys, pushChat, settleDue, calc, sellerWht, spendData, freeRefLeft, bgname, autoMatches, optsOf, soldQty, leftOf,
 	cartLines, csList, myProductIds, dataPrice
 } from './helpers';
-import { ACTIVE_BLOCKERS, BREF_TIMES, CLEAR_DAYS, KAKAO_DEMO, KAKAO_JS_KEY, PLAT_RATE, PRIORITY_TIER, SAMPLE_CEL_WON, SHOP, TEST_DAYS, TOPUP, WHT, BUYER_NAMES, COURIERS } from './constants';
+import { ACTIVE_BLOCKERS, BREF_TIMES, CLEAR_DAYS, KAKAO_DEMO, KAKAO_JS_KEY, PRIORITY_TIER, SAMPLE_CEL_WON, SHOP, TEST_DAYS, TOPUP, WHT, BUYER_NAMES, COURIERS } from './constants';
 import { CEL, gfull } from './icons';
 import { addD, esc, fmt, md, P, strip, today, ymd } from './util';
 import { persistCart, persistCust, persistSession } from './storage';
@@ -291,7 +291,7 @@ export interface ProductForm { name: string; desc: string; cat: string; cp: numb
 const parseOpts = (s: string): Option[] => s.split(/\n/).map((l) => l.split('|')).filter((a) => a.length >= 2 && a[0].trim() && +a[1].replace(/[^\d]/g, '')).map((a) => ({ n: a[0].trim(), price: +a[1].replace(/[^\d]/g, '') }));
 export function createProduct(f: ProductForm) {
 	if (!f.name.trim()) { toast('상품명을 입력하세요'); return; }
-	D_().products.push({ id: nextId('p'), brandId: S.actingBrand, name: f.name.trim(), desc: f.desc.trim() || '—', em: '📦', cat: f.cat || '건기식', thumb: f.thumb || null, imgs: f.imgs.slice(0, 4), options: parseOpts(f.opts), cp: f.cp || 0, gp: f.gp || 0, rate: Math.max(5, (f.totalRate || 30) - PLAT_RATE * 100) / 100, sample: f.sample || '무상 1개', samplePolicy: f.samplePolicy, stock: f.stock || 0, status: 'pending', ...(f.exclGrade ? { exclusive: { grade: f.exclGrade as never, label: f.exclLabel.trim() || f.exclGrade + ' 등급 독점권' } } : {}) });
+	D_().products.push({ id: nextId('p'), brandId: S.actingBrand, name: f.name.trim(), desc: f.desc.trim() || '—', em: '📦', cat: f.cat || '건기식', thumb: f.thumb || null, imgs: f.imgs.slice(0, 4), options: parseOpts(f.opts), cp: f.cp || 0, gp: f.gp || 0, rate: Math.max(5, f.totalRate || 20) / 100, sample: f.sample || '무상 1개', samplePolicy: f.samplePolicy, stock: f.stock || 0, status: 'pending', ...(f.exclGrade ? { exclusive: { grade: f.exclGrade as never, label: f.exclLabel.trim() || f.exclGrade + ' 등급 독점권' } } : {}) });
 	closeModal(); save(); toast('검수 요청 완료 — 관리자 승인 후 노출');
 }
 export function saveProduct(pid: string, f: ProductForm) {
@@ -300,7 +300,7 @@ export function saveProduct(pid: string, f: ProductForm) {
 	p.name = f.name.trim(); p.desc = f.desc.trim() || '—'; p.cat = f.cat || p.cat; if (f.thumb) p.thumb = f.thumb; if (f.imgs.length) p.imgs = f.imgs.slice(0, 4);
 	p.stock = f.stock || 0; p.sample = f.sample || p.sample; p.options = parseOpts(f.opts); p.samplePolicy = f.samplePolicy;
 	if (f.exclGrade) p.exclusive = { grade: f.exclGrade as never, label: f.exclLabel.trim() || f.exclGrade + ' 등급 독점권' }; else if (!p.exclusiveSellerId) delete p.exclusive;
-	if (!locked) { const cp = f.cp || p.cp, gp = f.gp || p.gp, rate = Math.max(5, (f.totalRate || 30) - PLAT_RATE * 100) / 100; const changed = gp !== p.gp || rate !== p.rate; p.cp = cp; p.gp = gp; p.rate = rate; if (changed && p.status === 'listed') { p.status = 'pending'; toast('판매가·수수료율 변경 — 재검수 대기로 전환됩니다'); } }
+	if (!locked) { const cp = f.cp || p.cp, gp = f.gp || p.gp, rate = Math.max(5, f.totalRate || 20) / 100; const changed = gp !== p.gp || rate !== p.rate; p.cp = cp; p.gp = gp; p.rate = rate; if (changed && p.status === 'listed') { p.status = 'pending'; toast('판매가·수수료율 변경 — 재검수 대기로 전환됩니다'); } }
 	if (p.status === 'rejected') { p.status = 'pending'; delete p.rejectReason; }
 	closeModal(); save(); toast(p.status === 'pending' ? `${p.name} 수정 저장 — 재검수 요청됨` : `${p.name} 수정 저장 완료`);
 }

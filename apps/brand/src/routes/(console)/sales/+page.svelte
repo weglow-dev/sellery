@@ -18,8 +18,9 @@
 	const today = $derived(data.today ?? '');
 	const t = $derived(data.totals);
 	const clearDays = $derived(data.rates?.clear_days ?? 21);
-	const pgRate = $derived(data.rates?.pg_rate ?? 0.019);
-	const platformRate = $derived(data.rates?.platform_rate ?? 0.1);
+	// 0053: 브랜드가 내는 플랫폼 몫 = 이용 3% + 결제 5% (PG 는 셀러리 비용 — 표에서 뺐다)
+	const brandPlatRate = $derived(data.rates?.brand_platform_rate ?? 0.03);
+	const payRate = $derived(data.rates?.payment_fee_rate ?? 0.05);
 	const barMax = (daily: { gross: number }[]) => Math.max(1, ...daily.map((x) => x.gross));
 	const kWon = (n: number) => (n >= 1000 ? `₩${fmtNum(Math.round(n / 1000))}k` : n > 0 ? `₩${fmtNum(n)}` : '');
 	const dayLabel = (iso: string) => md(toKstYmd(iso) ?? iso);
@@ -110,18 +111,16 @@
 					<dl class="console-kv">
 						<dt>순매출</dt>
 						<dd>₩{fmtNum(c.net)} <span class="meta">(취소·환불 제외{#if c.sample_net > 0} · 샘플 구매분 ₩{fmtNum(c.sample_net)} 포함{/if})</span></dd>
-						<dt>PG 수수료</dt>
-						<dd>−₩{fmtNum(c.pg_fee)} <span class="meta">({Math.round(pgRate * 1000) / 10}% · 플랫폼+PG 에 포함)</span></dd>
 						<dt>인플루언서 수수료</dt>
 						<dd>
 							−₩{fmtNum(c.seller_fee)}
 							<span class="meta">{brandRateLine(c.seller_rate, c.seller_bonus_pp, c.ref_boost_applied)}{#if c.seller_fee_total !== c.seller_fee}{' '}· 인플루언서 수령 ₩{fmtNum(c.seller_fee_total)} — 등급 보너스·추천 부스트 ₩{fmtNum(c.seller_fee_total - c.seller_fee)} 는 셀러리 부담{/if}</span>
 						</dd>
-						<dt>플랫폼+PG</dt>
-						<dd>−₩{fmtNum(c.platform_pg)} <span class="meta">({platformPgLine(platformRate, pgRate, data.brandGrade, c.brand_discount > 0 ? data.brandDiscountRate : 0, c.brand_ref_applied)})</span></dd>
+						<dt>플랫폼 수수료</dt>
+						<dd>−₩{fmtNum(c.platform_pg)} <span class="meta">({platformPgLine(brandPlatRate, payRate, data.brandGrade, c.brand_discount > 0 ? data.brandDiscountRate : 0, c.brand_ref_applied)})</span></dd>
 						{#if c.brand_discount > 0 || c.brand_ref_boost > 0}
 							<dt>브랜드 할인</dt>
-							<dd>+₩{fmtNum(c.brand_discount + c.brand_ref_boost)} <span class="meta">({c.brand_discount > 0 ? `${data.brandGrade ?? '등급'} 등급 ₩${fmtNum(c.brand_discount)}` : ''}{c.brand_discount > 0 && c.brand_ref_boost > 0 ? ' · ' : ''}{c.brand_ref_boost > 0 ? `추천 ₩${fmtNum(c.brand_ref_boost)}` : ''} — 플랫폼+PG 에 반영됨)</span></dd>
+							<dd>+₩{fmtNum(c.brand_discount + c.brand_ref_boost)} <span class="meta">({c.brand_discount > 0 ? `${data.brandGrade ?? '등급'} 등급 ₩${fmtNum(c.brand_discount)}` : ''}{c.brand_discount > 0 && c.brand_ref_boost > 0 ? ' · ' : ''}{c.brand_ref_boost > 0 ? `추천 ₩${fmtNum(c.brand_ref_boost)}` : ''} — 플랫폼 수수료에 반영됨)</span></dd>
 						{/if}
 						<dt>정산 예상액</dt>
 						<dd><b style="color:var(--color-plat);font-size:15px">₩{fmtNum(c.brand_payout_est)}</b></dd>
@@ -165,5 +164,5 @@
 </div>
 
 {#if data.campaigns.length}
-	<p class="meta" style="margin:8px 3px 0">브랜드 정산 예상액 = 순매출 − 인플루언서 수수료 − 플랫폼+PG · 브랜드 등급 할인({brandDiscountLine(data.brandDiscountRate, platformRate)})은 실시간 등급 기준이고, 정산 실행 시점의 등급 스냅샷이 정답이에요 · 등급 보너스·추천 부스트는 셀러리가 부담해요.</p>
+	<p class="meta" style="margin:8px 3px 0">브랜드 정산 예상액 = 순매출 − 인플루언서 수수료 − 플랫폼 수수료(이용 3% + 결제 5% · VAT 포함) · 브랜드 등급 할인({brandDiscountLine(data.brandDiscountRate, brandPlatRate + payRate)})은 실시간 등급 기준이고, 정산 실행 시점의 등급 스냅샷이 정답이에요 · 등급 보너스·추천 부스트는 셀러리가 부담해요.</p>
 {/if}

@@ -63,8 +63,8 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 
 상수는 모두 `packages/core/src/constants.ts` 에 있습니다.
 
-**정산** `PG_RATE 1.9%` · `PLAT_RATE 10%` · `WHT 3.3%` · `CLEAR_DAYS 21`
-확정 매출 − PG − 인플루언서 수수료 − 플랫폼 수수료, 판매 종료 D+21 지급. 등급 추가분과 브랜드 등급 할인은 상대 몫을 깎지 않고 플랫폼이 부담. → docs/settlement-policy.md
+**정산 (2026-10-12 · 0053)** `SELLER_PLAT_RATE 3%` · `BRAND_PLAT_RATE 3%` · `PAY_FEE_RATE 5%` (`PLAT_RATE 11%` = 합) · `PG_RATE 1.9%`(셀러리 비용) · `WHT 3.3%` · `CLEAR_DAYS 21`
+브랜드가 정한 요율은 전부 인플루언서 몫. 브랜드 지급 = 확정 매출 − 인플 수수료 − 플랫폼 이용 3% − 결제 5% (+ 등급·추천 할인) · 인플 지급 = 수수료(+보너스) − 원천징수 − 플랫폼 이용 3%(기준 = 매출 − 본인 샘플 구매) · 셀러리 순수익 = 11% − 보너스·할인 − VAT − PG. 판매 종료 D+21 지급. 세 요율은 `platform_settings` `seller_platform_rate` `brand_platform_rate` `payment_fee_rate`. → docs/settlement-policy.md §1~§2 (§3 이하는 옛 모델 기록)
 
 **등급** 인플루언서 스타터~블랙 7단계, 최근 3개월 확정 매출 기준 (`GRADES`). 등급 보너스는 **브랜드사가 제안한 수수료율에 더해지는 값**입니다.
 (제안 20% → 골드 21%, 블랙 23%) "3%를 받는다"가 아니라 "수수료율 +3%p". **노출 범위(2026-10-12)**: 고객은 인플루언서·브랜드 등급을 못 본다(0052 · anon 컬럼 권한 회수) · 인플루언서끼리는 익명(랭킹 ○○○ · 일정 폼 ○○○) · 브랜드는 인플루언서 등급을 본다. → docs/grade-policy.md §5.4

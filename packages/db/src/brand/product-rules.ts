@@ -4,12 +4,12 @@
  * `../server/brand/products.server.ts`.
  *
  * 프로토타입 원본: packages/core/src/actions.ts createProduct · saveProduct · deleteProduct · toggleListing(잠금 · 재검수 · 삭제 가드),
- * helpers.ts optsOf(자동 옵션) · allocated · stockLeft, packages/ui/src/modals/ProductModal.svelte(폼 필드 · 총 수수료율 = 플랫폼 10%p + 인플루언서).
+ * helpers.ts optsOf(자동 옵션) · allocated · stockLeft, packages/ui/src/modals/ProductModal.svelte(폼 필드 · 수수료율 = 인플루언서 몫 · 0053).
  *
  *   parseProductInput(form)        FormData · 객체 → `ProductInput`(RPC p_input 과 1:1) — 첫 실패 필드 + 문구. DB 함수가 같은 조건을 다시 검사한다.
  *   parseOptionLines(text)         "옵션명 | 가격" 줄 → [{n, price}] (데모 parseOpts)
  *   autoOptions(salePrice)         옵션이 비었을 때 1개 / 2개 −5% / 3개 −10% (0008 resolve_product_options 와 같은 결과 — 표시용, 저장은 [])
- *   totalRateToCommission(pct)     총 요율(%) → 인플루언서 수수료율(소수, ≥ 0.05) · commissionToTotalRate(rate) 역변환(폼 프리필)
+ *   totalRateToCommission(pct)     폼 요율(%) → 인플루언서 수수료율(소수, ≥ 0.05) · commissionToTotalRate(rate) 역변환(폼 프리필) — 0053: 플랫폼 몫 없음
  *   isProductLocked(statuses) · allocatedOf(campaigns) · stockLeftOf(stock, allocated)   잠금 · 배정량 (표시용 — 판정은 SQL)
  *   productStatusChip(status)      pending · listed · paused · rejected → 칩
  *   PRODUCT_FAIL_MESSAGES · productFailMessage(result)   RPC {ok:false, code, field} → 사용자 문구
@@ -20,12 +20,13 @@ import { cleanText } from "../text";
 
 /* ---------------- 상수 (0015 · 0002 제약과 같은 값) ---------------- */
 
-/** 플랫폼 몫 10%p — 브랜드가 입력하는 총 수수료율에 포함 (@sellery/core PLAT_RATE) */
-export const PLATFORM_RATE_PP = 10;
 /** 인플루언서 수수료율 하한 — platform_settings.min_seller_rate 와 같은 값 (데모 `Math.max(5, …)`) */
 export const MIN_SELLER_RATE = 0.05;
-/** 총 수수료율 폼 힌트(문구) — 상한은 정책이 아니다(§8) */
-export const TOTAL_RATE_HINT = { min: 11, max: 50, default: 30 } as const;
+/**
+ * 폼 힌트(문구). 0053(2026-10-12)부터 `total_rate` 는 **인플루언서 수수료율 그대로**다 — 플랫폼 몫(이용 3% + 결제 5%)은 정산 시 따로 받고
+ * 브랜드가 적는 숫자에 들어 있지 않다. 필드 이름은 폼·RPC 호환을 위해 그대로 둔다. 상한은 정책이 아니다(§8).
+ */
+export const TOTAL_RATE_HINT = { min: 5, max: 50, default: 20 } as const;
 
 export const PRODUCT_NAME_MAX = 80;
 export const PRODUCT_DESC_MAX = 300;
@@ -89,18 +90,15 @@ export function canDeleteProduct(campaignStatuses: readonly string[]): boolean {
 
 /* ---------------- 수수료율 · 옵션 ---------------- */
 
-/**
- * 총 수수료율(%) → 인플루언서 수수료율(소수 4자리). 데모 `Math.max(5, totalRate − 10) / 100` — 총 요율이 15 미만이면 하한 0.05.
- * 범위 검증은 `parseProductInput` 이 한다(`TOTAL_RATE_HINT` 11~50) — 그래서 하한이 걸리는 구간은 11~14.9 뿐이다.
- */
+/** 폼 요율(%) → 인플루언서 수수료율(소수 4자리) — 0053: 그대로(하한 0.05). 범위 검증은 `parseProductInput`(5~50). */
 export function totalRateToCommission(totalPct: number): number {
-  const v = Math.max(MIN_SELLER_RATE, totalPct / 100 - PLATFORM_RATE_PP / 100);
+  const v = Math.max(MIN_SELLER_RATE, totalPct / 100);
   return Math.round(v * 10000) / 10000;
 }
 
-/** 인플루언서 수수료율(소수) → 총 수수료율(%) — 수정 폼 프리필 (데모 `Math.round((rate + PLAT_RATE) * 100)`) */
+/** 인플루언서 수수료율(소수) → 폼 요율(%) — 수정 폼 프리필. 0053: 그대로 */
 export function commissionToTotalRate(rate: number): number {
-  return Math.round((rate + PLATFORM_RATE_PP / 100) * 1000) / 10;
+  return Math.round(rate * 1000) / 10;
 }
 
 export type ProductOption = { n: string; price: number };
@@ -156,7 +154,7 @@ export type ProductInput = {
   category: string;
   consumer_price: number;
   sale_price: number;
-  /** 총 수수료율(%) — 플랫폼 10%p 포함 */
+  /** 인플루언서 수수료율(%) — 0053: 플랫폼 몫 미포함(정산 시 별도) */
   total_rate: number;
   stock: number;
   sample_text: string;
@@ -193,7 +191,7 @@ export const PRODUCT_FIELD_MESSAGES: Record<ProductField, string> = {
   category: "카테고리를 선택해주세요 — 건강·웰니스 범위 안의 카테고리만 등록할 수 있어요",
   consumer_price: "소비자가를 확인해주세요 (0 이상)",
   sale_price: "판매가를 입력해주세요 (1원 이상)",
-  total_rate: `총 수수료율은 ${TOTAL_RATE_HINT.min}~${TOTAL_RATE_HINT.max}% 사이로 정해주세요 (플랫폼 ${PLATFORM_RATE_PP}%p 포함 · 제안 수수료 하한 ${MIN_SELLER_RATE * 100}%)`,
+  total_rate: `인플루언서 수수료율은 ${TOTAL_RATE_HINT.min}~${TOTAL_RATE_HINT.max}% 사이로 정해주세요 (셀러리 플랫폼 이용 3% · 결제 5% 는 정산 시 별도)`,
   stock: "재고를 확인해주세요 (0 이상)",
   sample_text: `샘플 내용은 ${SAMPLE_TEXT_MAX}자 이내로 입력해주세요`,
   sample_policy: "샘플 정책을 확인해주세요 — 지정가를 고르면 금액을 입력해야 해요",
@@ -420,7 +418,7 @@ export const PRODUCT_FAIL_MESSAGES: Record<ProductFailCode, string> = {
   DB_ERROR: "저장 중 문제가 생겼어요 — 잠시 후 다시 시도해주세요",
 };
 
-const LOCKED_FIELD_LABELS: Record<string, string> = { consumer_price: "소비자가", sale_price: "판매가", total_rate: "수수료율", options: "구매 옵션" };
+const LOCKED_FIELD_LABELS: Record<string, string> = { consumer_price: "소비자가", sale_price: "판매가", total_rate: "인플루언서 수수료율", options: "구매 옵션" };
 
 /** {code, field?, allocated?} → 문구. INVALID_INPUT 은 필드 문구, LOCKED_FIELD 는 필드명, STOCK_BELOW_ALLOCATED 는 배정량을 붙인다. */
 export function productFailMessage(r: { code: string; field?: string | null; allocated?: number | null }): string {

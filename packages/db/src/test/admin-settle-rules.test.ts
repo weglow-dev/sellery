@@ -31,31 +31,35 @@ describe("calcSettlement — 시드 c1 (지유 골드 × 버닝온 20% · b1 골
   const k = calcSettlement({ gross: 1375400, refunds: 59800, rate: 0.2, bonusPp: 1, brandDiscRate: BG_DISC.골드, whtRate: sellerWhtRate("personal") });
   const seller = calcSellerShare({ net: 1375400 - 59800, rate: 0.2, bonusPp: 1, whtRate: sellerWhtRate("personal") });
   const brand = calcBrandPay({ net: 1375400 - 59800, rate: 0.2, bonusPp: 1, brandDiscRate: BG_DISC.골드 });
-  it("인플루언서 라인 = calcSellerShare (sfTotal 276,276 · wht 9,117 · 실수령 267,159)", () => {
+  it("인플루언서 라인 = calcSellerShare (sfTotal 276,276 · wht 9,117 · 플랫폼 이용 3% 39,468 · 실수령 227,691) — 0053", () => {
     expect(k.base).toBe(seller.base);
     expect(k.sf).toBe(seller.sf);
     expect(k.gBonus).toBe(seller.gBonus);
     expect(k.boost).toBe(seller.boost);
     expect(k.sfTotal).toBe(276276);
     expect(k.wht).toBe(9117);
-    expect(k.sellerPayout).toBe(267159);
+    expect(k.sellerPlatformFee).toBe(39468); // 1,315,600 × 3%
+    expect(k.sellerPlatformFee).toBe(seller.platformFee);
+    expect(k.sellerPayout).toBe(227691); // 276,276 − 9,117.108 − 39,468
     expect(k.sellerPayout).toBe(seller.payout);
   });
-  it("브랜드 라인 = calcBrandPay (brandPay 902,502 · platformPg 149,978 · pg 24,996)", () => {
+  it("브랜드 라인 = calcBrandPay (brandPay 953,810 · platformPg 98,670 · PG 24,996 은 셀러리 비용) — 0053", () => {
     expect(k.pg).toBe(24996);
     expect(k.pg).toBe(brand.pg);
-    expect(k.pfGross).toBe(131560);
+    expect(k.brandPlatformFee).toBe(39468); // net × 3%
+    expect(k.paymentFee).toBe(65780); // net × 5%
+    expect(k.pfGross).toBe(144716); // 39,468 + 39,468 + 65,780
     expect(k.bDisc).toBe(6578);
-    expect(k.brandPay).toBe(902502);
+    expect(k.brandPay).toBe(953810); // 1,315,600 − 263,120 − 39,468 − 65,780 + 6,578
     expect(k.brandPay).toBe(brand.brandPay);
-    expect(k.platformPg).toBe(149978);
+    expect(k.platformPg).toBe(98670); // 39,468 + 65,780 − 6,578
     expect(k.platformPg).toBe(brand.platformPg);
   });
-  it("플랫폼 라인 — costs = 등급 보너스 + 등급 할인 · pf = 10% − costs · vat = pf − pf/1.1", () => {
+  it("플랫폼 라인 — costs = 등급 보너스 + 등급 할인 · pf = 11% − costs · vat = pf − pf/1.1 · 순수익은 PG 차감 후 (0053)", () => {
     expect(k.costs).toBe(19734); // 13,156 + 6,578
-    expect(k.pf).toBe(111826); // 131,560 − 19,734
-    expect(k.vat).toBe(10166); // 111,826 − 101,660
-    expect(k.pfNet).toBe(101660);
+    expect(k.pf).toBe(124982); // 144,716 − 19,734
+    expect(k.vat).toBe(11362); // 124,982 − 113,620
+    expect(k.pfNet).toBe(88624); // 124,982 − 11,362 − 24,996.4 (SQL app_admin_settle_preview 와 같다)
     expect(k.refReward).toBe(0);
     expect(k.bBoost).toBe(0);
     expect(k.bReward).toBe(0);
@@ -78,21 +82,22 @@ describe("calcSettlement — 시드 c5 (민지 실버 +0.5%p · 추천 부스트
     expect(k.sfTotal).toBe(2578271); // 2,578,270.5
     expect(k.sfTotal).toBe(seller.sfTotal);
     expect(k.wht).toBe(85083); // 85,082.93
-    expect(k.sellerPayout).toBe(2493188); // 2,493,187.57
+    expect(k.sellerPlatformFee).toBe(396657); // 13,221,900 × 3%
+    expect(k.sellerPayout).toBe(2096531); // 2,578,270.5 − 85,082.93 − 396,657
     expect(k.sellerPayout).toBe(seller.payout);
   });
-  it("브랜드 정산액 9,334,661 · 플랫폼+PG 1,507,297 (calcBrandPay 와 동일)", () => {
-    expect(k.brandPay).toBe(9334661);
+  it("브랜드 정산액 9,850,316 · 플랫폼 수수료 991,643 (calcBrandPay 와 동일) — 0053", () => {
+    expect(k.brandPay).toBe(9850316); // 13,221,900 − 2,379,942 − 396,657 − 661,095 + 66,109.5
     expect(k.brandPay).toBe(brand.brandPay);
-    expect(k.platformPg).toBe(1507297);
+    expect(k.platformPg).toBe(991643); // 396,657 + 661,095 − 66,109.5
     expect(k.bDisc).toBe(66110);
   });
-  it("플랫폼 — costs 528,876 · pf 793,314 · vat 72,119 · pfNet 721,195 (라인 독립 반올림: 저장값끼리 ±1원 가능)", () => {
-    expect(k.pfGross).toBe(1322190);
+  it("플랫폼 — pfGross 1,454,409 · costs 528,876 · pf 925,533 · vat 84,139 · pfNet 590,178 (PG 251,216 차감 · 라인 독립 반올림 ±1원)", () => {
+    expect(k.pfGross).toBe(1454409); // 396,657 × 2 + 661,095
     expect(k.costs).toBe(528876);
-    expect(k.pf).toBe(793314);
-    expect(k.vat).toBe(72119);
-    expect(k.pfNet).toBe(721195);
+    expect(k.pf).toBe(925533);
+    expect(k.vat).toBe(84139);
+    expect(k.pfNet).toBe(590178);
   });
 });
 
@@ -104,16 +109,17 @@ describe("calcSettlement — 제안서 예시 (settlement-policy §12 · 플래�
     expect(k.sf).toBe(525860);
     expect(k.gBonus).toBe(39440); // 39,439.5
     expect(k.sfTotal).toBe(565300); // 565,299.5
-    expect(k.pf).toBe(223491); // 223,490.5 (제안서는 223,490 — 문서에 기록된 ₩1 차이)
-    expect(k.brandPay).toBe(1790553);
+    expect(k.pfGross).toBe(289223); // 78,879 + 78,879 + 131,465 (0053)
+    expect(k.pf).toBe(249784); // 289,223 − 39,439.5
+    expect(k.brandPay).toBe(1893096); // 2,629,300 − 525,860 − 78,879 − 131,465
     expect(k.wht).toBe(18655);
-    expect(k.sellerPayout).toBe(546645);
-    expect(k.pfNet).toBe(203173);
+    expect(k.sellerPayout).toBe(467766); // 565,299.5 − 18,654.88 − 78,879
+    expect(k.pfNet).toBe(177119); // 249,783.5 − 22,707.59 − 49,956.7
   });
 });
 
 describe("calcSettlement — 샘플 구매분 · 환급 · 브랜드 추천 · 사업자", () => {
-  it("샘플 구매분은 sf·gBonus 에서만 빠지고 pg·10%·추천·할인은 net 전체 (§9)", () => {
+  it("샘플 구매분은 sf·gBonus·인플 이용 수수료에서만 빠지고 pg·브랜드 수수료·추천·할인은 net 전체 (§9 · 0053)", () => {
     const k = calcSettlement({ gross: 100000, sampleNet: 20000, rate: 0.2, bonusPp: 1, refBoost: true, brandRefBoost: true, brandDiscRate: 0.01, whtRate: 0 });
     expect(k.base).toBe(80000);
     expect(k.sf).toBe(16000);
@@ -123,28 +129,32 @@ describe("calcSettlement — 샘플 구매분 · 환급 · 브랜드 추천 · �
     expect(k.bBoost).toBe(1000);
     expect(k.bReward).toBe(1000);
     expect(k.bDisc).toBe(1000);
-    expect(k.pfGross).toBe(10000);
+    expect(k.sellerPlatformFee).toBe(2400); // base 80,000 × 3%
+    expect(k.brandPlatformFee).toBe(3000); // net × 3%
+    expect(k.paymentFee).toBe(5000); // net × 5%
+    expect(k.pfGross).toBe(10400);
     expect(k.costs).toBe(6800);
-    expect(k.pf).toBe(3200);
-    expect(k.brandPay).toBe(100000 - 1900 - 16000 - 10000 + 1000 + 1000);
+    expect(k.pf).toBe(3600);
+    expect(k.brandPay).toBe(100000 - 16000 - 3000 - 5000 + 1000 + 1000);
     expect(k.wht).toBe(0);
-    expect(k.sellerPayout).toBe(17800);
+    expect(k.sellerPayout).toBe(17800 - 2400);
   });
   it("샘플 환급 — 현금은 실수령에 가산(원천징수 없음) · 🥬 는 개수만 · 보전액 = sampleCel × 20,000", () => {
     const k = calcSettlement({ gross: 123920, sampleNet: 23920, rate: 0.2, whtRate: WHT, sampleRefundCel: 1, sampleRefundCash: 3920, sampleCel: 1 });
     expect(k.sfTotal).toBe(20000);
     expect(k.wht).toBe(660);
-    expect(k.sellerPayout).toBe(20000 - 660 + 3920);
+    expect(k.sellerPlatformFee).toBe(3000); // base 100,000 × 3%
+    expect(k.sellerPayout).toBe(20000 - 660 - 3000 + 3920);
     expect(k.sampleRefundCel).toBe(1);
     expect(k.sampleRefundCash).toBe(3920);
     expect(k.sampleCelCover).toBe(20000);
   });
-  it("사업자(whtRate 0) 는 원천징수 0 · pf 가 0 이하이면 vat 0", () => {
-    const k = calcSettlement({ gross: 100000, rate: 0.9, bonusPp: 3, refBoost: true, brandRefBoost: true, brandDiscRate: 0.02, whtRate: sellerWhtRate("biz") });
+  it("사업자(whtRate 0) 는 원천징수 0 · pf 가 0 이하이면 vat 0 · 순수익은 PG 만큼 음수 (0053)", () => {
+    const k = calcSettlement({ gross: 100000, rate: 0.9, bonusPp: 3, refBoost: true, brandRefBoost: true, brandDiscRate: 0.03, whtRate: sellerWhtRate("biz") });
     expect(k.wht).toBe(0);
-    expect(k.pf).toBe(0); // 10% − (3 + 1 + 2 + 1 + 1 + 2)% = 0
+    expect(k.pf).toBe(0); // 11% − (3 + 1 + 2 + 1 + 1 + 3)% = 0
     expect(k.vat).toBe(0);
-    expect(k.pfNet).toBe(0);
+    expect(k.pfNet).toBe(-1900); // PG 1.9% 는 플랫폼 비용
   });
   it("빈 입력은 전부 0", () => {
     const k = calcSettlement({ gross: 0, rate: 0.2 });
@@ -379,7 +389,7 @@ describe("파서 · 문구", () => {
 });
 
 describe("샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28)", () => {
-  /** p4 · 샘플 구매 ₩75,650 만 있는 캠페인 (판매 0) · 인플 15% · 플랫폼 10% · PG 1.9% */
+  /** p4 · 샘플 구매 ₩75,650 만 있는 캠페인 (판매 0) · 인플 15% · 브랜드 플랫폼 몫 8%(3+5) · PG 1.9% 는 플랫폼 비용 (0053) */
   const sampleOnly = (extra: Partial<Parameters<typeof calcSettlement>[0]> = {}) =>
     calcSettlement({ gross: 75650, sampleNet: 75650, rate: 0.15, sampleRefundCash: 75650, ...extra });
 
@@ -389,9 +399,10 @@ describe("샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28)"
     expect(k.sellerPayout).toBe(75650);
   });
 
-  it("재원 = 브랜드 반환 + 플랫폼 포기 + 카드 수수료 (합이 환급액)", () => {
+  it("재원 = 브랜드 반환 + 플랫폼 포기 (합이 환급액) · 카드 수수료는 원래 플랫폼 비용이라 기록만 (0053)", () => {
     const k = sampleOnly();
-    expect(k.sampleRefundBrand + k.sampleRefundPlatform + k.sampleRefundPg).toBe(75650);
+    expect(k.sampleRefundBrand + k.sampleRefundPlatform).toBe(75650);
+    expect(k.sampleRefundPlatform).toBe(Math.round(75650 * 0.08)); // 브랜드 이용 3% + 결제 5%
     expect(k.sampleRefundPg).toBe(Math.round(75650 * 0.019));
   });
 

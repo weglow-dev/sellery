@@ -41,28 +41,27 @@ const base = {
   thumb_url: "",
 };
 
-describe("totalRateToCommission · commissionToTotalRate — 총 요율(플랫폼 10%p 포함) ↔ 인플루언서 수수료율", () => {
+describe("totalRateToCommission · commissionToTotalRate — 폼 요율 = 인플루언서 수수료율 그대로 (0053 · 플랫폼 몫 없음)", () => {
   it.each([
-    [30, 0.2],
-    [25, 0.15],
-    [15, 0.05],
-    [12, MIN_SELLER_RATE], // 하한 5% (데모 Math.max(5, …))
-    [11, MIN_SELLER_RATE],
-    [50, 0.4],
-    [32.5, 0.225],
-  ])("총 %s% → %s", (total, rate) => {
+    [20, 0.2],
+    [15, 0.15],
+    [5, 0.05],
+    [4, MIN_SELLER_RATE], // 하한 5% (데모 Math.max(5, …))
+    [3, MIN_SELLER_RATE],
+    [50, 0.5],
+    [32.5, 0.325],
+  ])("폼 %s% → %s", (total, rate) => {
     expect(totalRateToCommission(total)).toBe(rate);
   });
-  it("하한이 걸리는 구간은 11~14.9 뿐 — 폼도 같은 함수를 써야 표시와 저장이 같다", () => {
-    // ProductForm 이 `총 − 10` 으로 계산하면 12% 를 "2%" 로 보여주는데 실제 저장은 5% 다
-    expect(totalRateToCommission(14.9)).toBe(MIN_SELLER_RATE);
-    expect(totalRateToCommission(15)).toBe(0.05); // 같은 값이지만 클램프가 아니라 계산 결과
-    expect(totalRateToCommission(15.5)).toBe(0.055);
+  it("하한이 걸리는 구간은 5 미만뿐 — 폼도 같은 함수를 써야 표시와 저장이 같다", () => {
+    expect(totalRateToCommission(4.9)).toBe(MIN_SELLER_RATE);
+    expect(totalRateToCommission(5)).toBe(0.05);
+    expect(totalRateToCommission(5.5)).toBe(0.055);
   });
   it("역변환 (폼 프리필)", () => {
-    expect(commissionToTotalRate(0.2)).toBe(30);
-    expect(commissionToTotalRate(0.15)).toBe(25);
-    expect(commissionToTotalRate(0.225)).toBe(32.5);
+    expect(commissionToTotalRate(0.2)).toBe(20);
+    expect(commissionToTotalRate(0.15)).toBe(15);
+    expect(commissionToTotalRate(0.325)).toBe(32.5);
   });
 });
 
@@ -169,8 +168,8 @@ describe("parseProductInput — 폼 → RPC p_input", () => {
     ["sale_price 0", { sale_price: 0 }, "sale_price"],
     ["sale_price 소수", { sale_price: 100.5 }, "sale_price"],
     ["sale_price 빈 값", { sale_price: "" }, "sale_price"],
-    ["total_rate 10 (플랫폼 몫만)", { total_rate: 10 }, "total_rate"],
-    ["total_rate 10.5 (하한 11 미만)", { total_rate: 10.5 }, "total_rate"],
+    ["total_rate 4 (하한 5 미만)", { total_rate: 4 }, "total_rate"],
+    ["total_rate 4.5 (하한 5 미만)", { total_rate: 4.5 }, "total_rate"],
     ["total_rate 빈 값", { total_rate: "" }, "total_rate"],
     // 폼은 novalidate(서버 문구로 안내하는 관례)라 브라우저가 max=50 을 막지 않는다 — 서버가 막는다
     ["total_rate 50.5 (상한 50 초과)", { total_rate: 50.5 }, "total_rate"],
@@ -242,9 +241,9 @@ describe("상수 · 칩 · 문구", () => {
     expect(productStatusChip("weird")).toEqual({ label: "weird", tone: "gray" });
   });
   it("productFailMessage — 필드 · 잠금 필드명 · 배정량", () => {
-    // 문구가 범위(11~50)와 제안 수수료 하한을 알려 준다 — 폼 min/max 와 같은 값
-    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("11~50%");
-    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("하한");
+    // 문구가 범위(5~50)와 플랫폼 몫이 별도라는 점을 알려 준다 — 폼 min/max 와 같은 값 (0053)
+    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("5~50%");
+    expect(productFailMessage({ code: "INVALID_INPUT", field: "total_rate" })).toContain("별도");
     expect(productFailMessage({ code: "INVALID_INPUT", field: "zzz" })).toBe("입력 내용을 확인해주세요");
     expect(productFailMessage({ code: "LOCKED_FIELD", field: "sale_price" })).toContain("판매가");
     expect(productFailMessage({ code: "LOCKED_FIELD", field: "options" })).toContain("구매 옵션");

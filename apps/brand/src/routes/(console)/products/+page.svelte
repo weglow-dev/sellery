@@ -52,7 +52,7 @@
 				{/if}
 				<div class="console-prodmeta">
 					<span><b>₩{fmtNum(p.sale_price)}</b> <s>₩{fmtNum(p.consumer_price)}</s></span>
-					<span>수수료 <b>{p.total_rate}%</b> <small>(인플루언서 {(p.commission_rate * 100).toFixed(0)} + 플랫폼 10)</small></span>
+					<span>인플루언서 수수료 <b>{p.total_rate}%</b> <small>· 셀러리 이용 3% + 결제 5% 별도</small></span>
 					<span>샘플 {p.sample_text || '—'} <small>· {p.sample_free_grade ?? '실버'}↑ 무상 · 구매 ₩{fmtNum(buyPrice(p))}{p.sample_refund ? ' · 환급' : ''}</small></span>
 					<span>재고 <b>{fmtNum(p.stock)}</b> <small>· 배정 {fmtNum(p.allocated)} · 잔여 {fmtNum(p.left)}</small></span>
 					<span>독점권 {#if p.exclusive_grade}<GradeBox grade={p.exclusive_grade} sm /> 이상{#if p.exclusive_seller_id}{' '}<span class="st green" style="animation:none">확정</span>{/if}{:else}<small>—</small>{/if}</span>

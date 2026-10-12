@@ -49,16 +49,16 @@ describe("parseProductStatusFilter", () => {
   });
 });
 
-describe("totalFeeLine — commission_rate 는 인플루언서 몫, 플랫폼은 상수", () => {
-  it("인플 20% + 플랫폼 10% = 30%", () => {
-    expect(PLAT_RATE).toBe(0.1);
-    expect(totalFeeLine(0.2)).toEqual({ total: "30%", detail: "인플 20 + 플랫폼 10" });
+describe("totalFeeLine — commission_rate 는 인플루언서 몫 전부, 플랫폼 11%(3+3+5)는 정산 시 별도 (0053)", () => {
+  it("인플 20% · 플랫폼 별도", () => {
+    expect(PLAT_RATE).toBe(0.11);
+    expect(totalFeeLine(0.2)).toEqual({ total: "20%", detail: "인플 20 · 플랫폼 11 별도" });
   });
-  it("최소 요율(5%)도 더한다", () => {
-    expect(totalFeeLine(0.05)).toEqual({ total: "15%", detail: "인플 5 + 플랫폼 10" });
+  it("최소 요율(5%)", () => {
+    expect(totalFeeLine(0.05)).toEqual({ total: "5%", detail: "인플 5 · 플랫폼 11 별도" });
   });
   it("소수는 반올림한다", () => {
-    expect(totalFeeLine(0.185).detail).toBe("인플 19 + 플랫폼 10");
+    expect(totalFeeLine(0.185).detail).toBe("인플 19 · 플랫폼 11 별도");
   });
 });
 

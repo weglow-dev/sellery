@@ -15,7 +15,7 @@
  *   parseSettleInfo · parseSetSettleInfoResult · parseSellerSales · parseSellerSettlements — RPC jsonb 를 타입으로
  *   SETTLE_FAIL_MESSAGES · settlementStatusLabel · payoutLine — 화면 문구
  */
-import { BANKS as CORE_BANKS, CLEAR_DAYS, REF_BOOST, WHT } from "@sellery/core/constants";
+import { BANKS as CORE_BANKS, CLEAR_DAYS, REF_BOOST, SELLER_PLAT_RATE, WHT } from "@sellery/core/constants";
 import { fmtNum } from "../campaign";
 import { addDays, md } from "../dates";
 import type { StatusTone } from "../order-status";
@@ -64,6 +64,8 @@ export type SellerShareInput = {
   refBoost?: boolean;
   /** 원천징수율 — sellerWhtRate(settleType). 기본 WHT */
   whtRate?: number;
+  /** 플랫폼 이용 수수료율(0053) — base 기준. 기본 SELLER_PLAT_RATE 3% */
+  sellerPlatformRate?: number;
 };
 
 export type SellerShare = {
@@ -79,7 +81,9 @@ export type SellerShare = {
   sfTotal: number;
   /** 원천징수액 */
   wht: number;
-  /** 실수령(예정) = sfTotal − wht — 샘플 환급 현금은 정산 실행 시 별도 가산(runSettle refundCash) */
+  /** 플랫폼 이용 수수료(0053) = base × 3% · VAT 포함 */
+  platformFee: number;
+  /** 실수령(예정) = sfTotal − wht − platformFee — 샘플 환급 현금은 정산 실행 시 별도 가산(runSettle refundCash) */
   payout: number;
 };
 
@@ -95,13 +99,15 @@ export function calcSellerShare(input: SellerShareInput): SellerShare {
   const rate = Number(input.rate) || 0;
   const bonusPp = Number(input.bonusPp) || 0;
   const whtRate = input.whtRate === undefined ? WHT : Number(input.whtRate) || 0;
+  const sellerPlatformRate = input.sellerPlatformRate === undefined ? SELLER_PLAT_RATE : Number(input.sellerPlatformRate) || 0;
   const base = net - sampleNet;
   const sf = base * rate;
   const gBonus = (base * bonusPp) / 100;
   const boost = input.refBoost ? net * REF_BOOST : 0;
   const sfTotal = sf + gBonus + boost;
   const wht = sfTotal * whtRate;
-  const payout = sfTotal - wht;
+  const platformFee = base * sellerPlatformRate; // 0053
+  const payout = sfTotal - wht - platformFee;
   return {
     base: Math.round(base),
     sf: Math.round(sf),
@@ -109,6 +115,7 @@ export function calcSellerShare(input: SellerShareInput): SellerShare {
     boost: Math.round(boost),
     sfTotal: Math.round(sfTotal),
     wht: Math.round(wht),
+    platformFee: Math.round(platformFee),
     payout: Math.round(payout),
   };
 }
@@ -316,6 +323,8 @@ export type SellerSalesCampaign = {
   ref_boost: number;
   my_fee_total: number;
   wht: number;
+  /** 플랫폼 이용 수수료 3% (0053) */
+  my_platform_fee: number;
   my_payout_est: number;
   /** 최근 7일(KST) 일별 PAID 합 — 오래된 날부터 */
   daily: { d: string; gross: number }[];
@@ -329,9 +338,9 @@ export type SellerSales = {
   wht_rate: number;
   grade: string | null;
   grade_bonus_pp: number;
-  rates: { platform_rate: number; ref_boost: number; ref_times: number; clear_days: number };
+  rates: { platform_rate: number; seller_platform_rate: number; ref_boost: number; ref_times: number; clear_days: number };
   campaigns: SellerSalesCampaign[];
-  totals: { net: number; my_fee_total: number; wht: number; my_payout_est: number; today_gross: number; today_orders: number; paid_count: number; refund_count: number };
+  totals: { net: number; my_fee_total: number; wht: number; my_platform_fee: number; my_payout_est: number; today_gross: number; today_orders: number; paid_count: number; refund_count: number };
 };
 
 function parseProduct(v: unknown): SellerSalesCampaign["product"] {
@@ -381,6 +390,7 @@ export function parseSellerSales(raw: unknown): SellerSales | null {
       ref_boost: num(c.ref_boost),
       my_fee_total: num(c.my_fee_total),
       wht: num(c.wht),
+      my_platform_fee: num(c.my_platform_fee),
       my_payout_est: num(c.my_payout_est),
       daily: (Array.isArray(c.daily) ? c.daily : []).map((d) => {
         const e = obj(d) ?? {};
@@ -398,12 +408,13 @@ export function parseSellerSales(raw: unknown): SellerSales | null {
     wht_rate: num(o.wht_rate, WHT),
     grade: str(o.grade),
     grade_bonus_pp: num(o.grade_bonus_pp),
-    rates: { platform_rate: num(r.platform_rate, 0.1), ref_boost: num(r.ref_boost, REF_BOOST), ref_times: num(r.ref_times, 5), clear_days: num(r.clear_days, CLEAR_DAYS) },
+    rates: { platform_rate: num(r.platform_rate, 0.11), seller_platform_rate: num(r.seller_platform_rate, SELLER_PLAT_RATE), ref_boost: num(r.ref_boost, REF_BOOST), ref_times: num(r.ref_times, 5), clear_days: num(r.clear_days, CLEAR_DAYS) },
     campaigns,
     totals: {
       net: num(t.net),
       my_fee_total: num(t.my_fee_total),
       wht: num(t.wht),
+      my_platform_fee: num(t.my_platform_fee),
       my_payout_est: num(t.my_payout_est),
       today_gross: num(t.today_gross),
       today_orders: num(t.today_orders),
@@ -434,6 +445,8 @@ export type SellerSettlementRow = {
   grade_bonus: number | null;
   ref_boost: number | null;
   my_fee_total: number | null;
+  /** 플랫폼 이용 수수료 (0053 · 이전 스냅샷은 0) */
+  my_platform_fee: number | null;
   wht_rate: number | null;
   wht: number | null;
   sample_refund_cel: number | null;
@@ -483,6 +496,7 @@ export function parseSellerSettlements(raw: unknown): SellerSettlements | null {
       grade_bonus: numOrNull(c.grade_bonus),
       ref_boost: numOrNull(c.ref_boost),
       my_fee_total: numOrNull(c.my_fee_total),
+      my_platform_fee: numOrNull(c.my_platform_fee),
       wht_rate: numOrNull(c.wht_rate),
       wht: numOrNull(c.wht),
       sample_refund_cel: numOrNull(c.sample_refund_cel),

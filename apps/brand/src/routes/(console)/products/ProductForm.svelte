@@ -11,7 +11,6 @@
 		EXCLUSIVE_GRADES,
 		IMAGE_URLS_MAX,
 		MIN_SELLER_RATE,
-		PLATFORM_RATE_PP,
 		autoOptions,
 		sampleTierOptions,
 		totalRateToCommission,
@@ -56,7 +55,7 @@
 	const topBonus = GRADES[0]?.bonus ?? 3;
 	const tiers = sampleTierOptions();
 
-	// 총 수수료율 → 인플루언서 수수료 문구 (데모 rateCalc 원문) — 입력 중 실시간. 초기값만 props 에서 (평범한 POST 라 실패 시 페이지가 다시 그려진다).
+	// 인플루언서 수수료율 문구 (0053: 플랫폼 몫 별도) — 입력 중 실시간. 초기값만 props 에서 (평범한 POST 라 실패 시 페이지가 다시 그려진다).
 	// svelte-ignore state_referenced_locally
 	let totalRate = $state(Number(values.total_rate) || 0);
 	// svelte-ignore state_referenced_locally
@@ -71,7 +70,7 @@
 	 */
 	const sellerPct = $derived(+(totalRateToCommission(totalRate) * 100).toFixed(1));
 	/** 하한이 걸렸나 — 걸렸으면 왜 입력값과 다른지 알려 준다 */
-	const rateClamped = $derived(totalRate > PLATFORM_RATE_PP && sellerPct > +(totalRate - PLATFORM_RATE_PP).toFixed(1));
+	const rateClamped = $derived(totalRate >= 1 && sellerPct > +totalRate.toFixed(1));
 	const auto = $derived(autoOptions(salePrice));
 	const thumb = $derived(imageSrc(thumbUrl));
 </script>
@@ -167,17 +166,18 @@
 			{#if locked}<input type="hidden" name="sale_price" value={v('sale_price')} />{/if}
 		</div>
 		<div class="fld {inv('total_rate')}">
-			<label for="pf-rate">총 수수료율 (%) — 플랫폼 {PLATFORM_RATE_PP}%p 포함</label>
-			<input id="pf-rate" name="total_rate" type="number" inputmode="decimal" bind:value={totalRate} min="11" max="50" step="0.5" disabled={locked} required />
+			<label for="pf-rate">인플루언서 수수료율 (%)</label>
+			<input id="pf-rate" name="total_rate" type="number" inputmode="decimal" bind:value={totalRate} min="5" max="50" step="0.5" disabled={locked} required />
 			{#if locked}<input type="hidden" name="total_rate" value={v('total_rate')} />{/if}
 			<div class="hint">
-				{#if totalRate > PLATFORM_RATE_PP}
-					→ 플랫폼 <b>{PLATFORM_RATE_PP}%p</b> + 제안 수수료 <b class="console-accent">{sellerPct}%</b> · 등급 보너스 포함 최대 <b>{+(sellerPct + topBonus).toFixed(1)}%</b> (블랙, 보너스는 플랫폼 부담)
+				{#if totalRate >= MIN_SELLER_RATE * 100}
+					→ 인플루언서 수수료 <b class="console-accent">{sellerPct}%</b> · 등급 보너스 포함 최대 <b>{+(sellerPct + topBonus).toFixed(1)}%</b> (블랙, 보너스는 셀러리 부담)
+					<br />셀러리 플랫폼 이용 수수료 3% + 결제 수수료 5%(VAT 포함)는 이 숫자와 별개로 정산 시 차감돼요.
 					{#if rateClamped}
-						<br /><span class="console-danger">제안 수수료 하한 {MIN_SELLER_RATE * 100}% 가 적용됐어요 — 총 {+(MIN_SELLER_RATE * 100 + PLATFORM_RATE_PP).toFixed(1)}% 이상으로 정해야 입력한 대로 저장됩니다.</span>
+						<br /><span class="console-danger">수수료 하한 {MIN_SELLER_RATE * 100}% 가 적용됐어요.</span>
 					{/if}
 				{:else}
-					<span class="console-danger">총 수수료율은 플랫폼 몫({PLATFORM_RATE_PP}%)보다 커야 합니다</span>
+					<span class="console-danger">인플루언서 수수료율은 {MIN_SELLER_RATE * 100}% 이상이어야 합니다</span>
 				{/if}
 			</div>
 		</div>
@@ -219,7 +219,7 @@
 			</div>
 		</div>
 		<label class="console-check" style="margin:4px 0 0"><input type="checkbox" name="sample_refund" checked={v('sample_refund') === 'on'} /> <span>판매 확정 시 샘플 구매액 환급 (신규 인플루언서 유입용)</span></label>
-		<div class="hint" style="font-size:11px;color:var(--color-mute);margin-top:6px">샘플 구매는 인플루언서 수수료 0의 판매 1건으로 정산됩니다(플랫폼 10% 동일). 인플루언서는 현금 또는 셀러리(1🥬=₩20,000)로 결제합니다.</div>
+		<div class="hint" style="font-size:11px;color:var(--color-mute);margin-top:6px">샘플 구매는 인플루언서 수수료 0의 판매 1건으로 정산됩니다(플랫폼 수수료 동일). 인플루언서는 현금 또는 셀러리(1🥬=₩20,000)로 결제합니다.</div>
 	</div>
 
 	<div class="fld {inv('options')}">

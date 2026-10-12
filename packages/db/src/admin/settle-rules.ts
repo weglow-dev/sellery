@@ -16,7 +16,7 @@
  *   payoutCsv · rrnCsv — 이체 파일 · 지급명세서 CSV (BOM + CRLF · 엑셀)
  *   HOLD_LABELS · ADMIN_SETTLE_FAIL_MESSAGES · settlementStatusChip · payoutStatusChip · settleRunSummary — 화면 문구
  */
-import { BREF_DISC, BREF_RATE, CLEAR_DAYS, PG_RATE, PLAT_RATE, REF_BOOST, REF_RATE, SAMPLE_CEL_WON, WHT } from "@sellery/core/constants";
+import { BREF_DISC, BREF_RATE, CLEAR_DAYS, PG_RATE, PLAT_RATE, REF_BOOST, REF_RATE, SAMPLE_CEL_WON, WHT, BRAND_PLAT_RATE, PAY_FEE_RATE, SELLER_PLAT_RATE } from "@sellery/core/constants";
 import { parseBrandOrderRow, type BrandOrderRow } from "../brand/order-rules";
 import { fmtNum } from "../campaign";
 import { md } from "../dates";
@@ -98,7 +98,11 @@ export type SettlementInput = {
   /** 캠페인 샘플 결제 🥬 (브랜드 원화 보전 = cel × SAMPLE_CEL_WON) */
   sampleCel?: number;
   pgRate?: number;
+  /** 합계(표시용) — 계산은 아래 세 요율 (0053) */
   platformRate?: number;
+  sellerPlatformRate?: number;
+  brandPlatformRate?: number;
+  paymentFeeRate?: number;
   refBoostRate?: number;
   refRewardRate?: number;
   brandRefDiscRate?: number;
@@ -121,6 +125,10 @@ export type Settlement = {
   bBoost: number;
   bReward: number;
   bDisc: number;
+  /** 0053 — 인플루언서 플랫폼 이용 수수료 = base × 3% · 브랜드 플랫폼 이용 수수료 = net × 3% · 브랜드 결제 수수료 = net × 5% */
+  sellerPlatformFee: number;
+  brandPlatformFee: number;
+  paymentFee: number;
   pfGross: number;
   costs: number;
   pf: number;
@@ -136,9 +144,9 @@ export type Settlement = {
   sampleRefundPg: number;
   sampleCelCover: number;
   brandPay: number;
-  /** 인플루언서 실수령 = sfTotal − wht + 샘플 환급 현금 */
+  /** 인플루언서 실수령 = sfTotal − wht − sellerPlatformFee + 샘플 환급 현금 */
   sellerPayout: number;
-  /** 브랜드 실제 부담 "플랫폼+PG" = pfGross − bBoost − bDisc + pg (0019 platform_pg) */
+  /** 브랜드가 내는 플랫폼 몫 = brandPlatformFee + paymentFee − bBoost − bDisc (0019 platform_pg · 0053) */
   platformPg: number;
 };
 
@@ -152,7 +160,9 @@ export function calcSettlement(input: SettlementInput): Settlement {
   const rate = n(input.rate);
   const bonusPp = n(input.bonusPp);
   const pgRate = input.pgRate === undefined ? PG_RATE : n(input.pgRate);
-  const platformRate = input.platformRate === undefined ? PLAT_RATE : n(input.platformRate);
+  const sellerPlatformRate = input.sellerPlatformRate === undefined ? SELLER_PLAT_RATE : n(input.sellerPlatformRate);
+  const brandPlatformRate = input.brandPlatformRate === undefined ? BRAND_PLAT_RATE : n(input.brandPlatformRate);
+  const paymentFeeRate = input.paymentFeeRate === undefined ? PAY_FEE_RATE : n(input.paymentFeeRate);
   const refBoostRate = input.refBoostRate === undefined ? REF_BOOST : n(input.refBoostRate);
   const refRewardRate = input.refRewardRate === undefined ? REF_RATE : n(input.refRewardRate);
   const brandRefDiscRate = input.brandRefDiscRate === undefined ? BREF_DISC : n(input.brandRefDiscRate);
@@ -173,10 +183,14 @@ export function calcSettlement(input: SettlementInput): Settlement {
   const bBoost = input.brandRefBoost ? net * brandRefDiscRate : 0;
   const bReward = input.brandRefBoost ? net * brandRefRewardRate : 0;
   const bDisc = net * brandDiscRate;
-  const pfGross = net * platformRate;
+  // 0053: 플랫폼 이용 수수료(인플 3% · 브랜드 3%) + 결제 수수료(5%). PG 는 플랫폼 비용이라 브랜드 몫에서 빼지 않는다
+  const sellerPlatformFee = base * sellerPlatformRate;
+  const brandPlatformFee = net * brandPlatformRate;
+  const paymentFee = net * paymentFeeRate;
+  const pfGross = sellerPlatformFee + brandPlatformFee + paymentFee;
   const costs = gBonus + boost + refReward + bBoost + bReward + bDisc;
   let pf = pfGross - costs;
-  let brandPay = net - pg - sf - pfGross + bBoost + bDisc;
+  let brandPay = net - sf - brandPlatformFee - paymentFee + bBoost + bDisc;
 
   /**
    * 샘플 구매액 환급의 재원 — 0023 (운영 결정 2026-09-28).
@@ -185,21 +199,22 @@ export function calcSettlement(input: SettlementInput): Settlement {
    * 카드 수수료(PG)와 추천인 보상(`bReward`)은 회수할 수 없어 플랫폼이 안는다.
    * `payouts.amount >= 0`(0004)을 지키려고 브랜드 몫은 0 에서 멈춘다.
    */
+  // 0053: 샘플 대금에서 브랜드가 받은 몫 = cash − 브랜드 수수료(3%+5%) + 할인 · 플랫폼이 받은 몫 = 브랜드 수수료 − 할인. PG 는 원래 플랫폼 비용(기록만)
+  const brandFeeRate = brandPlatformRate + paymentFeeRate;
   const refundPg = sampleRefundCash * pgRate;
-  const refundPlatform = sampleRefundCash * platformRate - (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) - sampleRefundCash * brandDiscRate;
-  const refundBrand =
-    sampleRefundCash - refundPg - sampleRefundCash * platformRate + (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) + sampleRefundCash * brandDiscRate;
+  const refundPlatform = sampleRefundCash * brandFeeRate - (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) - sampleRefundCash * brandDiscRate;
+  const refundBrand = sampleRefundCash - sampleRefundCash * brandFeeRate + (input.brandRefBoost ? sampleRefundCash * brandRefDiscRate : 0) + sampleRefundCash * brandDiscRate;
   if (sampleRefundCash > 0) {
     brandPay = Math.max(brandPay - refundBrand, 0);
     pf = pf - refundPlatform;
   }
 
   const vat = pf > 0 ? pf - pf / 1.1 : 0;
-  const pfNet = pf - vat;
+  const pfNet = pf - vat - pg; // PG 는 플랫폼 비용 (0053)
   const sfTotal = sf + gBonus + boost;
   const wht = sfTotal * whtRate;
-  const sellerPayout = sfTotal - wht + sampleRefundCash;
-  const platformPg = pfGross - bBoost - bDisc + pg;
+  const sellerPayout = sfTotal - wht - sellerPlatformFee + sampleRefundCash;
+  const platformPg = brandPlatformFee + paymentFee - bBoost - bDisc;
   const r = Math.round;
   return {
     gross: r(gross),
@@ -215,6 +230,9 @@ export function calcSettlement(input: SettlementInput): Settlement {
     bBoost: r(bBoost),
     bReward: r(bReward),
     bDisc: r(bDisc),
+    sellerPlatformFee: r(sellerPlatformFee),
+    brandPlatformFee: r(brandPlatformFee),
+    paymentFee: r(paymentFee),
     pfGross: r(pfGross),
     costs: r(costs),
     pf: r(pf),
@@ -461,6 +479,10 @@ export type SettlePreview = {
   sample_net: number;
   pg_rate: number;
   platform_rate: number;
+  /** 0053 */
+  seller_platform_rate: number;
+  brand_platform_rate: number;
+  payment_fee_rate: number;
   seller_rate: number;
   seller_grade: string | null;
   seller_bonus_pp: number;
@@ -481,6 +503,10 @@ export type SettlePreview = {
   brand_ref_boost: number;
   brand_ref_reward: number;
   brand_discount: number;
+  /** 0053 */
+  seller_platform_fee: number;
+  brand_platform_fee: number;
+  payment_fee: number;
   platform_fee_gross: number;
   costs: number;
   platform_fee: number;
@@ -561,6 +587,9 @@ export function parseSettlePreview(raw: unknown): SettlePreview | null {
     sample_net: num(o.sample_net),
     pg_rate: num(o.pg_rate, PG_RATE),
     platform_rate: num(o.platform_rate, PLAT_RATE),
+    seller_platform_rate: num(o.seller_platform_rate, SELLER_PLAT_RATE),
+    brand_platform_rate: num(o.brand_platform_rate, BRAND_PLAT_RATE),
+    payment_fee_rate: num(o.payment_fee_rate, PAY_FEE_RATE),
     seller_rate: num(o.seller_rate),
     seller_grade: str(o.seller_grade),
     seller_bonus_pp: num(o.seller_bonus_pp),
@@ -581,6 +610,9 @@ export function parseSettlePreview(raw: unknown): SettlePreview | null {
     brand_ref_boost: num(o.brand_ref_boost),
     brand_ref_reward: num(o.brand_ref_reward),
     brand_discount: num(o.brand_discount),
+    seller_platform_fee: num(o.seller_platform_fee),
+    brand_platform_fee: num(o.brand_platform_fee),
+    payment_fee: num(o.payment_fee),
     platform_fee_gross: num(o.platform_fee_gross),
     costs: num(o.costs),
     platform_fee: num(o.platform_fee),
