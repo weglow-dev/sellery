@@ -173,7 +173,8 @@ export const INVITE_FAIL_MESSAGES: Record<string, string> = {
   NOT_LISTED: "노출 중인 상품이 아닙니다",
   SELLER_NOT_FOUND: "없거나 정지된 인플루언서입니다",
   SELLER_HIDDEN: "비공개 인플루언서입니다 — 갤러리 열람(6단계) 뒤에 제안할 수 있습니다",
-  PRIORITY_INVITE_GATED: "우선권 등급(플래티넘 이상)은 🥬 제안권(6단계)이 필요합니다",
+  // 게이트는 `invite_cost_cel > 0`(다이아·블랙)이다 — 플래티넘은 우선권 등급이지만 비용이 0 이라 걸리지 않는다(0036:5 · :11)
+  PRIORITY_INVITE_GATED: "다이아·블랙 등급 제안은 브랜드 셀러리에서 🥬 제안권 10 이 차감됩니다 — 잔액을 확인해주세요",
   EXCLUSIVE_LOCKED: "다른 인플루언서에게 독점권이 확정된 상품입니다",
   ALREADY_ACTIVE: "이미 진행 중인 제안·캠페인이 있습니다",
   BAD_MESSAGE: "제안 메시지가 너무 깁니다",

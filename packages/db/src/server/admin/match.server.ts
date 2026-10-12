@@ -28,8 +28,11 @@ import {
 
 export type { MatchCandidate, MatchProduct, MatchSeller, AutoProposeOutcome } from "../../admin/match-rules";
 
-/** 우선권 등급은 제안에 🥬 제안권(6단계)이 필요해 후보에서 뺀다 — `grade_tiers.is_priority` */
-type Tier = { name: string; is_priority: boolean; invite_cost_cel: number };
+/**
+ * 등급별 제안 비용 — `grade_tiers.invite_cost_cel`(다이아·블랙 10 · 나머지 0 · 0036:11).
+ * 우선권 등급을 후보에서 빼지 않는다(0036:232) — 비용이 들 뿐이다. `is_priority` 는 여기서 쓰지 않는다.
+ */
+type Tier = { name: string; invite_cost_cel: number };
 
 export type MatchBrand = {
   id: string;
@@ -64,7 +67,7 @@ export type AdminMatchView = {
   /** 한 번 실행에 보낼 건수 */
   batch: number;
   /** 후보가 왜 적은지 화면이 설명할 수 있게 — 적격에서 빠진 이유별 인원 */
-  excluded: { hidden: number; priority: number; unverified: number; suspended: number };
+  excluded: { hidden: number; unverified: number; suspended: number };
 };
 
 type SellerRow = {
@@ -84,16 +87,13 @@ type SellerRow = {
 
 /**
  * 적격 여부 — `app_brand_invite_candidates`(0036) 의 where 절과 같은 조건.
- * 0036 부터 **우선권 등급(다이아·블랙)은 제외하지 않는다** — 제안권 🥬 10 이 들 뿐이다.
+ * 0036 부터 **우선권 등급(다이아·블랙)은 제외하지 않는다**(0036:232) — 제안권 🥬 10 이 들 뿐이다.
+ * 플래티넘은 우선권 등급이지만 비용이 0 이다(`invite_cost_cel` · 0036:11) — 제안에 제약이 없다.
  * 비용·잔액 판정은 브랜드가 정해지는 후보 단계에서 한다(`costCel`·`affordable`).
  * 비공개는 **브랜드별**로 갈리므로(열람 여부) 여기서는 여전히 제외하고, 갤러리에서 열람한 브랜드가
  * 상품 초대 화면으로 제안한다 — 자동 제안은 브랜드를 대신 고르므로 익명을 넣지 않는다.
  */
-function eligibilityOf(
-  s: SellerRow,
-  tiers: Map<string, Tier>,
-  verifiedPrimary: Set<string>
-): { eligible: boolean; reason: string | null } {
+function eligibilityOf(s: SellerRow, verifiedPrimary: Set<string>): { eligible: boolean; reason: string | null } {
   if (s.active === false) return { eligible: false, reason: "정지" };
   if (s.hidden === true) return { eligible: false, reason: "비공개 — 브랜드가 갤러리에서 레퍼런스를 열람한 뒤 제안" };
   if (!verifiedPrimary.has(s.id)) return { eligible: false, reason: "메인 채널 미인증" };
@@ -111,7 +111,7 @@ export async function getAdminMatch(admin: Admin = createAdminClient()): Promise
       .order("created_at", { ascending: false }),
     admin.from("seller_channels").select("seller_id, is_primary, verified"),
     admin.from("categories").select("name, group_name"),
-    admin.from("grade_tiers").select("name, is_priority, invite_cost_cel"),
+    admin.from("grade_tiers").select("name, invite_cost_cel"),
     admin.from("celery_balances").select("owner_id, balance, owner_type"),
   ]);
 
@@ -142,14 +142,16 @@ export async function getAdminMatch(admin: Admin = createAdminClient()): Promise
     growth: growthOf(s.recent_likes),
   });
 
-  // priority 는 0036 부터 제외 사유가 아니다 — 0 으로 남겨 화면·테스트의 모양을 지킨다
-  const excluded = { hidden: 0, priority: 0, unverified: 0, suspended: 0 };
+  // 우선권 등급(다이아·블랙)은 **제외 사유가 아니다**(0036:232) — 후보에 들고 제안권 🥬 10 이 든다.
+  // 0036 당시 `priority: 0` 을 남겨 뒀는데, 화면이 `{#if excluded.priority}` 로 감싸 **어떤 데이터로도
+  // 뜨지 않는 칩**이 됐다(2026-10-12 확인). 올라가는 코드가 없는 집계는 지운다.
+  const excluded = { hidden: 0, unverified: 0, suspended: 0 };
   const eligibleSellers: MatchSeller[] = [];
   const rising: AdminMatchView["rising"] = [];
 
   for (const s of sellerRows) {
     const m = toMatchSeller(s);
-    const e = eligibilityOf(s, tiers, verifiedPrimary);
+    const e = eligibilityOf(s, verifiedPrimary);
     rising.push({ ...m, hidden: s.hidden === true, active: s.active !== false, eligible: e.eligible, reason: e.reason });
     if (e.eligible) eligibleSellers.push(m);
     else if (s.active === false) excluded.suspended += 1;
