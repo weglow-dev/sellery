@@ -37,6 +37,12 @@
 	 * 조정분이 없으면 `*_adjusted` 는 조정 전과 같다(파서가 보정).
 	 */
 	const pf = $derived(v && bd ? profitSummary(v.totals.net_adjusted, v.totals.platform_net_adjusted, bd.total) : null);
+	/**
+	 * 정산 후 환불 조정분이 있는가(0050). 있으면 "비용 집계 → 최종 순이익" 표는 **전부 조정 후 기준**이고
+	 * KPI 는 조정 전 기준이라, 같은 이름의 값이 두 개가 된다 — 양쪽 라벨에 기준을 적어 구분한다.
+	 * 조정분이 없으면 `*_adjusted` 가 조정 전과 같아(파서가 보정 · revenue-rules.ts:236) 두 값이 일치하므로 접미사를 붙이지 않는다.
+	 */
+	const adjusted = $derived(!!v && v.totals.post_refunds > 0);
 	/** 저장된 값과 다르면 "저장 전" 표시 */
 	const dirty = $derived(!!v && OPEX_ROWS.some((r) => draft[r.key] !== v.opex[r.key]));
 
@@ -89,7 +95,7 @@
 		<div class="card static kpi">
 			<div class="lbl">플랫폼 순수익 (VAT 제외)</div>
 			<div class="val accent">{won(v.totals.platform_net)}</div>
-			<div class="sub">부가세 {won(v.totals.vat)} 제외 · 순 테이크레이트 {pct(v.profit.takeRate)}</div>
+			<div class="sub">부가세 {won(v.totals.vat)} 제외 · 순 테이크레이트{adjusted ? ' (조정 전)' : ''} {pct(v.profit.takeRate)}</div>
 		</div>
 		<div class="card static kpi">
 			<div class="lbl">셀러리 충전 매출</div>
@@ -105,6 +111,8 @@
 		{#if v.counts.no_snapshot}
 			정산 명세가 없는 {v.counts.no_snapshot}건은 금액을 계산할 수 없어 합계에서 빠졌습니다.
 		{/if}
+		<b>금액은 판매별로 원 단위 반올림한 뒤 합산합니다</b> — 실제 정산액이 판매 단위로 확정되기 때문입니다.
+		그래서 보조 설명의 뺄셈(예: 수수료 총액 − 보상·할인)이 합계와 1~2원 다를 수 있습니다. 데이터 오류가 아닙니다.
 	</p>
 
 	<div class="grid g2 rev-2col">
@@ -207,13 +215,21 @@
 						<tr><td class="in">PG 고정비</td><td class="num">−{won(bd.pgFixed)}</td></tr>
 						<tr><td class="in">샘플 셀러리 결제 보전 <small>🥬로 낸 샘플값을 브랜드에 원화 지급</small></td><td class="num">−{won(bd.celCover)}</td></tr>
 						<tr class="sum"><td>운영 비용 합계</td><td class="num">−{won(bd.total)}</td></tr>
-						<tr><td>플랫폼 순수익 (VAT 제외)</td><td class="num">{won(v.totals.platform_net)}</td></tr>
+						<!--
+							아래 세 줄은 **전부 조정 후 기준**이어야 한다 — 최종 순이익(`pf.finalNet`)이 `platform_net_adjusted`
+							기반이므로(0050), 순수익 줄에 조정 전 `platform_net` 을 쓰면 운영자가 두 줄을 더해도 세 번째 줄이 안 나온다.
+							조정분이 없으면 `platform_net_adjusted` 는 조정 전과 같은 값이다(파서가 보정).
+						-->
+						<tr>
+							<td>플랫폼 순수익 (VAT 제외) {#if adjusted}<small>환불 조정 후</small>{/if}</td>
+							<td class="num">{won(v.totals.platform_net_adjusted)}</td>
+						</tr>
 						<tr class="tot">
 							<td>운영비 차감 최종 순이익</td>
 							<td class="num" class:accent={pf.finalNet >= 0} class:down={pf.finalNet < 0}>{pf.finalNet < 0 ? '−' : ''}{won(Math.abs(pf.finalNet))}</td>
 						</tr>
-						<tr><td>손익분기 월 GMV <small>운영비 ÷ 순 테이크레이트 {pct(pf.takeRate)}</small></td><td class="num">{pf.breakEvenGmv === null ? '—' : won(pf.breakEvenGmv)}</td></tr>
-						<tr><td>운영비율 <small>운영비 ÷ GMV</small></td><td class="num">{pct(pf.opexRatio)}</td></tr>
+						<tr><td>손익분기 월 GMV <small>운영비 ÷ 순 테이크레이트{adjusted ? ' (환불 조정 후)' : ''} {pct(pf.takeRate)}</small></td><td class="num">{pf.breakEvenGmv === null ? '—' : won(pf.breakEvenGmv)}</td></tr>
+						<tr><td>운영비율 <small>운영비 ÷ GMV{adjusted ? ' (환불 조정 후)' : ''}</small></td><td class="num">{pct(pf.opexRatio)}</td></tr>
 					</tbody>
 				</table>
 			{/if}
