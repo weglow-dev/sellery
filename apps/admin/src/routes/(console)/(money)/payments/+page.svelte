@@ -60,7 +60,7 @@
 		<div><span class="ms-l">결제완료</span><span class="ms-v">{h.orders.paid}</span><span class="ms-s"><a href={data.ordersPath}>주문 표</a></span></div>
 		<div><span class="ms-l">결제키 없음</span><span class="ms-v" style={h.orders.paid_without_key ? 'color:var(--color-danger)' : ''}>{h.orders.paid_without_key}</span><span class="ms-s"><a href="{data.ordersPath}?f=manual">시드 · 수기</a></span></div>
 		<div><span class="ms-l">부분취소</span><span class="ms-v" style={h.orders.partial_refund ? 'color:var(--color-danger)' : ''}>{h.orders.partial_refund}</span><span class="ms-s"><a href="{data.ordersPath}?f=partial">정산 수동 확인</a></span></div>
-		<div><span class="ms-l">정산 후 환불</span><span class="ms-v" style={h.orders.refund_needs_adjust ? 'color:var(--color-danger)' : ''}>{h.orders.refund_needs_adjust}</span><span class="ms-s">조정 큐 · 발송 후 환불 {h.orders.refund_after_ship} · 취소 조정 {h.orders.canceled_adjust}</span></div>
+		<div><span class="ms-l">정산 후 환불</span><span class="ms-v" style={h.orders.refund_needs_adjust ? 'color:var(--color-danger)' : ''}>{h.orders.refund_needs_adjust}</span><span class="ms-s"><a href={data.payoutsPath}>과지급 확인</a> · 누적 집계(처리해도 줄지 않아요)</span></div>
 	</div>
 
 	<div class="sec">정산 · 지급</div>

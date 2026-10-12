@@ -54,6 +54,7 @@
 //   payout-paid <payout id> ["메모"]        app_admin_payout_mark_paid — 이체 후 지급 완료(pending → paid · 양측 paid 면 정산 paid)
 //   payout-hold <payout id> ["사유"] · payout-release <payout id>   운영자 보류 / 해제(정보 완비 재검사 · STILL_INCOMPLETE 면 거부)
 //   payments-health                         app_admin_payments_health — 결제 정합성 카운트(만료 세션 · 미처리 이벤트 · 부분취소 · 정산 후 조정 큐 …)
+//   overpay [--limit N]                     정산 후 환불로 과지급되는 정산 건 (0051) — 지급 전이면 정산 취소로 되돌릴 수 있다
 //   admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]   전 브랜드 주문 표
 //
 //   ── 토스 지급대행 (0040 · docs/admin-console-plan.md "정산·돈" §7 · deploy.md §5.3.1 — TOSS_PAYOUT_SECRET_KEY · TOSS_PAYOUT_SECURITY_KEY 필요) ──
@@ -135,7 +136,7 @@ function usage(code = 2) {
       "  tick | tick-campaign <campaign> | orders [--campaign c] [--brand b] [--unshipped|--shipped|--refunded] [--limit N] | cs [--open] [--brand b] [--limit N]",
       "  settle-preview <campaign> | settle-run <campaign> [--force --reason \"사유\"] | settle-due | settlements [--status pending|held|paid] [--limit N]",
       "  payouts [--status pending|held|paid|all] | payouts-export [--status pending] --purpose \"…\" [--out file.csv] | payout-paid <id> [\"메모\"] | payout-hold <id> [\"사유\"] | payout-release <id>",
-      "  payments-health | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
+      "  payments-health | overpay | admin-orders [--filter all|paid|unshipped|shipped|refunded|sample|manual|partial] [--q 검색] [--limit N]",
       "  payout-mode [manual|toss] | payout-cap [<원>] | toss-balance | toss-queue | toss-seller-sync <seller> [--brand] | toss-seller-delete <seller> [--brand]",
       "  toss-payout-request [--all | --id <payout id>] [--express | --date YYYY-MM-DD] | toss-payout-refresh <payout id> | toss-payout-cancel <payout id>",
       "  tracking-due [--limit N] | tracking-sweep [--dry-run] [--limit N] | track <택배사> <송장> | tracking-usage | tracking-companies",
@@ -1109,6 +1110,38 @@ async function cmdPaymentsHealth() {
   console.table(flat);
 }
 
+/**
+ * overpay — 정산 후 환불로 과지급되는 정산 건 (0051).
+ * 정산은 보관액을 남김없이 쪼개므로 환불이 들어오면 보관액만 줄고 `payouts` 금액은 그대로다
+ * → 약속한 금액을 다 보내면 차액을 플랫폼이 메운다. 지급 전이면 정산 취소(0048)로 되돌릴 수 있다.
+ * 지급액 자동 차감은 설계에 없다 — 수동 정산 조정이다(docs/app-plan.md:625 · §9 #12).
+ */
+async function cmdOverpay() {
+  const { data, error } = await admin.rpc("app_admin_post_settle_refunds", { p_limit: Math.min(Number(flags.limit) || 200, 1000) });
+  if (error) throw new Error(`app_admin_post_settle_refunds failed: ${error.message}`);
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  if (!rows.length) {
+    console.log("정산 후 환불 없음 — 과지급 건이 없습니다.");
+    return;
+  }
+  let sum = 0;
+  console.table(
+    rows.map((r) => {
+      sum += Number(r.amount) || 0;
+      return {
+        캠페인: r.campaign_code ?? "",
+        환불액: Number(r.amount) || 0,
+        건수: Number(r.count) || 0,
+        미지급: Number(r.unpaid_payouts) || 0,
+        지급완료: Number(r.paid_payouts) || 0,
+        되돌리기: Number(r.paid_payouts) === 0 ? "정산 취소 가능" : "불가(지급됨) — 다음 정산에서 협의",
+      };
+    }),
+  );
+  console.log(`\n과지급 합계 ₩${sum.toLocaleString("ko-KR")} (정산 ${rows.length}건) — 플랫폼이 부담합니다.`);
+  console.log("지급 전이면 /admin/settle/<코드> 에서 정산 취소 → 기일에 다시 실행하면 환불이 반영됩니다.");
+}
+
 async function cmdAdminOrders() {
   const { data, error } = await admin.rpc("app_admin_orders", {
     p_filter: flags.filter ? String(flags.filter) : "all",
@@ -1548,6 +1581,9 @@ try {
       break;
     case "payments-health":
       await cmdPaymentsHealth();
+      break;
+    case "overpay":
+      await cmdOverpay();
       break;
     case "admin-orders":
       await cmdAdminOrders();

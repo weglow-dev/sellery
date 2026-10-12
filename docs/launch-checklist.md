@@ -98,6 +98,7 @@
 - [ ] **에스크로 문구**: 약관·방침은 사용자 결정(2026-09-17)으로 결제대금예치·피해보상보험 언급을 뺐다(`terms.ts:11` 주석 · app-plan.md §13). 그런데 고객 화면에는 "고객 결제 → 셀러리 보관(에스크로)"(`apps/shop/src/routes/about/+page.svelte:97`) · "셀러리 에스크로 보관 · 종료 후 21일 환불 보호"(`packages/ui/src/site/VerifyModal.svelte:48`) 가 남아 있다. 전자상거래법상 "에스크로" 표기는 결제대금예치업 등록 또는 PG 의 예치 서비스 이용을 전제로 오해 소지 → **법률 검토 요청(결정: 대표)** — 문구를 "판매 종료 후 21일 뒤 정산" 으로 바꿀지, 실제 예치 서비스를 붙일지. 여기서 정하지 않는다.
 - [ ] 방침 `privacy.ts:303` "고객 문의는 회사가 이메일로 직접 응대" vs 실제 흐름은 고객 문의가 **브랜드 콘솔 `/brand/cs` 로 바로** 간다(CLAUDE.md "고객 CS" · 0018). 브랜드가 수취인 이름·연락처·주소를 보는 구조가 방침 제3자 제공 항목에 있는지 **확인 필요(법률 검토)**.
 - [ ] 청약철회(약관 제12조 `terms.ts:237`) 7일 · 발송 후 고객 셀프 환불 불가(app-plan.md §0-8) 가 브랜드 CS 응대 매뉴얼에 반영됐는지.
+- [ ] **파트너 약관이 없다 — 법률 검토 필요(2026-10-08 발견)**. `packages/db/src/legal/` 에는 **고객용** `terms.ts` 와 `privacy.ts` 둘뿐인데, 브랜드·인플루언서 가입 화면도 그 고객 약관에 동의시킨다(`brand/signup-rules.ts:71` · `partner/signup-rules.ts:67` 둘 다 "이용약관과 개인정보처리방침에 동의해주세요"). 파트너 전용 조항 — **정산 조정** · 지급 보류 · 수수료율 변경 · 정지·퇴출 · 독점권 · 샘플 환급 — 의 근거가 어디에도 없다. 특히 브랜드 정산 화면은 "브랜드 정산액 = 확정 매출 − PG 1.9% − 인플루언서 수수료 − 플랫폼 수수료 10% · 판매 종료 **D+21** 에 등록 계좌로 지급" 이라고 **확정**을 약속한다(`apps/brand/src/routes/(console)/settle/+page.svelte:40`). 파트너와 다툼이 생기면 댈 조항이 없다.
 
 ---
 
@@ -202,6 +203,7 @@
 | 9 | Supabase PITR 애드온 · 자동 정산 크론 켜는 시점 | PITR 미사용 · 수동 정산 | §6 |
 | 10 | 데모 화면 — Preview 에만 vs 완전 삭제 | Production `PUBLIC_DEMO` 제거, 코드는 유지 | §7 |
 | 11 | 기본 OG 이미지 · sitemap | 없음(후속) | §7 |
+| 12 | **정산 후 환불 과지급** — 자동 차감을 만들지 여부. 현재 설계는 **수동 정산 조정**(`app-plan.md:625` · `deploy.md:228` · `0020:47`) | **설계 그대로 수동.** 화면이 과지급을 경고하고(0051) 지급 전이면 정산 취소(0048) → 재실행으로 되돌린다 | 0051 |
 
 **저장소로 확인 못 한 것(이 문서의 가정)**: Vercel 각 프로젝트의 현재 env 값 종류(테스트/라이브) · 토스 심사 상태 · Vercel Firewall 규칙 · Supabase 플랜/백업 설정 · 각 대시보드 2FA · 클라우드 Auth 의 dev-* 계정과 대표 실계정 · c105/c106/b2 연결 — 전부 대표가 준 사실(2026-09-22)이며 실행 전 대시보드에서 다시 본다.
 
@@ -262,6 +264,9 @@ node --env-file=.env.cloud.local packages/db/scripts/partner-admin.mjs toss-queu
 node --env-file=.env.cloud.local packages/db/scripts/partner-admin.mjs payout-mode toss
 node --env-file=.env.cloud.local packages/db/scripts/partner-admin.mjs toss-balance   # 토스 잔액 · 셀러리 지급 대기 · 오늘 요청/상한 한 줄
 #    리허설 캠페인 정산(settle-run <c> --force) 뒤 payouts 2건(브랜드 법인 · 인플루언서)을 ₩1,000 으로 — 금액은 리허설 정산건 그대로 쓰거나 관리자 화면에서 해당 건만 체크
+#    ⚠ 지급 전에 /admin/settle/payouts 상단 띠 확인 — "정산 후 환불" 경고가 있으면 그만큼 과지급된다(0051).
+#      3) 의 환불 테스트를 **정산 뒤**에 했으면 반드시 뜬다. 지급 전이면 /admin/settle/<코드> 에서 정산 취소(0048) → 다시 실행.
+#      지급액 자동 차감은 설계에 없다 — 수동 정산 조정이다(app-plan.md:625 · §9 #12).
 node --env-file=.env.cloud.local packages/db/scripts/partner-admin.mjs toss-payout-request --id <payout id 브랜드>
 node --env-file=.env.cloud.local packages/db/scripts/partner-admin.mjs toss-payout-request --id <payout id 인플루언서>
 #    가드 줄이 먼저 찍힌다(이번 · 대기 · 잔액 · 오늘/상한). 거절(DAILY_CAP_EXCEEDED · BALANCE_*)이면 payout_events request.refused — 상한/잔액 확인 뒤 재시도

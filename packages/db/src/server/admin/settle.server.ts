@@ -182,6 +182,53 @@ export async function listAdminSettlements(status?: string | null, limit = 200, 
   return parseAdminSettlements(data);
 }
 
+/**
+ * 정산 후 환불 (0051) — 정산이 확정된 뒤 들어온 환불. **그만큼 과지급된다.**
+ *
+ * 정산은 보관액을 남김없이 쪼개므로(PG + 브랜드 + 인플 + 추천 + 플랫폼 + VAT = net) 여유분이 없다.
+ * 환불하면 보관액만 줄고 `payouts` 금액은 그대로라, 약속한 금액을 다 보내면 차액을 플랫폼이 메운다.
+ *
+ * **금액을 깎지 않는다** — 설계가 수동 정산 조정이다(docs/app-plan.md:625 · 0020:47 · 0051 헤더).
+ * 운영자가 지급 전에 알도록 화면에 경고만 띄운다.
+ *
+ * `settlement_id` 로 지급 건에 이어 붙인다 — 지급 화면이 건당 RPC 를 부르지 않도록 한 번에 받는다.
+ */
+export type PostSettleRefund = {
+  campaign_id: string;
+  campaign_code: string | null;
+  settlement_id: string;
+  amount: number;
+  count: number;
+  unpaid_payouts: number;
+  paid_payouts: number;
+};
+
+export async function listPostSettleRefunds(limit = 200, admin: Admin = createAdminClient()): Promise<Map<string, PostSettleRefund>> {
+  const out = new Map<string, PostSettleRefund>();
+  const { data, error } = await admin.rpc("app_admin_post_settle_refunds", { p_limit: limit });
+  if (error) {
+    console.error("[admin/settle] app_admin_post_settle_refunds failed:", error.message);
+    return out;
+  }
+  const rows = (data as { rows?: unknown[] } | null)?.rows;
+  if (!Array.isArray(rows)) return out;
+  for (const raw of rows) {
+    const r = raw as Record<string, unknown>;
+    const sid = typeof r.settlement_id === "string" ? r.settlement_id : null;
+    if (!sid) continue;
+    out.set(sid, {
+      campaign_id: String(r.campaign_id ?? ""),
+      campaign_code: typeof r.campaign_code === "string" ? r.campaign_code : null,
+      settlement_id: sid,
+      amount: Number(r.amount ?? 0) || 0,
+      count: Number(r.count ?? 0) || 0,
+      unpaid_payouts: Number(r.unpaid_payouts ?? 0) || 0,
+      paid_payouts: Number(r.paid_payouts ?? 0) || 0
+    });
+  }
+  return out;
+}
+
 export async function markPayoutPaid(payoutId: string, opts: { actorUserId?: string | null; memo?: string | null } = {}, admin: Admin = createAdminClient()): Promise<PayoutActionResult> {
   if (!UUID_RE.test(payoutId)) return { ok: false, code: "NOT_FOUND" };
   const { data, error } = await admin.rpc("app_admin_payout_mark_paid", { p_payout_id: payoutId, p_actor_user_id: opts.actorUserId ?? undefined, p_memo: opts.memo ?? undefined });

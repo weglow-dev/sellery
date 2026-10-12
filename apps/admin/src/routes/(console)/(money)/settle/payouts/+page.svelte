@@ -46,6 +46,21 @@
 		picked = on ? [...new Set([...picked, id])] : picked.filter((x) => x !== id);
 	};
 	const exportStatus = $derived(data.status === 'all' ? 'all' : data.status);
+
+	// 정산 후 환불 (0051) — 표시 중인 지급 건에 걸린 과지급 총액. 정산 단위로 센다(한 정산에 지급 건 2~3개).
+	const overpay = $derived.by(() => {
+		const seen = new Map<string, number>();
+		let unpaid = 0;
+		for (const r of data.rows) {
+			const pr = r.post_refund;
+			if (!pr || seen.has(pr.settlement_id)) continue;
+			seen.set(pr.settlement_id, pr.amount);
+			if (r.status !== 'paid') unpaid += 1;
+		}
+		let sum = 0;
+		for (const v of seen.values()) sum += v;
+		return { count: seen.size, amount: sum, unpaid };
+	});
 </script>
 
 <svelte:head>
@@ -58,6 +73,15 @@
 	<span class="meta">{tossMode ? '토스 지급대행으로 요청 → 웹훅이 이체 완료를 받으면 자동으로 지급 완료 (이체 파일은 폴백)' : '이체 파일로 내려받아 이체 → [지급 완료] 표시 · 양측 완료면 정산이 지급 완료'}</span>
 	<a href={data.settlePath} class="btn ghost sm" style="margin-left:auto">정산 실행 →</a>
 </div>
+
+{#if overpay.count}
+	<!-- 정산 후 환불 (0051) — 설계가 수동 정산 조정이라(app-plan.md:625) 운영자에게 알리는 것이 방어다. -->
+	<p class="admin-overpay-band">
+		⚠ 정산 후 환불이 있는 정산 <b>{overpay.count}건</b> · 합계 <b>{money(overpay.amount)}</b> — 지급액은 환불 전 금액이라
+		<b>이 금액만큼 과지급</b>되고 차액은 플랫폼이 부담해요. 지급 전이면 <a href={data.settlePath}>정산 실행</a>에서 취소해 다시 돌리고,
+		이미 지급했으면 파트너와 협의해 다음 정산에서 조정해주세요.
+	</p>
+{/if}
 
 {#if data.msg}
 	<p class={`notice ${data.msg.tone === 'ok' ? 'ok' : data.msg.tone === 'danger' ? 'danger' : ''}`} role="status">{data.msg.text}</p>
@@ -166,7 +190,11 @@
 						<td data-l="토스" class="admin-pick">{#if r.toss?.requestable}<input type="checkbox" aria-label="토스 지급 요청에 포함" checked={tossPicked.includes(r.id)} onchange={(e) => toggleToss(r.id, e.currentTarget.checked)} />{:else if r.toss?.reason && r.status === 'pending'}<small class="meta" title={r.toss.reason}>{r.toss.reason === 'IN_FLIGHT' ? '진행 중' : r.toss.reason === 'NO_TOSS_SELLER' ? '셀러 없음' : r.toss.reason === 'TOSS_SELLER_PENDING' ? '셀러 대기' : r.toss.reason}</small>{/if}</td>
 					{/if}
 					<td data-l="캠페인"><a href={detail(r.campaign_code)} class="console-mono">{r.campaign_code.toUpperCase()}</a><small>{r.title ?? ''}</small></td>
-					<td data-l="대상"><span class="chip {r.payee_type}">{payeeTypeLabel(r.payee_type)}</span> {r.payee_name}<small>{r.payee_sub}{r.payee_type === 'seller' ? ` · ${r.settle_type === 'biz' ? '사업자' : '개인'}` : ''}</small></td>
+					<td data-l="대상"><span class="chip {r.payee_type}">{payeeTypeLabel(r.payee_type)}</span> {r.payee_name}<small>{r.payee_sub}{r.payee_type === 'seller' ? ` · ${r.settle_type === 'biz' ? '사업자' : '개인'}` : ''}</small>
+						{#if r.post_refund}
+							<!-- 정산 후 환불 (0051) — 지급액은 환불 전 금액으로 고정돼 있어 그만큼 과지급된다. 조정은 운영자가 손으로 한다(app-plan.md:625). -->
+							<small class="admin-overpay">⚠ 정산 후 환불 {money(r.post_refund.amount)} ({r.post_refund.count}건) — 이 금액만큼 <b>과지급</b>돼요{r.status === 'paid' ? ' (이미 지급됨)' : ''}</small>
+						{/if}</td>
 					<td data-l="계좌">{#if r.bank_snapshot?.bank}{r.bank_snapshot.bank} <span class="console-mask">{r.bank_snapshot.account_masked ?? ''}</span><small>{r.bank_snapshot.holder ?? ''}</small>{:else}<span class="meta">미등록</span>{/if}</td>
 					<td class="num" data-l="지급액"><b>{money(r.amount)}</b>{#if r.wht}<small>원천징수 {money(r.wht)} 차감</small>{/if}</td>
 					<td data-l="상태"><StatusChip tone={chip.tone}>{chip.label}</StatusChip>{#if r.status === 'held'}<small class="console-danger">{r.hold_reason ?? holdLabel(r.hold_code) ?? '운영자 보류'}</small>{/if}{#if r.memo}<small>{r.memo}</small>{/if}
@@ -183,7 +211,7 @@
 						{#if r.status === 'pending'}
 							<details class="console-reject admin-act">
 								<summary class="btn pri sm">지급 완료</summary>
-								<form method="post" action="?/paid" class="console-form console-reject-form" onsubmit={(e) => { if (!confirm(`${r.payee_name} ${money(r.amount)} 을 지급 완료로 표시할까요? 실제 이체를 마친 뒤에만 눌러주세요.`)) e.preventDefault(); }}>
+								<form method="post" action="?/paid" class="console-form console-reject-form" onsubmit={(e) => { if (!confirm(`${r.payee_name} ${money(r.amount)} 을 지급 완료로 표시할까요? 실제 이체를 마친 뒤에만 눌러주세요.${r.post_refund ? `\n\n\u26a0 이 정산에는 정산 후 환불 ${money(r.post_refund.amount)}(${r.post_refund.count}건)이 있습니다. 지급액은 환불 전 금액이라 그만큼 과지급되고 차액은 플랫폼이 부담합니다. 파트너와 협의해 다음 정산에서 조정하거나, 지급 전이면 정산을 취소해 다시 실행하세요.` : ''}`)) e.preventDefault(); }}>
 									<input type="hidden" name="payout_id" value={r.id} />
 									<input name="memo" maxlength={200} placeholder="메모 (선택)" aria-label="지급 메모" />
 									<button type="submit" class="pri sm">확정</button>
