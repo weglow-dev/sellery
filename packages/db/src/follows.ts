@@ -53,3 +53,16 @@ export function followMessage(key: string | null | undefined): string | null {
   if (!key) return null;
   return FOLLOW_MESSAGES[key] ?? null;
 }
+
+/**
+ * 결과 문구의 톤 — `err_` 키는 **실패**다.
+ *
+ * 화면이 톤을 구분하지 않으면 실패가 초록 성공 박스로 나온다. `err_DB_ERROR` 는 DevTools 없이도 닿는다 —
+ * 팔로우 토글 레이트리밋(사용자당 30분 60회 · `/influencers` 액션)을 넘기면 이 키로 떨어지고,
+ * 렌더 뒤 셀러가 비공개·삭제되면 `followSeller` 가 `NOT_FOUND` 를 돌려준다.
+ * 문구가 없는 키는 `followMessage` 가 null 이라 아무것도 그리지 않으므로 톤도 null.
+ */
+export function followMessageTone(key: string | null | undefined): "ok" | "danger" | null {
+  if (!key || !FOLLOW_MESSAGES[key]) return null;
+  return key.startsWith("err_") ? "danger" : "ok";
+}

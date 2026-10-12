@@ -12,6 +12,7 @@ import { absoluteUrl, fetchHomeCampaigns, fetchPublicSellerProfiles, followSelle
  *   PUBLIC_SUPABASE_* 가 비면 빈 목록으로 렌더(빈 상태 문구).
  *   **팔로우(0045)**: 회원이면 팔로우 여부를 함께 넘긴다 — 토글은 아래 폼 액션이고, 효과는 홈 정렬 우대뿐이다(메일 없음).
  *     해제도 이 화면에서 한다(`/account` 에 팔로우 목록 화면이 없다 — 같은 버튼이 토글).
+ *     `?following=1` 이면 팔로우한 사람만 — 모아 볼 화면이 여기뿐이라 목록을 눈으로 훑지 않게 한다(로그아웃은 무시).
  */
 export const load: PageServerLoad = async (event) => {
 	const platformParam = event.url.searchParams.get('platform');
@@ -27,21 +28,34 @@ export const load: PageServerLoad = async (event) => {
 		event.locals.safeGetSession().then(({ user }) => followedSellerIds(user?.id ?? null))
 	]);
 
-	const list = filterSellers(all, { platform, cat }).map((s) => ({
-		s,
-		stats: sellerCampaignStats(cards, s.id, L),
-		following: followed.has(s.id)
-	}));
+	const signedIn = parentData.user !== null;
+	/**
+	 * 팔로잉만 보기(`?following=1`) — 팔로우한 인플루언서를 **모아 볼 화면이 여기뿐**이라 필터로 둔다.
+	 * 로그아웃이면 무시한다(팔로우는 회원 전용이고 `followed` 가 비어 있어 전원이 걸러진다).
+	 */
+	const onlyFollowing = event.url.searchParams.get('following') === '1' && signedIn;
+
+	const filtered = filterSellers(all, { platform, cat });
+	const list = filtered
+		.filter((s) => !onlyFollowing || followed.has(s.id))
+		.map((s) => ({
+			s,
+			stats: sellerCampaignStats(cards, s.id, L),
+			following: followed.has(s.id)
+		}));
 
 	return {
 		platform,
 		cat,
+		onlyFollowing,
 		total: all.length,
 		counts: sellerCounts(all),
+		/** 칩 건수 — 플랫폼·카테고리 칩과 같은 기준(전체) */
+		followingCount: all.filter((s) => followed.has(s.id)).length,
 		list,
 		link: L ? { sellerName: L.sellerName } : null,
 		canonical: absoluteUrl('/influencers'),
-		signedIn: parentData.user !== null,
+		signedIn,
 		followMsg: event.url.searchParams.get('follow')
 	};
 };
