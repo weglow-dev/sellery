@@ -1,6 +1,7 @@
 <script lang="ts">
 	/**
-	 * 비회원 주문 조회 폼 (0021) — 주문번호 + 연락처. 실패 문구는 한 가지(열거 방지). 회원이면 「내 주문」 안내를 위에 한 줄.
+	 * 비회원 주문 조회 폼 (0021) — 주문번호 + 연락처. 실패 문구는 한 가지(열거 방지).
+	 * 회원 여부로 갈리는 두 곳: 위에 「내 주문」 안내(로그인 시) · 아래 회원 로그인 입구(로그아웃 시).
 	 */
 	import { enhance } from '$app/forms';
 	import { KAKAO_ICON as KakaoIcon } from '@sellery/ui/site';
@@ -57,8 +58,16 @@
 			</div>
 		</form>
 
-		<div class="meta" style="margin-top:16px;border-top:1px dashed var(--color-line);padding-top:12px">
-			회원으로 주문했다면 → <a href="/login?next=%2Faccount%2Forders" class="btn sm kakao" style="vertical-align:middle"><KakaoIcon /> 카카오 로그인</a>
-		</div>
+		<!--
+			회원 입구는 **로그아웃 상태에만**. 로그인한 사람에게는 위쪽 `data.signedIn` 안내가 이미
+			`내 주문` 으로 보내고 있고, 이 버튼은 눌러도 `/login` 이 곧바로 `/account/orders` 로 되돌린다
+			(`login/+page.server.ts` — 세션이 있으면 `next` 로 303). 누르면 로그인 화면이 나올 것처럼 보이는
+			버튼만 남아 혼란스럽다.
+		-->
+		{#if !data.signedIn}
+			<div class="meta" style="margin-top:16px;border-top:1px dashed var(--color-line);padding-top:12px">
+				회원으로 주문했다면 → <a href="/login?next=%2Faccount%2Forders" class="btn sm kakao" style="vertical-align:middle"><KakaoIcon /> 카카오 로그인</a>
+			</div>
+		{/if}
 	</div>
 </div>
