@@ -27,7 +27,6 @@ export type SellerProfile = {
   followers: number;
   category: string | null;
   intro: string | null;
-  grade: string | null;
 };
 
 export type SellerListFilter = { platform: SellerPlatform | null; cat: string | null };

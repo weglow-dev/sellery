@@ -9,7 +9,7 @@
 	import { CATS, fmtNum, storeUrl } from '@sellery/db/campaign';
 	import { followButtonView, followMessage } from '@sellery/db/follows';
 	import { SELLER_PLATFORMS } from '@sellery/db/sellers';
-	import { GradeBox, PLATFORM_NAMES, PlatIcon, ProductIcon, SellerAvatar } from '@sellery/ui/site';
+	import { PLATFORM_NAMES, PlatIcon, ProductIcon, SellerAvatar } from '@sellery/ui/site';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -80,7 +80,7 @@
 			<div class="infl-head">
 				<SellerAvatar avatarUrl={s.avatar_url} size={52} />
 				<div class="infl-id">
-					<div><b class="infl-nm">{s.name}</b> <GradeBox grade={s.grade} sm /></div>
+					<div><b class="infl-nm">{s.name}</b></div>
 					<div class="infl-sub"><PlatIcon platform={s.platform} /> {s.handle} · 팔로워 {fmtNum(s.followers)} · 채널 인증 ✓</div>
 				</div>
 			</div>

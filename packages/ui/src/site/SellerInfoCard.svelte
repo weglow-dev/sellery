@@ -3,7 +3,6 @@
 	import type { CampaignCard } from '@sellery/db/campaign';
 	import { COMPANY } from '@sellery/db/company';
 	import PlatIcon from './icons/PlatIcon.svelte';
-	import GradeBox from './GradeBox.svelte';
 	let { card }: { card: CampaignCard } = $props();
 	const brand = $derived(card.brand);
 	const seller = $derived(card.seller);
@@ -22,7 +21,7 @@
 					`docs/grade-policy.md:143` 도 "인증 뱃지가 아니며 등급과 무관" 으로 분석해 뒀다.
 					브랜드 가입 시 사업자번호는 필수(`brand/signup-rules.ts:96` · 0014)라 정상 경로에서는 비지 않는다.
 				-->
-				<td>{brand.name} <GradeBox grade={brand.grade} sm /></td>
+				<td>{brand.name}</td>
 			</tr>
 			{#if brand.biz_no}
 				<tr>

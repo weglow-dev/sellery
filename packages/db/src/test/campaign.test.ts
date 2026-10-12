@@ -49,8 +49,8 @@ const RAW = {
     options_raw: null,
     status: "listed",
   },
-  seller: { id: "s1", code: "s1", name: "지유", handle: "@Jiyu_Beauty", platform: "instagram", avatar_url: null, grade: "골드" },
-  brand: { id: "b1", code: "b1", name: "바인허브", logo_url: null, grade: null, biz_no: null, mail_order_no: null },
+  seller: { id: "s1", code: "s1", name: "지유", handle: "@Jiyu_Beauty", platform: "instagram", avatar_url: null },
+  brand: { id: "b1", code: "b1", name: "바인허브", logo_url: null, biz_no: null, mail_order_no: null },
   channels: [{ platform: "instagram", handle: "@jiyu_beauty", url: "https://instagram.com/jiyu_beauty" }, { platform: "x" }],
   settings: { clear_days: 21, link_protect_days: 7, home_feature_days: 7 },
 };

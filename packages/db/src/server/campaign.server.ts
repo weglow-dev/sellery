@@ -40,7 +40,7 @@ export function fetchCampaignCard(event: DbEvent, code: string): Promise<Campaig
 const HOME_SELECT =
   "id, code, status, start_date, end_date, qty, sold_qty, home_featured_at, seller_id, product_id, brand_id, " +
   "product:products!inner(id, name, description, emoji, thumb_url, category, consumer_price, sale_price), " +
-  "seller:sellers!inner(id, code, name, handle, platform, avatar_url, grade), " +
+  "seller:sellers!inner(id, code, name, handle, platform, avatar_url), " +
   "brand:brands!inner(id, name)";
 
 const HOME_STATUSES: readonly CampaignStatus[] = ["LIVE", "SCHEDULE_CONFIRMED", "CLEARING"];
@@ -105,7 +105,6 @@ export function parseHomeCard(row: unknown): HomeCard | null {
       handle: sHandle,
       platform: str(s.platform) || "",
       avatar_url: str(s.avatar_url),
-      grade: str(s.grade),
     },
     brand: { id: bId, name: bName },
   };
@@ -173,7 +172,6 @@ export type PublicSeller = {
   handle: string;
   platform: string;
   avatar_url: string | null;
-  grade: string | null;
 };
 
 /** sellers 공개 행 (RLS: active and not hidden) — 이름순. 오류 시 빈 배열. */
@@ -183,7 +181,7 @@ export async function fetchPublicSellers(event: DbEvent): Promise<PublicSeller[]
   try {
     const { data, error } = await supabase
       .from("sellers")
-      .select("id, code, name, handle, platform, avatar_url, grade")
+      .select("id, code, name, handle, platform, avatar_url")
       .order("name", { ascending: true });
     if (error) {
       console.error("[campaign] public sellers failed", error.message);
@@ -196,7 +194,6 @@ export async function fetchPublicSellers(event: DbEvent): Promise<PublicSeller[]
       handle: s.handle,
       platform: s.platform,
       avatar_url: s.avatar_url,
-      grade: s.grade,
     }));
   } catch (e) {
     console.error("[campaign] public sellers threw", e);
@@ -218,7 +215,7 @@ export async function fetchPublicSellerProfiles(event: DbEvent): Promise<SellerP
   try {
     const { data, error } = await supabase
       .from("sellers")
-      .select("id, code, name, handle, platform, avatar_url, followers, category, intro, grade, channels:seller_channels!inner(id)")
+      .select("id, code, name, handle, platform, avatar_url, followers, category, intro, channels:seller_channels!inner(id)")
       .eq("channels.is_primary", true)
       .order("followers", { ascending: false });
     if (error) {
@@ -235,7 +232,6 @@ export async function fetchPublicSellerProfiles(event: DbEvent): Promise<SellerP
       followers: s.followers,
       category: s.category,
       intro: s.intro,
-      grade: s.grade,
     }));
   } catch (e) {
     console.error("[campaign] public seller profiles threw", e);

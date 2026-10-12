@@ -4,7 +4,7 @@
 	 *   1 히어로 · 2 링크 보호 안내 · 3 카테고리 칩(URL ?cat=) · 4 카테고리 안내 · 5 목록 + 우측(순위 · 인플루언서 칩 ?seller=) · 6 셀러리가 다른 이유 · 7 하단 카드
 	 */
 	import { CATS, CAT_INFO, fmtKR, fmtNum, storeUrl } from '@sellery/db/campaign';
-	import { CampaignCard, CEL, GradeBox, KAKAO_ICON, PlatIcon, ProductIcon, ViewersSum } from '@sellery/ui/site';
+	import { CampaignCard, CEL, KAKAO_ICON, PlatIcon, ProductIcon, ViewersSum } from '@sellery/ui/site';
 	import { whyCards } from '$lib/why';
 	import type { PageData } from './$types';
 
@@ -133,7 +133,7 @@
 			<div style="display:flex;gap:8px;flex-wrap:wrap">
 				{#each data.pubSellers as s (s.id)}
 					<a href={s.code ? qs({ seller: s.code }) : '/'} class={data.sel?.id === s.id ? 'catchip on' : 'catchip'} aria-current={data.sel?.id === s.id ? 'page' : undefined}>
-						<PlatIcon platform={s.platform} /> {s.name} <GradeBox grade={s.grade} sm />
+						<PlatIcon platform={s.platform} /> {s.name}
 					</a>
 				{/each}
 				{#if !data.pubSellers.length}<span class="meta">인증 인플루언서를 준비 중입니다</span>{/if}
