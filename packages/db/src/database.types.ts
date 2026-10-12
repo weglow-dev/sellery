@@ -2056,6 +2056,9 @@ export type Database = {
           platform_fee: number
           platform_fee_gross: number
           platform_net: number
+          payment_fee: number
+          seller_platform_fee: number
+          brand_platform_fee: number
           platform_rate: number
           ref_boost: number
           ref_boost_applied: boolean
@@ -2109,6 +2112,9 @@ export type Database = {
           platform_fee?: number
           platform_fee_gross?: number
           platform_net?: number
+          payment_fee?: number
+          seller_platform_fee?: number
+          brand_platform_fee?: number
           platform_rate: number
           ref_boost?: number
           ref_boost_applied?: boolean
@@ -2162,6 +2168,9 @@ export type Database = {
           platform_fee?: number
           platform_fee_gross?: number
           platform_net?: number
+          payment_fee?: number
+          seller_platform_fee?: number
+          brand_platform_fee?: number
           platform_rate?: number
           ref_boost?: number
           ref_boost_applied?: boolean

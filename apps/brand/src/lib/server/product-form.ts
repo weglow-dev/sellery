@@ -37,14 +37,14 @@ export type ProductFormValues = Record<string, string>;
 
 export function productFormValues(p: BrandProduct | null): ProductFormValues {
 	if (!p) {
-		// 데모 ProductModal 기본값 (소비자가 39,000 · 판매가 29,900 · 총 30% · 재고 1,000 · 샘플 '무상 1개' · 무상 등급 실버)
+		// 데모 ProductModal 기본값 (소비자가 39,000 · 판매가 29,900 · 인플루언서 20% · 재고 1,000 · 샘플 '무상 1개' · 무상 등급 실버)
 		return {
 			name: '',
 			description: '',
 			category: '',
 			consumer_price: '39000',
 			sale_price: '29900',
-			total_rate: '30',
+			total_rate: '20',
 			stock: '1000',
 			sample_text: '무상 1개',
 			sample_free_grade: '실버',

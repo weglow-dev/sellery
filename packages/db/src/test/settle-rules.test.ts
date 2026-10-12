@@ -33,9 +33,10 @@ describe("calcSellerShare — docs/settlement-policy.md §12 제안서 예시 (�
     expect(k.sfTotal).toBe(565300); // 565,299.5
     expect(k.boost).toBe(0);
   });
-  it("원천징수 3.3% · 실수령", () => {
+  it("원천징수 3.3% · 플랫폼 이용 수수료 3% · 실수령 (0053)", () => {
     expect(k.wht).toBe(18655); // 18,654.88
-    expect(k.payout).toBe(546645); // 546,644.62
+    expect(k.platformFee).toBe(78879); // 2,629,300 × 3%
+    expect(k.payout).toBe(467766); // 565,299.5 − 18,654.88 − 78,879
   });
   it("플래티넘 보너스 1.5 는 GRADES 상수와 같다", () => {
     expect(GRADES.find((t) => t.g === "플래티넘")?.bonus).toBe(1.5);
@@ -46,7 +47,7 @@ describe("calcSellerShare — 시드 c1 (지유 골드 × 버닝온 20%) = 0013 
   // seed.sql: 34건 중 1건 REFUNDED(qty 2) · 총 qty 46 × ₩29,900 = gross 1,375,400 · refund 59,800
   const k = calcSellerShare({ net: 1375400 - 59800, rate: 0.2, bonusPp: 1, whtRate: sellerWhtRate("personal") });
   it("SQL 과 같은 라인 값", () => {
-    expect(k).toEqual({ base: 1315600, sf: 263120, gBonus: 13156, boost: 0, sfTotal: 276276, wht: 9117, payout: 267159 });
+    expect(k).toEqual({ base: 1315600, sf: 263120, gBonus: 13156, boost: 0, sfTotal: 276276, wht: 9117, platformFee: 39468, payout: 227691 });
   });
 });
 
@@ -59,11 +60,12 @@ describe("calcSellerShare — 샘플 구매분 · 추천 부스트 · 사업자"
     expect(k.boost).toBe(1000); // 100,000 × 1%
     expect(k.sfTotal).toBe(17800);
   });
-  it("사업자는 원천징수 0 — 실수령 = 세전 (§5.9 '항상 3.3%' 버그 금지)", () => {
+  it("사업자는 원천징수 0 — 실수령 = 세전 − 플랫폼 이용 수수료 (§5.9 '항상 3.3%' 버그 금지 · 0053)", () => {
     const k = calcSellerShare({ net: 1000000, rate: 0.2, whtRate: sellerWhtRate("biz") });
     expect(k.wht).toBe(0);
-    expect(k.payout).toBe(k.sfTotal);
-    expect(k.payout).toBe(200000);
+    expect(k.platformFee).toBe(30000);
+    expect(k.payout).toBe(k.sfTotal - k.platformFee);
+    expect(k.payout).toBe(170000);
   });
   it("미등록(null) 도 3.3%", () => {
     expect(sellerWhtRate(null)).toBe(WHT);
@@ -72,7 +74,7 @@ describe("calcSellerShare — 샘플 구매분 · 추천 부스트 · 사업자"
     expect(sellerWhtRate("biz")).toBe(0);
   });
   it("빈 입력은 0", () => {
-    expect(calcSellerShare({ net: 0, rate: 0.2 })).toEqual({ base: 0, sf: 0, gBonus: 0, boost: 0, sfTotal: 0, wht: 0, payout: 0 });
+    expect(calcSellerShare({ net: 0, rate: 0.2 })).toEqual({ base: 0, sf: 0, gBonus: 0, boost: 0, sfTotal: 0, wht: 0, platformFee: 0, payout: 0 });
   });
 });
 
@@ -211,7 +213,7 @@ describe("RPC 결과 파서", () => {
       wht_rate: 0.033,
       grade: "골드",
       grade_bonus_pp: 1.0,
-      rates: { platform_rate: 0.1, ref_boost: 0.01, ref_times: 5, clear_days: 21 },
+      rates: { platform_rate: 0.11, seller_platform_rate: 0.03, ref_boost: 0.01, ref_times: 5, clear_days: 21 },
       campaigns: [
         {
           campaign_id: "c0000000-0000-4000-8000-000000000001",
@@ -243,21 +245,22 @@ describe("RPC 결과 파서", () => {
           ref_boost: 0,
           my_fee_total: 276276,
           wht: 9117,
-          my_payout_est: 267159,
+          my_platform_fee: 39468,
+          my_payout_est: 227691,
           daily: [{ d: "2026-09-15", gross: 0 }],
           recent: [{ code: "o133", buyer_masked: "김*은", qty: 1, amount: 29900, status: "PAID", paid_at: "2026-09-17T00:00:00+00:00" }],
         },
       ],
-      totals: { net: 1315600, my_fee_total: 276276, wht: 9117, my_payout_est: 267159, today_gross: 0, today_orders: 0, paid_count: 33, refund_count: 1 },
+      totals: { net: 1315600, my_fee_total: 276276, wht: 9117, my_platform_fee: 39468, my_payout_est: 227691, today_gross: 0, today_orders: 0, paid_count: 33, refund_count: 1 },
     };
     const v = parseSellerSales(raw)!;
     expect(v.campaigns).toHaveLength(1);
     const c = v.campaigns[0];
-    expect(c.my_payout_est).toBe(267159);
+    expect(c.my_payout_est).toBe(227691);
     expect(settleDue(c.end_date!)).toBe(c.due_on);
     // SQL 라인 = TS calcSellerShare
     const k = calcSellerShare({ net: c.net, sampleNet: c.sample_net, rate: c.my_rate, bonusPp: c.grade_bonus_pp, refBoost: c.ref_boost_applied, whtRate: v.wht_rate });
-    expect(k).toEqual({ base: 1315600, sf: c.my_fee, gBonus: c.grade_bonus, boost: c.ref_boost, sfTotal: c.my_fee_total, wht: c.wht, payout: c.my_payout_est });
+    expect(k).toEqual({ base: 1315600, sf: c.my_fee, gBonus: c.grade_bonus, boost: c.ref_boost, sfTotal: c.my_fee_total, wht: c.wht, platformFee: c.my_platform_fee, payout: c.my_payout_est });
     expect(parseSellerSales({ ok: false, code: "NOT_FOUND" })).toBeNull();
   });
   it("parseSellerSettlements — settled(스냅샷) · pending(예정) · 스냅샷 없는 SETTLED", () => {

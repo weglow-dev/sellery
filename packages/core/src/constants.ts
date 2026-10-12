@@ -24,7 +24,11 @@ export const DONE_STATES: Status[] = ['LIVE', 'CLEARING', 'SETTLED'];
 export const ACTIVE_BLOCKERS: Status[] = ['REJECTED', 'PASSED', 'DECLINED', 'SETTLED']; // 같은 상품 재요청 가능 상태
 
 /* ---- 수수료·정산 ---- */
-export const PG_RATE = 0.019, PLAT_RATE = 0.10, WHT = 0.033, CLEAR_DAYS = 21;
+/* 0053 (대표 결정 2026-10-12) — 브랜드가 제안하는 요율은 전부 인플루언서 몫. 플랫폼은 확정 매출 기준으로 따로 받는다(VAT 포함):
+ *   인플루언서 플랫폼 이용 수수료 3%(기준액 = net − 본인 샘플 구매) · 브랜드 플랫폼 이용 수수료 3% · 브랜드 결제 수수료 5%.
+ *   PG 1.9% 는 플랫폼 비용(브랜드 정산에서 빼지 않는다). PLAT_RATE 는 세 항목의 합(표시·호환용). */
+export const SELLER_PLAT_RATE = 0.03, BRAND_PLAT_RATE = 0.03, PAY_FEE_RATE = 0.05;
+export const PG_RATE = 0.019, PLAT_RATE = 0.11, WHT = 0.033, CLEAR_DAYS = 21; // PLAT_RATE = 3% + 3% + 5% (리터럴 — 부동소수 합 회피)
 export const BREF_RATE = 0.01, BREF_DISC = 0.01, BREF_TIMES = 3;
 export const REF_RATE = 0.02, REF_BOOST = 0.01, REF_TIMES = 5;
 export const TEST_DAYS = 14;

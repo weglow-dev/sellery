@@ -18,7 +18,7 @@
  *   · parseBrandGradeCard · parseBrandGradeRecalcResult — RPC jsonb 를 타입으로
  *   BRAND_SETTLE_FAIL_MESSAGES · BRAND_PROFILE_FIELD_MESSAGES · brandSettlementStatusLabel · brandRateLine · platformPgLine · brandGradeLine · brandPayoutLine — 화면 문구
  */
-import { BG_DISC, BGRADES, BREF_DISC, BREF_TIMES, CLEAR_DAYS, PG_RATE, PLAT_RATE, REF_BOOST } from "@sellery/core/constants";
+import { BG_DISC, BGRADES, BREF_DISC, BREF_TIMES, CLEAR_DAYS, PG_RATE, PLAT_RATE, REF_BOOST, BRAND_PLAT_RATE, PAY_FEE_RATE } from "@sellery/core/constants";
 import { fmtNum } from "../campaign";
 import { md } from "../dates";
 import type { StatusTone } from "../order-status";
@@ -98,7 +98,10 @@ export type BrandPayInput = {
   /** 브랜드 등급 수수료 할인율 (BG_DISC[등급] · 골드 0.005) */
   brandDiscRate?: number;
   pgRate?: number;
+  /** 합계(표시용) — 0053 계산은 아래 둘 */
   platformRate?: number;
+  brandPlatformRate?: number;
+  paymentFeeRate?: number;
 };
 
 export type BrandPay = {
@@ -114,15 +117,18 @@ export type BrandPay = {
   boost: number;
   /** 인플루언서 수령 합계(세전) = sf + gBonus + boost — 참고 표시 */
   sfTotal: number;
-  /** 플랫폼 수수료 총액 10% */
+  /** 0053 — 브랜드 플랫폼 이용 수수료 = net × 3% · 결제 수수료 = net × 5% */
+  brandPlatformFee: number;
+  paymentFee: number;
+  /** 브랜드가 내는 플랫폼 수수료 합 = brandPlatformFee + paymentFee (할인 전) */
   pfGross: number;
   /** 브랜드 추천 할인 (정산액 가산) */
   bBoost: number;
   /** 브랜드 등급 할인 (정산액 가산) */
   bDisc: number;
-  /** 정산 표 "플랫폼+PG" = pfGross − bBoost − bDisc + pg (브랜드 실제 부담 · plan §8) */
+  /** 정산 표 "플랫폼 수수료" = brandPlatformFee + paymentFee − bBoost − bDisc (브랜드 실제 부담 · 0053 — PG 는 빼지 않는다) */
   platformPg: number;
-  /** 브랜드 정산액 = net − pg − sf − pfGross + bBoost + bDisc */
+  /** 브랜드 정산액 = net − sf − brandPlatformFee − paymentFee + bBoost + bDisc */
   brandPay: number;
 };
 
@@ -133,18 +139,22 @@ export function calcBrandPay(input: BrandPayInput): BrandPay {
   const rate = Number(input.rate) || 0;
   const bonusPp = Number(input.bonusPp) || 0;
   const pgRate = input.pgRate === undefined ? PG_RATE : Number(input.pgRate) || 0;
-  const platformRate = input.platformRate === undefined ? PLAT_RATE : Number(input.platformRate) || 0;
+  const brandPlatformRate = input.brandPlatformRate === undefined ? BRAND_PLAT_RATE : Number(input.brandPlatformRate) || 0;
+  const paymentFeeRate = input.paymentFeeRate === undefined ? PAY_FEE_RATE : Number(input.paymentFeeRate) || 0;
   const brandDiscRate = Number(input.brandDiscRate) || 0;
   const base = net - sampleNet;
   const pg = net * pgRate;
   const sf = base * rate;
   const gBonus = (base * bonusPp) / 100;
   const boost = input.refBoost ? net * REF_BOOST : 0;
-  const pfGross = net * platformRate;
+  // 0053: 브랜드가 내는 플랫폼 몫 = 이용 3% + 결제 5% − 할인. PG 는 플랫폼 비용(표시만)
+  const brandPlatformFee = net * brandPlatformRate;
+  const paymentFee = net * paymentFeeRate;
+  const pfGross = brandPlatformFee + paymentFee;
   const bBoost = input.brandRefBoost ? net * BREF_DISC : 0;
   const bDisc = net * brandDiscRate;
-  const platformPg = pfGross - bBoost - bDisc + pg;
-  const brandPay = net - pg - sf - pfGross + bBoost + bDisc;
+  const platformPg = brandPlatformFee + paymentFee - bBoost - bDisc;
+  const brandPay = net - sf - brandPlatformFee - paymentFee + bBoost + bDisc;
   return {
     base: Math.round(base),
     pg: Math.round(pg),
@@ -152,6 +162,8 @@ export function calcBrandPay(input: BrandPayInput): BrandPay {
     gBonus: Math.round(gBonus),
     boost: Math.round(boost),
     sfTotal: Math.round(sf + gBonus + boost),
+    brandPlatformFee: Math.round(brandPlatformFee),
+    paymentFee: Math.round(paymentFee),
     pfGross: Math.round(pfGross),
     bBoost: Math.round(bBoost),
     bDisc: Math.round(bDisc),
@@ -487,10 +499,13 @@ export type BrandSalesCampaign = {
   seller_bonus: number;
   ref_boost: number;
   seller_fee_total: number;
+  /** 0053 */
+  brand_platform_fee: number;
+  payment_fee: number;
   platform_fee_gross: number;
   brand_discount: number;
   brand_ref_boost: number;
-  /** pfGross − bBoost − bDisc + pg */
+  /** brand_platform_fee + payment_fee − bBoost − bDisc (0053) */
   platform_pg: number;
   brand_payout_est: number;
   /** 최근 7일(KST) 일별 PAID 합 — 오래된 날부터 */
@@ -504,7 +519,7 @@ export type BrandSales = {
   brand_grade: string | null;
   brand_discount_rate: number;
   settle_info_complete: boolean;
-  rates: { pg_rate: number; platform_rate: number; brand_ref_disc: number; brand_ref_times: number; clear_days: number };
+  rates: { pg_rate: number; platform_rate: number; brand_platform_rate: number; payment_fee_rate: number; brand_ref_disc: number; brand_ref_times: number; clear_days: number };
   campaigns: BrandSalesCampaign[];
   totals: { net: number; pg_fee: number; seller_fee: number; platform_pg: number; brand_payout_est: number; today_gross: number; today_orders: number; paid_count: number; refund_count: number };
 };
@@ -547,6 +562,8 @@ export function parseBrandSales(raw: unknown): BrandSales | null {
       seller_bonus: num(c.seller_bonus),
       ref_boost: num(c.ref_boost),
       seller_fee_total: num(c.seller_fee_total),
+      brand_platform_fee: num(c.brand_platform_fee),
+      payment_fee: num(c.payment_fee),
       platform_fee_gross: num(c.platform_fee_gross),
       brand_discount: num(c.brand_discount),
       brand_ref_boost: num(c.brand_ref_boost),
@@ -570,6 +587,8 @@ export function parseBrandSales(raw: unknown): BrandSales | null {
     rates: {
       pg_rate: num(r.pg_rate, PG_RATE),
       platform_rate: num(r.platform_rate, PLAT_RATE),
+      brand_platform_rate: num(r.brand_platform_rate, BRAND_PLAT_RATE),
+      payment_fee_rate: num(r.payment_fee_rate, PAY_FEE_RATE),
       brand_ref_disc: num(r.brand_ref_disc, BREF_DISC),
       brand_ref_times: num(r.brand_ref_times, BREF_TIMES),
       clear_days: num(r.clear_days, CLEAR_DAYS),
@@ -608,6 +627,9 @@ export type BrandSettlementRow = {
   seller_bonus: number | null;
   ref_boost: number | null;
   seller_fee_total: number | null;
+  /** 0053 — 0053 이전 스냅샷은 0 */
+  brand_platform_fee: number | null;
+  payment_fee: number | null;
   platform_fee_gross: number | null;
   brand_grade: string | null;
   brand_discount_rate: number | null;
@@ -658,6 +680,8 @@ export function parseBrandSettlements(raw: unknown): BrandSettlements | null {
       seller_bonus: numOrNull(c.seller_bonus),
       ref_boost: numOrNull(c.ref_boost),
       seller_fee_total: numOrNull(c.seller_fee_total),
+      brand_platform_fee: numOrNull(c.brand_platform_fee),
+      payment_fee: numOrNull(c.payment_fee),
       platform_fee_gross: numOrNull(c.platform_fee_gross),
       brand_grade: str(c.brand_grade),
       brand_discount_rate: numOrNull(c.brand_discount_rate),
@@ -710,13 +734,13 @@ export function brandRateLine(rate: number | null, bonusPp?: number | null, refB
   return extras.length ? `${base} (${extras.join(" · ")} 셀러리 부담)` : base;
 }
 
-/** "플랫폼 10% + PG 1.9%" / 할인이 있으면 "플랫폼 10% −0.5%p 골드 −1%p 추천 + PG 1.9%" */
-export function platformPgLine(platformRate: number, pgRate: number, brandGrade: string | null, brandDiscRate: number | null, brandRefApplied: boolean | null): string {
+/** 0053 — "플랫폼 이용 3% + 결제 5%" / 할인이 있으면 "플랫폼 이용 3% + 결제 5% −0.5%p 골드 −1%p 추천" (PG 는 셀러리 비용이라 표기하지 않는다) */
+export function platformPgLine(brandPlatformRate: number, paymentFeeRate: number, brandGrade: string | null, brandDiscRate: number | null, brandRefApplied: boolean | null): string {
   const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
-  const parts = [`플랫폼 ${pct(platformRate)}`];
+  const parts = [`플랫폼 이용 ${pct(brandPlatformRate)} + 결제 ${pct(paymentFeeRate)}`];
   if (brandDiscRate && brandDiscRate > 0) parts.push(`−${Math.round(brandDiscRate * 1000) / 10}%p ${brandGrade ?? "등급"}`);
   if (brandRefApplied) parts.push(`−${Math.round(BREF_DISC * 1000) / 10}%p 추천`);
-  return `${parts.join(" ")} + PG ${pct(pgRate)}`;
+  return parts.join(" ");
 }
 
 /** 등급 카드 한 줄 — "골드 · 누적 ₩91,373,500 · 플래티넘까지 ₩108,626,500" / 블랙 "블랙 · 누적 ₩… · 최고 등급" */
@@ -725,8 +749,8 @@ export function brandGradeLine(card: Pick<BrandGradeCard, "grade" | "gmv" | "nex
   return `${card.grade} · 누적 ₩${fmtNum(card.gmv)} · ${nx}`;
 }
 
-/** 수수료 할인 한 줄 — "플랫폼 수수료 −0.5%p (실효 9.5%)" / 없으면 "수수료 할인 없음 (골드부터 −0.5%p)" */
-export function brandDiscountLine(feeDiscount: number, platformRate = PLAT_RATE): string {
+/** 수수료 할인 한 줄 — "플랫폼 수수료 −0.5%p (실효 7.5%)" / 없으면 "수수료 할인 없음 (골드부터 −0.5%p)". 기준은 브랜드가 내는 8%(이용 3% + 결제 5%) (0053) */
+export function brandDiscountLine(feeDiscount: number, platformRate = BRAND_PLAT_RATE + PAY_FEE_RATE): string {
   if (!feeDiscount || feeDiscount <= 0) return "수수료 할인 없음 (골드부터 −0.5%p)";
   const pp = Math.round(feeDiscount * 1000) / 10;
   const eff = Math.round((platformRate - feeDiscount) * 1000) / 10;

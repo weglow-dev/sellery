@@ -1,6 +1,6 @@
 <script lang="ts">
 	/* 상품 등록·수정 (js/70-campaign.js productModal) */
-	import { D_, prod, spOf, exGradeOf, CATS, CAT_INFO, CAT_POLICY, GRADES, PLAT_RATE, act, closeModal, type Product, type SamplePolicy } from '@sellery/core';
+	import { D_, prod, spOf, exGradeOf, CATS, CAT_INFO, CAT_POLICY, GRADES, act, closeModal, type Product, type SamplePolicy } from '@sellery/core';
 	import Modal from '../components/Modal.svelte';
 	let { pid }: { pid: string | null } = $props();
 	const ed: Product | null = pid ? prod(pid) : null;
@@ -8,12 +8,12 @@
 	const locked = !!ed && D_().campaigns.some((c) => c.productId === ed.id && ['SCHEDULE_CONFIRMED', 'LIVE', 'CLEARING'].includes(c.status));
 	let f = $state({
 		name: ed?.name || '', desc: ed?.desc || '', cat: ed?.cat || '다이어트·체형', cp: ed?.cp || 39000, gp: ed?.gp || 29900,
-		totalRate: ed ? Math.round((ed.rate + PLAT_RATE) * 100) : 30, stock: ed?.stock ?? 1000, sample: ed?.sample || '무상 1개',
+		totalRate: ed ? Math.round(ed.rate * 100) : 20, stock: ed?.stock ?? 1000, sample: ed?.sample || '무상 1개',
 		opts: ed?.options ? ed.options.map((o) => o.n + ' | ' + o.price).join('\n') : '',
 		samplePolicy: { ...sp0 } as SamplePolicy, exclGrade: ed?.exclusive ? (exGradeOf(ed) as string) : '', exclLabel: ed?.exclusive?.label || '',
 		thumb: ed?.thumb || null as string | null, imgs: ed?.imgs ? ed.imgs.slice() : [] as string[]
 	});
-	const rateCalc = $derived(f.totalRate > 10 ? `→ 플랫폼 <b>10%p</b> + 제안 수수료 <b style="color:var(--red)">${+(f.totalRate - 10).toFixed(1)}%</b> · 등급 보너스 포함 최대 <b>${+(f.totalRate - 10 + GRADES[0].bonus).toFixed(1)}%</b> (블랙, 보너스는 플랫폼 부담)` : '<span style="color:var(--danger)">총 수수료율은 플랫폼 몫(10%)보다 커야 합니다</span>');
+	const rateCalc = $derived(f.totalRate >= 5 ? `→ 인플루언서 수수료 <b style="color:var(--red)">${+f.totalRate.toFixed(1)}%</b> · 등급 보너스 포함 최대 <b>${+(f.totalRate + GRADES[0].bonus).toFixed(1)}%</b> (블랙, 보너스는 셀러리 부담) · 셀러리 플랫폼 이용 3% + 결제 5% 는 정산 시 별도` : '<span style="color:var(--danger)">인플루언서 수수료율은 5% 이상이어야 합니다</span>');
 	function pickThumb(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) act.fileToDataURL(file, 360, (u) => (f.thumb = u)); }
 	function pickImgs(e: Event) { [...((e.target as HTMLInputElement).files || [])].slice(0, 4 - f.imgs.length).forEach((file) => act.fileToDataURL(file, 700, (u) => f.imgs.push(u))); }
 	const submit = () => (ed ? act.saveProduct(ed.id, $state.snapshot(f)) : act.createProduct($state.snapshot(f)));
@@ -39,7 +39,7 @@
 	<div class="grid g2">
 		<div class="fld"><label>소비자가 (₩)</label><input type="number" bind:value={f.cp} step="1000" disabled={locked} /></div>
 		<div class="fld"><label>판매가 (₩)</label><input type="number" bind:value={f.gp} step="100" disabled={locked} /></div>
-		<div class="fld"><label>총 수수료율 (%) — 플랫폼 10%p 포함</label><input type="number" bind:value={f.totalRate} min="11" max="50" disabled={locked} />
+		<div class="fld"><label>인플루언서 수수료율 (%)</label><input type="number" bind:value={f.totalRate} min="5" max="50" disabled={locked} />
 			<div style="font-size:11.5px;margin-top:5px;color:var(--mute)">{@html rateCalc}</div></div>
 		<div class="fld"><label>재고</label><input type="number" bind:value={f.stock} step="100" /></div>
 	</div>
@@ -52,7 +52,7 @@
 				<input type="number" step="100" bind:value={f.samplePolicy.fixedPrice} placeholder="지정가 (₩) — 지정가 선택 시" style="margin-top:6px" /></div>
 		</div>
 		<label style="display:flex;gap:8px;align-items:center;font-size:12.5px;margin-top:4px"><input type="checkbox" bind:checked={f.samplePolicy.refund} style="width:auto;margin:0" /> 판매 확정 시 샘플 구매액 환급 (신규 인플루언서 유입용)</label>
-		<div style="font-size:11px;color:var(--mute);margin-top:6px">샘플 구매는 인플루언서 수수료 0의 판매 1건으로 정산됩니다(플랫폼 10% 동일). 인플루언서는 현금 또는 셀러리(1🥬=₩20,000)로 결제합니다.</div>
+		<div style="font-size:11px;color:var(--mute);margin-top:6px">샘플 구매는 인플루언서 수수료 0의 판매 1건으로 정산됩니다(플랫폼 수수료 동일). 인플루언서는 현금 또는 셀러리(1🥬=₩20,000)로 결제합니다.</div>
 	</div>
 	<div class="fld"><label>구매 옵션 <span class="font-normal">— 한 줄에 하나, "옵션명 | 가격" (비우면 1개/2개 세트/3개 세트 자동 생성)</span></label>
 		<textarea rows="3" bind:value={f.opts} placeholder={'1박스 (30포) | 29900\n2박스 세트 | 56800\n3박스 + 쉐이커 | 79900'}></textarea></div>

@@ -32,28 +32,30 @@ import {
   type BrandSettlementRow,
 } from "../brand/settle-rules";
 
-describe("calcBrandPay — docs/settlement-policy.md §12 제안서 예시 (총 30% · 플래티넘 +1.5%p · 브랜드 할인 없음)", () => {
+describe("calcBrandPay — docs/settlement-policy.md §12 제안서 예시 (인플 20% · 플래티넘 +1.5%p · 브랜드 할인 없음) — 0053", () => {
   // 결제 91건 ₩2,719,000 − 환불 3건 ₩89,700 = net ₩2,629,300
   const k = calcBrandPay({ net: 2719000 - 89700, rate: 0.2, bonusPp: 1.5 });
-  it("PG · 인플루언서 · 플랫폼 · 브랜드 정산액", () => {
-    expect(k.pg).toBe(49957); // 49,956.7
+  it("인플루언서 · 플랫폼 이용 3% · 결제 5% · 브랜드 정산액 (PG 는 셀러리 비용)", () => {
+    expect(k.pg).toBe(49957); // 49,956.7 — 표시만, 정산액에서 빼지 않는다
     expect(k.sf).toBe(525860);
     expect(k.gBonus).toBe(39440); // 플랫폼 부담 — 브랜드 정산액에 없다
     expect(k.sfTotal).toBe(565300);
-    expect(k.pfGross).toBe(262930);
+    expect(k.brandPlatformFee).toBe(78879);
+    expect(k.paymentFee).toBe(131465);
+    expect(k.pfGross).toBe(210344);
     expect(k.bBoost).toBe(0);
     expect(k.bDisc).toBe(0);
-    expect(k.brandPay).toBe(1790553); // 2,629,300 − 49,956.7 − 525,860 − 262,930 = 1,790,553.3
+    expect(k.brandPay).toBe(1893096); // 2,629,300 − 525,860 − 78,879 − 131,465
   });
-  it("플랫폼+PG 열 = pfGross − bBoost − bDisc + pg → net − sf − platformPg = brandPay (plan §8 결정)", () => {
-    expect(k.platformPg).toBe(312887); // 262,930 + 49,956.7
+  it("플랫폼 수수료 열 = brandPlatformFee + paymentFee − bBoost − bDisc → net − sf − platformPg = brandPay", () => {
+    expect(k.platformPg).toBe(210344);
     expect(k.base - k.sf - k.platformPg).toBe(k.brandPay);
   });
-  it("확정 매출 100만원 분배 — 브랜드 ₩681,000 · 인플루언서 ₩200,000 · 셀러리 ₩100,000 · PG ₩19,000", () => {
+  it("확정 매출 100만원 분배 — 브랜드 ₩720,000 · 인플루언서 ₩200,000(−이용 3%) · 셀러리 ₩80,000 + 인플 ₩30,000 · PG ₩19,000 은 셀러리 비용", () => {
     const m = calcBrandPay({ net: 1000000, rate: 0.2 });
-    expect(m.brandPay).toBe(681000);
+    expect(m.brandPay).toBe(720000);
     expect(m.sf).toBe(200000);
-    expect(m.pfGross).toBe(100000);
+    expect(m.pfGross).toBe(80000);
     expect(m.pg).toBe(19000);
   });
 });
@@ -67,35 +69,37 @@ describe("calcBrandPay — 시드 c1 (b1 골드 −0.5%p · s1 골드 +1%p · 20
     expect(k.sf).toBe(263120);
     expect(k.gBonus).toBe(13156);
     expect(k.sfTotal).toBe(276276);
-    expect(k.pfGross).toBe(131560);
+    expect(k.brandPlatformFee).toBe(39468);
+    expect(k.paymentFee).toBe(65780);
+    expect(k.pfGross).toBe(105248);
     expect(k.bDisc).toBe(6578);
-    expect(k.platformPg).toBe(149978); // 131,560 − 6,578 + 24,996.4
-    expect(k.brandPay).toBe(902502); // 902,501.6
+    expect(k.platformPg).toBe(98670); // 39,468 + 65,780 − 6,578
+    expect(k.brandPay).toBe(953810); // 1,315,600 − 263,120 − 39,468 − 65,780 + 6,578 (SQL app_admin_settle_preview 와 같다)
   });
   it("시드 c12 (net 1,963,700) — half-up 반올림 (bDisc 9,818.5 → 9,819)", () => {
     const m = calcBrandPay({ net: 2044400 - 80700, rate: 0.2, bonusPp: 1, brandDiscRate: 0.005 });
     expect(m.bDisc).toBe(9819);
     expect(m.pg).toBe(37310);
-    expect(m.platformPg).toBe(223862);
-    expect(m.brandPay).toBe(1347098);
+    expect(m.platformPg).toBe(147278); // 58,911 + 98,185 − 9,818.5
+    expect(m.brandPay).toBe(1423683); // 1,963,700 − 392,740 − 58,911 − 98,185 + 9,818.5
   });
   it("시드 c5 (s3 추천 부스트 · 실버 +0.5%p · 18%) — 부스트는 인플루언서 수령에만", () => {
     const m = calcBrandPay({ net: 13695000 - 473100, rate: 0.18, bonusPp: 0.5, refBoost: true, brandDiscRate: 0.005 });
     expect(m.boost).toBe(132219);
     expect(m.sf).toBe(2379942);
     expect(m.sfTotal).toBe(2578271);
-    expect(m.brandPay).toBe(9334661);
-    expect(m.platformPg).toBe(1507297);
+    expect(m.brandPay).toBe(9850316);
+    expect(m.platformPg).toBe(991643);
   });
 });
 
 describe("calcBrandPay — 브랜드 추천 · 샘플 구매분 · 요율 덮어쓰기", () => {
-  it("피추천 브랜드 첫 3회 −1%p 는 정산액 가산 · 플랫폼+PG 에서 차감", () => {
+  it("피추천 브랜드 첫 3회 −1%p 는 정산액 가산 · 플랫폼 수수료에서 차감", () => {
     const k = calcBrandPay({ net: 1000000, rate: 0.2, brandRefBoost: true, brandDiscRate: 0.01 });
     expect(k.bBoost).toBe(10000);
     expect(k.bDisc).toBe(10000);
-    expect(k.brandPay).toBe(701000); // 681,000 + 10,000 + 10,000
-    expect(k.platformPg).toBe(99000); // 100,000 − 10,000 − 10,000 + 19,000
+    expect(k.brandPay).toBe(740000); // 720,000 + 10,000 + 10,000
+    expect(k.platformPg).toBe(60000); // 80,000 − 10,000 − 10,000
     expect(k.base - k.sf - k.platformPg).toBe(k.brandPay);
   });
   it("샘플 구매분은 인플루언서 수수료 기준에서만 빠진다 (PG · 플랫폼 · 할인은 net 전체)", () => {
@@ -103,20 +107,22 @@ describe("calcBrandPay — 브랜드 추천 · 샘플 구매분 · 요율 덮어
     expect(k.base).toBe(924350);
     expect(k.sf).toBe(184870);
     expect(k.pg).toBe(19000);
-    expect(k.pfGross).toBe(100000);
+    expect(k.pfGross).toBe(80000);
     expect(k.bDisc).toBe(5000);
-    expect(k.brandPay).toBe(701130);
+    expect(k.brandPay).toBe(740130); // 1,000,000 − 184,870 − 80,000 + 5,000
   });
   it("platform_settings 요율을 넘기면 그 값 · 기본은 코어 상수", () => {
-    const k = calcBrandPay({ net: 1000000, rate: 0.2, pgRate: 0.02, platformRate: 0.12 });
+    const k = calcBrandPay({ net: 1000000, rate: 0.2, pgRate: 0.02, brandPlatformRate: 0.04, paymentFeeRate: 0.06 });
     expect(k.pg).toBe(20000);
-    expect(k.pfGross).toBe(120000);
+    expect(k.brandPlatformFee).toBe(40000);
+    expect(k.paymentFee).toBe(60000);
+    expect(k.pfGross).toBe(100000);
     expect(PG_RATE).toBe(0.019);
-    expect(PLAT_RATE).toBe(0.1);
+    expect(PLAT_RATE).toBe(0.11);
   });
   it("빈 입력은 0", () => {
     const k = calcBrandPay({ net: 0, rate: 0 });
-    expect(k).toEqual({ base: 0, pg: 0, sf: 0, gBonus: 0, boost: 0, sfTotal: 0, pfGross: 0, bBoost: 0, bDisc: 0, platformPg: 0, brandPay: 0 });
+    expect(k).toEqual({ base: 0, pg: 0, sf: 0, gBonus: 0, boost: 0, sfTotal: 0, brandPlatformFee: 0, paymentFee: 0, pfGross: 0, bBoost: 0, bDisc: 0, platformPg: 0, brandPay: 0 });
   });
 });
 
@@ -275,14 +281,14 @@ describe("RPC 파서 — app_brand_settle_info · app_brand_profile · app_brand
     expect(brandGradeFor(v!.gmv)).toBe(v!.grade);
     expect(nextBrandGrade(v!.gmv)?.remaining).toBe(v!.next!.remaining);
     expect(brandGradeLine(v!)).toBe("골드 · 누적 ₩91,373,500 · 플래티넘까지 ₩108,626,500");
-    expect(brandDiscountLine(v!.fee_discount)).toBe("플랫폼 수수료 −0.5%p (실효 9.5%)");
+    expect(brandDiscountLine(v!.fee_discount)).toBe("플랫폼 수수료 −0.5%p (실효 7.5%)");
     expect(brandDiscountLine(0)).toMatch(/골드부터/);
     expect(freeRefLine(v!)).toMatch(/다이아 등급부터/);
   });
   it("parseBrandGradeCard — 다이아 (스모크 b2 gmv_base 6억 · 이달 2회 사용) · 블랙은 next null", () => {
     const v = parseBrandGradeCard({ ...card, gmv: 600075650, grade: "다이아", sort_order: 1, fee_discount: 0.015, next: { grade: "블랙", min_gmv: 1000000000, remaining: 399924350 }, free_ref_per_month: 5, free_ref_used_this_month: 2, free_ref_left: 3 });
     expect(freeRefLine(v!)).toBe("이달 무료 열람 3/5회 남음");
-    expect(brandDiscountLine(v!.fee_discount)).toBe("플랫폼 수수료 −1.5%p (실효 8.5%)");
+    expect(brandDiscountLine(v!.fee_discount)).toBe("플랫폼 수수료 −1.5%p (실효 6.5%)");
     const b = parseBrandGradeCard({ ...card, gmv: 1500000000, grade: "블랙", next: null });
     expect(b?.next).toBeNull();
     expect(brandGradeLine(b!)).toMatch(/최고 등급/);
@@ -296,7 +302,7 @@ describe("RPC 파서 — app_brand_settle_info · app_brand_profile · app_brand
 describe("parseBrandSales — 0019 app_brand_sales (시드 b1 c1 행 · 2026-09-22 스모크)", () => {
   const raw = {
     ok: true, today: "2026-09-22", brand_grade: "골드", brand_discount_rate: 0.005, settle_info_complete: true,
-    rates: { pg_rate: 0.019, platform_rate: 0.1, brand_ref_disc: 0.01, brand_ref_times: 3, clear_days: 21 },
+    rates: { pg_rate: 0.019, platform_rate: 0.11, brand_platform_rate: 0.03, payment_fee_rate: 0.05, brand_ref_disc: 0.01, brand_ref_times: 3, clear_days: 21 },
     campaigns: [{
       campaign_id: "c0000000-0000-4000-8000-000000000001", campaign_code: "c1", status: "CLEARING",
       seller: { id: "a0000000-0000-4000-8000-000000000001", code: "s1", name: "지유", handle: "@jiyu_beauty", platform: "instagram", avatar_url: "assets/av-s1.svg", grade: "골드" },
@@ -305,7 +311,8 @@ describe("parseBrandSales — 0019 app_brand_sales (시드 b1 c1 행 · 2026-09-
       paid_count: 33, refund_count: 1, gross: 1375400, canceled: 0, refunded: 59800, net: 1315600, sample_net: 0, qty_sold: 44, today_orders: 0, today_gross: 0,
       seller_rate: 0.2, seller_grade: "골드", seller_bonus_pp: 1, ref_boost_applied: false, brand_ref_applied: false,
       pg_fee: 24996, seller_fee: 263120, seller_bonus: 13156, ref_boost: 0, seller_fee_total: 276276,
-      platform_fee_gross: 131560, brand_discount: 6578, brand_ref_boost: 0, platform_pg: 149978, brand_payout_est: 902502,
+      brand_platform_fee: 39468, payment_fee: 65780,
+      platform_fee_gross: 105248, brand_discount: 6578, brand_ref_boost: 0, platform_pg: 98670, brand_payout_est: 953810,
       daily: [{ d: "2026-09-16", gross: 0 }], recent: [{ code: "o105", buyer_masked: "김*은", qty: 1, amount: 29900, status: "PAID", paid_at: "2026-09-17T00:00:00+00:00" }],
     }],
     totals: { net: 16533100, pg_fee: 314129, seller_fee: 3042820, platform_pg: 1884773, brand_payout_est: 11605507, today_gross: 0, today_orders: 0, paid_count: 487, refund_count: 19 },
@@ -315,8 +322,8 @@ describe("parseBrandSales — 0019 app_brand_sales (시드 b1 c1 행 · 2026-09-
     expect(s?.campaigns).toHaveLength(1);
     const c = s!.campaigns[0];
     expect(c.seller.handle).toBe("@jiyu_beauty");
-    expect(c.brand_payout_est).toBe(902502);
-    expect(c.platform_pg).toBe(149978);
+    expect(c.brand_payout_est).toBe(953810);
+    expect(c.platform_pg).toBe(98670);
     expect(c.net - c.seller_fee - c.platform_pg).toBe(c.brand_payout_est);
     expect(s?.totals.brand_payout_est).toBe(11605507);
     expect(s?.rates.brand_ref_times).toBe(3);
@@ -329,6 +336,8 @@ describe("parseBrandSales — 0019 app_brand_sales (시드 b1 c1 행 · 2026-09-
     expect(k.sf).toBe(c.seller_fee);
     expect(k.gBonus).toBe(c.seller_bonus);
     expect(k.sfTotal).toBe(c.seller_fee_total);
+    expect(k.brandPlatformFee).toBe(c.brand_platform_fee);
+    expect(k.paymentFee).toBe(c.payment_fee);
     expect(k.pfGross).toBe(c.platform_fee_gross);
     expect(k.bDisc).toBe(c.brand_discount);
     expect(k.platformPg).toBe(c.platform_pg);
@@ -397,9 +406,9 @@ describe("문구", () => {
     expect(brandRateLine(null)).toBe("—");
   });
   it("platformPgLine", () => {
-    expect(platformPgLine(0.1, 0.019, "골드", 0.005, false)).toBe("플랫폼 10% −0.5%p 골드 + PG 1.9%");
-    expect(platformPgLine(0.1, 0.019, "플래티넘", 0.01, true)).toBe("플랫폼 10% −1%p 플래티넘 −1%p 추천 + PG 1.9%");
-    expect(platformPgLine(0.1, 0.019, "실버", 0, null)).toBe("플랫폼 10% + PG 1.9%");
+    expect(platformPgLine(0.03, 0.05, "골드", 0.005, false)).toBe("플랫폼 이용 3% + 결제 5% −0.5%p 골드");
+    expect(platformPgLine(0.03, 0.05, "플래티넘", 0.01, true)).toBe("플랫폼 이용 3% + 결제 5% −1%p 플래티넘 −1%p 추천");
+    expect(platformPgLine(0.03, 0.05, "실버", 0, null)).toBe("플랫폼 이용 3% + 결제 5%");
   });
   it("brandPayoutLine", () => {
     expect(brandPayoutLine(1315600, 902502, "2026-10-08")).toBe("확정 ₩1,315,600 → 브랜드 정산액 ₩902,502 (D+21 10/8)");

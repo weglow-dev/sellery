@@ -72,13 +72,12 @@ export function parseProductSpecialFilter(raw: string | null | undefined): Produ
 }
 
 /**
- * 총 수수료 — 데모의 "{(rate + PLAT_RATE) * 100}% · 인플 n + 플랫폼 m".
- * `commission_rate` 는 **인플루언서 몫**이고 플랫폼 몫(`PLAT_RATE`)은 상수다(docs/settlement-policy.md §3).
+ * 수수료 표기 — 0053: `commission_rate` 는 인플루언서 몫 전부. 플랫폼 몫(이용 3%+3% · 결제 5% = `PLAT_RATE` 11%)은 정산 시 따로 받는다(docs/settlement-policy.md §1).
  */
 export function totalFeeLine(commissionRate: number): { total: string; detail: string } {
   const seller = Math.round(commissionRate * 100);
   const plat = Math.round(PLAT_RATE * 100);
-  return { total: `${seller + plat}%`, detail: `인플 ${seller} + 플랫폼 ${plat}` };
+  return { total: `${seller}%`, detail: `인플 ${seller} · 플랫폼 ${plat} 별도` };
 }
 
 /** 노출 제어 버튼 — listed 면 pause, 그 밖(paused)이면 approve(재개). 데모 `toggleListing` 과 같은 동작 */

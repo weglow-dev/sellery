@@ -26,7 +26,10 @@
 -- ============================================================
 insert into public.platform_settings (key, value, description) values
   ('pg_rate',          '0.019',    'PG 수수료율 (PG_RATE)'),
-  ('platform_rate',    '0.10',     '플랫폼 수수료율 (PLAT_RATE) — 인플루언서 수수료율과 별도'),
+  ('platform_rate',    '0.11',     '플랫폼 수수료 합계(3% + 3% + 5%) — 표시·호환용 (0053)'),
+  ('seller_platform_rate', '0.03', '인플루언서 플랫폼 이용 수수료율 — (net − sample_net) 기준 · VAT 포함 · 정산 시 차감 (0053)'),
+  ('brand_platform_rate',  '0.03', '브랜드 플랫폼 이용 수수료율 — net 기준 · VAT 포함 (0053)'),
+  ('payment_fee_rate',     '0.05', '브랜드 결제 수수료율 — net 기준 · VAT 포함 · PG 원가(pg_rate)는 플랫폼 비용 (0053)'),
   ('wht_rate',         '0.033',    '원천징수율 (WHT). sellers.settle_type = ''biz'' 만 0, personal 과 null(미등록)은 이 값 (sellerWht L1656)'),
   ('clear_days',       '21',       '판매 종료 후 정산 기준일까지 일수 (CLEAR_DAYS)'),
   ('celery_per_won',   '5000000',  '확정 매출 ₩500만당 🥬1 획득 (CELERY_PER)'),
