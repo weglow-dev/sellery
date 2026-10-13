@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+/* 셀러리 브랜딩 랜딩 전용 테마 — 기존 packages/ui 팔레트와 무관한 독립 UI.
+   토스 톤: 흰 배경 · 진한 잉크 타이포 · 블루 포인트 하나. */
+@theme {
+	--font-sans: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', sans-serif;
+
+	--color-ink: #191f28;
+	--color-ink-soft: #4e5968;
+	--color-ink-faint: #8b95a1;
+	--color-fill: #f7f8fa;
+	--color-fill-deep: #eef0f3;
+	--color-line: #e5e8eb;
+	--color-blue: #3182f6;
+	--color-blue-deep: #1b64da;
+	--color-blue-soft: #e8f3ff;
+}
+
+:root {
+	color-scheme: light;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	background: #fff;
+	color: var(--color-ink);
+	font-family: var(--font-sans);
+	/* 합성 굵기 차단 — Pretendard Variable 은 실제 100~900 을 가진다 */
+	font-synthesis: none;
+	/* 한글 어절 중간 줄바꿈 방지 */
+	word-break: keep-all;
+	-webkit-text-size-adjust: 100%;
+}
+
+::selection {
+	background: var(--color-blue-soft);
+	color: var(--color-blue-deep);
+}
+
+/* 스크롤 리빌 — [data-reveal] 은 숨김으로 시작, .revealed 가 붙으면 떠오른다 */
+[data-reveal] {
+	opacity: 0;
+	transform: translateY(28px);
+	transition:
+		opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+		transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+	transition-delay: var(--reveal-delay, 0s);
+}
+[data-reveal].revealed {
+	opacity: 1;
+	transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	[data-reveal] {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+	html {
+		scroll-behavior: auto;
+	}
+}
