@@ -12,6 +12,7 @@
     "dev:brand": "npm run dev -w apps/brand",
     "dev:admin": "npm run dev -w apps/admin",
     "dev:shop": "npm run dev -w apps/shop",
+    "dev:branding": "npm run dev -w apps/branding",
     "check": "npm run check --workspaces --if-present",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
