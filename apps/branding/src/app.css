@@ -1,23 +1,60 @@
 @import 'tailwindcss';
 
 /* 셀러리 브랜딩 랜딩 전용 테마 — 기존 packages/ui 팔레트와 무관한 독립 UI.
-   토스 톤: 흰 배경 · 진한 잉크 타이포 · 블루 포인트 하나. */
+   다크 베이스 + 웜 앰버 글로우의 프리미엄 무드.
+   여기 남기는 건 "여러 요소가 함께 쓰는" 애니메이션·스크롤 리빌 뿐 —
+   그 외 레이아웃·색상·호버는 전부 +page.svelte 안에서 Tailwind 유틸리티로 인라인 작성한다. */
 @theme {
 	--font-sans: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', sans-serif;
 
-	--color-ink: #191f28;
-	--color-ink-soft: #4e5968;
-	--color-ink-faint: #8b95a1;
-	--color-fill: #f7f8fa;
-	--color-fill-deep: #eef0f3;
-	--color-line: #e5e8eb;
-	--color-blue: #3182f6;
-	--color-blue-deep: #1b64da;
-	--color-blue-soft: #e8f3ff;
+	--color-bg: #0a0b0e;
+	--color-panel: #121319;
+	--color-line: rgba(255, 255, 255, 0.08);
+	--color-fg: #ffffff;
+	--color-fg-soft: rgba(255, 255, 255, 0.65);
+	--color-fg-faint: rgba(255, 255, 255, 0.4);
+	--color-accent: #ff7a3d;
+	--color-accent-deep: #ff5a1f;
+	--color-accent-soft: rgba(255, 122, 61, 0.16);
+	--color-accent-2: #7c3aed;
+
+	/* float·spin·토스트 — 서로 다른 섹션의 여러 요소가 공유하는 애니메이션이라 토큰으로 뺀다.
+	   motion-safe: 변형으로 쓰면 prefers-reduced-motion 을 Tailwind 가 자동으로 존중한다. */
+	--animate-float: float 6s ease-in-out infinite;
+	--animate-float-delay: float 7s ease-in-out 1s infinite;
+	--animate-float-delay-2: float 8s ease-in-out 2s infinite;
+	--animate-spin-slow: spin-slow 46s linear infinite;
+	--animate-spin-reverse: spin-slow 64s linear infinite reverse;
+	--animate-toast-in: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-12px);
+	}
+}
+@keyframes spin-slow {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@keyframes toast-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, 12px);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
 }
 
 :root {
-	color-scheme: light;
+	color-scheme: dark;
 }
 
 html {
@@ -25,10 +62,10 @@ html {
 }
 
 body {
-	background: #fff;
-	color: var(--color-ink);
+	background: var(--color-bg);
+	color: var(--color-fg);
 	font-family: var(--font-sans);
-	/* 합성 굵기 차단 — Pretendard Variable 은 실제 100~900 을 가진다 */
+	/* 합성 굵기 차단 (CLAUDE.md 타이포 규칙) */
 	font-synthesis: none;
 	/* 한글 어절 중간 줄바꿈 방지 */
 	word-break: keep-all;
@@ -36,11 +73,13 @@ body {
 }
 
 ::selection {
-	background: var(--color-blue-soft);
-	color: var(--color-blue-deep);
+	background: var(--color-accent-soft);
+	color: var(--color-fg);
 }
 
-/* 스크롤 리빌 — [data-reveal] 은 숨김으로 시작, .revealed 가 붙으면 떠오른다 */
+/* 스크롤 리빌 — 페이지 전체에서 공유하는 유일한 커스텀 CSS.
+   [data-reveal] 은 숨김으로 시작, JS 가 .revealed 를 붙이면 떠오른다.
+   .reveal-line 은 같은 타이밍에 SVG 성장 그래프의 선이 그려지도록 하는 확장. */
 [data-reveal] {
 	opacity: 0;
 	transform: translateY(28px);
@@ -53,13 +92,25 @@ body {
 	opacity: 1;
 	transform: none;
 }
+[data-reveal] .reveal-line {
+	stroke-dashoffset: var(--line-length, 1200);
+	transition: stroke-dashoffset 1.6s ease-out 0.2s;
+}
+[data-reveal].revealed .reveal-line {
+	stroke-dashoffset: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
 	[data-reveal] {
 		opacity: 1;
 		transform: none;
 		transition: none;
 	}
-	html {
-		scroll-behavior: auto;
+	[data-reveal] .reveal-line {
+		stroke-dashoffset: 0;
+		transition: none;
 	}
 }
