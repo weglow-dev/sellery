@@ -16,6 +16,7 @@
 	let name = $state(untrack(() => form?.values?.name ?? ''));
 	let phone = $state(untrack(() => form?.values?.phone ?? ''));
 	let category = $state(untrack(() => form?.values?.category ?? ''));
+	let categoryCustom = $state(untrack(() => form?.values?.categoryCustom ?? ''));
 	let ingredient = $state(untrack(() => form?.values?.ingredient ?? ''));
 	let dosageForm = $state<string>(untrack(() => form?.values?.dosageForm ?? ''));
 	let pillType = $state(untrack(() => form?.values?.pillType ?? ''));
@@ -120,7 +121,7 @@
 			</p>
 
 			<div class="mt-6 rounded-2xl border border-accent/25 bg-accent-soft/50 px-4 py-3.5 text-sm text-fg-soft">
-				<span class="font-bold text-accent">최소 제작 수량</span> {MIN_QTY.toLocaleString('ko-KR')}개 — 모든 카테고리·제형 공통 고정값이에요.
+				<span class="font-bold text-accent">최소 제작 수량</span> {MIN_QTY.toLocaleString('ko-KR')}개 — 제형 및 패키지 형태에 따라 달라 질 수 있습니다.
 			</div>
 
 			{#if formError}
@@ -155,7 +156,7 @@
 					<h2 class="text-lg font-bold text-fg">연락처</h2>
 					<div class="grid gap-4 sm:grid-cols-2">
 						<label id="field-name" class="block scroll-mt-24">
-							<span class="mb-1.5 block text-sm font-semibold text-fg-soft">활동명 / 브랜드명</span>
+							<span class="mb-1.5 block text-sm font-semibold text-fg-soft">활동명</span>
 							<input
 								name="name"
 								bind:value={name}
@@ -190,6 +191,15 @@
 						<p class="mb-2.5 text-sm font-semibold text-fg-soft">카테고리</p>
 						<ChipGroup name="category" options={CATEGORIES} bind:value={category} label="카테고리" />
 						{#if errors.category}<p class="mt-1.5 text-xs text-accent">{errors.category}</p>{/if}
+						{#if category === '기타'}
+							<input
+								name="categoryCustom"
+								bind:value={categoryCustom}
+								type="text"
+								placeholder="어떤 제품인지 간단히 적어주세요 (선택)"
+								class="mt-3 w-full rounded-xl border border-line bg-white/[0.02] px-4 py-3 text-[15px] text-fg placeholder:text-fg-faint focus:border-accent focus:outline-none"
+							/>
+						{/if}
 					</div>
 					<label class="block">
 						<span class="mb-1.5 block text-sm font-semibold text-fg-soft">들어갔으면 하는 메인 성분 (선택)</span>
@@ -207,14 +217,14 @@
 				<section class="space-y-4">
 					<h2 class="text-lg font-bold text-fg">2. 제형</h2>
 					<div id="field-dosageForm" class="scroll-mt-24">
-						<ChipGroup name="dosageForm" options={DOSAGE_FORMS} bind:value={dosageForm} label="제형" />
+						<ChipGroup name="dosageForm" options={DOSAGE_FORMS} bind:value={dosageForm} label="제형" icons />
 						{#if errors.dosageForm}<p class="mt-1.5 text-xs text-accent">{errors.dosageForm}</p>{/if}
 					</div>
 
 					{#if dosageForm === '알약'}
 						<div id="field-pillType" class="scroll-mt-24">
 							<p class="mb-2.5 text-sm font-semibold text-fg-soft">알약 종류</p>
-							<ChipGroup name="pillType" options={PILL_TYPES} bind:value={pillType} label="알약 종류" />
+							<ChipGroup name="pillType" options={PILL_TYPES} bind:value={pillType} label="알약 종류" icons />
 							{#if errors.pillType}<p class="mt-1.5 text-xs text-accent">{errors.pillType}</p>{/if}
 						</div>
 					{/if}
@@ -225,7 +235,7 @@
 					<section class="space-y-4">
 						<h2 class="text-lg font-bold text-fg">3. 패키지</h2>
 						<div id="field-packaging" class="scroll-mt-24">
-							<ChipGroup name="packaging" options={packagingOptions} bind:value={packaging} label="패키지" />
+							<ChipGroup name="packaging" options={packagingOptions} bind:value={packaging} label="패키지" icons />
 							{#if errors.packaging}<p class="mt-1.5 text-xs text-accent">{errors.packaging}</p>{/if}
 						</div>
 					</section>

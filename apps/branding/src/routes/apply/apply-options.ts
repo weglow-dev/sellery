@@ -3,7 +3,7 @@
 /** 모든 카테고리 공통 최소 제작 수량 — 폼에는 수정 불가 정보로만 표시한다. */
 export const MIN_QTY = 1000;
 
-export const CATEGORIES = ['다이어트', '피부', '건강'] as const;
+export const CATEGORIES = ['다이어트', '피부', '건강', '기타'] as const;
 
 export const DOSAGE_FORMS = ['알약', '젤리', '분말', '액상', '필름', '캔디'] as const;
 export type DosageForm = (typeof DOSAGE_FORMS)[number];
@@ -17,7 +17,7 @@ export const PACKAGING_BY_FORM: Record<DosageForm, readonly string[]> = {
 	분말: ['스틱', '병', '파우치'],
 	액상: ['스틱', '병', '파우치'],
 	필름: [],
-	캔디: ['구미', 'POP', '병', '카라멜']
+	캔디: ['구미', 'PTP', '병', '카라멜']
 };
 
 export const FLAVORS = ['포도', '딸기', '복숭아', '레몬', '플레인(무맛)', '기타'] as const;
