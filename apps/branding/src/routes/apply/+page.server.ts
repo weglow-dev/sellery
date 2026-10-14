@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { DOSAGE_FORMS, MIN_QTY, PACKAGING_BY_FORM, type DosageForm } from './apply-options';
 import { notifySlack } from '$lib/server/slack';
+import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 import type { Actions } from './$types';
 
 /** 폼 액션이 있는 페이지는 프리렌더할 수 없다 — 이 라우트만 서버에서 매 요청마다 처리한다. */
@@ -19,7 +20,8 @@ export const actions: Actions = {
 		const form = await request.formData();
 
 		const name = str(form.get('name'));
-		const phone = str(form.get('phone'));
+		// JS 없이 제출돼 하이픈이 없거나 공백이 섞여 와도 같은 모양으로 맞춘다
+		const phone = formatPhone(str(form.get('phone')));
 		const category = str(form.get('category'));
 		const ingredient = str(form.get('ingredient'));
 		const dosageForm = str(form.get('dosageForm'));
@@ -31,10 +33,11 @@ export const actions: Actions = {
 		const agree = form.get('agree') === 'on';
 
 		const values = { name, phone, category, ingredient, dosageForm, pillType, packaging, flavor, flavorCustom, note };
-		const errors: Partial<Record<keyof typeof values | 'agree', string>> = {};
+		const errors: Partial<Record<keyof typeof values | 'agree' | 'form', string>> = {};
 
 		if (!name) errors.name = '활동명 또는 브랜드명을 입력해주세요.';
 		if (!phone) errors.phone = '연락처를 입력해주세요.';
+		else if (!PHONE_RE.test(phone)) errors.phone = '연락처는 010-0000-0000 형식으로 입력해주세요.';
 		if (!category) errors.category = '카테고리를 선택해주세요.';
 		if (!dosageForm || !isDosageForm(dosageForm)) errors.dosageForm = '제형을 선택해주세요.';
 		if (dosageForm === '알약' && !pillType) errors.pillType = '알약 종류를 선택해주세요.';
@@ -48,9 +51,9 @@ export const actions: Actions = {
 
 		const flavorLine = flavor === '기타' ? flavorCustom || '기타(상세 미입력)' : flavor;
 
-		await notifySlack(
+		const delivered = await notifySlack(
 			[
-				'🧪 *새 제조의뢰 접수* (셀러리 브랜딩)',
+				'*새 제조의뢰 접수* [셀러리 브랜딩]',
 				`• 활동명/브랜드명: ${name}`,
 				`• 연락처: ${phone}`,
 				`• 카테고리: ${category}`,
@@ -64,6 +67,12 @@ export const actions: Actions = {
 				.filter((l): l is string => l !== null)
 				.join('\n')
 		);
+
+		// 슬랙이 유일한 접수 경로라, 전송에 실패하면 성공으로 보여주지 않고 입력값을 돌려보내 다시 시도하게 한다
+		if (!delivered) {
+			errors.form = '접수 전송에 실패했어요. 잠시 후 다시 시도해주세요 — 입력하신 내용은 그대로 남아 있어요.';
+			return fail(502, { errors, values });
+		}
 
 		return { success: true };
 	}

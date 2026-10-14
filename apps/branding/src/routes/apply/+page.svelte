@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { goto } from '$app/navigation';
 	import ChipGroup from '$lib/components/ChipGroup.svelte';
 	import SiteHeader from '$lib/components/section/SiteHeader.svelte';
 	import SiteFooter from '$lib/components/section/SiteFooter.svelte';
 	import { CATEGORIES, DOSAGE_FORMS, FLAVORS, MIN_QTY, PACKAGING_BY_FORM, PILL_TYPES, type DosageForm } from './apply-options';
+	import { formatPhone } from '$lib/utils/phone';
 	import type { ActionData } from './$types';
 
 	let { form }: { form: ActionData } = $props();
@@ -23,7 +25,27 @@
 	let note = $state(untrack(() => form?.values?.note ?? ''));
 
 	let submitting = $state(false);
-	let success = $state(untrack(() => form?.success === true));
+	// 서버에 닿지 못했거나(네트워크) 서버가 예외를 낸 경우(500) — 폼은 그대로 두고 배너만 띄운다
+	let submitError = $state('');
+	// 성공 여부는 form 이 바뀔 때마다 따라가야 한다 — use:enhance 로 새로고침 없이 제출해도 서버 응답이 form 으로 들어온다
+	const success = $derived(form?.success === true);
+
+	// 접수 완료 → 배너가 보이게 맨 위로 올리고, 몇 초 뒤 홈으로 보낸다(버튼으로 바로 갈 수도 있음)
+	const REDIRECT_SEC = 6;
+	let secondsLeft = $state(REDIRECT_SEC);
+	$effect(() => {
+		if (!success) return;
+		window.scrollTo({ top: 0, behavior: 'auto' });
+		secondsLeft = REDIRECT_SEC;
+		const timer = setInterval(() => {
+			secondsLeft -= 1;
+			if (secondsLeft <= 0) {
+				clearInterval(timer);
+				goto('/');
+			}
+		}, 1000);
+		return () => clearInterval(timer);
+	});
 
 	const errors = $derived(form?.errors ?? {});
 	const packagingOptions = $derived(
@@ -40,14 +62,21 @@
 		}
 	});
 
-	// 제출 실패 시 화면 위에서부터 가장 먼저 걸린 항목으로 스크롤 + 포커스한다
+	// 폼 전체 오류(전송 실패 등) — 서버가 돌려준 것과 클라이언트에서 잡은 것 중 하나
+	const formError = $derived(errors.form ?? submitError);
+
+	// 제출 실패 시 화면 위에서부터 가장 먼저 걸린 항목으로 스크롤 + 포커스한다. 폼 전체 오류면 상단 배너로.
 	const FIELD_ORDER = ['name', 'phone', 'category', 'dosageForm', 'pillType', 'packaging', 'agree'] as const;
 	$effect(() => {
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (formError) {
+			document.getElementById('form-error')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+			return;
+		}
 		const key = FIELD_ORDER.find((k) => errors[k]);
 		if (!key) return;
 		const el = document.getElementById(`field-${key}`);
 		if (!el) return;
-		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
 		el.querySelector<HTMLElement>('input, textarea')?.focus({ preventScroll: true });
 	});
@@ -66,10 +95,11 @@
 		{#if success}
 			<div class="rounded-3xl border border-line bg-panel px-6 py-14 text-center">
 				<p class="text-5xl">🙌</p>
-				<h1 class="mt-5 text-2xl font-bold text-fg md:text-3xl">제조의뢰가 접수됐어요</h1>
+				<h1 class="mt-5 text-2xl font-semibold text-fg md:text-3xl">제조의뢰가 접수됐어요</h1>
 				<p class="mx-auto mt-3 max-w-sm text-[15px] leading-relaxed text-fg-soft">
 					전담 매니저가 사흘 안에 남겨주신 연락처로 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.
 				</p>
+				<p class="mt-4 text-sm text-fg-faint" aria-live="polite">{secondsLeft}초 뒤 홈으로 이동해요</p>
 				<a
 					href="/"
 					class="mt-8 inline-block rounded-2xl bg-accent px-7 py-3.5 text-[15px] font-bold text-bg transition hover:-translate-y-0.5 hover:bg-accent-deep active:scale-95"
@@ -93,13 +123,29 @@
 				<span class="font-bold text-accent">최소 제작 수량</span> {MIN_QTY.toLocaleString('ko-KR')}개 — 모든 카테고리·제형 공통 고정값이에요.
 			</div>
 
+			{#if formError}
+				<div
+					id="form-error"
+					role="alert"
+					class="mt-6 scroll-mt-24 rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3.5 text-sm font-semibold text-fg"
+				>
+					{formError}
+				</div>
+			{/if}
+
 			<form
 				method="POST"
 				class="mt-10 space-y-10"
 				use:enhance={() => {
 					submitting = true;
-					return async ({ update }) => {
-						await update({ reset: false });
+					submitError = '';
+					return async ({ result, update }) => {
+						if (result.type === 'error') {
+							// 기본 에러 페이지로 넘어가면 입력값이 날아간다 — update() 를 부르지 않고 폼을 그대로 둔다
+							submitError = '일시적인 오류가 났어요. 잠시 후 다시 시도해주세요';
+						} else {
+							await update({ reset: false });
+						}
 						submitting = false;
 					};
 				}}
@@ -123,9 +169,12 @@
 							<span class="mb-1.5 block text-sm font-semibold text-fg-soft">연락처</span>
 							<input
 								name="phone"
-								bind:value={phone}
+								value={phone}
+								oninput={(e) => (phone = formatPhone(e.currentTarget.value))}
 								type="tel"
-								inputmode="tel"
+								inputmode="numeric"
+								maxlength="13"
+								autocomplete="tel"
 								placeholder="010-0000-0000"
 								class="w-full rounded-xl border border-line bg-white/[0.02] px-4 py-3 text-[15px] text-fg placeholder:text-fg-faint focus:border-accent focus:outline-none"
 							/>
