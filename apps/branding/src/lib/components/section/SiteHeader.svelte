@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { startApply } from '../cta.svelte';
-
 	let scrollY = $state(0);
 	const scrolled = $derived(scrollY > 8);
 </script>
@@ -17,11 +15,11 @@
 			<span class="grid size-7 place-items-center rounded-lg bg-accent text-sm font-extrabold text-bg">B</span>
 			Sellery&nbsp;Branding
 		</a>
-		<button
-			onclick={startApply}
+		<a
+			href="/apply"
 			class="md:rounded-xl rounded-lg bg-accent px-4 py-2 text-sm font-bold text-bg transition hover:bg-accent-deep active:scale-95"
 		>
 			제조의뢰 시작하기
-		</button>
+		</a>
 	</div>
 </header>

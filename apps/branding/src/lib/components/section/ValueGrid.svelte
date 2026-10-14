@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 
 	const values = [
 		{ icon: 'inventory.svg', title: '재고 부담 0', desc: '생산량 결정도, 창고도, 남는 재고도 셀러리가 책임져요.' },

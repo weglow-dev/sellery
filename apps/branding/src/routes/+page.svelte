@@ -1,15 +1,14 @@
 <script lang="ts">
-	import SiteHeader from '$lib/sections/SiteHeader.svelte';
-	import Hero from '$lib/sections/Hero.svelte';
-	import ZeroStats from '$lib/sections/ZeroStats.svelte';
-	import ValueGrid from '$lib/sections/ValueGrid.svelte';
-	import Steps from '$lib/sections/Steps.svelte';
-	import BrandStory from '$lib/sections/BrandStory.svelte';
-	import Growth from '$lib/sections/Growth.svelte';
-	import Categories from '$lib/sections/Categories.svelte';
-	import FinalCta from '$lib/sections/FinalCta.svelte';
-	import SiteFooter from '$lib/sections/SiteFooter.svelte';
-	import CtaToast from '$lib/sections/CtaToast.svelte';
+	import SiteHeader from '$lib/components/section/SiteHeader.svelte';
+	import Hero from '$lib/components/section/Hero.svelte';
+	import ZeroStats from '$lib/components/section/ZeroStats.svelte';
+	import ValueGrid from '$lib/components/section/ValueGrid.svelte';
+	import Steps from '$lib/components/section/Steps.svelte';
+	import BrandStory from '$lib/components/section/BrandStory.svelte';
+	import Growth from '$lib/components/section/Growth.svelte';
+	import Categories from '$lib/components/section/Categories.svelte';
+	import FinalCta from '$lib/components/section/FinalCta.svelte';
+	import SiteFooter from '$lib/components/section/SiteFooter.svelte';
 </script>
 
 <svelte:head>
@@ -39,4 +38,3 @@
 </main>
 
 <SiteFooter />
-<CtaToast />

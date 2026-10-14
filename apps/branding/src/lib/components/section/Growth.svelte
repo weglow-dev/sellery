@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 
 	const growthStats = [
 		{ num: '4', unit: '단계', label: '제조의뢰 → 샵 오픈' },

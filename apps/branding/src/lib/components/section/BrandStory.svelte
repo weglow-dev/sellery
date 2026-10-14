@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 
 	const stories = [
 		{ no: '01', title: '컨셉 스토리', desc: '당신의 메시지를 브랜드 언어로 바꿔요.', image: 'story.png' },

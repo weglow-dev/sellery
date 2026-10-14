@@ -1,7 +1,6 @@
 <script lang="ts">
-	import Constellation from '../Constellation.svelte';
-	import { reveal } from '../reveal';
-	import { startApply } from '../cta.svelte';
+	import Constellation from '$lib/components/constellation/Constellation.svelte';
+	import { reveal } from '$lib/utils/reveal';
 </script>
 
 <section use:reveal class="relative overflow-hidden bg-bg">
@@ -33,12 +32,12 @@
 			만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 셀러리가 맡을게요.
 		</p>
 		<div data-reveal style="--reveal-delay: 0.24s" class="mt-9 flex flex-wrap items-center gap-3">
-			<button
-				onclick={startApply}
+			<a
+				href="/apply"
 				class="rounded-xl md:rounded-2xl bg-accent px-4 md:px-7 py-3 md:py-4 text-[17px] font-bold text-bg shadow-lg shadow-accent/25 transition hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-xl hover:shadow-accent/30 active:scale-95"
 			>
 				제조의뢰 시작하기
-			</button>
+			</a>
 			<a
 				href="#how"
 				class="rounded-xl md:rounded-2xl border border-line px-4 md:px-6 py-3 md:py-4 text-[17px] font-semibold text-fg-soft transition hover:border-white/20 hover:bg-white/[0.04] active:scale-95"
