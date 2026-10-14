@@ -1,14 +1,14 @@
 import { env } from '$env/dynamic/private';
 
-/** 슬랙 알림 한 줄 — packages/db/src/server/partner/slack.server.ts 와 같은 패턴(선택 · best-effort · 3초 타임아웃).
- *  이 앱은 워크스페이스 의존성이 없는 독립 앱이라 그 모듈을 가져오지 않고 그대로 옮겨 쓴다.
- *  SLACK_WEBHOOK_URL 이 Vercel 프로젝트(sellery-branding)에 없으면 조용히 아무 일도 하지 않는다 — 그 경우
- *  접수 내용이 어디에도 남지 않으니 실제 운영 전에 반드시 설정해야 한다 (docs/branding-plan.md §5). */
-export async function notifySlack(text: string): Promise<void> {
+/** 슬랙 알림 한 줄 — packages/db/src/server/partner/slack.server.ts 와 같은 전송 방식(3초 타임아웃)이지만,
+ *  거기서는 "알림"이라 실패를 삼키는 반면 여기서는 **슬랙이 제조의뢰의 유일한 접수 경로**라 결과를 돌려준다.
+ *  false 면 호출자(apply/+page.server.ts)가 사용자에게 "접수 실패 — 다시 시도" 를 보여줘 입력이 조용히 사라지지 않게 한다.
+ *  SLACK_WEBHOOK_URL 이 없는 것도 실패로 친다 — Vercel 프로젝트 sellery-branding 에 설정돼 있어야 한다(docs/branding-plan.md §5). */
+export async function notifySlack(text: string): Promise<boolean> {
 	const url = env.SLACK_WEBHOOK_URL;
 	if (!url) {
-		console.warn('[slack] SLACK_WEBHOOK_URL 이 없어 알림을 보내지 않았습니다:', text);
-		return;
+		console.error('[slack] SLACK_WEBHOOK_URL 이 없어 접수를 받을 수 없습니다:', text);
+		return false;
 	}
 	try {
 		const res = await fetch(url, {
@@ -17,8 +17,13 @@ export async function notifySlack(text: string): Promise<void> {
 			body: JSON.stringify({ text }),
 			signal: AbortSignal.timeout(3_000)
 		});
-		if (!res.ok) console.error('[slack] webhook responded', res.status);
+		if (!res.ok) {
+			console.error('[slack] webhook responded', res.status);
+			return false;
+		}
+		return true;
 	} catch (e) {
 		console.error('[slack] webhook failed:', e instanceof Error ? e.message : e);
+		return false;
 	}
 }

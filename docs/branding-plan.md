@@ -14,7 +14,7 @@
 | 디자인 | packages/ui (theme.css · legacy skin) | **자체 테마만** — 다크 베이스 + 웜 앰버(#ff7a3d) 포인트의 프리미엄 무드 |
 | 폰트 | IBM Plex Sans KR (700 최대) | **Pretendard Variable** (실제 100~900 · jsdelivr CDN, `src/app.html`) |
 | 패키지 의존 | @sellery/core·db·ui·payments | **워크스페이스 의존성 0** — 단독 `npm install` 로도 빌드됨. 슬랙 알림도 `packages/db` 재사용 없이 `/apply` 라우트 안에서 자체 구현 |
-| 렌더링 | SPA(ssr=false) 또는 Supabase SSR | **정적 프리렌더 + `/apply` 한 라우트만 서버 액션**(아래 §5) — 그 외 전부 prerender, 환경변수도 `/apply` 하나(`SLACK_WEBHOOK_URL`, 선택)뿐 |
+| 렌더링 | SPA(ssr=false) 또는 Supabase SSR | **정적 프리렌더 + `/apply` 한 라우트만 서버 액션**(아래 §5) — 그 외 전부 prerender, 환경변수도 `/apply` 하나(`SLACK_WEBHOOK_URL` — 없으면 접수가 "전송 실패"로 막히므로 사실상 필수)뿐 |
 | base 경로 | '' 또는 /influencer /brand /admin | **''** — 자체 오리진(독립 배포, sellery.life 리라이트에 안 물림) |
 | 셀러리 로고 규칙(-14° 등) | 적용 | **적용 안 함** — 기존 아이덴티티와 무관하게 감 |
 
@@ -42,7 +42,7 @@ apps/branding/
     utils/
       reveal.ts                   [data-reveal] 스크롤 리빌 액션 + 숫자 카운트 애니메이션 (모든 섹션이 import)
     server/
-      slack.ts                    SLACK_WEBHOOK_URL 로 알림 한 줄(best-effort) — 서버 전용
+      slack.ts                    SLACK_WEBHOOK_URL 로 접수 한 줄 전송 — 실패/미설정이면 false 를 돌려 접수를 막는다 · 서버 전용
   static/                       favicon.svg · 아이콘 SVG(inventory/cost/admin/manager/sample) · 에디토리얼 사진(story/identiti/conect/diet/inner/mental/mans.png)
   svelte.config.js              adapter-vercel(nodejs22.x) · base 없음 · Supabase hooks 없음
   vite.config.ts                포트 5177 · tailwindcss 플러그인
@@ -71,11 +71,11 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 ## 5. 제조의뢰 폼 (`/apply`)
 
-**필드**: 활동명/브랜드명 · 연락처(둘 다 필수) → ① 카테고리(다이어트/피부/건강, 단일 선택) + 메인 성분 주관식(선택) → ② 제형(알약/젤리/분말/액상/필름/캔디, 단일) — 알약이면 하위로 타정/분말캡슐/연질캡슐 추가 선택 → ③ 패키지(제형에 따라 선택지가 바뀜, `apply/apply-options.ts` `PACKAGING_BY_FORM` — 필름은 패키지 선택 단계 자체를 건너뜀) → ④ 맛(칩 선택 + 기타 직접입력) → ⑤ 마지막 자유 주관식(선택) → 개인정보 수집 동의 체크(필수). **최소 제작 수량 1,000개는 고정값으로 표시만** 하고 입력받지 않습니다(`MIN_QTY` 상수).
+**필드**: 활동명/브랜드명 · 연락처(둘 다 필수 — 연락처는 입력 중 `010-0000-0000` 으로 자동 하이픈, 서버도 `lib/utils/phone.ts` 의 같은 함수로 정규화한 뒤 `01x-xxx(x)-xxxx` 형식 검증) → ① 카테고리(다이어트/피부/건강, 단일 선택) + 메인 성분 주관식(선택) → ② 제형(알약/젤리/분말/액상/필름/캔디, 단일) — 알약이면 하위로 타정/분말캡슐/연질캡슐 추가 선택 → ③ 패키지(제형에 따라 선택지가 바뀜, `apply/apply-options.ts` `PACKAGING_BY_FORM` — 필름은 패키지 선택 단계 자체를 건너뜀) → ④ 맛(칩 선택 + 기타 직접입력) → ⑤ 마지막 자유 주관식(선택) → 개인정보 수집 동의 체크(필수). **최소 제작 수량 1,000개는 고정값으로 표시만** 하고 입력받지 않습니다(`MIN_QTY` 상수).
 
-**제출 처리** (`apply/+page.server.ts`): SvelteKit 폼 액션으로 서버 검증(`fail()` 로 에러 반환, `use:enhance` 로 리로드 없이 에러 표시 — JS 없이도 동작). 검증 통과 시 **슬랙 웹훅으로 알림**만 보냅니다 — DB 저장·이메일은 없습니다. 패턴은 `packages/db/src/server/partner/slack.server.ts` 와 동일(선택·best-effort·3초 타임아웃)이지만, 이 앱은 워크스페이스 의존성이 없는 독립 앱이라 코드를 가져오지 않고 `src/lib/server/slack.ts` 에 그대로 다시 구현했습니다(다른 앱의 `lib/server/` 규칙과 동일).
+**제출 처리** (`apply/+page.server.ts`): SvelteKit 폼 액션으로 서버 검증(`fail()` 로 에러 반환, `use:enhance` 로 리로드 없이 에러 표시 — JS 없이도 동작). 검증 통과 시 **슬랙 웹훅으로 보내는 것이 유일한 접수 경로**입니다 — DB 저장·이메일은 없습니다. 그래서 다른 앱의 슬랙 "알림"과 달리 전송 실패를 삼키지 않습니다: `notifySlack` 이 false 를 돌려주면 `fail(502)` 로 입력값과 함께 "접수 전송에 실패했어요 — 다시 시도" 배너를 보여주고, 네트워크 단절·서버 예외(`result.type === 'error'`)도 `use:enhance` 콜백에서 잡아 기본 에러 페이지로 넘기지 않고 폼을 유지합니다. 어느 경우든 사용자가 적은 내용은 남아 있습니다. 패턴은 `packages/db/src/server/partner/slack.server.ts` 와 동일(선택·best-effort·3초 타임아웃)이지만, 이 앱은 워크스페이스 의존성이 없는 독립 앱이라 코드를 가져오지 않고 `src/lib/server/slack.ts` 에 그대로 다시 구현했습니다(다른 앱의 `lib/server/` 규칙과 동일).
 
-**환경변수**: `SLACK_WEBHOOK_URL` 은 2026-10-14 에 Vercel 프로젝트 `sellery-branding` 의 Production·Preview 에 Sensitive 로 넣었습니다(값은 Vercel 에만 — 저장소·문서에 적지 않음). **이 변수가 비면 폼은 "접수 완료"로 정상 동작하지만 접수 내용이 서버 로그 경고 말고는 어디에도 남지 않으니**, 웹훅을 교체·회전할 때는 반드시 같이 갱신할 것. 참고로 다른 4개 앱(shop·brand·influencer·admin)에는 이 변수가 없어서 거기의 가입·채널 인증 슬랙 알림은 아직 휴면 상태 — 켜려면 같은(또는 다른 채널의) 웹훅을 그 프로젝트들에도 넣으면 됩니다.
+**환경변수**: `SLACK_WEBHOOK_URL` 은 2026-10-14 에 Vercel 프로젝트 `sellery-branding` 의 Production·Preview 에 Sensitive 로 넣었습니다(값은 Vercel 에만 — 저장소·문서에 적지 않음). **이 변수가 비거나 웹훅이 죽으면 접수가 "전송 실패" 로 막힙니다**(조용히 유실되지 않도록 의도한 동작). 웹훅을 교체·회전할 때는 반드시 같이 갱신할 것. 참고로 다른 4개 앱(shop·brand·influencer·admin)에는 이 변수가 없어서 거기의 가입·채널 인증 슬랙 알림은 아직 휴면 상태 — 켜려면 같은(또는 다른 채널의) 웹훅을 그 프로젝트들에도 넣으면 됩니다.
 
 **이 라우트만 서버 렌더링**: 폼 액션이 있는 라우트는 프리렌더할 수 없어서 `apply/+page.server.ts` 에 `export const prerender = false` 를 선언했습니다. 루트 레이아웃의 `prerender = true` 는 그대로 유지되므로 홈(`/`)은 여전히 정적 HTML로 빌드되고, `/apply` 만 Vercel 서버리스 함수로 분리됩니다(`vercel build` 결과물의 `.vercel/output/functions/apply.func` 로 확인 가능).
 
@@ -87,7 +87,7 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 ## 7. 개발 · 배포
 
-- 로컬: 루트에서 `npm run dev:branding` → http://localhost:5177 (`/apply` 슬랙 알림 테스트하려면 `apps/branding/.env` 에 `SLACK_WEBHOOK_URL=...` 추가 — 없어도 폼 자체는 정상 동작, 콘솔에 경고만 찍힘)
+- 로컬: 루트에서 `npm run dev:branding` → http://localhost:5177 (`/apply` 는 `apps/branding/.env.local` 에 `SLACK_WEBHOOK_URL=...` 이 있어야 접수가 통과함 — 없으면 "전송 실패" 배너. 값이 있으면 **로컬 제출도 실제 슬랙 채널로 나가니** 주의)
 - 검사: `npm run check -w apps/branding` · 빌드: `npm run build -w apps/branding` — CI(`프로토타입 점검`)에 자동 포함됨
 - **Vercel**: team `weglow-team` · 프로젝트 `sellery-branding` · Root Directory `apps/branding` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://sellery-branding.vercel.app**
   - 고유 배포 URL(`…-weglow-team.vercel.app`)은 팀 SSO 보호가 걸려 302 — 정상입니다. 공개 확인은 위 주소로.
