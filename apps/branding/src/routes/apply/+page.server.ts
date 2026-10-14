@@ -23,6 +23,7 @@ export const actions: Actions = {
 		// JS 없이 제출돼 하이픈이 없거나 공백이 섞여 와도 같은 모양으로 맞춘다
 		const phone = formatPhone(str(form.get('phone')));
 		const category = str(form.get('category'));
+		const categoryCustom = str(form.get('categoryCustom'));
 		const ingredient = str(form.get('ingredient'));
 		const dosageForm = str(form.get('dosageForm'));
 		const pillType = str(form.get('pillType'));
@@ -32,7 +33,7 @@ export const actions: Actions = {
 		const note = str(form.get('note'));
 		const agree = form.get('agree') === 'on';
 
-		const values = { name, phone, category, ingredient, dosageForm, pillType, packaging, flavor, flavorCustom, note };
+		const values = { name, phone, category, categoryCustom, ingredient, dosageForm, pillType, packaging, flavor, flavorCustom, note };
 		const errors: Partial<Record<keyof typeof values | 'agree' | 'form', string>> = {};
 
 		if (!name) errors.name = '활동명 또는 브랜드명을 입력해주세요.';
@@ -56,7 +57,7 @@ export const actions: Actions = {
 				'*새 제조의뢰 접수* [셀러리 브랜딩]',
 				`• 활동명/브랜드명: ${name}`,
 				`• 연락처: ${phone}`,
-				`• 카테고리: ${category}`,
+				`• 카테고리: ${category === '기타' && categoryCustom ? `기타(${categoryCustom})` : category}`,
 				ingredient ? `• 메인 성분: ${ingredient}` : '• 메인 성분: (미정 — 미팅 때 결정)',
 				`• 제형: ${dosageForm}${pillType ? ` (${pillType})` : ''}`,
 				packaging ? `• 패키지: ${packaging}` : '• 패키지: (해당 없음)',
