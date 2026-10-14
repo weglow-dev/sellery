@@ -8,7 +8,7 @@
 	];
 </script>
 
-<section use:reveal class="bg-bg py-24 md:py-32">
+<section use:reveal class="bg-bg py-16 md:py-32">
 	<div class="mx-auto max-w-5xl px-5">
 		<p data-reveal class="text-[15px] font-bold text-accent">브랜드가 만들어지는 과정</p>
 		<h2
@@ -18,12 +18,15 @@
 		>
 			제품이 아니라<br />당신의 이야기를 팔아요
 		</h2>
-		<div class="mt-12 grid gap-4 sm:grid-cols-3">
+		<!-- 모바일: 좌우 스와이프 슬라이드 · sm↑: 그리드 -->
+		<div
+			class="-mx-5 mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 scrollbar-none sm:mx-0 sm:mt-12 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden"
+		>
 			{#each stories as s, i (s.no)}
 				<div
 					data-reveal
 					style="--reveal-delay: {0.08 * i}s"
-					class="group relative aspect-[3/4] overflow-hidden rounded-[1.75rem] border border-line bg-panel"
+					class="group relative aspect-[3/4] w-3/4 max-w-72 shrink-0 snap-center overflow-hidden rounded-[1.75rem] border border-line bg-panel sm:w-auto sm:max-w-none"
 				>
 					<img
 						src="/{s.image}"

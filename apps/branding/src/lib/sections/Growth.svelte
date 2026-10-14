@@ -11,7 +11,7 @@
 	const ops = ['주문·결제 자동화', '포장·출고 대행', '투명한 정산 리포트'];
 </script>
 
-<section use:reveal class="bg-panel py-28 md:py-36">
+<section use:reveal class="bg-panel py-20 md:py-36">
 	<div data-reveal class="mx-auto max-w-3xl px-5 text-center">
 		<p class="text-[15px] font-bold text-accent">GROWTH, SIMPLIFIED</p>
 		<h2

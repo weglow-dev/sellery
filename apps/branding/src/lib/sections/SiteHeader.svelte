@@ -19,7 +19,7 @@
 		</a>
 		<button
 			onclick={startApply}
-			class="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-bg transition hover:bg-accent-deep active:scale-95"
+			class="md:rounded-xl rounded-lg bg-accent px-4 py-2 text-sm font-bold text-bg transition hover:bg-accent-deep active:scale-95"
 		>
 			제조의뢰 시작하기
 		</button>

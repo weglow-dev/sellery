@@ -2,7 +2,7 @@
 	import { reveal } from '../reveal';
 </script>
 
-<section use:reveal class="relative overflow-hidden bg-panel py-24 md:py-32">
+<section use:reveal class="relative overflow-hidden bg-panel py-16 md:py-32">
 	<div class="relative mx-auto max-w-5xl px-5 text-center">
 		<p data-reveal class="text-[15px] font-bold text-accent">START WITH ZERO</p>
 		<h2

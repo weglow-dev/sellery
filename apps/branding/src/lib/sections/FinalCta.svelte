@@ -3,10 +3,10 @@
 	import { startApply } from '../cta.svelte';
 </script>
 
-<section id="start" use:reveal class="scroll-mt-16 bg-bg px-5 py-24 md:py-32">
+<section id="start" use:reveal class="scroll-mt-16 bg-bg px-5 py-16 md:py-32">
 	<div
 		data-reveal
-		class="mx-auto max-w-5xl rounded-[2.5rem] px-6 py-20 text-center text-fg md:py-28"
+		class="mx-auto max-w-5xl rounded-md md:rounded-[2.5rem] px-6 py-14 text-center text-fg md:py-28"
 		style="background:
   radial-gradient(85% 120% at 15% 105%, rgba(201,138,59,0.75) 0%, rgba(122,78,42,0.45) 35%, rgba(42,28,18,0) 70%),
   radial-gradient(70% 90% at 90% -10%, rgba(122,78,42,0.35) 0%, rgba(42,28,18,0) 60%),
