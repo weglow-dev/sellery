@@ -58,16 +58,14 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-blue` `text-ink-
 ## 5. 남은 일 (우선순위순)
 
 1. **제조의뢰 폼** — `src/routes/apply/+page.svelte` 신설. 필드 초안: 활동명 · 연락처 · 이메일 · 주 채널+링크 · 팔로워 규모 · 제품 카테고리(다이어트/이너뷰티/건기식 등 멀티 선택) · 희망 출시 시기 · 제품 아이디어(서술) · 개인정보 동의. **접수 데이터를 어디로 받을지 미정** — 후보: Resend 메일(브랜드 콘솔처럼) / Supabase 테이블 / 구글 폼 임베드. 폼을 붙이면 prerender 유지 가능 여부 확인(서버 액션을 쓰면 프리렌더 해제 필요).
-2. **Vercel–GitHub 연동** — 아래 §6. 지금은 CLI 수동 배포라 main 병합해도 자동 반영 안 됨.
-3. 도메인 결정 — 예: `branding.sellery.life` (Vercel 프로젝트 Domains 에 추가 + DNS).
-4. OG 이미지 · 실제 샵 목업 이미지 교체(지금은 CSS 가짜 목업) · 카피 다듬기.
+2. 도메인 결정 — 예: `branding.sellery.life` (Vercel 프로젝트 Domains 에 추가 + DNS).
+3. OG 이미지 · 실제 샵 목업 이미지 교체(지금은 CSS 가짜 목업) · 카피 다듬기.
 
 ## 6. 개발 · 배포
 
 - 로컬: 루트에서 `npm run dev:branding` → http://localhost:5177 (환경변수 불필요)
 - 검사: `npm run check -w apps/branding` · 빌드: `npm run build -w apps/branding` — CI(`프로토타입 점검`)에 자동 포함됨
-- **Vercel**: team `weglow-team` · 프로젝트 `sellery-branding` (2026-10-13 CLI 로 생성, **GitHub 미연동**) · 공개 주소 **https://sellery-branding.vercel.app**
-  - 수동 배포: `apps/branding` 에서 `vercel link --project sellery-branding --scope weglow-team` 후 `vercel deploy` (프로덕션은 `--prod`)
+- **Vercel**: team `weglow-team` · 프로젝트 `sellery-branding` · Root Directory `apps/branding` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://sellery-branding.vercel.app**
   - 고유 배포 URL(`…-weglow-team.vercel.app`)은 팀 SSO 보호가 걸려 302 — 정상입니다. 공개 확인은 위 주소로.
-  - GitHub 연동 시(대시보드 → Settings → Git): Root Directory `apps/branding` 로 지정. 워크스페이스 의존성이 없어서 "Include source files outside of the Root Directory" 는 꺼도 됩니다.
+  - **트러블슈팅 기록**: 프로젝트를 CLI(`vercel link`/`vercel deploy`)로 먼저 만든 뒤 나중에 대시보드에서 GitHub 저장소를 연결하면, Root Directory 가 `.`(저장소 루트)로 남아 있을 수 있다 — 이 경우 push 때마다 `apps/branding` 만이 아니라 루트의 `npm run build --workspaces`(모노레포 4개 앱 전체)가 돌다가 다른 앱(`apps/shop` 등)의 환경변수가 없어서 빌드가 실패한다. 대시보드에서 안 고쳐지면 `vercel project update sellery-branding --root-directory apps/branding --scope weglow-team` 로 직접 설정.
 - sellery.life 아래로 넣으려면(`sellery.life/branding`): base 경로 `/branding` 설정 + `apps/shop/vercel.json` 리라이트 추가가 필요 — 현재는 독립 오리진 방침이라 안 함.
