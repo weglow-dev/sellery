@@ -75,7 +75,7 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 **제출 처리** (`apply/+page.server.ts`): SvelteKit 폼 액션으로 서버 검증(`fail()` 로 에러 반환, `use:enhance` 로 리로드 없이 에러 표시 — JS 없이도 동작). 검증 통과 시 **슬랙 웹훅으로 알림**만 보냅니다 — DB 저장·이메일은 없습니다. 패턴은 `packages/db/src/server/partner/slack.server.ts` 와 동일(선택·best-effort·3초 타임아웃)이지만, 이 앱은 워크스페이스 의존성이 없는 독립 앱이라 코드를 가져오지 않고 `src/lib/server/slack.ts` 에 그대로 다시 구현했습니다(다른 앱의 `lib/server/` 규칙과 동일).
 
-**⚠️ 운영 전 필수 설정**: `SLACK_WEBHOOK_URL` 환경변수를 Vercel 프로젝트 `sellery-branding` 에 추가해야 합니다 — **없으면 폼은 "접수 완료"로 정상 동작하지만 접수 내용이 콘솔 로그 말고는 어디에도 남지 않습니다** (서버 로그에 경고만 찍힘). 다른 4개 앱이 이미 쓰는 것과 같은 웹훅 URL을 그대로 재사용해도 되고(`.env.example` 참고), 제조의뢰 알림만 따로 보고 싶으면 새 웹훅(새 슬랙 채널)을 만들어 거기 값을 넣어도 됩니다 — 어느 쪽이든 Vercel 대시보드 → `sellery-branding` → Settings → Environment Variables 에서 추가.
+**환경변수**: `SLACK_WEBHOOK_URL` 은 2026-10-14 에 Vercel 프로젝트 `sellery-branding` 의 Production·Preview 에 Sensitive 로 넣었습니다(값은 Vercel 에만 — 저장소·문서에 적지 않음). **이 변수가 비면 폼은 "접수 완료"로 정상 동작하지만 접수 내용이 서버 로그 경고 말고는 어디에도 남지 않으니**, 웹훅을 교체·회전할 때는 반드시 같이 갱신할 것. 참고로 다른 4개 앱(shop·brand·influencer·admin)에는 이 변수가 없어서 거기의 가입·채널 인증 슬랙 알림은 아직 휴면 상태 — 켜려면 같은(또는 다른 채널의) 웹훅을 그 프로젝트들에도 넣으면 됩니다.
 
 **이 라우트만 서버 렌더링**: 폼 액션이 있는 라우트는 프리렌더할 수 없어서 `apply/+page.server.ts` 에 `export const prerender = false` 를 선언했습니다. 루트 레이아웃의 `prerender = true` 는 그대로 유지되므로 홈(`/`)은 여전히 정적 HTML로 빌드되고, `/apply` 만 Vercel 서버리스 함수로 분리됩니다(`vercel build` 결과물의 `.vercel/output/functions/apply.func` 로 확인 가능).
 
