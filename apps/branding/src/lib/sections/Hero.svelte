@@ -1,53 +1,15 @@
 <script lang="ts">
+	import Constellation from '../Constellation.svelte';
 	import { reveal } from '../reveal';
 	import { startApply } from '../cta.svelte';
 </script>
 
 <section use:reveal class="relative overflow-hidden bg-bg">
-	<!-- 궤도형 데코 그래픽 -->
-	<div aria-hidden="true" class="pointer-events-none absolute top-1/2 right-[25rem] hidden -translate-y-1/2 md:block">
+	<!-- 컨스텔레이션 데코 — 커서를 따라 점·선이 이어진다 -->
+	<div aria-hidden="true" class="pointer-events-none absolute top-1/2 right-[28rem] hidden -translate-y-1/2 md:block">
 		<div class="relative size-100">
 			<div class="absolute inset-10 rounded-full bg-accent/20 blur-[90px]"></div>
-			<svg viewBox="0 0 400 400" class="motion-safe:animate-spin-reverse absolute inset-0 size-full" fill="none">
-				<ellipse cx="200" cy="200" rx="190" ry="70" stroke="white" stroke-opacity="0.08" stroke-width="1" />
-				<circle cx="390" cy="200" r="5" fill="var(--color-accent)" />
-			</svg>
-			<svg
-				viewBox="0 0 400 400"
-				class="motion-safe:animate-spin-slow absolute inset-0 size-full"
-				fill="none"
-				style="animation-duration: 54s"
-			>
-				<ellipse
-					cx="200"
-					cy="200"
-					rx="145"
-					ry="145"
-					stroke="white"
-					stroke-opacity="0.1"
-					stroke-width="1"
-					transform="rotate(35 200 200)"
-				/>
-				<circle cx="200" cy="55" r="4" fill="white" fill-opacity="0.65" />
-			</svg>
-			<svg
-				viewBox="0 0 400 400"
-				class="motion-safe:animate-spin-reverse absolute inset-0 size-full"
-				fill="none"
-				style="animation-duration: 70s"
-			>
-				<ellipse
-					cx="200"
-					cy="200"
-					rx="100"
-					ry="40"
-					stroke="var(--color-accent)"
-					stroke-opacity="0.35"
-					stroke-width="1.5"
-					transform="rotate(-20 200 200)"
-				/>
-				<circle cx="300" cy="170" r="3.5" fill="var(--color-accent)" />
-			</svg>
+			<Constellation />
 		</div>
 	</div>
 
@@ -62,12 +24,12 @@
 		<h1
 			data-reveal
 			style="--reveal-delay: 0.08s"
-			class="max-w-2xl text-[40px] leading-[1.16] font-extrabold tracking-[-0.02em] text-fg md:text-[60px]"
+			class="max-w-2xl text-[40px] leading-[1.16] font-bold tracking-[-0.02em] text-fg md:text-[60px]"
 		>
 			팔로워가 있다면,<br />브랜드도 가질 수 있어요
 		</h1>
 		<p data-reveal style="--reveal-delay: 0.16s" class="mt-6 max-w-lg text-lg leading-relaxed text-accent">
-			다이어트, 이너뷰티, 더마 — 내 이름을 건 웰니스 브랜드. <br class="hidden md:block"/>
+			다이어트, 이너뷰티, 멘탈·맨즈 웰니스 — 내 이름을 건 브랜드. <br class="hidden md:block"/>
 			만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 셀러리가 맡을게요.
 		</p>
 		<div data-reveal style="--reveal-delay: 0.24s" class="mt-9 flex flex-wrap items-center gap-3">

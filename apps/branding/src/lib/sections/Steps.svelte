@@ -15,7 +15,7 @@
 		<h2
 			data-reveal
 			style="--reveal-delay: 0.06s"
-			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-extrabold tracking-[-0.02em] text-fg md:text-[38px]"
+			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-bold tracking-[-0.02em] text-fg md:text-[38px]"
 		>
 			브랜드가 되기까지,<br />네 단계면 돼요
 		</h2>

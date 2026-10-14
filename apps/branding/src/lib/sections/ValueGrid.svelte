@@ -16,7 +16,7 @@
 		<h2
 			data-reveal
 			style="--reveal-delay: 0.06s"
-			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-extrabold tracking-[-0.02em] text-fg md:text-[38px]"
+			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-bold tracking-[-0.02em] text-fg md:text-[38px]"
 		>
 			브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요
 		</h2>
