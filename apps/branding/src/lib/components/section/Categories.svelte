@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 
 	const categories = [
 		{ image: 'diet.png', title: '다이어트', desc: '식단 · 대체식 · 체중 관리' },

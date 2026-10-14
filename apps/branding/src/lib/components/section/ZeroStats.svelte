@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 </script>
 
 <section use:reveal class="relative overflow-hidden bg-panel py-16 md:py-32">

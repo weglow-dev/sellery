@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { reveal } from '../reveal';
+	import { reveal } from '$lib/utils/reveal';
 
 	const steps = [
 		{ no: '01', title: '제조의뢰', desc: '만들고 싶은 제품을 알려주세요. 폼 하나 작성이면 충분해요.' },

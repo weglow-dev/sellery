@@ -18,12 +18,11 @@
 	--color-accent-soft: rgba(255, 122, 61, 0.16);
 	--color-accent-2: #7c3aed;
 
-	/* float·spin·토스트 — 서로 다른 섹션의 여러 요소가 공유하는 애니메이션이라 토큰으로 뺀다.
+	/* float — 서로 다른 섹션의 여러 요소가 공유하는 애니메이션이라 토큰으로 뺀다.
 	   motion-safe: 변형으로 쓰면 prefers-reduced-motion 을 Tailwind 가 자동으로 존중한다. */
 	--animate-float: float 6s ease-in-out infinite;
 	--animate-float-delay: float 7s ease-in-out 1s infinite;
 	--animate-float-delay-2: float 8s ease-in-out 2s infinite;
-	--animate-toast-in: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes float {
@@ -33,16 +32,6 @@
 	}
 	50% {
 		transform: translateY(-12px);
-	}
-}
-@keyframes toast-in {
-	from {
-		opacity: 0;
-		transform: translate(-50%, 12px);
-	}
-	to {
-		opacity: 1;
-		transform: translate(-50%, 0);
 	}
 }
 
