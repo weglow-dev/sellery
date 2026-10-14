@@ -14,7 +14,7 @@
 		<h2
 			data-reveal
 			style="--reveal-delay: 0.06s"
-			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-extrabold tracking-[-0.02em] text-fg md:text-[38px]"
+			class="mt-3 max-w-xl text-[28px] leading-[1.3] font-bold tracking-[-0.02em] text-fg md:text-[38px]"
 		>
 			제품이 아니라<br />당신의 이야기를 팔아요
 		</h2>

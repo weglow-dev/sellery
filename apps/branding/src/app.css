@@ -23,8 +23,6 @@
 	--animate-float: float 6s ease-in-out infinite;
 	--animate-float-delay: float 7s ease-in-out 1s infinite;
 	--animate-float-delay-2: float 8s ease-in-out 2s infinite;
-	--animate-spin-slow: spin-slow 46s linear infinite;
-	--animate-spin-reverse: spin-slow 64s linear infinite reverse;
 	--animate-toast-in: toast-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -35,11 +33,6 @@
 	}
 	50% {
 		transform: translateY(-12px);
-	}
-}
-@keyframes spin-slow {
-	to {
-		transform: rotate(360deg);
 	}
 }
 @keyframes toast-in {

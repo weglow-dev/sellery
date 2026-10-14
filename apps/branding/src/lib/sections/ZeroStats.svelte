@@ -8,7 +8,7 @@
 		<h2
 			data-reveal
 			style="--reveal-delay: 0.06s"
-			class="mx-auto mt-3 max-w-xl text-[28px] leading-[1.3] font-extrabold tracking-[-0.02em] text-fg md:text-[38px]"
+			class="mx-auto mt-3 max-w-xl text-[28px] leading-[1.3] font-bold tracking-[-0.02em] text-fg md:text-[38px]"
 		>
 			시작하는 데 필요한 건<br />당신의 이름뿐이에요
 		</h2>
