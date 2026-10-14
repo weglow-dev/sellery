@@ -10,7 +10,7 @@
 	];
 </script>
 
-<section use:reveal class="bg-bg py-24 md:py-32">
+<section use:reveal class="bg-bg py-16 md:py-32">
 	<div class="mx-auto max-w-5xl px-5">
 		<p data-reveal class="text-[15px] font-bold text-accent">부담은 셀러리가</p>
 		<h2

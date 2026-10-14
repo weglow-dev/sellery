@@ -13,7 +13,7 @@
 		</div>
 	</div>
 
-	<div class="relative mx-auto max-w-5xl px-5 pt-36 pb-28 md:pt-44 md:pb-36">
+	<div class="relative mx-auto max-w-5xl px-5 pt-32 pb-20 md:pt-44 md:pb-36">
 		<p
 			data-reveal
 			class="mb-5 inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.03] px-3.5 py-1.5 text-[13px] font-semibold text-fg-soft"
@@ -35,13 +35,13 @@
 		<div data-reveal style="--reveal-delay: 0.24s" class="mt-9 flex flex-wrap items-center gap-3">
 			<button
 				onclick={startApply}
-				class="rounded-2xl bg-accent px-7 py-4 text-[17px] font-bold text-bg shadow-lg shadow-accent/25 transition hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-xl hover:shadow-accent/30 active:scale-95"
+				class="rounded-xl md:rounded-2xl bg-accent px-4 md:px-7 py-3 md:py-4 text-[17px] font-bold text-bg shadow-lg shadow-accent/25 transition hover:-translate-y-0.5 hover:bg-accent-deep hover:shadow-xl hover:shadow-accent/30 active:scale-95"
 			>
 				제조의뢰 시작하기
 			</button>
 			<a
 				href="#how"
-				class="rounded-2xl border border-line px-6 py-4 text-[17px] font-semibold text-fg-soft transition hover:border-white/20 hover:bg-white/[0.04] active:scale-95"
+				class="rounded-xl md:rounded-2xl border border-line px-4 md:px-6 py-3 md:py-4 text-[17px] font-semibold text-fg-soft transition hover:border-white/20 hover:bg-white/[0.04] active:scale-95"
 			>
 				어떻게 진행되나요?
 			</a>
