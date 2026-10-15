@@ -110,8 +110,8 @@
 		'no-scrollbar relative flex h-full w-full shrink-0 snap-start flex-col overflow-x-hidden overflow-y-auto px-6 pt-[72px] pb-6 short:pt-16 short:pb-4 lg:justify-center lg:px-16 lg:pt-24 lg:pb-12';
 	const twoCol =
 		'relative mt-auto lg:mx-auto lg:mt-0 lg:grid lg:w-full lg:max-w-[1120px] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-center lg:gap-20';
-	// 3장(할 일 표)은 내용이 많아 모바일에서 아래 정렬 대신 제목 바로 아래부터 시작한다 — 남는 공간을 표가 쓴다
-	const twoColTop = twoCol.replace('mt-auto', 'mt-1');
+	// 3장(할 일 표)은 다른 슬라이드처럼 아래 정렬하되 모바일에서 아래 여백을 조금 줘 살짝 올라와 보이게 한다
+	const twoColLift = `${twoCol} mb-2 lg:mb-0`;
 	const rightCol = 'mt-[22px] min-w-0 lg:mt-0';
 	const eyebrowCls = 'text-[13px] font-bold text-accent lg:text-sm';
 	const h2Cls = 'mt-3 text-[30px] leading-[1.25] font-extrabold tracking-[-0.03em] text-balance text-fg short:mt-2 short:text-[26px] lg:text-[46px] lg:leading-[1.18]';
@@ -210,7 +210,7 @@
 
 		<!-- 3 · 부담은 셀러리가 -->
 		<section class={slideCls} aria-label="셀러리가 맡는 일">
-			<div class={twoColTop}>
+			<div class={twoColLift}>
 				<div class="relative">
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
