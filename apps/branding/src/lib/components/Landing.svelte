@@ -110,6 +110,8 @@
 		'no-scrollbar relative flex h-full w-full shrink-0 snap-start flex-col overflow-x-hidden overflow-y-auto px-6 pt-[72px] pb-6 short:pt-16 short:pb-4 lg:justify-center lg:px-16 lg:pt-24 lg:pb-12';
 	const twoCol =
 		'relative mt-auto lg:mx-auto lg:mt-0 lg:grid lg:w-full lg:max-w-[1120px] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-center lg:gap-20';
+	// 3장(할 일 표)은 내용이 많아 모바일에서 아래 정렬 대신 제목 바로 아래부터 시작한다 — 남는 공간을 표가 쓴다
+	const twoColTop = twoCol.replace('mt-auto', 'mt-1');
 	const rightCol = 'mt-[22px] min-w-0 lg:mt-0';
 	const eyebrowCls = 'text-[13px] font-bold text-accent lg:text-sm';
 	const h2Cls = 'mt-3 text-[30px] leading-[1.25] font-extrabold tracking-[-0.03em] text-balance text-fg short:mt-2 short:text-[26px] lg:text-[46px] lg:leading-[1.18]';
@@ -208,7 +210,7 @@
 
 		<!-- 3 · 부담은 셀러리가 -->
 		<section class={slideCls} aria-label="셀러리가 맡는 일">
-			<div class={twoCol}>
+			<div class={twoColTop}>
 				<div class="relative">
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
@@ -222,14 +224,14 @@
 						{#each BURDENS as b, i (b.t)}
 							{@const on = burdenSel === i}
 							<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
-								<div class="h-[52px] rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl lg:h-14"></div>
-								<div class="h-[52px] rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl lg:h-14"></div>
+								<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl"></div>
+								<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl"></div>
 								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
 									onclick={() => (burdenSel = i)}
-									class="absolute top-0 left-0 flex h-[52px] w-[calc(50%-4px)] items-center justify-between rounded-[14px] border px-4 text-[15px] font-bold short:h-[38px] short:rounded-xl short:px-3 short:text-xs lg:h-14 lg:w-[calc(50%-6px)] {on
+									class="absolute top-0 left-0 flex h-14 w-[calc(50%-4px)] items-center justify-between rounded-[14px] border px-4 text-[15px] font-bold short:h-[38px] short:rounded-xl short:px-3 short:text-xs lg:w-[calc(50%-6px)] {on
 										? 'border-accent bg-accent/[0.14] text-accent'
 										: 'border-white/[0.12] bg-panel text-fg/85'}"
 									style="transform:{bz ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
@@ -241,12 +243,12 @@
 					</div>
 					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 short:mt-2 lg:mt-3 lg:gap-3">
 						<div
-							class="rounded-2xl bg-accent p-4 text-[15px] leading-[1.35] font-extrabold text-bg short:rounded-[14px] short:p-2.5 short:text-xs"
+							class="rounded-2xl bg-accent p-[18px] text-[15px] leading-[1.35] font-extrabold text-bg short:rounded-[14px] short:p-2.5 short:text-xs"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
 							브랜드에만<br />집중하기
 						</div>
-						<div class="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 text-[13px] leading-relaxed text-fg/75 short:rounded-[14px] short:p-2.5 short:text-[11px] short:leading-normal">{BURDENS[burdenSel].d}</div>
+						<div class="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-[18px] text-[13px] leading-relaxed text-fg/75 short:rounded-[14px] short:p-2.5 short:text-[11px] short:leading-normal">{BURDENS[burdenSel].d}</div>
 					</div>
 				</div>
 			</div>
