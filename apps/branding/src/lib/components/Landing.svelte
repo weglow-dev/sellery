@@ -89,6 +89,16 @@
 		{ big: '1:1', unit: '', label: '전담 매니저' }
 	];
 
+	// lg(1024px) 이상인지 — 3장 칩이 건너가는 거리가 열 간격(모바일 8px · 데스크톱 12px)에 맞게 바뀐다
+	let desktop = $state(false);
+	$effect(() => {
+		const mq = window.matchMedia('(min-width: 1024px)');
+		const sync = () => (desktop = mq.matches);
+		sync();
+		mq.addEventListener('change', sync);
+		return () => mq.removeEventListener('change', sync);
+	});
+
 	const z = $derived(slide === 1);
 	const bz = $derived(slide === 2);
 	const pz = $derived(slide === 3);
@@ -203,40 +213,40 @@
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 				</div>
-				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[480px]">
-					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em]">
+				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[560px]">
+					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em] lg:gap-3 lg:text-[13px]">
 						<div class="px-1 text-fg/45">내가 할 일</div>
 						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
 					</div>
-					<div class="mt-2 flex flex-col gap-1.5">
+					<div class="mt-2 flex flex-col gap-1.5 lg:mt-2.5 lg:gap-2">
 						{#each BURDENS as b, i (b.t)}
 							{@const on = burdenSel === i}
-							<div class="relative grid grid-cols-2 gap-2">
-								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
-								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
+							<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
+								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
+								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
 								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
 									onclick={() => (burdenSel = i)}
-									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold {on
+									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold lg:h-14 lg:w-[calc(50%-6px)] lg:rounded-[14px] lg:px-4 lg:text-[15px] {on
 										? 'border-accent bg-accent/[0.14] text-accent'
 										: 'border-white/[0.12] bg-panel text-fg/85'}"
-									style="transform:{bz ? 'translateX(calc(100% + 8px))' : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
+									style="transform:{bz ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
 								>
-									<span>{b.t}</span><span class="text-xs font-extrabold opacity-80">{b.n}</span>
+									<span>{b.t}</span><span class="text-xs font-extrabold opacity-80 lg:text-[13px]">{b.n}</span>
 								</button>
 							</div>
 						{/each}
 					</div>
-					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2">
+					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 lg:mt-3 lg:gap-3">
 						<div
-							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg"
+							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg lg:rounded-2xl lg:p-4 lg:text-[15px]"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
 							브랜드에만<br />집중하기
 						</div>
-						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75">{BURDENS[burdenSel].d}</div>
+						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75 lg:rounded-2xl lg:p-4 lg:text-[13px] lg:leading-relaxed">{BURDENS[burdenSel].d}</div>
 					</div>
 				</div>
 			</div>
