@@ -337,22 +337,23 @@
 					<h2 class={h2Cls}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
 					<p class="mt-2.5 text-sm text-fg/60 lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
-				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-2.5">
+				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
+				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
 					{#each LANDING_CATEGORIES as c, i (c.title)}
 						{@const on = landingPick === i}
 						<button
 							type="button"
 							aria-pressed={on}
 							onclick={() => pickCategory(i)}
-							class="flex flex-col gap-3 rounded-[18px] border p-3.5 text-left text-fg hover:border-accent/60 active:scale-[0.97] {on
+							class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
 								? 'border-accent bg-accent/[0.12]'
 								: 'border-white/[0.08] bg-white/[0.04]'}"
 							style="opacity:{cz ? 1 : 0};transform:{cz ? 'none' : 'translateY(14px)'};transition:border-color .2s,background-color .2s,transform .4s cubic-bezier(.2,.8,.2,1) {0.08 + i * 0.07}s,opacity .4s {0.08 + i * 0.07}s"
 						>
-							<span class="grid size-12 place-items-center rounded-[14px] bg-white/5 text-fg/90"><TileIcon name={c.icon} size={30} /></span>
+							<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
 							<span>
-								<span class="block text-base font-bold">{c.title}</span>
-								<span class="mt-0.5 block text-xs leading-[1.45] text-fg/60">{c.desc}</span>
+								<span class="block text-[17px] font-bold lg:text-lg">{c.title}</span>
+								<span class="mt-1 block text-[13px] leading-[1.45] text-fg/60">{c.desc}</span>
 							</span>
 						</button>
 					{/each}

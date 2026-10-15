@@ -106,12 +106,11 @@ export const SUGGESTED_INGREDIENTS: Partial<Record<Category, readonly string[]>>
 	건강: ['유산균', '비타민C', '홍삼', '오메가3']
 };
 
-/** 랜딩 "지금 만들어지고 있는 브랜드 카테고리" 타일 — 탭하면 category 로 매핑돼 퍼널이 그 카테고리로 시작한다. */
+/** 랜딩 "지금 만들어지고 있는 브랜드 카테고리" 타일 4장(2×2) — 탭하면 category 로 매핑돼 퍼널이 그 카테고리로 시작한다.
+ *  더마 · 헤어&바디는 2026-10-15 대표 결정으로 뺐다. */
 export const LANDING_CATEGORIES: readonly { title: string; desc: string; icon: string; category: Category }[] = [
 	{ title: '다이어트', desc: '식단 · 대체식 · 체중 관리', icon: '다이어트', category: '다이어트' },
 	{ title: '이너뷰티', desc: '콜라겐 · 이너케어', icon: '이너뷰티', category: '피부' },
-	{ title: '더마', desc: '스킨케어 · 바디케어', icon: '피부', category: '피부' },
-	{ title: '헤어 & 바디', desc: '헤어 · 두피 · 바디', icon: '헤어', category: '건강' },
 	{ title: '멘탈 웰니스', desc: '수면 · 스트레스 케어', icon: '멘탈', category: '건강' },
 	{ title: '맨즈 웰니스', desc: '남성 전용 건강관리', icon: '맨즈', category: '건강' }
 ];
