@@ -136,7 +136,7 @@
 				<div class="relative">
 					<p class="{eyebrowCls} tracking-[0.02em]">인플루언서 전용 브랜드 메이킹</p>
 					<h1 class="mt-3 text-[38px] leading-[1.2] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-6xl lg:leading-[1.12]">팔로워가 있다면,<br />브랜드도<br />가질 수 있어요</h1>
-					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-fg-soft lg:max-w-[520px] lg:text-lg">
+					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-accent lg:max-w-[520px] lg:text-lg">
 						다이어트, 이너뷰티, 더마 — 내 이름을 건 웰니스 브랜드. 만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 셀러리가 맡을게요.
 					</p>
 					<button type="button" onclick={() => goSlide(1)} class="mt-[22px] flex items-center gap-2 text-[13px] font-semibold text-fg/50 transition hover:text-fg/80">
@@ -205,8 +205,8 @@
 				</div>
 				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[480px]">
 					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em]">
-						<div class="px-1 text-fg/45">당신</div>
-						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리</div>
+						<div class="px-1 text-fg/45">내가 할 일</div>
+						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
 					</div>
 					<div class="mt-2 flex flex-col gap-1.5">
 						{#each BURDENS as b, i (b.t)}
@@ -214,7 +214,7 @@
 							<div class="relative grid grid-cols-2 gap-2">
 								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
 								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
-								<!-- 슬라이드가 보이면 "당신" 칸의 짐이 "셀러리" 칸으로 하나씩 건너간다 -->
+								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
@@ -234,7 +234,7 @@
 							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
-							당신은<br />브랜드에만 집중
+							브랜드에만<br />집중하기
 						</div>
 						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75">{BURDENS[burdenSel].d}</div>
 					</div>
