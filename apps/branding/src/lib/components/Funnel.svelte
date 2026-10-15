@@ -88,6 +88,7 @@
 
 	// 데스크톱 사이드 레일 — 질문 목록에 번호 · 제목 · 고른 값. 지난 질문과 현재 질문은 눌러 이동할 수 있고,
 	// 앞 질문도 그 앞의 질문이 전부 답해져 있으면(메인 성분은 선택이라 항상 통과) 눌러서 갈 수 있다. 그 외는 잠근다.
+	// 접수가 끝나면(done) 보낸 내용을 다시 고치러 들어가지 못하게 전부 잠근다 — 표시는 "완료"로 채운 채.
 	const RAIL_TITLE: Record<string, string> = { category: '카테고리', ingredient: '메인 성분', form: '제형', package: '패키지', flavor: '맛', contact: '연락처' };
 	const rail = $derived.by(() => {
 		const cur = questions.indexOf(step);
@@ -113,7 +114,8 @@
 				value: vals[st] || (raw[st] === UNSURE ? '미팅 때 결정' : past ? '건너뜀' : on ? '진행 중' : ''),
 				on,
 				past,
-				locked: !past && !on && !reachable
+				locked: step === 'done' || (!past && !on && !reachable),
+				dim: !past && !on && !reachable
 			};
 		});
 	});
@@ -326,9 +328,9 @@
 					disabled={r.locked}
 					aria-current={r.on ? 'step' : undefined}
 					onclick={() => (step = r.step)}
-					class="flex items-center gap-3.5 rounded-[14px] px-3 py-[11px] text-left transition-colors {r.on ? 'bg-accent/10' : 'hover:bg-white/[0.03]'} {r.locked
+					class="flex items-center gap-3.5 rounded-[14px] px-3 py-[11px] text-left transition-colors {r.on ? 'bg-accent/10' : ''} {r.locked
 						? 'cursor-default'
-						: 'cursor-pointer'}"
+						: 'cursor-pointer hover:bg-white/[0.03]'}"
 				>
 					<span
 						class="grid size-[26px] shrink-0 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold transition-colors {r.past
@@ -340,7 +342,7 @@
 						{r.n}
 					</span>
 					<span class="flex min-w-0 flex-1 flex-col gap-px">
-						<span class="text-sm font-bold {r.locked ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
+						<span class="text-sm font-bold {r.dim ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
 						<span class="truncate text-xs text-fg/50">{r.value}</span>
 					</span>
 				</button>
