@@ -33,7 +33,7 @@
 	// 진행 과정 슬라이드: 사용자가 손대기 전까지 PROC_MS 마다 다음 단계로 넘어간다(게이지가 차는 시간과 같은 값).
 	// 타이머는 슬라이드에 들어온 순간 0부터 다시 시작해, 현재 단계 게이지가 다 찬 뒤에야 다음 단계로 간다 —
 	// 전에는 타이머가 늘 돌고 있어서 도착 직후 튀면 1번이 차는 중에 2번이 같이 차 보였다.
-	const PROC_MS = 2400;
+	const PROC_MS = 2200;
 	$effect(() => {
 		if (slide !== 3 || procTouched) return;
 		procSel = 0;
@@ -92,7 +92,7 @@
 	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
 	const ZERO_ROWS = [
 		{ label: '초기 비용', was: '₩ 3,000만', now: '0원' },
-		{ label: '떠안는 재고', was: '300박스', now: '0박스' },
+		{ label: '재고 부담', was: '300박스', now: '0박스' },
 		{ label: '준비할 서류', was: '12장', now: '1장' }
 	];
 	const BURDENS = [
