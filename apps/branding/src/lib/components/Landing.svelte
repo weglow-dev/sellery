@@ -366,7 +366,7 @@
 				<div class="relative">
 					<p class={eyebrowCls}>이렇게 브랜드가 태어나요</p>
 					<h2 class={h2Cls}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
-					<p class="mt-2.5 text-sm text-fg/60 lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
+					<p class="mt-2.5 text-sm text-accent lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
 				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
 				<div
