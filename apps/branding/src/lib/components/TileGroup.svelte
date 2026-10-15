@@ -3,7 +3,7 @@
 
 	/** 타일형 단일 선택 — 퍼널에서는 탭하면 바로 다음 단계로 넘어가므로 라디오 대신 버튼이다(답은 연락처 화면의 hidden input 으로 보낸다).
 	 *  layout 별 모양(모바일 → lg 데스크톱): grid = 아이콘 위·글자 아래 카드 2열 → 4열(카테고리), grid-lg = 60px 아이콘 칸 2열 → 3열(제형),
-	 *  row = 아이콘 왼쪽 가로 카드 → 3열 세로 카드(세부 종류 · 패키지), swatch = 색 원 위·이름 아래 3열 → 6열(맛). 선택되면 체크 배지가 톡 튀어나온다. */
+	 *  row = 아이콘 왼쪽 가로 카드 → 3열 세로 카드(세부 종류 · 패키지), swatch = 아이콘 위·이름 아래 3열 → 6열(맛). 선택되면 체크 배지가 톡 튀어나온다. */
 	let {
 		options,
 		value,
@@ -19,7 +19,7 @@
 		layout?: 'grid' | 'grid-lg' | 'row' | 'swatch';
 		/** 옵션 이름 → 한 줄 설명 */
 		desc?: Record<string, string>;
-		/** swatch 레이아웃용: 옵션 이름 → hex | 'outline' | 'plus' */
+		/** swatch 레이아웃용: 옵션 이름 → static 아이콘 경로('/…svg') | 'plus' */
 		swatch?: Record<string, string>;
 		onpick: (value: string) => void;
 	} = $props();
@@ -66,17 +66,12 @@
 				: 'border-white/[0.08] bg-white/[0.03] hover:border-accent/60'}"
 		>
 			{#if layout === 'swatch'}
-				{#if sw === 'outline'}
-					<span class="size-11 rounded-full border-2 border-white/55 bg-white/5"></span>
-				{:else if sw === 'plus' || !sw}
-					<span class="grid size-11 place-items-center rounded-full border-2 border-dashed border-white/45 text-fg/80">
+				{#if sw?.startsWith('/')}
+					<img src={sw} alt="" width="48" height="48" class="size-12" />
+				{:else}
+					<span class="grid size-12 place-items-center rounded-full border-2 border-dashed border-white/45 text-fg/80">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
 					</span>
-				{:else}
-					<span
-						class="size-11 rounded-full shadow-[inset_-6px_-6px_12px_rgba(0,0,0,0.25),inset_5px_5px_10px_rgba(255,255,255,0.22)]"
-						style="background: {sw}"
-					></span>
 				{/if}
 				<span class="text-[15px] font-bold">{main}{#if sub}<span class="text-xs font-medium text-fg/60">{sub}</span>{/if}</span>
 			{:else}

@@ -60,6 +60,10 @@
 	}
 }
 
+/* short — 세로가 짧은 모바일(≤ 830px · lg 미만)에서만 켜지는 변형. 랜딩 슬라이드가 세로 스크롤 없이 한 화면에 들어오도록
+   카드 높이 · 여백 · 글자를 한 단계씩 줄일 때 쓴다. 데스크톱은 폭 조건으로 제외해 lg: 값과 충돌하지 않는다. */
+@custom-variant short (@media (max-height: 830px) and (max-width: 1023.98px));
+
 /* 가로 슬라이드 · 단계 화면의 내부 스크롤은 스크롤바 없이 */
 @utility no-scrollbar {
 	scrollbar-width: none;

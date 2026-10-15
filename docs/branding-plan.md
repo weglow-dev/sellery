@@ -31,7 +31,7 @@ apps/branding/
   src/routes/+page.server.ts   prerender=false · lib/server/apply-action.ts 의 액션 re-export
   src/routes/apply/+page.svelte / +page.server.ts   같은 <Funnel> 을 startStep="category" 로 — 랜딩을 건너뛰는 바로 가기(noindex) · 액션도 같은 것
   src/lib/
-    apply-options.ts            퍼널 선택지의 단일 출처 — 카테고리·제형·세부 종류(알약/캔디)·패키지·맛·미팅 시간대·랜딩 카테고리 4종 · 타일 설명 · 맛 색 견본 · 성분 제안 · 폼 액션 결과 타입(ApplyValues/ApplyErrors/ApplyResult)
+    utils/apply-options.ts      퍼널 선택지의 단일 출처 — 카테고리·제형·세부 종류(알약/캔디)·패키지·맛·미팅 시간대·랜딩 카테고리 4종 · 타일 설명 · 맛 색 견본 · 성분 제안 · 폼 액션 결과 타입(ApplyValues/ApplyErrors/ApplyResult)
     components/
       Funnel.svelte               퍼널 본체 — 단계 상태 머신(intro→…→done) · 모바일 고정 헤더(뒤로 · 진행 세그먼트 · n/N · 고른 경로) · lg: 360px 사이드 레일(로고=처음으로 · 진행 · 질문 목록(지난 질문은 클릭해 되돌아감, 앞 질문은 잠금) · 안내) + 상단 [이전]·경로 바 · 질문 화면 · 연락처 <form>(hidden input 으로 일괄 POST · use:enhance 결과 처리) · 접수 완료
       Landing.svelte              intro 단계 = 랜딩. 가로 스크롤 스냅 7장(히어로 · 0에서 시작 · 부담은 셀러리가 · 진행 과정 자동 재생 · 브랜드 스토리 · 카테고리 타일 · 마지막) + 점 인디케이터 + [제조의뢰 시작하기] · lg: 1120px 두 열(왼쪽 글 · 오른쪽 카드) · 히어로 오른쪽 떠 있는 제형 카드 6장 · ◀ ▶ 버튼과 좌우 화살표 키 · 하단 바 한 줄

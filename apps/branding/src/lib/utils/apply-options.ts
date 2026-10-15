@@ -1,4 +1,4 @@
-/** 제조의뢰 퍼널의 선택지 — 폼 UI(Funnel.svelte · Landing.svelte)와 서버 검증(lib/server/apply-action.ts)이 같이 참조하는 단일 출처. */
+/** 제조의뢰 퍼널의 선택지 — 폼 UI(components/Funnel.svelte · Landing.svelte)와 서버 검증(server/apply-action.ts)이 같이 참조하는 단일 출처. */
 
 /** 모든 카테고리 공통 최소 제작 수량 — 슬랙 접수 한 줄에 고정값으로만 찍는다. */
 export const MIN_QTY = 1000;
@@ -89,13 +89,13 @@ export const OPTION_DESC: Record<string, string> = {
 	파우치: '여러 개 담긴 지퍼 봉투'
 };
 
-/** 맛 타일의 색 견본 — hex 는 색 원, 'outline' 은 빈 원(무맛), 'plus' 는 점선 원에 + (기타). */
+/** 맛 타일의 그림 — '/' 로 시작하면 static/ 의 아이콘 파일(48×48 라인 아이콘), 'plus' 는 점선 원에 + (기타). */
 export const FLAVOR_SWATCH: Record<string, string> = {
-	포도: '#7B4BC4',
-	딸기: '#E5484D',
-	복숭아: '#FFAE86',
-	레몬: '#F2D33C',
-	'플레인(무맛)': 'outline',
+	포도: '/grape.svg',
+	딸기: '/strawberry.svg',
+	복숭아: '/peach.svg',
+	레몬: '/lemon.svg',
+	'플레인(무맛)': '/plain.svg',
 	기타: 'plus'
 };
 
