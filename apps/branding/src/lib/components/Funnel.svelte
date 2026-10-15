@@ -115,6 +115,21 @@
 	});
 	const stepLabel = $derived(step === 'done' ? '완료' : `${qi} / ${questions.length}`);
 
+	// 이전으로 돌아왔을 때 — 들어온 순간 이미 답이 있던 질문이면 [다음] 을 보여 준다.
+	// 방금 탭해서 자동으로 넘어가는 0.28초 동안 버튼이 깜빡 나타나지 않도록, 지금 값이 아니라 "들어올 때 값"을 본다.
+	const answerOf: Partial<Record<Step, () => string>> = {
+		category: () => category,
+		form: () => dosageForm,
+		sub: () => subType,
+		package: () => packaging,
+		flavor: () => flavor
+	};
+	let enteredAnswered = $state(false);
+	$effect(() => {
+		const read = answerOf[step];
+		enteredAnswered = untrack(() => (read ? read() !== '' : false));
+	});
+
 	function go(delta: number) {
 		const i = Math.max(0, steps.indexOf(step));
 		step = steps[Math.max(0, Math.min(steps.length - 1, i + delta))];
@@ -244,6 +259,17 @@
 	<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 {/snippet}
 
+{#snippet nextFoot()}
+	{#if enteredAnswered}
+		<div class={footCls}>
+			<button type="button" onclick={() => go(1)} class={ctaOn}>
+				<span>다음</span>
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+			</button>
+		</div>
+	{/if}
+{/snippet}
+
 <main class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-bg md:border-x md:border-line lg:max-w-none lg:border-0">
 	{#if step === 'intro'}
 		<Landing onstart={() => (step = 'category')} onpick={startWith} />
@@ -350,6 +376,7 @@
 							{#if errors.category}<p class={errCls}>{errors.category}</p>{/if}
 						</div>
 					</div>
+					{@render nextFoot()}
 				{:else if step === 'ingredient'}
 					<!-- ============ Q: 메인 성분 + 추가 내용 (둘 다 선택) ============ -->
 					<div class={scrollCls}>
@@ -404,6 +431,7 @@
 						</div>
 						{@render unsureButton(dosageForm === UNSURE, () => pickForm(UNSURE))}
 					</div>
+					{@render nextFoot()}
 				{:else if step === 'sub'}
 					<!-- ============ Q: 세부 종류 (알약 · 캔디) ============ -->
 					<div class={scrollCls}>
@@ -416,6 +444,7 @@
 						</div>
 						{@render unsureButton(subType === UNSURE, () => pickSub(UNSURE))}
 					</div>
+					{@render nextFoot()}
 				{:else if step === 'package'}
 					<!-- ============ Q: 패키지 ============ -->
 					<div class={scrollCls}>
@@ -428,6 +457,7 @@
 						</div>
 						{@render unsureButton(packaging === UNSURE, () => pickPackage(UNSURE))}
 					</div>
+					{@render nextFoot()}
 				{:else if step === 'flavor'}
 					<!-- ============ Q: 맛 ============ -->
 					<div class={scrollCls}>
@@ -439,6 +469,7 @@
 						</div>
 						{@render unsureButton(flavor === UNSURE, () => pickFlavor(UNSURE))}
 					</div>
+					{@render nextFoot()}
 				{:else if step === 'contact'}
 					<!-- ============ 연락처 + 제출 ============ -->
 					<form
