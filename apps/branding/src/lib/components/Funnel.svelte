@@ -9,6 +9,7 @@
 		FLAVORS,
 		FLAVOR_SWATCH,
 		MEETING_SLOTS,
+		MIN_QTY,
 		OPTION_DESC,
 		SUB_STEP_COPY,
 		SUGGESTED_INGREDIENTS,
@@ -377,6 +378,11 @@
 						<div class="mt-6 {bodyCls} lg:mt-7">
 							<TileGroup options={CATEGORIES} value={category} label="카테고리" desc={OPTION_DESC} onpick={pickCategory} />
 							{#if errors.category}<p class={errCls}>{errors.category}</p>{/if}
+						</div>
+						<!-- 최소 제작 수량 안내 — 옛 인트로 카드의 문구 그대로, 시작 전에 알 수 있게 첫 질문에 둔다 -->
+						<div class="mt-6 flex items-center gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-[18px] py-4 text-sm text-fg/85 {bodyCls} lg:mt-7">
+							<svg class="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></svg>
+							<span><b class="font-bold text-fg">최소 제작 수량 {MIN_QTY.toLocaleString('ko-KR')}개</b> — 제형 및 패키지 형태에 따라 달라 질 수 있습니다.</span>
 						</div>
 					</div>
 					{@render nextFoot()}
