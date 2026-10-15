@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { applyAction, enhance } from '$app/forms';
 	import Landing from './Landing.svelte';
 	import TileGroup from './TileGroup.svelte';
@@ -205,6 +205,26 @@
 	const digits = $derived(phone.replace(/\D/g, ''));
 	const canSubmit = $derived(name.trim() !== '' && digits.length >= 10 && agree);
 
+	// 제출 버튼은 항상 눌리게 두고, 빠진 게 있으면 서버와 같은 문구로 그 칸 아래에 안내한다 — 동의 없이 눌렀을 때 "왜 안 되지?" 가 없도록
+	function validateContact(): ApplyErrors {
+		const e: ApplyErrors = {};
+		if (!name.trim()) e.name = '활동명 또는 채널을 입력해주세요.';
+		if (!digits) e.phone = '연락처를 입력해주세요.';
+		else if (digits.length < 10) e.phone = '연락처는 010-0000-0000 형식으로 입력해주세요.';
+		if (!agree) e.agree = '개인정보 수집에 동의해주세요.';
+		return e;
+	}
+	// 고치면 그 칸의 안내는 바로 지운다
+	$effect(() => {
+		if (agree) untrack(() => errors.agree && (errors = { ...errors, agree: undefined }));
+	});
+	$effect(() => {
+		if (name.trim()) untrack(() => errors.name && (errors = { ...errors, name: undefined }));
+	});
+	$effect(() => {
+		if (digits.length >= 10) untrack(() => errors.phone && (errors = { ...errors, phone: undefined }));
+	});
+
 	const UNDECIDED = '미팅 때 결정';
 	const NA = '해당 없음';
 	const ANY = '상관없음';
@@ -382,7 +402,7 @@
 							{#if errors.category}<p class={errCls}>{errors.category}</p>{/if}
 						</div>
 						<!-- 최소 제작 수량 안내 — 옛 인트로 카드의 문구 그대로, 시작 전에 알 수 있게 첫 질문에 둔다 -->
-						<div class="mt-6 flex items-center gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-[18px] py-4 text-sm text-fg/85 {bodyCls} lg:mt-7">
+						<div class="mt-4 md:mt-6 flex items-center gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-[18px] py-3 md:py-4 text-sm text-fg/85 {bodyCls} lg:mt-7">
 							<svg class="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></svg>
 							<span><b class="font-bold text-fg">최소 제작 수량 {MIN_QTY.toLocaleString('ko-KR')}개</b> — 제형 및 패키지 형태에 따라 달라 질 수 있습니다.</span>
 						</div>
@@ -486,7 +506,16 @@
 					<form
 						method="POST"
 						class="flex min-h-0 flex-1 flex-col"
-						use:enhance={() => {
+						use:enhance={({ cancel }) => {
+							const missing = validateContact();
+							if (Object.keys(missing).length > 0) {
+								errors = { ...errors, ...missing };
+								cancel();
+								// 모바일은 버튼이 아래 고정이라 안내가 화면 밖에 있을 수 있다 — 첫 번째로 빠진 칸으로 데려간다
+								const first = (['name', 'phone', 'agree'] as const).find((k) => missing[k]);
+								tick().then(() => document.getElementById(first === 'agree' ? 'agree-box' : first!)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+								return;
+							}
 							submitting = true;
 							submitError = '';
 							return async ({ result }) => {
@@ -562,13 +591,18 @@
 										{/each}
 									</div>
 								</div>
-								<label class="flex cursor-pointer items-start gap-3 rounded-[14px] bg-white/[0.03] px-4 py-3.5 lg:col-span-2">
+								<label
+									id="agree-box"
+									class="flex cursor-pointer items-start gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 transition-colors lg:col-span-2 {errors.agree
+										? 'border-accent bg-accent/[0.06]'
+										: 'border-transparent bg-white/[0.03]'}"
+								>
 									<input name="agree" type="checkbox" bind:checked={agree} class="m-0 size-[22px] shrink-0 accent-[color:var(--color-accent)]" />
 									<span class="text-[13px] leading-[1.55] text-fg/70">
 										<b class="font-bold text-fg">(필수)</b> 남겨주신 연락처는 제조의뢰 상담 목적으로만 사용되며, 상담 종료 후 파기돼요.
 									</span>
 								</label>
-								{#if errors.agree}<p class="{errCls} lg:col-span-2">{errors.agree}</p>{/if}
+								{#if errors.agree}<p role="alert" class="{errCls} -mt-2 lg:col-span-2">{errors.agree}</p>{/if}
 							</div>
 						</div>
 						<div class={footCls}>
@@ -577,8 +611,8 @@
 							{/if}
 							<button
 								type="submit"
-								disabled={!canSubmit || submitting}
-								class="{canSubmit ? ctaOn : ctaOff} disabled:pointer-events-none {canSubmit ? 'disabled:opacity-60' : 'text-fg/40'}"
+								disabled={submitting}
+								class="{canSubmit ? ctaOn : `${ctaOff} text-fg/60 hover:bg-white/[0.12]`} disabled:pointer-events-none disabled:opacity-60"
 							>
 								{submitting ? '접수하는 중…' : '제조의뢰 접수하기'}
 							</button>
