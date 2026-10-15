@@ -85,7 +85,8 @@
 	const q = (st: Step) => `Q${questions.indexOf(st) + 1}`;
 	const showHeader = $derived(step !== 'intro' && step !== 'done');
 
-	// 데스크톱 사이드 레일 — 질문 목록에 번호 · 제목 · 고른 값. 지난 질문은 눌러서 되돌아갈 수 있고 앞 질문은 잠근다.
+	// 데스크톱 사이드 레일 — 질문 목록에 번호 · 제목 · 고른 값. 지난 질문과 현재 질문은 눌러 이동할 수 있고,
+	// 앞 질문도 그 앞의 질문이 전부 답해져 있으면(메인 성분은 선택이라 항상 통과) 눌러서 갈 수 있다. 그 외는 잠근다.
 	const RAIL_TITLE: Record<string, string> = { category: '카테고리', ingredient: '메인 성분', form: '제형', package: '패키지', flavor: '맛', contact: '연락처' };
 	const rail = $derived.by(() => {
 		const cur = questions.indexOf(step);
@@ -99,9 +100,11 @@
 			contact: name.trim()
 		};
 		const raw: Record<string, string> = { form: dosageForm, sub: subType, package: packaging, flavor };
+		const answered = (st: Step) => st === 'ingredient' || st === 'contact' || (answerOf[st]?.() ?? '') !== '';
 		return questions.map((st, i) => {
 			const on = st === step;
 			const past = step === 'done' || i < cur;
+			const reachable = questions.slice(0, i).every(answered);
 			return {
 				step: st,
 				n: String(i + 1).padStart(2, '0'),
@@ -109,7 +112,7 @@
 				value: vals[st] || (raw[st] === UNSURE ? '미팅 때 결정' : past ? '건너뜀' : on ? '진행 중' : ''),
 				on,
 				past,
-				locked: !past && !on
+				locked: !past && !on && !reachable
 			};
 		});
 	});
