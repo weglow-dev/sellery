@@ -26,6 +26,8 @@
 	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 	/* step — 퍼널의 모든 단계 화면과 랜딩 진행 과정 카드가 오른쪽에서 미끄러져 들어오는 등장 */
 	--animate-step: step-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	/* blink — 랜딩 카테고리 타일의 테두리가 두 번 반짝이며 "눌러보라"고 부르는 연출 (한 번에 한 장) */
+	--animate-blink: blink 1.4s ease-in-out both;
 }
 
 @keyframes float {
@@ -46,6 +48,25 @@
 	100% {
 		opacity: 1;
 		transform: scale(1);
+	}
+}
+
+@keyframes blink {
+	0%,
+	100% {
+		border-color: rgba(255, 255, 255, 0.08);
+		box-shadow: 0 0 0 0 rgba(255, 122, 61, 0);
+	}
+	22%,
+	68% {
+		border-color: var(--color-accent);
+		box-shadow:
+			0 0 0 3px rgba(255, 122, 61, 0.16),
+			0 0 26px rgba(255, 122, 61, 0.28);
+	}
+	45% {
+		border-color: rgba(255, 122, 61, 0.35);
+		box-shadow: 0 0 0 1px rgba(255, 122, 61, 0.06);
 	}
 }
 
