@@ -220,9 +220,10 @@
 		'flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-accent text-[17px] font-extrabold text-bg transition hover:bg-accent-deep active:scale-[0.98] lg:h-14 lg:w-[260px]';
 	const ctaOff =
 		'flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-white/[0.08] text-[17px] font-extrabold text-fg transition active:scale-[0.98] lg:h-14 lg:w-[260px]';
-	// 단계 화면 공통 — 내부 세로 스크롤, 아래 버튼은 고정(데스크톱은 오른쪽 정렬) · 질문 본문은 데스크톱에서 900px 까지
+	// 단계 화면 공통 — 내부 세로 스크롤, 아래 버튼은 고정 · 질문 본문은 데스크톱에서 900px 까지.
+	// 데스크톱 푸터는 본문과 같은 폭(900px + 좌우 여백 56px)으로 묶고 그 안에서 오른쪽 정렬 — 버튼이 화면 끝이 아니라 입력란 끝선에 온다
 	const scrollCls = 'no-scrollbar flex-1 overflow-y-auto px-5 pt-2 pb-7 lg:px-14 lg:pb-12';
-	const footCls = 'shrink-0 px-5 pt-3 pb-7 lg:flex lg:flex-col lg:items-end lg:px-14 lg:pb-9';
+	const footCls = 'shrink-0 px-5 pt-3 pb-7 lg:flex lg:w-full lg:max-w-[1012px] lg:flex-col lg:items-end lg:px-14 lg:pb-9';
 	const bodyCls = 'lg:max-w-[900px]';
 </script>
 
@@ -317,7 +318,7 @@
 		</nav>
 		<div class="flex items-start gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-4 py-3.5">
 			<svg class="mt-0.5 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-			<span class="text-xs leading-[1.55] text-fg/65">약 1분이면 끝나요. 확실하지 않은 건 건너뛰고 첫 미팅에서 같이 정해요.</span>
+			<span class="text-xs leading-[1.55] text-fg/65">약 1분이면 끝나요. 확실하지 않은 건 건너뛰고 <br/> 첫 미팅에서 같이 정해요.</span>
 		</div>
 	</aside>
 
