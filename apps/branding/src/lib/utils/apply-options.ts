@@ -89,13 +89,13 @@ export const OPTION_DESC: Record<string, string> = {
 	파우치: '여러 개 담긴 지퍼 봉투'
 };
 
-/** 맛 타일의 색 견본 — hex 는 색 원, 'outline' 은 빈 원(무맛), 'plus' 는 점선 원에 + (기타). */
+/** 맛 타일의 그림 — '/' 로 시작하면 static/ 의 아이콘 파일(48×48 라인 아이콘), 'plus' 는 점선 원에 + (기타). */
 export const FLAVOR_SWATCH: Record<string, string> = {
-	포도: '#7B4BC4',
-	딸기: '#E5484D',
-	복숭아: '#FFAE86',
-	레몬: '#F2D33C',
-	'플레인(무맛)': 'outline',
+	포도: '/grape.svg',
+	딸기: '/strawberry.svg',
+	복숭아: '/peach.svg',
+	레몬: '/lemon.svg',
+	'플레인(무맛)': '/plain.svg',
 	기타: 'plus'
 };
 
