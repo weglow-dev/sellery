@@ -9,6 +9,7 @@
 		FLAVORS,
 		FLAVOR_SWATCH,
 		MEETING_SLOTS,
+		MIN_QTY,
 		OPTION_DESC,
 		SUB_STEP_COPY,
 		SUGGESTED_INGREDIENTS,
@@ -87,6 +88,7 @@
 
 	// 데스크톱 사이드 레일 — 질문 목록에 번호 · 제목 · 고른 값. 지난 질문과 현재 질문은 눌러 이동할 수 있고,
 	// 앞 질문도 그 앞의 질문이 전부 답해져 있으면(메인 성분은 선택이라 항상 통과) 눌러서 갈 수 있다. 그 외는 잠근다.
+	// 접수가 끝나면(done) 보낸 내용을 다시 고치러 들어가지 못하게 전부 잠근다 — 표시는 "완료"로 채운 채.
 	const RAIL_TITLE: Record<string, string> = { category: '카테고리', ingredient: '메인 성분', form: '제형', package: '패키지', flavor: '맛', contact: '연락처' };
 	const rail = $derived.by(() => {
 		const cur = questions.indexOf(step);
@@ -112,7 +114,8 @@
 				value: vals[st] || (raw[st] === UNSURE ? '미팅 때 결정' : past ? '건너뜀' : on ? '진행 중' : ''),
 				on,
 				past,
-				locked: !past && !on && !reachable
+				locked: step === 'done' || (!past && !on && !reachable),
+				dim: !past && !on && !reachable
 			};
 		});
 	});
@@ -325,9 +328,9 @@
 					disabled={r.locked}
 					aria-current={r.on ? 'step' : undefined}
 					onclick={() => (step = r.step)}
-					class="flex items-center gap-3.5 rounded-[14px] px-3 py-[11px] text-left transition-colors {r.on ? 'bg-accent/10' : 'hover:bg-white/[0.03]'} {r.locked
+					class="flex items-center gap-3.5 rounded-[14px] px-3 py-[11px] text-left transition-colors {r.on ? 'bg-accent/10' : ''} {r.locked
 						? 'cursor-default'
-						: 'cursor-pointer'}"
+						: 'cursor-pointer hover:bg-white/[0.03]'}"
 				>
 					<span
 						class="grid size-[26px] shrink-0 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold transition-colors {r.past
@@ -339,7 +342,7 @@
 						{r.n}
 					</span>
 					<span class="flex min-w-0 flex-1 flex-col gap-px">
-						<span class="text-sm font-bold {r.locked ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
+						<span class="text-sm font-bold {r.dim ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
 						<span class="truncate text-xs text-fg/50">{r.value}</span>
 					</span>
 				</button>
@@ -377,6 +380,11 @@
 						<div class="mt-6 {bodyCls} lg:mt-7">
 							<TileGroup options={CATEGORIES} value={category} label="카테고리" desc={OPTION_DESC} onpick={pickCategory} />
 							{#if errors.category}<p class={errCls}>{errors.category}</p>{/if}
+						</div>
+						<!-- 최소 제작 수량 안내 — 옛 인트로 카드의 문구 그대로, 시작 전에 알 수 있게 첫 질문에 둔다 -->
+						<div class="mt-6 flex items-center gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-[18px] py-4 text-sm text-fg/85 {bodyCls} lg:mt-7">
+							<svg class="shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5 9 5 9-5z" /><path d="M3 8v8l9 5 9-5V8" /><path d="M12 13v8" /></svg>
+							<span><b class="font-bold text-fg">최소 제작 수량 {MIN_QTY.toLocaleString('ko-KR')}개</b> — 제형 및 패키지 형태에 따라 달라 질 수 있습니다.</span>
 						</div>
 					</div>
 					{@render nextFoot()}
