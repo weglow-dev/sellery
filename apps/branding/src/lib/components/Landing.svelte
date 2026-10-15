@@ -107,12 +107,12 @@
 
 	// 슬라이드 공통: 모바일은 내용 아래 정렬(mt-auto) + 화면이 낮으면 내부 세로 스크롤, lg 는 가운데 정렬 두 열
 	const slideCls =
-		'no-scrollbar relative flex h-full w-full shrink-0 snap-start flex-col overflow-x-hidden overflow-y-auto px-6 pt-[72px] pb-6 lg:justify-center lg:px-16 lg:pt-24 lg:pb-12';
+		'no-scrollbar relative flex h-full w-full shrink-0 snap-start flex-col overflow-x-hidden overflow-y-auto px-6 pt-[72px] pb-6 short:pt-16 short:pb-4 lg:justify-center lg:px-16 lg:pt-24 lg:pb-12';
 	const twoCol =
 		'relative mt-auto lg:mx-auto lg:mt-0 lg:grid lg:w-full lg:max-w-[1120px] lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:items-center lg:gap-20';
 	const rightCol = 'mt-[22px] min-w-0 lg:mt-0';
 	const eyebrowCls = 'text-[13px] font-bold text-accent lg:text-sm';
-	const h2Cls = 'mt-3 text-[30px] leading-[1.25] font-extrabold tracking-[-0.03em] text-balance text-fg lg:text-[46px] lg:leading-[1.18]';
+	const h2Cls = 'mt-3 text-[30px] leading-[1.25] font-extrabold tracking-[-0.03em] text-balance text-fg short:mt-2 short:text-[26px] lg:text-[46px] lg:leading-[1.18]';
 	const navBtn =
 		'hidden size-11 place-items-center rounded-full border border-white/[0.14] bg-white/[0.04] text-fg transition hover:border-accent hover:text-accent lg:grid';
 </script>
@@ -213,23 +213,23 @@
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 				</div>
-				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[560px]">
+				<div class="{rightCol} mt-5 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px]">
 					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em] lg:gap-3 lg:text-[13px]">
 						<div class="px-1 text-fg/45">내가 할 일</div>
 						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
 					</div>
-					<div class="mt-2 flex flex-col gap-1.5 lg:mt-2.5 lg:gap-2">
+					<div class="mt-2 flex flex-col gap-1.5 short:mt-1.5 short:gap-1 lg:mt-2.5 lg:gap-2">
 						{#each BURDENS as b, i (b.t)}
 							{@const on = burdenSel === i}
 							<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
-								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
-								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
+								<div class="h-11 rounded-xl border border-dashed border-white/10 short:h-[38px] lg:h-14 lg:rounded-[14px]"></div>
+								<div class="h-11 rounded-xl border border-dashed border-white/10 short:h-[38px] lg:h-14 lg:rounded-[14px]"></div>
 								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
 									onclick={() => (burdenSel = i)}
-									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold lg:h-14 lg:w-[calc(50%-6px)] lg:rounded-[14px] lg:px-4 lg:text-[15px] {on
+									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold short:h-[38px] short:text-xs lg:h-14 lg:w-[calc(50%-6px)] lg:rounded-[14px] lg:px-4 lg:text-[15px] {on
 										? 'border-accent bg-accent/[0.14] text-accent'
 										: 'border-white/[0.12] bg-panel text-fg/85'}"
 									style="transform:{bz ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
@@ -239,14 +239,14 @@
 							</div>
 						{/each}
 					</div>
-					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 lg:mt-3 lg:gap-3">
+					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 short:mt-2 lg:mt-3 lg:gap-3">
 						<div
-							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg lg:rounded-2xl lg:p-4 lg:text-[15px]"
+							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg short:p-2.5 short:text-xs lg:rounded-2xl lg:p-4 lg:text-[15px]"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
 							브랜드에만<br />집중하기
 						</div>
-						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75 lg:rounded-2xl lg:p-4 lg:text-[13px] lg:leading-relaxed">{BURDENS[burdenSel].d}</div>
+						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75 short:p-2.5 short:text-[11px] lg:rounded-2xl lg:p-4 lg:text-[13px] lg:leading-relaxed">{BURDENS[burdenSel].d}</div>
 					</div>
 				</div>
 			</div>
@@ -308,10 +308,10 @@
 					<p class={eyebrowCls}>브랜드가 만들어지는 과정</p>
 					<h2 class={h2Cls}>제품이 아니라<br />당신의 이야기를 팔아요</h2>
 				</div>
-				<div class="{rightCol} mt-6">
+				<div class="{rightCol} mt-6 short:mt-4">
 					<div class="flex flex-col">
 						{#each STORY as st (st.n)}
-							<div class="flex gap-4 border-t border-white/[0.08] py-4">
+							<div class="flex gap-4 border-t border-white/[0.08] py-4 short:py-3">
 								<span class="grid size-9 shrink-0 place-items-center rounded-xl bg-accent/[0.14] text-[13px] font-extrabold text-accent">{st.n}</span>
 								<div class="min-w-0">
 									<div class="text-[17px] font-bold text-fg">{st.t}</div>
@@ -338,22 +338,22 @@
 					<p class="mt-2.5 text-sm text-fg/60 lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
 				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
-				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
+				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 short:mt-4 short:gap-2 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
 					{#each LANDING_CATEGORIES as c, i (c.title)}
 						{@const on = landingPick === i}
 						<button
 							type="button"
 							aria-pressed={on}
 							onclick={() => pickCategory(i)}
-							class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
+							class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] short:gap-2.5 short:p-3 lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
 								? 'border-accent bg-accent/[0.12]'
 								: 'border-white/[0.08] bg-white/[0.04]'}"
 							style="opacity:{cz ? 1 : 0};transform:{cz ? 'none' : 'translateY(14px)'};transition:border-color .2s,background-color .2s,transform .4s cubic-bezier(.2,.8,.2,1) {0.08 + i * 0.07}s,opacity .4s {0.08 + i * 0.07}s"
 						>
-							<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
+							<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 short:size-11 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
 							<span>
-								<span class="block text-[17px] font-bold lg:text-lg">{c.title}</span>
-								<span class="mt-1 block text-[13px] leading-[1.45] text-fg/60">{c.desc}</span>
+								<span class="block text-[17px] font-bold short:text-[15px] lg:text-lg">{c.title}</span>
+								<span class="mt-1 block text-[13px] leading-[1.45] text-fg/60 short:mt-0.5 short:text-xs">{c.desc}</span>
 							</span>
 						</button>
 					{/each}
@@ -374,7 +374,7 @@
 					<p class="mt-3.5 text-[15px] leading-[1.65] text-pretty text-fg/70 lg:max-w-[520px] lg:text-lg">제조의뢰를 남기면 전담 매니저가 사흘 안에 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.</p>
 				</div>
 				<!-- 통계 4칸 — 데스크톱은 카드를 키워 오른쪽 열을 채운다 -->
-				<div class="relative order-1 mb-6 grid grid-cols-2 gap-2 lg:order-2 lg:mb-0 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
+				<div class="relative order-1 mb-6 grid grid-cols-2 gap-2 short:mb-4 lg:order-2 lg:mb-0 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
 					{#each FINAL_STATS as f, i (f.label)}
 						<div
 							class="flex flex-col gap-1.5 rounded-[18px] border border-white/10 bg-white/5 px-4 pt-4 pb-3.5 backdrop-blur-sm lg:min-h-[150px] lg:justify-between lg:gap-3 lg:rounded-3xl lg:p-6"
@@ -393,7 +393,7 @@
 	</div>
 
 	<!-- 하단 — 모바일: 점 · 시작 버튼 · 안내 세 줄 / 데스크톱: [◀ 점 ▶] … 안내 · 시작 버튼 한 줄 -->
-	<div class="flex shrink-0 flex-col gap-3.5 px-5 pt-2.5 pb-7 lg:mx-auto lg:w-full lg:max-w-[1248px] lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:px-16 lg:pt-4 lg:pb-9">
+	<div class="flex shrink-0 flex-col gap-3.5 px-5 pt-2.5 pb-7 short:gap-2.5 short:pt-2 short:pb-5 lg:mx-auto lg:w-full lg:max-w-[1248px] lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:px-16 lg:pt-4 lg:pb-9">
 		<div class="flex items-center justify-center gap-1.5 lg:gap-[18px]">
 			<button type="button" aria-label="이전 슬라이드" onclick={() => goSlide(slide - 1)} class={navBtn}>
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
@@ -414,12 +414,12 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 			</button>
 		</div>
-		<div class="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:gap-5">
+		<div class="flex flex-col gap-3.5 short:gap-2.5 lg:flex-row lg:items-center lg:gap-5">
 			<p class="order-2 text-center text-xs text-fg/45 lg:order-1 lg:text-[13px] lg:text-fg/50">약 1분 · 선택형 · 무료 상담</p>
 			<button
 				type="button"
 				onclick={onstart}
-				class="order-1 flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-accent text-[17px] font-extrabold text-bg transition hover:bg-accent-deep active:scale-[0.98] lg:order-2 lg:w-[280px]"
+				class="order-1 flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl bg-accent text-[17px] font-extrabold text-bg transition hover:bg-accent-deep active:scale-[0.98] short:h-[52px] short:text-base lg:order-2 lg:w-[280px]"
 			>
 				<span>제조의뢰 시작하기</span>
 				{@render arrow(20)}
