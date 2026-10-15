@@ -30,11 +30,14 @@
 		else if (e.key === 'ArrowLeft') goSlide(slide - 1);
 	}
 
-	// 진행 과정 슬라이드: 사용자가 손대기 전까지 3.2초마다 다음 단계로 넘어간다
+	// 진행 과정 슬라이드: 사용자가 손대기 전까지 PROC_MS 마다 다음 단계로 넘어간다(게이지가 차는 시간과 같은 값).
+	// 타이머는 슬라이드에 들어온 순간 0부터 다시 시작해, 현재 단계 게이지가 다 찬 뒤에야 다음 단계로 간다 —
+	// 전에는 타이머가 늘 돌고 있어서 도착 직후 튀면 1번이 차는 중에 2번이 같이 차 보였다.
+	const PROC_MS = 2200;
 	$effect(() => {
-		const t = setInterval(() => {
-			if (slide === 3 && !procTouched) procSel = (procSel + 1) % 4;
-		}, 3200);
+		if (slide !== 3 || procTouched) return;
+		procSel = 0;
+		const t = setInterval(() => (procSel = (procSel + 1) % 4), PROC_MS);
 		return () => clearInterval(t);
 	});
 
@@ -89,7 +92,7 @@
 	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
 	const ZERO_ROWS = [
 		{ label: '초기 비용', was: '₩ 3,000만', now: '0원' },
-		{ label: '떠안는 재고', was: '300박스', now: '0박스' },
+		{ label: '재고 부담', was: '300박스', now: '0박스' },
 		{ label: '준비할 서류', was: '12장', now: '1장' }
 	];
 	const BURDENS = [
@@ -316,7 +319,7 @@
 								<span class="relative block h-1 overflow-hidden rounded-sm bg-white/10">
 									<span
 										class="absolute inset-y-0 left-0 bg-accent"
-										style="width:{i < procSel || (cur && pz) ? '100%' : '0%'};transition:width {cur && pz && !procTouched ? '3.2s' : '.3s'} linear"
+										style="width:{i < procSel || (cur && pz) ? '100%' : '0%'};transition:width {cur && pz && !procTouched ? `${PROC_MS}ms` : '.3s'} linear"
 									></span>
 								</span>
 								<span class="text-xs font-bold whitespace-nowrap">{p.n} {p.t}</span>
