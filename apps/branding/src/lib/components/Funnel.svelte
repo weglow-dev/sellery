@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { applyAction, enhance } from '$app/forms';
 	import Landing from './Landing.svelte';
 	import TileGroup from './TileGroup.svelte';
@@ -511,6 +511,9 @@
 							if (Object.keys(missing).length > 0) {
 								errors = { ...errors, ...missing };
 								cancel();
+								// 모바일은 버튼이 아래 고정이라 안내가 화면 밖에 있을 수 있다 — 첫 번째로 빠진 칸으로 데려간다
+								const first = (['name', 'phone', 'agree'] as const).find((k) => missing[k]);
+								tick().then(() => document.getElementById(first === 'agree' ? 'agree-box' : first!)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
 								return;
 							}
 							submitting = true;
@@ -589,6 +592,7 @@
 									</div>
 								</div>
 								<label
+									id="agree-box"
 									class="flex cursor-pointer items-start gap-3 rounded-[14px] border-[1.5px] px-4 py-3.5 transition-colors lg:col-span-2 {errors.agree
 										? 'border-accent bg-accent/[0.06]'
 										: 'border-transparent bg-white/[0.03]'}"
