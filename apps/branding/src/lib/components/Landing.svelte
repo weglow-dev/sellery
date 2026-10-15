@@ -56,6 +56,8 @@
 		{ name: '필름', tilt: 'rotate(-5deg) translateY(10px)', hot: false },
 		{ name: '캔디', tilt: 'rotate(8deg) translateY(2px)', hot: false }
 	];
+	// 셋씩 다른 박자로 둥실거리게 — 기울기(안쪽 카드)와 겹치지 않도록 바깥 래퍼에 건다
+	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
 	const ZERO_ROWS = [
 		{ label: '초기 비용', was: '₩ 3,000만', now: '0원' },
 		{ label: '떠안는 재고', was: '300박스', now: '0박스' },
@@ -146,15 +148,17 @@
 				<!-- 데스크톱에만: 떠 있는 제형 카드 6장 -->
 				<div class="hidden min-w-0 lg:block">
 					<div class="ml-auto grid max-w-[460px] grid-cols-3 gap-3.5">
-						{#each HERO_TILES as t (t.name)}
-							<div
-								class="flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 {t.hot
-									? 'border-[1.5px] border-accent bg-accent/[0.14]'
-									: 'border-white/[0.09] bg-panel'}"
-								style="transform: {t.tilt}"
-							>
-								<TileIcon name={t.name} size={40} />
-								<span class="text-[13px] font-semibold text-fg/75">{t.name}</span>
+						{#each HERO_TILES as t, i (t.name)}
+							<div class={FLOAT[i % 3]}>
+								<div
+									class="flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 {t.hot
+										? 'border-[1.5px] border-accent bg-accent/[0.14]'
+										: 'border-white/[0.09] bg-panel'}"
+									style="transform: {t.tilt}"
+								>
+									<TileIcon name={t.name} size={40} />
+									<span class="text-[13px] font-semibold text-fg/75">{t.name}</span>
+								</div>
 							</div>
 						{/each}
 					</div>
