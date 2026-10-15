@@ -213,40 +213,40 @@
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 				</div>
-				<div class="{rightCol} mt-5 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px]">
-					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em] lg:gap-3 lg:text-[13px]">
+				<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px]">
+					<div class="grid grid-cols-2 gap-2 text-[13px] font-bold tracking-[0.04em] short:text-xs lg:gap-3 lg:text-[13px]">
 						<div class="px-1 text-fg/45">내가 할 일</div>
 						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
 					</div>
-					<div class="mt-2 flex flex-col gap-1.5 short:mt-1.5 short:gap-1 lg:mt-2.5 lg:gap-2">
+					<div class="mt-2 flex flex-col gap-2 short:mt-1.5 short:gap-1 lg:mt-2.5 lg:gap-2">
 						{#each BURDENS as b, i (b.t)}
 							{@const on = burdenSel === i}
 							<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
-								<div class="h-11 rounded-xl border border-dashed border-white/10 short:h-[38px] lg:h-14 lg:rounded-[14px]"></div>
-								<div class="h-11 rounded-xl border border-dashed border-white/10 short:h-[38px] lg:h-14 lg:rounded-[14px]"></div>
+								<div class="h-[52px] rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl lg:h-14"></div>
+								<div class="h-[52px] rounded-[14px] border border-dashed border-white/10 short:h-[38px] short:rounded-xl lg:h-14"></div>
 								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
 									onclick={() => (burdenSel = i)}
-									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold short:h-[38px] short:text-xs lg:h-14 lg:w-[calc(50%-6px)] lg:rounded-[14px] lg:px-4 lg:text-[15px] {on
+									class="absolute top-0 left-0 flex h-[52px] w-[calc(50%-4px)] items-center justify-between rounded-[14px] border px-4 text-[15px] font-bold short:h-[38px] short:rounded-xl short:px-3 short:text-xs lg:h-14 lg:w-[calc(50%-6px)] {on
 										? 'border-accent bg-accent/[0.14] text-accent'
 										: 'border-white/[0.12] bg-panel text-fg/85'}"
 									style="transform:{bz ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
 								>
-									<span>{b.t}</span><span class="text-xs font-extrabold opacity-80 lg:text-[13px]">{b.n}</span>
+									<span>{b.t}</span><span class="text-[13px] font-extrabold opacity-80 short:text-xs">{b.n}</span>
 								</button>
 							</div>
 						{/each}
 					</div>
 					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 short:mt-2 lg:mt-3 lg:gap-3">
 						<div
-							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg short:p-2.5 short:text-xs lg:rounded-2xl lg:p-4 lg:text-[15px]"
+							class="rounded-2xl bg-accent p-4 text-[15px] leading-[1.35] font-extrabold text-bg short:rounded-[14px] short:p-2.5 short:text-xs"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
 							브랜드에만<br />집중하기
 						</div>
-						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75 short:p-2.5 short:text-[11px] lg:rounded-2xl lg:p-4 lg:text-[13px] lg:leading-relaxed">{BURDENS[burdenSel].d}</div>
+						<div class="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 text-[13px] leading-relaxed text-fg/75 short:rounded-[14px] short:p-2.5 short:text-[11px] short:leading-normal">{BURDENS[burdenSel].d}</div>
 					</div>
 				</div>
 			</div>
