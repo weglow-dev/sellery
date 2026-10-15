@@ -15,9 +15,8 @@
 		피부: `<path d="M22 9c6 8 11 14 11 20a11 11 0 0 1-22 0c0-6 5-12 11-20z" fill="${A}" opacity="0.35" stroke="none"/><path d="M22 9c6 8 11 14 11 20a11 11 0 0 1-22 0c0-6 5-12 11-20z"/><path d="M38 6v8M34 10h8" stroke="${A}"/><path d="M17 30a5 5 0 0 0 5 5"/>`,
 		건강: `<path d="M24 39s-14-8-14-18a7.5 7.5 0 0 1 14-3.7A7.5 7.5 0 0 1 38 21c0 10-14 18-14 18z"/><path d="M13 25h7l2.5-5 4 9 2.5-4h6" stroke="${A}"/>`,
 		기타: `<rect x="9" y="9" width="12" height="12" rx="3.5"/><rect x="27" y="9" width="12" height="12" rx="3.5" fill="${A}" stroke="none"/><rect x="9" y="27" width="12" height="12" rx="3.5"/><rect x="27" y="27" width="12" height="12" rx="3.5"/>`,
-		// 랜딩 카테고리 타일 전용
+		// 랜딩 카테고리 타일 전용 (이너뷰티 · 멘탈 · 맨즈 — 다이어트는 퍼널과 공유)
 		이너뷰티: `<path d="M24 40s-13-8-13-18a7 7 0 0 1 13-3.5A7 7 0 0 1 37 22c0 10-13 18-13 18z" fill="${A}" opacity="0.35" stroke="none"/><path d="M24 40s-13-8-13-18a7 7 0 0 1 13-3.5A7 7 0 0 1 37 22c0 10-13 18-13 18z"/><path d="M38 6v6M35 9h6" stroke="${A}"/><path d="M18 22c0 3 2 5.5 5 6.5"/>`,
-		헤어: `<path d="M14 20c0-7 4.5-11 10-11s10 4 10 11c0 3-1.5 5-1.5 8v11h-17V28c0-3-1.5-5-1.5-8z"/><path d="M20 9c1.5 5 1.5 9 0 15" stroke="${A}"/><path d="M28 9c-1.5 5-1.5 9 0 15" stroke="${A}"/><circle cx="24" cy="24" r="3" fill="${A}" stroke="none"/>`,
 		멘탈: `<path d="M36 29a13 13 0 1 1-17-17 10 10 0 0 0 17 17z" fill="${A}" opacity="0.35" stroke="none"/><path d="M36 29a13 13 0 1 1-17-17 10 10 0 0 0 17 17z"/><path d="M33 8v6M30 11h6" stroke="${A}"/><circle cx="39" cy="20" r="1.5" fill="${A}" stroke="none"/>`,
 		맨즈: `<circle cx="20" cy="28" r="11"/><circle cx="20" cy="28" r="4" fill="${A}" stroke="none"/><path d="M28 20L40 8" stroke="${A}"/><path d="M31 8h9v9" stroke="${A}"/>`,
 		// 제형

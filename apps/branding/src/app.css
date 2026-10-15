@@ -16,10 +16,26 @@
 	--color-accent-deep: #ff5a1f;
 	--color-accent-soft: rgba(255, 122, 61, 0.16);
 
+	/* float — 랜딩 히어로의 떠 있는 제형 카드 6장이 셋씩 다른 박자로 둥실거린다.
+	   motion-safe: 변형으로 쓰면 prefers-reduced-motion 을 Tailwind 가 자동으로 존중한다. */
+	--animate-float: float 6s ease-in-out infinite;
+	--animate-float-delay: float 7s ease-in-out 1s infinite;
+	--animate-float-delay-2: float 8s ease-in-out 2s infinite;
+
 	/* pop — 타일의 선택 체크 배지 · 접수 완료 아이콘이 함께 쓰는 "톡 튀어나오는" 등장 */
 	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 	/* step — 퍼널의 모든 단계 화면과 랜딩 진행 과정 카드가 오른쪽에서 미끄러져 들어오는 등장 */
 	--animate-step: step-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-12px);
+	}
 }
 
 @keyframes pop {

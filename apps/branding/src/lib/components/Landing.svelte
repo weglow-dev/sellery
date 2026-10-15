@@ -56,6 +56,8 @@
 		{ name: '필름', tilt: 'rotate(-5deg) translateY(10px)', hot: false },
 		{ name: '캔디', tilt: 'rotate(8deg) translateY(2px)', hot: false }
 	];
+	// 셋씩 다른 박자로 둥실거리게 — 기울기(안쪽 카드)와 겹치지 않도록 바깥 래퍼에 건다
+	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
 	const ZERO_ROWS = [
 		{ label: '초기 비용', was: '₩ 3,000만', now: '0원' },
 		{ label: '떠안는 재고', was: '300박스', now: '0박스' },
@@ -86,6 +88,16 @@
 		{ big: '0', unit: '건', label: '떠안는 재고' },
 		{ big: '1:1', unit: '', label: '전담 매니저' }
 	];
+
+	// lg(1024px) 이상인지 — 3장 칩이 건너가는 거리가 열 간격(모바일 8px · 데스크톱 12px)에 맞게 바뀐다
+	let desktop = $state(false);
+	$effect(() => {
+		const mq = window.matchMedia('(min-width: 1024px)');
+		const sync = () => (desktop = mq.matches);
+		sync();
+		mq.addEventListener('change', sync);
+		return () => mq.removeEventListener('change', sync);
+	});
 
 	const z = $derived(slide === 1);
 	const bz = $derived(slide === 2);
@@ -134,7 +146,7 @@
 				<div class="relative">
 					<p class="{eyebrowCls} tracking-[0.02em]">인플루언서 전용 브랜드 메이킹</p>
 					<h1 class="mt-3 text-[38px] leading-[1.2] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-6xl lg:leading-[1.12]">팔로워가 있다면,<br />브랜드도<br />가질 수 있어요</h1>
-					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-fg-soft lg:max-w-[520px] lg:text-lg">
+					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-accent lg:max-w-[520px] lg:text-lg">
 						다이어트, 이너뷰티, 더마 — 내 이름을 건 웰니스 브랜드. 만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 셀러리가 맡을게요.
 					</p>
 					<button type="button" onclick={() => goSlide(1)} class="mt-[22px] flex items-center gap-2 text-[13px] font-semibold text-fg/50 transition hover:text-fg/80">
@@ -146,15 +158,17 @@
 				<!-- 데스크톱에만: 떠 있는 제형 카드 6장 -->
 				<div class="hidden min-w-0 lg:block">
 					<div class="ml-auto grid max-w-[460px] grid-cols-3 gap-3.5">
-						{#each HERO_TILES as t (t.name)}
-							<div
-								class="flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 {t.hot
-									? 'border-[1.5px] border-accent bg-accent/[0.14]'
-									: 'border-white/[0.09] bg-panel'}"
-								style="transform: {t.tilt}"
-							>
-								<TileIcon name={t.name} size={40} />
-								<span class="text-[13px] font-semibold text-fg/75">{t.name}</span>
+						{#each HERO_TILES as t, i (t.name)}
+							<div class={FLOAT[i % 3]}>
+								<div
+									class="flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 {t.hot
+										? 'border-[1.5px] border-accent bg-accent/[0.14]'
+										: 'border-white/[0.09] bg-panel'}"
+									style="transform: {t.tilt}"
+								>
+									<TileIcon name={t.name} size={40} />
+									<span class="text-[13px] font-semibold text-fg/75">{t.name}</span>
+								</div>
 							</div>
 						{/each}
 					</div>
@@ -199,40 +213,40 @@
 					<p class={eyebrowCls}>부담은 셀러리가</p>
 					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 				</div>
-				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[480px]">
-					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em]">
-						<div class="px-1 text-fg/45">당신</div>
-						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리</div>
+				<div class="{rightCol} mt-5 lg:ml-auto lg:w-full lg:max-w-[560px]">
+					<div class="grid grid-cols-2 gap-2 text-xs font-bold tracking-[0.04em] lg:gap-3 lg:text-[13px]">
+						<div class="px-1 text-fg/45">내가 할 일</div>
+						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
 					</div>
-					<div class="mt-2 flex flex-col gap-1.5">
+					<div class="mt-2 flex flex-col gap-1.5 lg:mt-2.5 lg:gap-2">
 						{#each BURDENS as b, i (b.t)}
 							{@const on = burdenSel === i}
-							<div class="relative grid grid-cols-2 gap-2">
-								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
-								<div class="h-11 rounded-xl border border-dashed border-white/10"></div>
-								<!-- 슬라이드가 보이면 "당신" 칸의 짐이 "셀러리" 칸으로 하나씩 건너간다 -->
+							<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
+								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
+								<div class="h-11 rounded-xl border border-dashed border-white/10 lg:h-14 lg:rounded-[14px]"></div>
+								<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
 								<button
 									type="button"
 									aria-pressed={on}
 									onclick={() => (burdenSel = i)}
-									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold {on
+									class="absolute top-0 left-0 flex h-11 w-[calc(50%-4px)] items-center justify-between rounded-xl border px-3 text-[13px] font-bold lg:h-14 lg:w-[calc(50%-6px)] lg:rounded-[14px] lg:px-4 lg:text-[15px] {on
 										? 'border-accent bg-accent/[0.14] text-accent'
 										: 'border-white/[0.12] bg-panel text-fg/85'}"
-									style="transform:{bz ? 'translateX(calc(100% + 8px))' : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
+									style="transform:{bz ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
 								>
-									<span>{b.t}</span><span class="text-xs font-extrabold opacity-80">{b.n}</span>
+									<span>{b.t}</span><span class="text-xs font-extrabold opacity-80 lg:text-[13px]">{b.n}</span>
 								</button>
 							</div>
 						{/each}
 					</div>
-					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2">
+					<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 lg:mt-3 lg:gap-3">
 						<div
-							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg"
+							class="rounded-[14px] bg-accent p-3 text-[13px] leading-[1.35] font-extrabold text-bg lg:rounded-2xl lg:p-4 lg:text-[15px]"
 							style="opacity:{bz ? 1 : 0};transform:{bz ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
 						>
-							당신은<br />브랜드에만 집중
+							브랜드에만<br />집중하기
 						</div>
-						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75">{BURDENS[burdenSel].d}</div>
+						<div class="rounded-[14px] border border-white/[0.08] bg-white/[0.04] p-3 text-xs leading-normal text-fg/75 lg:rounded-2xl lg:p-4 lg:text-[13px] lg:leading-relaxed">{BURDENS[burdenSel].d}</div>
 					</div>
 				</div>
 			</div>
@@ -323,22 +337,23 @@
 					<h2 class={h2Cls}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
 					<p class="mt-2.5 text-sm text-fg/60 lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
-				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-2.5">
+				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
+				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
 					{#each LANDING_CATEGORIES as c, i (c.title)}
 						{@const on = landingPick === i}
 						<button
 							type="button"
 							aria-pressed={on}
 							onclick={() => pickCategory(i)}
-							class="flex flex-col gap-3 rounded-[18px] border p-3.5 text-left text-fg hover:border-accent/60 active:scale-[0.97] {on
+							class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
 								? 'border-accent bg-accent/[0.12]'
 								: 'border-white/[0.08] bg-white/[0.04]'}"
 							style="opacity:{cz ? 1 : 0};transform:{cz ? 'none' : 'translateY(14px)'};transition:border-color .2s,background-color .2s,transform .4s cubic-bezier(.2,.8,.2,1) {0.08 + i * 0.07}s,opacity .4s {0.08 + i * 0.07}s"
 						>
-							<span class="grid size-12 place-items-center rounded-[14px] bg-white/5 text-fg/90"><TileIcon name={c.icon} size={30} /></span>
+							<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
 							<span>
-								<span class="block text-base font-bold">{c.title}</span>
-								<span class="mt-0.5 block text-xs leading-[1.45] text-fg/60">{c.desc}</span>
+								<span class="block text-[17px] font-bold lg:text-lg">{c.title}</span>
+								<span class="mt-1 block text-[13px] leading-[1.45] text-fg/60">{c.desc}</span>
 							</span>
 						</button>
 					{/each}
@@ -358,17 +373,18 @@
 					<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15]">다음 웰니스 브랜드의<br />주인공은 당신이에요</h2>
 					<p class="mt-3.5 text-[15px] leading-[1.65] text-pretty text-fg/70 lg:max-w-[520px] lg:text-lg">제조의뢰를 남기면 전담 매니저가 사흘 안에 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.</p>
 				</div>
-				<div class="relative order-1 mb-6 grid grid-cols-2 gap-2 lg:order-2 lg:mb-0 lg:ml-auto lg:w-full lg:max-w-[520px]">
+				<!-- 통계 4칸 — 데스크톱은 카드를 키워 오른쪽 열을 채운다 -->
+				<div class="relative order-1 mb-6 grid grid-cols-2 gap-2 lg:order-2 lg:mb-0 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
 					{#each FINAL_STATS as f, i (f.label)}
 						<div
-							class="flex flex-col gap-1.5 rounded-[18px] border border-white/10 bg-white/5 px-4 pt-4 pb-3.5 backdrop-blur-sm"
+							class="flex flex-col gap-1.5 rounded-[18px] border border-white/10 bg-white/5 px-4 pt-4 pb-3.5 backdrop-blur-sm lg:min-h-[150px] lg:justify-between lg:gap-3 lg:rounded-3xl lg:p-6"
 							style="opacity:{fz ? 1 : 0};transform:{fz ? 'none' : 'translateY(12px)'};transition:opacity .5s {0.1 + i * 0.1}s,transform .5s cubic-bezier(.2,.8,.2,1) {0.1 + i * 0.1}s"
 						>
 							<div class="flex items-baseline gap-[3px]">
-								<span class="text-3xl leading-none font-extrabold tracking-[-0.05em] text-accent tabular-nums">{f.big}</span>
-								{#if f.unit}<span class="text-[13px] font-bold text-fg/85">{f.unit}</span>{/if}
+								<span class="text-3xl leading-none font-extrabold tracking-[-0.05em] text-accent tabular-nums lg:text-5xl">{f.big}</span>
+								{#if f.unit}<span class="text-[13px] font-bold text-fg/85 lg:text-base">{f.unit}</span>{/if}
 							</div>
-							<div class="text-xs text-fg/60">{f.label}</div>
+							<div class="text-xs text-fg/60 lg:text-sm">{f.label}</div>
 						</div>
 					{/each}
 				</div>
