@@ -30,11 +30,13 @@
 		else if (e.key === 'ArrowLeft') goSlide(slide - 1);
 	}
 
-	// 진행 과정 슬라이드: 사용자가 손대기 전까지 3.2초마다 다음 단계로 넘어간다
+	// 진행 과정 슬라이드: 사용자가 손대기 전까지 3.2초마다 다음 단계로 넘어간다.
+	// 타이머는 슬라이드에 들어온 순간 0부터 다시 시작해, 현재 단계 게이지(3.2초)가 다 찬 뒤에야 다음 단계로 간다 —
+	// 전에는 타이머가 늘 돌고 있어서 도착 직후 튀면 1번이 차는 중에 2번이 같이 차 보였다.
 	$effect(() => {
-		const t = setInterval(() => {
-			if (slide === 3 && !procTouched) procSel = (procSel + 1) % 4;
-		}, 3200);
+		if (slide !== 3 || procTouched) return;
+		procSel = 0;
+		const t = setInterval(() => (procSel = (procSel + 1) % 4), 3200);
 		return () => clearInterval(t);
 	});
 
