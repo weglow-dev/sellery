@@ -47,6 +47,35 @@
 	}
 	$effect(() => () => clearTimeout(pickTimer));
 
+	// 카테고리 타일 테두리 반짝임 — 슬라이드가 보이는 동안 1.6초마다 한 장씩, 한 바퀴에 전부 한 번씩(섞은 순서 · 연속 같은 장 없음).
+	// 마우스를 올리면 멈추고 떼면 다시 돌며, 탭해서 고르면(landingPick) 그대로 멈춘다.
+	let blinkIdx = $state<number | null>(null);
+	let blinkPaused = $state(false);
+	$effect(() => {
+		if (slide !== 5 || blinkPaused || landingPick !== null) {
+			blinkIdx = null;
+			return;
+		}
+		const n = LANDING_CATEGORIES.length;
+		let order: number[] = [];
+		let last = -1;
+		const next = () => {
+			if (order.length === 0) {
+				order = [...Array(n).keys()].sort(() => Math.random() - 0.5);
+				if (n > 1 && order[0] === last) order.push(order.shift()!);
+			}
+			last = order.shift()!;
+			blinkIdx = last;
+		};
+		const first = setTimeout(next, 700); // 타일 등장 연출이 끝난 뒤부터
+		const timer = setInterval(next, 1600);
+		return () => {
+			clearTimeout(first);
+			clearInterval(timer);
+			blinkIdx = null;
+		};
+	});
+
 	// 데스크톱 히어로 오른쪽의 떠 있는 제형 카드 — 살짝씩 기울여 흩어 놓고, 젤리 하나만 포인트 색
 	const HERO_TILES = [
 		{ name: '알약', tilt: 'rotate(-7deg) translateY(4px)', hot: false },
@@ -340,7 +369,12 @@
 					<p class="mt-2.5 text-sm text-fg/60 lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
 				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
-				<div class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 short:mt-4 short:gap-2 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
+				<div
+					role="presentation"
+					onpointerenter={(e) => e.pointerType === 'mouse' && (blinkPaused = true)}
+					onpointerleave={() => (blinkPaused = false)}
+					class="{rightCol} mt-6 grid grid-cols-2 gap-2.5 short:mt-4 short:gap-2 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3"
+				>
 					{#each LANDING_CATEGORIES as c, i (c.title)}
 						{@const on = landingPick === i}
 						<button
@@ -349,7 +383,7 @@
 							onclick={() => pickCategory(i)}
 							class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] short:gap-2.5 short:p-3 lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
 								? 'border-accent bg-accent/[0.12]'
-								: 'border-white/[0.08] bg-white/[0.04]'}"
+								: 'border-white/[0.08] bg-white/[0.04]'} {blinkIdx === i && !on ? 'motion-safe:animate-blink' : ''}"
 							style="opacity:{cz ? 1 : 0};transform:{cz ? 'none' : 'translateY(14px)'};transition:border-color .2s,background-color .2s,transform .4s cubic-bezier(.2,.8,.2,1) {0.08 + i * 0.07}s,opacity .4s {0.08 + i * 0.07}s"
 						>
 							<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 short:size-11 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
