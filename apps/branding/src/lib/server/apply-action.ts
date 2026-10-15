@@ -9,7 +9,7 @@ import {
 	subTypesFor,
 	type ApplyErrors,
 	type ApplyValues
-} from '$lib/apply-options';
+} from '$lib/utils/apply-options';
 import { notifySlack } from './slack';
 import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 

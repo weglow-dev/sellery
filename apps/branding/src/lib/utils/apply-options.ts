@@ -1,4 +1,4 @@
-/** 제조의뢰 퍼널의 선택지 — 폼 UI(Funnel.svelte · Landing.svelte)와 서버 검증(lib/server/apply-action.ts)이 같이 참조하는 단일 출처. */
+/** 제조의뢰 퍼널의 선택지 — 폼 UI(components/Funnel.svelte · Landing.svelte)와 서버 검증(server/apply-action.ts)이 같이 참조하는 단일 출처. */
 
 /** 모든 카테고리 공통 최소 제작 수량 — 슬랙 접수 한 줄에 고정값으로만 찍는다. */
 export const MIN_QTY = 1000;

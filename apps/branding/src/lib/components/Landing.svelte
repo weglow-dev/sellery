@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TileIcon from './TileIcon.svelte';
-	import { LANDING_CATEGORIES } from '$lib/apply-options';
+	import { LANDING_CATEGORIES } from '$lib/utils/apply-options';
 
 	/** 퍼널의 첫 화면 = 랜딩. 가로로 넘기는 7장 슬라이드(스크롤 스냅) + 점 인디케이터 + [제조의뢰 시작하기].
 	 *  모바일은 한 열(아래 정렬), lg 데스크톱은 1120px 두 열(왼쪽 글 · 오른쪽 카드)에 하단 바가 화살표 · 점 · CTA 한 줄로 바뀐다.
@@ -415,7 +415,7 @@
 			</button>
 		</div>
 		<div class="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:gap-5">
-			<p class="order-2 text-center text-xs text-fg/45 lg:order-1 lg:text-[13px] lg:text-fg/50">약 1분 · 전부 선택형 · 무료 상담</p>
+			<p class="order-2 text-center text-xs text-fg/45 lg:order-1 lg:text-[13px] lg:text-fg/50">약 1분 · 선택형 · 무료 상담</p>
 			<button
 				type="button"
 				onclick={onstart}

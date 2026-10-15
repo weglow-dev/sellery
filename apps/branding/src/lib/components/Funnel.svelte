@@ -20,7 +20,7 @@
 		type ApplyErrors,
 		type ApplyResult,
 		type Category
-	} from '$lib/apply-options';
+	} from '$lib/utils/apply-options';
 	import { formatPhone } from '$lib/utils/phone';
 
 	/* 한 화면 한 질문 퍼널 — 첫 화면(intro)이 랜딩 슬라이드다. 타일을 고르면 0.28초 뒤 다음 단계로 넘어가고, 헤더의 뒤로 가기로 되돌아온다.
