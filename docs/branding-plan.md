@@ -34,7 +34,17 @@ apps/branding/
     utils/apply-options.ts      퍼널 선택지의 단일 출처 — 카테고리·제형·세부 종류(알약/캔디)·패키지·맛·미팅 시간대·랜딩 카테고리 4종 · 타일 설명 · 맛 색 견본 · 성분 제안 · 폼 액션 결과 타입(ApplyValues/ApplyErrors/ApplyResult)
     components/
       Funnel.svelte               퍼널 본체 — 단계 상태 머신(intro→…→done) · 모바일 고정 헤더(뒤로 · 진행 세그먼트 · n/N · 고른 경로) · lg: 360px 사이드 레일(로고=처음으로 · 진행 · 질문 목록(지난 질문은 클릭해 되돌아감, 앞 질문은 잠금) · 안내) + 상단 [이전]·경로 바 · 질문 화면 · 연락처 <form>(hidden input 으로 일괄 POST · use:enhance 결과 처리) · 접수 완료
-      Landing.svelte              intro 단계 = 랜딩. 가로 스크롤 스냅 7장(히어로 · 0에서 시작 · 부담은 셀러리가 · 진행 과정 자동 재생 · 브랜드 스토리 · 카테고리 타일 · 마지막) + 점 인디케이터 + [제조의뢰 시작하기] · lg: 1120px 두 열(왼쪽 글 · 오른쪽 카드) · 히어로 오른쪽 떠 있는 제형 카드 6장 · ◀ ▶ 버튼과 좌우 화살표 키 · 하단 바 한 줄
+      Landing.svelte              intro 단계 = 랜딩의 틀 — 현재 슬라이드 번호 · 스크롤 스냅/키보드/점/◀▶ 이동 · 상단 바 · 하단 바([제조의뢰 시작하기]). 슬라이드 7장은 landing/ 컴포넌트에 `active`(지금 보이는 장인지)만 넘긴다
+      landing/
+        shared.ts                 슬라이드 공통 클래스(slideCls · twoCol · rightCol · eyebrowCls · h2Cls) + 진입 연출 헬퍼 rise()/d()
+        ArrowIcon.svelte          → 화살표 아이콘 (히어로 힌트 · 2장 표 · 하단 CTA)
+        HeroSlide.svelte          1장 헤드라인 + (데스크톱) 둥실 떠 있는 제형 카드 6장
+        ZeroSlide.svelte          2장 START WITH ZERO — 취소선 표
+        BurdenSlide.svelte        3장 내가 할 일 / 셀러리가 할 일 — 칩이 건너가는 표 (desktop 판정 포함)
+        ProcessSlide.svelte       4장 진행 과정 — 자동 재생 타이머 · 게이지(PROC_MS 2.2초 · 되감기 없이 01번부터)
+        StorySlide.svelte         5장 브랜드 스토리 3줄 + 서비스 칩
+        CategorySlide.svelte      6장 카테고리 타일 4장 — 반짝임 · 탭하면 onpick(category)
+        FinalSlide.svelte         7장 통계 4칸 + 마지막 헤드라인
       TileGroup.svelte            타일형 단일 선택 버튼 — grid(카테고리 2열→lg 4열) · grid-lg(제형 2→3열) · row(세부 종류 · 패키지: 가로 카드→lg 3열 세로 카드) · swatch(맛 3→6열)
       TileIcon.svelte             48px 투톤 아이콘 표 (퍼널 타일 + 랜딩 카테고리 아이콘 이너뷰티/멘탈/맨즈)
     utils/phone.ts              연락처 자동 하이픈 + 완성 여부 정규식 (폼·서버 공용)
@@ -47,7 +57,7 @@ apps/branding/
   vercel.json                   리전 icn1
 ```
 
-`lib/components/`(컴포넌트) · `lib/server/`(서버 전용)는 다른 4개 앱과 같은 자리입니다. 화면을 고치려면 `Landing.svelte`(랜딩 슬라이드) 또는 `Funnel.svelte`(질문·연락처·완료) 하나만 보면 되고, 컴포넌트 `<style>` 블록은 쓰지 않습니다(Tailwind 유틸리티 인라인 원칙 — 슬라이드 연출의 지연값처럼 계산되는 값만 `style=` 속성).
+`lib/components/`(컴포넌트) · `lib/server/`(서버 전용)는 다른 4개 앱과 같은 자리입니다. 화면을 고치려면 `landing/<N장>Slide.svelte`(랜딩 슬라이드 한 장) 또는 `Funnel.svelte`(질문·연락처·완료) 하나만 보면 되고, 컴포넌트 `<style>` 블록은 쓰지 않습니다(Tailwind 유틸리티 인라인 원칙 — 슬라이드 연출의 지연값처럼 계산되는 값만 `style=` 속성).
 
 ## 3. 디자인 토큰 (`src/app.css` `@theme`)
 
@@ -60,7 +70,7 @@ apps/branding/
 
 Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg-soft` `border-line` …). 포인트 컬러는 앰버 하나 유지가 이 페이지의 톤입니다.
 
-**인터랙션 패턴**: 화면 전환 `motion-safe:animate-step`(단계 화면 · 진행 과정 카드)과 선택 체크 `motion-safe:animate-pop` 은 `app.css` 공유 토큰. 랜딩 슬라이드의 연출(취소선 그리기 · "당신" 칸의 짐이 "셀러리" 칸으로 건너가기 · 진행 과정 3.2초 자동 재생 · 타일/통계 순차 등장)은 `Landing.svelte` 가 현재 슬라이드 번호(`slide`)로만 켜고, 지연값은 `style=` 의 transition-delay 로 계산합니다. 옛 `[data-reveal]` 스크롤 리빌과 `float` 애니메이션은 2026-10-15 에 삭제됐습니다.
+**인터랙션 패턴**: 화면 전환 `motion-safe:animate-step`(단계 화면 · 진행 과정 카드)과 선택 체크 `motion-safe:animate-pop` 은 `app.css` 공유 토큰. 랜딩 슬라이드의 연출(취소선 그리기 · "당신" 칸의 짐이 "셀러리" 칸으로 건너가기 · 진행 과정 3.2초 자동 재생 · 타일/통계 순차 등장)은 각 슬라이드 컴포넌트가 `active`(Landing.svelte 가 넘기는 "지금 보이는 장인지")로만 켜고, 지연값은 `style=` 의 transition-delay 로 계산합니다. 옛 `[data-reveal]` 스크롤 리빌과 `float` 애니메이션은 2026-10-15 에 삭제됐습니다.
 
 ## 4. CTA 연결
 
