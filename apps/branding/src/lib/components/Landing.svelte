@@ -37,8 +37,18 @@
 	$effect(() => {
 		if (slide !== 3 || procTouched) return;
 		procSel = 0;
-		const t = setInterval(() => (procSel = (procSel + 1) % 4), PROC_MS);
-		return () => clearInterval(t);
+		// 4번이 끝나면 한 프레임 동안 전부 비웠다가(-1) 01번이 0부터 다시 차오른다 — 바로 0으로 돌리면 01번은 이미 100% 라 안 움직인다
+		let raf = 0;
+		const t = setInterval(() => {
+			if (procSel >= 3) {
+				procSel = -1;
+				raf = requestAnimationFrame(() => (raf = requestAnimationFrame(() => (procSel = 0))));
+			} else procSel += 1;
+		}, PROC_MS);
+		return () => {
+			clearInterval(t);
+			cancelAnimationFrame(raf);
+		};
 	});
 
 	// 카테고리 타일: 선택 표시를 잠깐 보여준 뒤 그 카테고리로 퍼널을 시작한다
@@ -108,6 +118,8 @@
 		{ n: '03', t: '생산 · 입고', stage: '검증된 파트너가', d: '검증된 제조 파트너가 생산하고, 셀러리 물류센터로 바로 입고돼요.' },
 		{ n: '04', t: '내 샵 오픈', stage: '판매 시작', d: '내 이름을 건 샵이 열려요. 링크 하나 공유하면 판매 시작이에요.' }
 	];
+	// 카드에 보여줄 단계 — 리셋 프레임(-1)에는 01번을 그대로 둔다
+	const procShown = $derived(PROCESS[Math.max(0, procSel)]);
 	const STORY = [
 		{ n: '01', t: '컨셉 스토리', d: '당신의 메시지를 브랜드 언어로 바꿔요.' },
 		{ n: '02', t: '비주얼 아이덴티티', d: '로고, 패키지, 비주얼 톤까지 함께 잡아요.' },
@@ -295,12 +307,12 @@
 				</div>
 				<div class="{rightCol} lg:ml-auto lg:w-full lg:max-w-[480px]">
 					<div class="relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.04] px-5 pt-[22px] pb-5">
-						<div aria-hidden="true" class="absolute top-1 right-3.5 text-8xl leading-none font-extrabold tracking-[-0.06em] text-accent/[0.12] tabular-nums">{PROCESS[procSel].n}</div>
-						{#key procSel}
+						<div aria-hidden="true" class="absolute top-1 right-3.5 text-8xl leading-none font-extrabold tracking-[-0.06em] text-accent/[0.12] tabular-nums">{procShown.n}</div>
+						{#key procShown}
 							<div class="relative motion-safe:animate-step">
-								<div class="text-xs font-bold tracking-[0.04em] text-accent">{PROCESS[procSel].stage}</div>
-								<div class="mt-1.5 text-2xl font-extrabold tracking-[-0.03em] text-fg">{PROCESS[procSel].t}</div>
-								<div class="mt-2 text-sm leading-[1.55] text-pretty text-fg/70">{PROCESS[procSel].d}</div>
+								<div class="text-xs font-bold tracking-[0.04em] text-accent">{procShown.stage}</div>
+								<div class="mt-1.5 text-2xl font-extrabold tracking-[-0.03em] text-fg">{procShown.t}</div>
+								<div class="mt-2 text-sm leading-[1.55] text-pretty text-fg/70">{procShown.d}</div>
 							</div>
 						{/key}
 					</div>
@@ -319,7 +331,7 @@
 								<span class="relative block h-1 overflow-hidden rounded-sm bg-white/10">
 									<span
 										class="absolute inset-y-0 left-0 bg-accent"
-										style="width:{i < procSel || (cur && pz) ? '100%' : '0%'};transition:width {cur && pz && !procTouched ? `${PROC_MS}ms` : '.3s'} linear"
+										style="width:{i < procSel || (cur && pz) ? '100%' : '0%'};transition:width {i < procSel ? '.3s' : cur && pz ? (procTouched ? '.3s' : `${PROC_MS}ms`) : '0s'} linear"
 									></span>
 								</span>
 								<span class="text-xs font-bold whitespace-nowrap">{p.n} {p.t}</span>
