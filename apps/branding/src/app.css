@@ -85,6 +85,27 @@
    카드 높이 · 여백 · 글자를 한 단계씩 줄일 때 쓴다. 데스크톱은 폭 조건으로 제외해 lg: 값과 충돌하지 않는다. */
 @custom-variant short (@media (max-height: 830px) and (max-width: 1023.98px));
 
+/* rise — 랜딩 슬라이드 진입 연출. 모든 슬라이드의 제목 · 본문 · 카드가 아래에서 살짝 올라오며 순서대로 나타난다.
+   .rise 로 숨겨 두고 그 슬라이드가 보이면 .rise-in 을 붙인다 · 순서 지연은 --d (0.05초 간격). */
+.rise {
+	opacity: 0;
+	transform: translateY(14px);
+	transition:
+		opacity 0.5s var(--d, 0s),
+		transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s);
+}
+.rise.rise-in {
+	opacity: 1;
+	transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.rise {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
 /* 가로 슬라이드 · 단계 화면의 내부 스크롤은 스크롤바 없이 */
 @utility no-scrollbar {
 	scrollbar-width: none;

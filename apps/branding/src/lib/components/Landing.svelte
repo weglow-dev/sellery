@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import TileIcon from './TileIcon.svelte';
 	import { LANDING_CATEGORIES } from '$lib/utils/apply-options';
 
@@ -143,6 +144,12 @@
 		return () => mq.removeEventListener('change', sync);
 	});
 
+	// 진입 연출 — 해당 슬라이드가 보일 때만 .rise-in. 첫 로드 때 1장도 올라오도록 마운트 뒤에 켠다 (스타일은 app.css 의 .rise)
+	let ready = $state(false);
+	onMount(() => (ready = true));
+	const rise = (i: number) => `rise ${ready && slide === i ? 'rise-in' : ''}`;
+	const d = (k: number) => `--d:${(k * 0.05).toFixed(2)}s`;
+
 	const z = $derived(slide === 1);
 	const bz = $derived(slide === 2);
 	const pz = $derived(slide === 3);
@@ -190,19 +197,19 @@
 			</div>
 			<div class={twoCol}>
 				<div class="relative">
-					<p class="{eyebrowCls} tracking-[0.02em]">인플루언서 전용 브랜드 메이킹</p>
-					<h1 class="mt-3 text-[38px] leading-[1.2] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-6xl lg:leading-[1.12]">팔로워가 있다면,<br />브랜드도<br />가질 수 있어요</h1>
-					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-accent lg:max-w-[520px] lg:text-lg">
+					<p class="{eyebrowCls} tracking-[0.02em] {rise(0)}" style={d(0)}>인플루언서 전용 브랜드 메이킹</p>
+					<h1 class="mt-3 text-[38px] leading-[1.2] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-6xl lg:leading-[1.12] {rise(0)}" style={d(1)}>팔로워가 있다면,<br />브랜드도<br />가질 수 있어요</h1>
+					<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-accent lg:max-w-[520px] lg:text-lg {rise(0)}" style={d(2)}>
 						다이어트, 이너뷰티, 더마 — 내 이름을 건 웰니스 브랜드. 만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 셀러리가 맡을게요.
 					</p>
-					<button type="button" onclick={() => goSlide(1)} class="mt-[22px] flex items-center gap-2 text-[13px] font-semibold text-fg/50 transition hover:text-fg/80">
+					<button type="button" onclick={() => goSlide(1)} class="mt-[22px] flex items-center gap-2 text-[13px] font-semibold text-fg/50 hover:text-fg/80 {rise(0)}" style={d(3)}>
 						<span class="lg:hidden">옆으로 넘겨 어떻게 진행되는지 보기</span>
 						<span class="hidden lg:inline">화살표나 트랙패드로 넘겨보세요</span>
 						{@render arrow(16)}
 					</button>
 				</div>
 				<!-- 데스크톱에만: 떠 있는 제형 카드 6장 -->
-				<div class="hidden min-w-0 lg:block">
+				<div class="hidden min-w-0 lg:block {rise(0)}" style={d(2)}>
 					<div class="ml-auto grid max-w-[460px] grid-cols-3 gap-3.5">
 						{#each HERO_TILES as t, i (t.name)}
 							<div class={FLOAT[i % 3]}>
@@ -226,10 +233,10 @@
 		<section class={slideCls} aria-label="초기 비용">
 			<div class={twoCol}>
 				<div class="relative">
-					<p class="{eyebrowCls} tracking-[0.08em]">START WITH ZERO</p>
-					<h2 class={h2Cls}>시작하는 데 필요한 건<br />당신의 이름뿐이에요</h2>
+					<p class="{eyebrowCls} tracking-[0.08em] {rise(1)}" style={d(0)}>START WITH ZERO</p>
+					<h2 class="{h2Cls} {rise(1)}" style={d(1)}>시작하는 데 필요한 건<br />당신의 이름뿐이에요</h2>
 				</div>
-				<div class={rightCol}>
+				<div class="{rightCol} {rise(1)}" style={d(2)}>
 					<div class="rounded-[22px] border border-white/[0.08] bg-white/[0.03] px-[18px] py-1 lg:ml-auto lg:max-w-[480px] lg:rounded-[26px] lg:px-[26px] lg:py-2">
 						{#each ZERO_ROWS as r, i (r.label)}
 							<div class="flex items-center gap-3 py-3.5 lg:gap-3.5 lg:py-[26px] {i ? 'border-t border-white/[0.07]' : ''}">
@@ -256,10 +263,10 @@
 		<section class={slideCls} aria-label="셀러리가 맡는 일">
 			<div class={twoColLift}>
 				<div class="relative">
-					<p class={eyebrowCls}>부담은 셀러리가</p>
-					<h2 class={h2Cls}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
+					<p class="{eyebrowCls} {rise(2)}" style={d(0)}>부담은 셀러리가</p>
+					<h2 class="{h2Cls} {rise(2)}" style={d(1)}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 				</div>
-				<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px]">
+				<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px] {rise(2)}" style={d(2)}>
 					<div class="grid grid-cols-2 gap-2 text-[13px] font-bold tracking-[0.04em] short:text-xs lg:gap-3 lg:text-[13px]">
 						<div class="px-1 text-fg/45">내가 할 일</div>
 						<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
@@ -302,11 +309,11 @@
 		<section class={slideCls} aria-label="진행 과정">
 			<div class={twoCol}>
 				<div class="relative">
-					<p class={eyebrowCls}>진행 과정</p>
-					<h2 class={h2Cls}>브랜드가 되기까지,<br />네 단계면 돼요</h2>
+					<p class="{eyebrowCls} {rise(3)}" style={d(0)}>진행 과정</p>
+					<h2 class="{h2Cls} {rise(3)}" style={d(1)}>브랜드가 되기까지,<br />네 단계면 돼요</h2>
 				</div>
 				<div class="{rightCol} lg:ml-auto lg:w-full lg:max-w-[480px]">
-					<div class="relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.04] px-5 pt-[22px] pb-5">
+					<div class="relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.04] px-5 pt-[22px] pb-5 {rise(3)}" style={d(2)}>
 						<div aria-hidden="true" class="absolute top-1 right-3.5 text-8xl leading-none font-extrabold tracking-[-0.06em] text-accent/[0.12] tabular-nums">{procShown.n}</div>
 						{#key procShown}
 							<div class="relative motion-safe:animate-step">
@@ -316,7 +323,7 @@
 							</div>
 						{/key}
 					</div>
-					<div class="mt-3.5 grid grid-cols-4 gap-1.5">
+					<div class="mt-3.5 grid grid-cols-4 gap-1.5 {rise(3)}" style={d(3)}>
 						{#each PROCESS as p, i (p.n)}
 							{@const cur = i === procSel}
 							<button
@@ -351,14 +358,14 @@
 			</div>
 			<div class={twoCol}>
 				<div class="relative">
-					<p class={eyebrowCls}>브랜드가 만들어지는 과정</p>
-					<h2 class={h2Cls}>제품이 아니라<br />당신의 이야기를 팔아요</h2>
+					<p class="{eyebrowCls} {rise(4)}" style={d(0)}>브랜드가 만들어지는 과정</p>
+					<h2 class="{h2Cls} {rise(4)}" style={d(1)}>제품이 아니라<br />당신의 이야기를 팔아요</h2>
 				</div>
 				<div class="{rightCol} mt-6 short:mt-4">
 					<div class="flex flex-col">
 						{#each STORY as st, i (st.n)}
 							<!-- 줄 사이에만 구분선 — 첫 줄(컨셉 스토리) 위에는 없다 -->
-							<div class="flex gap-4 py-4 short:py-3 {i ? 'border-t border-white/[0.08]' : ''}">
+							<div class="flex gap-4 py-4 short:py-3 {i ? 'border-t border-white/[0.08]' : ''} {rise(4)}" style={d(2 + i)}>
 								<span class="grid size-9 shrink-0 place-items-center rounded-xl bg-accent/[0.14] text-[13px] font-extrabold text-accent">{st.n}</span>
 								<div class="min-w-0">
 									<div class="text-[17px] font-bold text-fg">{st.t}</div>
@@ -367,7 +374,7 @@
 							</div>
 						{/each}
 					</div>
-					<div class="mt-4 flex flex-wrap gap-1.5">
+					<div class="mt-4 flex flex-wrap gap-1.5 {rise(4)}" style={d(5)}>
 						{#each SERVICES as s (s)}
 							<span class="rounded-full border border-white/[0.12] px-[11px] py-[7px] text-xs font-semibold text-fg/75">{s}</span>
 						{/each}
@@ -380,9 +387,9 @@
 		<section class={slideCls} aria-label="브랜드 카테고리">
 			<div class={twoCol}>
 				<div class="relative">
-					<p class={eyebrowCls}>이렇게 브랜드가 태어나요</p>
-					<h2 class={h2Cls}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
-					<p class="mt-2.5 text-sm text-accent lg:text-[17px]">끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
+					<p class="{eyebrowCls} {rise(5)}" style={d(0)}>이렇게 브랜드가 태어나요</p>
+					<h2 class="{h2Cls} {rise(5)}" style={d(1)}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
+					<p class="mt-2.5 text-sm text-accent lg:text-[17px] {rise(5)}" style={d(2)}>끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 				</div>
 				<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->
 				<div
@@ -422,8 +429,8 @@
 			</div>
 			<div class="{twoCol} flex flex-col lg:grid">
 				<div class="relative order-2 lg:order-1">
-					<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15]">다음 웰니스 브랜드의<br />주인공은 당신이에요</h2>
-					<p class="mt-3.5 text-[15px] leading-[1.65] text-pretty text-fg/70 lg:max-w-[520px] lg:text-lg">제조의뢰를 남기면 전담 매니저가 사흘 안에 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.</p>
+					<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15] {rise(6)}" style={d(0)}>다음 웰니스 브랜드의<br />주인공은 당신이에요</h2>
+					<p class="mt-3.5 text-[15px] leading-[1.65] text-pretty text-fg/70 lg:max-w-[520px] lg:text-lg {rise(6)}" style={d(1)}>제조의뢰를 남기면 전담 매니저가 사흘 안에 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.</p>
 				</div>
 				<!-- 통계 4칸 — 데스크톱은 카드를 키워 오른쪽 열을 채운다 -->
 				<div class="relative order-1 mb-6 grid grid-cols-2 gap-2 short:mb-4 lg:order-2 lg:mb-0 lg:ml-auto lg:w-full lg:max-w-[520px] lg:gap-3">
