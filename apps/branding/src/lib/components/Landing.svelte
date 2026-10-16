@@ -356,8 +356,9 @@
 				</div>
 				<div class="{rightCol} mt-6 short:mt-4">
 					<div class="flex flex-col">
-						{#each STORY as st (st.n)}
-							<div class="flex gap-4 border-t border-white/[0.08] py-4 short:py-3">
+						{#each STORY as st, i (st.n)}
+							<!-- 줄 사이에만 구분선 — 첫 줄(컨셉 스토리) 위에는 없다 -->
+							<div class="flex gap-4 py-4 short:py-3 {i ? 'border-t border-white/[0.08]' : ''}">
 								<span class="grid size-9 shrink-0 place-items-center rounded-xl bg-accent/[0.14] text-[13px] font-extrabold text-accent">{st.n}</span>
 								<div class="min-w-0">
 									<div class="text-[17px] font-bold text-fg">{st.t}</div>
