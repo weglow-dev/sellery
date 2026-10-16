@@ -8,7 +8,7 @@
 	const FINAL_STATS = [
 		{ from: 0, to: 4, fmt: (n: number) => String(n), unit: '단계', label: '제조의뢰 → 샵 오픈' },
 		{ from: 3000, to: 0, fmt: (n: number) => n.toLocaleString('ko-KR'), unit: '원', label: '초기 비용' },
-		{ from: 300, to: 0, fmt: (n: number) => String(n), unit: '건', label: '떠안는 재고' },
+		{ from: 300, to: 0, fmt: (n: number) => String(n), unit: '건', label: '재고 부담' },
 		{ from: 0, to: 1, fmt: (n: number) => `${n}:${n}`, unit: '', label: '전담 매니저' }
 	];
 	const COUNT_MS = 900;
