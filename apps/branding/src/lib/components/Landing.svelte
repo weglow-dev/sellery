@@ -101,6 +101,22 @@
 	];
 	// 셋씩 다른 박자로 둥실거리게 — 기울기(안쪽 카드)와 겹치지 않도록 바깥 래퍼에 건다
 	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
+	// 마우스 패럴랙스(데스크톱) — 히어로 위에서 마우스가 움직이면 카드가 그 방향으로 살짝 밀리고 기운다.
+	// 카드마다 깊이가 달라 입체감이 나고, 마우스가 나가면 제자리로 돌아온다. 모션 줄이기 설정이면 꺼진다.
+	const DEPTH = [10, 14, 8, 12, 7, 11];
+	let heroGrid = $state<HTMLDivElement>();
+	let mx = $state(0);
+	let my = $state(0);
+	function onHeroMove(e: PointerEvent) {
+		if (e.pointerType !== 'mouse' || !heroGrid || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		const r = heroGrid.getBoundingClientRect();
+		mx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
+		my = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+	}
+	function onHeroLeave() {
+		mx = 0;
+		my = 0;
+	}
 	const ZERO_ROWS = [
 		{ label: '초기 비용', was: '₩ 3,000만', now: '0원' },
 		{ label: '재고 부담', was: '300박스', now: '0박스' },
@@ -188,7 +204,7 @@
 
 	<div bind:this={slider} {onscroll} class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain">
 		<!-- 1 · 히어로 -->
-		<section class={slideCls} aria-label="소개">
+		<section class={slideCls} aria-label="소개" onpointermove={onHeroMove} onpointerleave={onHeroLeave}>
 			<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
 				<div
 					class="absolute top-5 -right-20 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.35),transparent)] lg:-top-[200px] lg:-right-[170px] lg:size-[780px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,0.5),rgba(255,122,61,0.16)_55%,transparent)] lg:opacity-85"
@@ -210,17 +226,23 @@
 				</div>
 				<!-- 데스크톱에만: 떠 있는 제형 카드 6장 -->
 				<div class="hidden min-w-0 lg:block {rise(0)}" style={d(2)}>
-					<div class="ml-auto grid max-w-[460px] grid-cols-3 gap-3.5">
+					<!-- 세 겹: 둥실(float) → 패럴랙스(마우스 따라 이동·기울기) → 카드(고정 기울기). 같은 요소에 두 transform 을 걸지 않기 위해 -->
+					<div bind:this={heroGrid} class="ml-auto grid max-w-[460px] grid-cols-3 gap-3.5 [perspective:900px]">
 						{#each HERO_TILES as t, i (t.name)}
 							<div class={FLOAT[i % 3]}>
 								<div
-									class="flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 {t.hot
-										? 'border-[1.5px] border-accent bg-accent/[0.14]'
-										: 'border-white/[0.09] bg-panel'}"
-									style="transform: {t.tilt}"
+									class="transition-transform duration-300 ease-out [transform-style:preserve-3d]"
+									style="transform: translate3d({(mx * DEPTH[i]).toFixed(1)}px, {(my * DEPTH[i]).toFixed(1)}px, 0) rotateX({(-my * 5).toFixed(1)}deg) rotateY({(mx * 5).toFixed(1)}deg)"
 								>
-									<TileIcon name={t.name} size={40} />
-									<span class="text-[13px] font-semibold text-fg/75">{t.name}</span>
+									<div
+										class="group flex h-[120px] flex-col items-center justify-center gap-2 rounded-[26px] border text-fg/90 transition-[border-color,background-color,box-shadow,color] duration-300 hover:border-accent hover:bg-accent/10 hover:text-fg hover:shadow-[0_0_28px_rgba(255,122,61,0.22)] {t.hot
+											? 'border-[1.5px] border-accent bg-accent/[0.14]'
+											: 'border-white/[0.09] bg-panel'}"
+										style="transform: {t.tilt}"
+									>
+										<span class="transition-transform duration-300 group-hover:scale-110"><TileIcon name={t.name} size={40} /></span>
+										<span class="text-[13px] font-semibold text-fg/75 transition-colors group-hover:text-fg">{t.name}</span>
+									</div>
 								</div>
 							</div>
 						{/each}
