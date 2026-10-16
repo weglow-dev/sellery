@@ -33,7 +33,18 @@ apps/branding/
   src/lib/
     utils/apply-options.ts      퍼널 선택지의 단일 출처 — 카테고리·제형·세부 종류(알약/캔디)·패키지·맛·미팅 시간대·랜딩 카테고리 4종 · 타일 설명 · 맛 색 견본 · 성분 제안 · 폼 액션 결과 타입(ApplyValues/ApplyErrors/ApplyResult)
     components/
-      Funnel.svelte               퍼널 본체 — 단계 상태 머신(intro→…→done) · 모바일 고정 헤더(뒤로 · 진행 세그먼트 · n/N · 고른 경로) · lg: 360px 사이드 레일(로고=처음으로 · 진행 · 질문 목록(지난 질문은 클릭해 되돌아감, 앞 질문은 잠금) · 안내) + 상단 [이전]·경로 바 · 질문 화면 · 연락처 <form>(hidden input 으로 일괄 POST · use:enhance 결과 처리) · 접수 완료
+      Funnel.svelte               퍼널의 상태 머신 + 셸 — 답 상태 · 단계 순서(제형에 따라 세부/패키지/맛 단계 유무) · 이동/자동 다음 · 레일 항목 · 연락처 검증과 use:enhance 결과 처리 · 완료 요약. 화면은 funnel/ 컴포넌트가 그린다
+      funnel/
+        shared.ts                 Step · RailItem 타입 + 단계 화면 공통 클래스(eyebrow/h1/helper/label/input/err · ctaOn/ctaOff · scrollCls/footCls/bodyCls)
+        StepHead.svelte           질문 머리(눈썹 · 두 줄 제목 · 도움말)
+        TileStep.svelte           타일 질문 한 벌(카테고리 · 제형 · 세부 종류 · 패키지 · 맛) — TileGroup + 오류 + "아직 모르겠어요" + [다음] 푸터, children 으로 덧붙임(최소 수량 카드)
+        IngredientStep.svelte     메인 성분 + 메모(선택) — 성분 제안 칩 토글, [다음]/[건너뛰기]
+        ContactStep.svelte        연락처 <form> — hidden 답 · 활동명 · 연락처(자동 하이픈) · 미팅 시간대 · 동의 · 오류/배너 · 제출 버튼 (use:enhance 는 Funnel 이 넘김)
+        DoneStep.svelte           접수 완료 — 요약 · 타임라인 · [홈으로]
+        UnsureButton.svelte · NextFoot.svelte   점선 "아직 모르겠어요" · [다음 →] 푸터
+        MobileHeader.svelte       모바일 고정 헤더(뒤로 · 진행 세그먼트 · n/N · 경로)
+        Rail.svelte               데스크톱 사이드 레일(로고 · 진행 · 질문 목록 · 안내)
+        DesktopBar.svelte         데스크톱 상단 바([이전] · 경로)
       Landing.svelte              intro 단계 = 랜딩의 틀 — 현재 슬라이드 번호 · 스크롤 스냅/키보드/점/◀▶ 이동 · 상단 바 · 하단 바([제조의뢰 시작하기]). 슬라이드 7장은 landing/ 컴포넌트에 `active`(지금 보이는 장인지)만 넘긴다
       landing/
         shared.ts                 슬라이드 공통 클래스(slideCls · twoCol · rightCol · eyebrowCls · h2Cls) + 진입 연출 헬퍼 rise()/d()
@@ -57,7 +68,7 @@ apps/branding/
   vercel.json                   리전 icn1
 ```
 
-`lib/components/`(컴포넌트) · `lib/server/`(서버 전용)는 다른 4개 앱과 같은 자리입니다. 화면을 고치려면 `landing/<N장>Slide.svelte`(랜딩 슬라이드 한 장) 또는 `Funnel.svelte`(질문·연락처·완료) 하나만 보면 되고, 컴포넌트 `<style>` 블록은 쓰지 않습니다(Tailwind 유틸리티 인라인 원칙 — 슬라이드 연출의 지연값처럼 계산되는 값만 `style=` 속성).
+`lib/components/`(컴포넌트) · `lib/server/`(서버 전용)는 다른 4개 앱과 같은 자리입니다. 화면을 고치려면 `landing/<N장>Slide.svelte`(랜딩 슬라이드 한 장) 또는 `funnel/<단계>Step.svelte`(질문 화면 하나) · 흐름을 바꾸려면 `Funnel.svelte` 만 보면 되고, 컴포넌트 `<style>` 블록은 쓰지 않습니다(Tailwind 유틸리티 인라인 원칙 — 슬라이드 연출의 지연값처럼 계산되는 값만 `style=` 속성).
 
 ## 3. 디자인 토큰 (`src/app.css` `@theme`)
 
