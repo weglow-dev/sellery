@@ -20,6 +20,7 @@
    ├─ /auth/{callback,confirm,signout}  /api/{checkout,payments/*,cron/reconcile,health,me}  │
    ├─ /assets/*  /email/celery.png  /favicon.svg  /robots.txt                  (static/)   │
    └─ apps/shop/vercel.json rewrites (프록시 — 브라우저 오리진은 sellery.life 그대로)          │
+        /influencer/oem, /influencer/oem/, /influencer/oem/:path*  ─→ sellery-branding.vercel.app  (브랜딩 랜딩 · base /influencer/oem · 2026-10-19 — 아래 /influencer/* 보다 먼저)
         /influencer, /influencer/, /influencer/:path*  ─→ sellery-influencer.vercel.app  (콘솔 SSR · 1~5단계)
         /brand, /brand/, /brand/:path*                 ─→ sellery-brand.vercel.app       (콘솔 SSR · 1~5단계 · 데모는 (demo) 그룹 PUBLIC_DEMO=1)
         /admin, /admin/, /admin/:path*                 ─→ sellery-admin.vercel.app       (데모 · 데모 띠 · noindex)
@@ -91,6 +92,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 
 | `source` | `destination` | 이유 |
 |---|---|---|
+| `/influencer/oem` · `/influencer/oem/` · `/influencer/oem/:path*` | `https://sellery-branding.vercel.app/influencer/oem…` | 셀러리 브랜딩(인플루언서 PB 제조의뢰) 랜딩 — `apps/branding` · Vercel `sellery-branding`(Root Directory `apps/branding`) · base `/influencer/oem` · **인플루언서 콘솔 규칙보다 앞에 둔다**(순서대로 첫 매치). 공개 주소 sellery.life/influencer/oem (2026-10-19) |
 | `/influencer` · `/influencer/` · `/influencer/:path*` | `https://sellery-influencer.vercel.app/influencer…` | 인플루언서 콘솔(SvelteKit · S5 PR-10 #20 부터). 콘솔 전용 `/influencer/auth/{confirm,signout}` 도 이 줄로 간다(결정 15) |
 | `/brand` · `/brand/` · `/brand/:path*` | `https://sellery-brand.vercel.app/brand…` | **브랜드 콘솔(SvelteKit SSR · 1단계부터)** — 콘솔 전용 `/brand/auth/{confirm,signout}` 도 이 줄로 간다. 데모 화면은 `(demo)` 그룹(`/brand/demo` · `/brand/demo-*` · `/brand/camps` …)으로 옮겨져 `PUBLIC_DEMO=1` 일 때만 열린다(데모 띠 + `noindex` + `/brand/robots.txt` disallow 는 그대로) |
 | `/admin` · `/admin/` · `/admin/:path*` | `https://sellery-admin.vercel.app/admin…` | 결정 D — 데모 노출(데모 띠 + `noindex` + `/admin/robots.txt` disallow) |

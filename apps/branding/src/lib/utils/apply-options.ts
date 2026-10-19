@@ -1,3 +1,4 @@
+import { base } from '$app/paths';
 /** 제조의뢰 퍼널의 선택지 — 폼 UI(components/Funnel.svelte · Landing.svelte)와 서버 검증(server/apply-action.ts)이 같이 참조하는 단일 출처. */
 
 /** 모든 카테고리 공통 최소 제작 수량 — 슬랙 접수 한 줄에 고정값으로만 찍는다. */
@@ -91,11 +92,11 @@ export const OPTION_DESC: Record<string, string> = {
 
 /** 맛 타일의 그림 — '/' 로 시작하면 static/ 의 아이콘 파일(48×48 라인 아이콘), 'plus' 는 점선 원에 + (기타). */
 export const FLAVOR_SWATCH: Record<string, string> = {
-	포도: '/grape.svg',
-	딸기: '/strawberry.svg',
-	복숭아: '/peach.svg',
-	레몬: '/lemon.svg',
-	'플레인(무맛)': '/plain.svg',
+	포도: `${base}/grape.svg`,
+	딸기: `${base}/strawberry.svg`,
+	복숭아: `${base}/peach.svg`,
+	레몬: `${base}/lemon.svg`,
+	'플레인(무맛)': `${base}/plain.svg`,
 	기타: 'plus'
 };
 
