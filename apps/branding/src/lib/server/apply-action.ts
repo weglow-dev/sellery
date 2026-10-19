@@ -11,6 +11,7 @@ import {
 	type ApplyValues
 } from '$lib/utils/apply-options';
 import { notifySlack } from './slack';
+import { OEM_PUBLIC_URL, sendMetaLeadEvent } from './meta-capi';
 import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 
 /** 제조의뢰 접수 폼 액션 — `/`(랜딩+퍼널)와 `/apply`(퍼널 바로 진입) 두 라우트가 같은 액션을 re-export 한다.
@@ -20,6 +21,15 @@ function str(v: FormDataEntryValue | null) {
 	return typeof v === 'string' ? v.trim() : '';
 }
 
+/** 어댑터에 따라 getClientAddress 가 throw 할 수 있다(프리렌더·로컬) */
+function safeClientAddress(get: () => string): string | null {
+	try {
+		return get() || null;
+	} catch {
+		return null;
+	}
+}
+
 /** 슬랙 한 줄용 — 미정 선택은 그렇게 보이게, 빈 값은 호출부가 정한 대체 문구로 */
 function show(v: string, empty: string) {
 	if (v === UNSURE) return '(미정 — 미팅 때 결정)';
@@ -27,8 +37,11 @@ function show(v: string, empty: string) {
 }
 
 export const applyActions: Actions = {
-	default: async ({ request }) => {
+	default: async ({ request, cookies, getClientAddress }) => {
 		const form = await request.formData();
+		// 메타 전환 API 중복 제거용 — 브라우저(use:enhance)가 넣어 보낸다. JS 없는 제출은 서버가 만든다
+		const eventIdRaw = str(form.get('event_id'));
+		const eventId = /^[A-Za-z0-9-]{8,64}$/.test(eventIdRaw) ? eventIdRaw : crypto.randomUUID();
 
 		const name = str(form.get('name'));
 		// JS 없이 제출돼 하이픈이 없거나 공백이 섞여 와도 같은 모양으로 맞춘다
@@ -88,6 +101,18 @@ export const applyActions: Actions = {
 			errors.form = '접수 전송에 실패했어요. 잠시 후 다시 시도해주세요 — 입력하신 내용은 그대로 남아 있어요.';
 			return fail(502, { errors, values });
 		}
+
+		// 메타 전환 API(Lead) — 픽셀과 같은 event_id. 실패해도 접수는 성공이다(로그만)
+		await sendMetaLeadEvent({
+			eventId,
+			phone,
+			category,
+			sourceUrl: `${OEM_PUBLIC_URL}/apply`,
+			ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || safeClientAddress(getClientAddress),
+			userAgent: request.headers.get('user-agent'),
+			fbp: cookies.get('_fbp') ?? null,
+			fbc: cookies.get('_fbc') ?? null
+		});
 
 		// JS 없이 새로고침되는 경로에서도 완료 화면의 요약이 채워지도록 값을 함께 돌려준다
 		return { success: true, values };

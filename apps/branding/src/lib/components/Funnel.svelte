@@ -2,6 +2,7 @@
 	import { tick, untrack } from 'svelte';
 	import { applyAction } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import { newEventId, track } from '$lib/meta-pixel';
 	import Landing from './Landing.svelte';
 	import MobileHeader from './funnel/MobileHeader.svelte';
 	import Rail from './funnel/Rail.svelte';
@@ -220,8 +221,17 @@
 		if (digits.length >= 10) untrack(() => errors.phone && (errors = { ...errors, phone: undefined }));
 	});
 
+	// 메타 ViewContent — 랜딩에서 퍼널로 처음 들어온 순간 1회
+	let funnelTracked = false;
+	$effect(() => {
+		if (step !== 'intro' && step !== 'done' && !funnelTracked) {
+			funnelTracked = true;
+			track('ViewContent', { content_name: 'oem_funnel' });
+		}
+	});
+
 	/** 연락처 <form> 의 use:enhance — 빠진 칸이 있으면 서버로 보내지 않고 안내 + 그 칸으로 스크롤, 결과는 단계 전환으로 반영 */
-	const submit: SubmitFunction = ({ cancel }) => {
+	const submit: SubmitFunction = ({ cancel, formData }) => {
 		const missing = validateContact();
 		if (Object.keys(missing).length > 0) {
 			errors = { ...errors, ...missing };
@@ -233,11 +243,15 @@
 		}
 		submitting = true;
 		submitError = '';
+		// 메타 전환 — 픽셀(Lead)과 서버 전환 API 가 같은 event_id 를 써서 중복 제거
+		const eventId = newEventId();
+		formData.set('event_id', eventId);
 		return async ({ result }) => {
 			submitting = false;
 			if (result.type === 'success') {
 				errors = {};
 				step = 'done';
+				track('Lead', { content_name: 'oem_apply', content_category: category }, eventId);
 			} else if (result.type === 'failure') {
 				errors = (result.data?.errors as ApplyErrors | undefined) ?? {};
 				const target = stepOfErrors(errors);
