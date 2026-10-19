@@ -5,6 +5,18 @@
   ],
   "rewrites": [
     {
+      "source": "/influencer/oem",
+      "destination": "https://sellery-branding.vercel.app/influencer/oem"
+    },
+    {
+      "source": "/influencer/oem/",
+      "destination": "https://sellery-branding.vercel.app/influencer/oem/"
+    },
+    {
+      "source": "/influencer/oem/:path*",
+      "destination": "https://sellery-branding.vercel.app/influencer/oem/:path*"
+    },
+    {
       "source": "/influencer",
       "destination": "https://sellery-influencer.vercel.app/influencer"
     },
