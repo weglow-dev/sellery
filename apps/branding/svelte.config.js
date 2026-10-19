@@ -10,6 +10,9 @@ export default {
 	compilerOptions: { runes: true },
 	kit: {
 		adapter: adapter({ runtime: 'nodejs22.x' }),
-		paths: { base: '/influencer/oem' }
+		paths: { base: '/influencer/oem' },
+		// 브라우저 오리진은 sellery.life, 이 앱이 보는 호스트는 sellery-branding.vercel.app — 다른 콘솔과 같은 이유(§8.3)로 trustedOrigins.
+		// 없으면 제조의뢰 접수 POST 가 "Cross-site POST form submissions are forbidden" 403 (2026-10-19 대표 QA — 버튼이 안 넘어감)
+		csrf: { trustedOrigins: ['https://sellery.life'] }
 	}
 };
