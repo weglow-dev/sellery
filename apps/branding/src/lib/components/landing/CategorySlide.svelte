@@ -66,12 +66,15 @@
 					type="button"
 					aria-pressed={on}
 					onclick={() => pickCategory(i)}
-					class="flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] short:gap-2.5 short:p-3 lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
+					class="group flex flex-col gap-4 rounded-[20px] border p-4 text-left text-fg hover:border-accent/60 active:scale-[0.97] short:gap-2.5 short:p-3 lg:min-h-[180px] lg:gap-5 lg:rounded-3xl lg:p-5 {on
 						? 'border-accent bg-accent/[0.12]'
 						: 'border-white/[0.08] bg-white/[0.04]'} {blinkIdx === i && !on ? 'motion-safe:animate-blink' : ''}"
 					style="opacity:{active ? 1 : 0};transform:{active ? 'none' : 'translateY(14px)'};transition:border-color .2s,background-color .2s,transform .4s cubic-bezier(.2,.8,.2,1) {0.08 + i * 0.07}s,opacity .4s {0.08 + i * 0.07}s"
 				>
-					<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 short:size-11 lg:size-16"><TileIcon name={c.icon} size={36} /></span>
+					<!-- 호버하면 아이콘 칸에 옅은 주황이 들고 아이콘이 살짝 커지며 포인트색으로 — 터치 기기엔 영향 없음 -->
+					<span class="grid size-14 place-items-center rounded-2xl bg-white/5 text-fg/90 transition-colors duration-300 group-hover:bg-accent/15 group-hover:text-accent short:size-11 lg:size-16">
+						<span class="flex transition-transform duration-300 ease-out group-hover:scale-110"><TileIcon name={c.icon} size={36} /></span>
+					</span>
 					<span>
 						<span class="block text-[17px] font-bold short:text-[15px] lg:text-lg">{c.title}</span>
 						<span class="mt-1 block text-[13px] leading-[1.45] text-fg/60 short:mt-0.5 short:text-xs">{c.desc}</span>
