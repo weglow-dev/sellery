@@ -42,17 +42,21 @@
 				{#each BURDENS as b, i (b.t)}
 					{@const on = burdenSel === i}
 					<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
+						<!-- 칩이 떠난 왼쪽 칸: 떠나는 시점(이동 시작)부터 옅은 주황 잔상이 남았다 사라진다 -->
+						<div
+							class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl {active ? 'motion-safe:animate-cell-afterglow' : ''}"
+							style="animation-delay:{0.3 + i * 0.3}s"
+						></div>
 						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
-						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
-						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
+						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너가고, 도착하는 순간(이동 .55초 뒤) 한 번 번쩍인다 -->
 						<button
 							type="button"
 							aria-pressed={on}
 							onclick={() => (burdenSel = i)}
 							class="absolute top-0 left-0 flex h-14 w-[calc(50%-4px)] items-center justify-between rounded-[14px] border px-4 text-[15px] font-bold short:h-[42px] short:rounded-xl short:px-3 short:text-xs lg:w-[calc(50%-6px)] {on
 								? 'border-accent bg-accent/[0.14] text-accent'
-								: 'border-white/[0.12] bg-panel text-fg/85'}"
-							style="transform:{active ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
+								: 'border-white/[0.12] bg-panel text-fg/85'} {active ? 'motion-safe:animate-chip-flash' : ''}"
+							style="transform:{active ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s;animation-delay:{0.3 + i * 0.3 + 0.5}s"
 						>
 							<span>{b.t}</span><span class="text-[13px] font-extrabold opacity-80 short:text-xs">{b.n}</span>
 						</button>
