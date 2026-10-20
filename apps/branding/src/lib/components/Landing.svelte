@@ -18,12 +18,17 @@
 	const SLIDES = 7;
 	let slider = $state<HTMLDivElement>();
 	let slide = $state(0);
+	// 가로 스크롤 진행도(0 ~ 6, 슬라이드 사이 값 포함) — 점 인디케이터가 이 값으로 흐른다
+	let progress = $state(0);
 
 	function onscroll() {
 		if (!slider) return;
-		const i = Math.round(slider.scrollLeft / slider.clientWidth);
+		progress = slider.scrollLeft / slider.clientWidth;
+		const i = Math.round(progress);
 		if (i !== slide) slide = i;
 	}
+	// 점 인디케이터 — 현재 장에 가까울수록 길고 진하다(0 → 1). 넘기는 동안 두 점 사이를 흐르듯 옮겨 간다
+	const dotWeight = (i: number) => Math.max(0, 1 - Math.abs(progress - i));
 	function goSlide(i: number) {
 		const n = Math.max(0, Math.min(SLIDES - 1, i));
 		slider?.scrollTo({ left: n * slider.clientWidth, behavior: 'smooth' });
@@ -73,14 +78,19 @@
 			</button>
 			<div class="flex items-center gap-1.5" role="tablist" aria-label="슬라이드">
 				{#each { length: SLIDES } as _, i (i)}
+					{@const w = dotWeight(i)}
+					<!-- 6px 점이 현재 장에서 22px 알약으로 — 스크롤 진행도에 따라 길이와 색이 연속으로 바뀐다 -->
 					<button
 						type="button"
 						role="tab"
 						aria-selected={i === slide}
 						aria-label="{i + 1}번째 슬라이드"
 						onclick={() => goSlide(i)}
-						class="h-1.5 rounded-full transition-[width,background-color] duration-300 {i === slide ? 'w-[22px] bg-accent' : 'w-1.5 bg-white/20'}"
-					></button>
+						class="relative h-1.5 overflow-hidden rounded-full bg-white/20"
+						style="width:{(6 + 16 * w).toFixed(1)}px"
+					>
+						<span class="absolute inset-0 rounded-full bg-accent" style="opacity:{w.toFixed(3)}"></span>
+					</button>
 				{/each}
 			</div>
 			<button type="button" aria-label="다음 슬라이드" onclick={() => goSlide(slide + 1)} class={navBtn}>
