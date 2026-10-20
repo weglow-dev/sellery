@@ -33,9 +33,16 @@
 		const n = Math.max(0, Math.min(SLIDES - 1, i));
 		slider?.scrollTo({ left: n * slider.clientWidth, behavior: 'smooth' });
 	}
-	// 데스크톱: 좌우 화살표 키로도 넘긴다 (이 컴포넌트는 intro 단계에서만 마운트된다)
+	// 마지막 장에서는 ▶(와 → 키)가 "다음 장"이 아니라 퍼널 시작이다 — 버튼도 포인트색 CTA 로 바뀐다
+	const last = $derived(slide === SLIDES - 1);
+	function next() {
+		if (last) onstart();
+		else goSlide(slide + 1);
+	}
+	// 데스크톱: 좌우 화살표 키로도 넘긴다 (이 컴포넌트는 intro 단계에서만 마운트된다). 브라우저 단축키(Cmd/Alt+화살표)는 건드리지 않는다
 	function onkeydown(e: KeyboardEvent) {
-		if (e.key === 'ArrowRight') goSlide(slide + 1);
+		if (e.altKey || e.metaKey || e.ctrlKey) return;
+		if (e.key === 'ArrowRight') next();
 		else if (e.key === 'ArrowLeft') goSlide(slide - 1);
 	}
 
@@ -44,8 +51,14 @@
 	onMount(() => (ready = true));
 	const active = (i: number) => ready && slide === i;
 
-	const navBtn =
-		'hidden size-11 place-items-center rounded-full border border-white/[0.14] bg-white/[0.04] text-fg transition hover:border-accent hover:text-accent lg:grid';
+	// ◀ ▶ — 평소엔 유리 버튼, 마지막 장의 ▶ 만 포인트색으로 채워 "여기서 시작"을 알린다
+	const navBtn = 'group relative hidden size-11 place-items-center rounded-full border transition lg:grid';
+	const navIdle = 'border-white/[0.14] bg-white/[0.04] text-fg hover:border-accent hover:text-accent';
+	const navCta = 'border-accent bg-accent text-bg hover:border-accent-deep hover:bg-accent-deep';
+	// 키보드 힌트 툴팁 — 마우스를 올리거나 키보드로 포커스하면 버튼 위에 ← → 가 떠오른다 (읽기 전용이라 보조기기에는 숨김)
+	const hint =
+		'pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 flex -translate-x-1/2 translate-y-1 items-center gap-1.5 rounded-lg border border-white/10 bg-[#1b1d23] px-2 py-1 text-[11px] font-semibold whitespace-nowrap text-fg/80 opacity-0 shadow-lg transition group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100';
+	const kbd = 'grid size-[18px] place-items-center rounded-[5px] border border-white/15 bg-white/10 font-sans text-xs leading-none text-fg';
 </script>
 
 <svelte:window {onkeydown} />
@@ -73,8 +86,9 @@
 	<!-- 하단 — 모바일: 점 · 시작 버튼 · 안내 세 줄 / 데스크톱: [◀ 점 ▶] … 안내 · 시작 버튼 한 줄 -->
 	<div class="flex shrink-0 flex-col gap-3.5 px-5 pt-2.5 pb-7 short:gap-2.5 short:pt-2 short:pb-5 lg:mx-auto lg:w-full lg:max-w-[1248px] lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:px-16 lg:pt-4 lg:pb-9">
 		<div class="flex items-center justify-center gap-1.5 lg:gap-[18px]">
-			<button type="button" aria-label="이전 슬라이드" onclick={() => goSlide(slide - 1)} class={navBtn}>
+			<button type="button" aria-label="이전 슬라이드" onclick={() => goSlide(slide - 1)} class="{navBtn} {navIdle}">
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+				<span class={hint} aria-hidden="true"><kbd class={kbd}>←</kbd>이전</span>
 			</button>
 			<div class="flex items-center gap-1.5" role="tablist" aria-label="슬라이드">
 				{#each { length: SLIDES } as _, i (i)}
@@ -93,8 +107,9 @@
 					</button>
 				{/each}
 			</div>
-			<button type="button" aria-label="다음 슬라이드" onclick={() => goSlide(slide + 1)} class={navBtn}>
+			<button type="button" aria-label={last ? '제조의뢰 시작하기' : '다음 슬라이드'} onclick={next} class="{navBtn} {last ? navCta : navIdle}">
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+				<span class={hint} aria-hidden="true"><kbd class={kbd}>→</kbd>{last ? '제조의뢰 시작' : '다음'}</span>
 			</button>
 		</div>
 		<div class="flex flex-col gap-3.5 short:gap-2.5 lg:flex-row lg:items-center lg:gap-5">
