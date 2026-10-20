@@ -18,12 +18,35 @@
 	const SLIDES = 7;
 	let slider = $state<HTMLDivElement>();
 	let slide = $state(0);
+	// 가로 스크롤 진행도(0 ~ 6, 슬라이드 사이 값 포함) — 공용 글로우가 이 값으로 흐른다
+	let progress = $state(0);
 
 	function onscroll() {
 		if (!slider) return;
-		const i = Math.round(slider.scrollLeft / slider.clientWidth);
+		progress = slider.scrollLeft / slider.clientWidth;
+		const i = Math.round(progress);
 		if (i !== slide) slide = i;
 	}
+
+	// 공용 배경 글로우 — 슬라이드마다 따로 두지 않고 하나가 위치 따라 흐른다. 장마다 "있어야 할 자리"를 정해 두고 그 사이를 보간.
+	// x · y 는 화면 비율(%), s 는 크기 배율, o 는 밝기. 1장(오른쪽 위) → 5장(왼쪽 가운데) → 7장(가운데 위, 가장 밝음)
+	const GLOW: { x: number; y: number; s: number; o: number }[] = [
+		{ x: 88, y: 22, s: 1.0, o: 0.42 }, // 1 히어로
+		{ x: 72, y: 62, s: 0.8, o: 0.14 }, // 2 0 에서 시작
+		{ x: 28, y: 34, s: 0.8, o: 0.14 }, // 3 부담은 셀러리가
+		{ x: 76, y: 72, s: 0.85, o: 0.16 }, // 4 진행 과정
+		{ x: 6, y: 52, s: 1.0, o: 0.26 }, // 5 브랜드 스토리
+		{ x: 62, y: 18, s: 0.8, o: 0.14 }, // 6 카테고리
+		{ x: 50, y: -8, s: 1.45, o: 0.46 } // 7 마지막
+	];
+	const glow = $derived.by(() => {
+		const p = Math.max(0, Math.min(SLIDES - 1, progress));
+		const a = GLOW[Math.floor(p)];
+		const b = GLOW[Math.min(SLIDES - 1, Math.ceil(p))];
+		const t = p - Math.floor(p);
+		const mix = (k: 'x' | 'y' | 's' | 'o') => a[k] + (b[k] - a[k]) * t;
+		return `left:${mix('x').toFixed(2)}%;top:${mix('y').toFixed(2)}%;transform:translate(-50%,-50%) scale(${mix('s').toFixed(3)});opacity:${mix('o').toFixed(3)}`;
+	});
 	function goSlide(i: number) {
 		const n = Math.max(0, Math.min(SLIDES - 1, i));
 		slider?.scrollTo({ left: n * slider.clientWidth, behavior: 'smooth' });
@@ -46,6 +69,13 @@
 <svelte:window {onkeydown} />
 
 <div class="relative flex min-h-0 flex-1 flex-col">
+	<!-- 공용 배경 글로우 — 슬라이드 뒤에서 스크롤 위치 따라 흐른다 (슬라이드 자체 배경은 투명) -->
+	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
+		<div
+			class="absolute size-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.9),rgba(255,122,61,0.3)_55%,transparent)] will-change-[transform,opacity] lg:size-[900px]"
+			style={glow}
+		></div>
+	</div>
 	<!-- 상단 바 — 슬라이드 위에 떠 있고 터치는 통과시킨다 -->
 	<div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-[60px] items-center justify-between px-5 lg:h-[72px] lg:px-16">
 		<div class="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-fg">
@@ -55,7 +85,7 @@
 		<span class="text-xs font-semibold text-fg/50 tabular-nums" aria-live="polite">{slide + 1} / {SLIDES}</span>
 	</div>
 
-	<div bind:this={slider} {onscroll} class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain">
+	<div bind:this={slider} {onscroll} class="no-scrollbar relative flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain">
 		<HeroSlide active={active(0)} onnext={() => goSlide(1)} />
 		<ZeroSlide active={active(1)} />
 		<BurdenSlide active={active(2)} />

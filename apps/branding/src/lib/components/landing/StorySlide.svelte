@@ -13,11 +13,6 @@
 </script>
 
 <section class={slideCls} aria-label="브랜드가 만들어지는 과정">
-	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
-		<div
-			class="absolute bottom-[120px] -left-[60px] size-[300px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.22),transparent)] lg:top-1/2 lg:bottom-auto lg:-left-[120px] lg:size-[760px] lg:-translate-y-[55%]"
-		></div>
-	</div>
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>브랜드가 만들어지는 과정</p>

@@ -50,11 +50,6 @@
 </script>
 
 <section class={slideCls} aria-label="시작하기">
-	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
-		<div
-			class="absolute -top-[200px] left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.42),transparent)] lg:-top-[520px] lg:h-[1000px] lg:w-[1600px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,0.38),transparent)]"
-		></div>
-	</div>
 	<div class="{twoCol} flex flex-col lg:grid">
 		<div class="relative order-2 lg:order-1">
 			<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15] {rise(active)}" style={d(0)}>다음 웰니스 브랜드의<br />주인공은 당신이에요</h2>

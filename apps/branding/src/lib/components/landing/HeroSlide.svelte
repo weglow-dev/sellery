@@ -20,10 +20,8 @@
 </script>
 
 <section class={slideCls} aria-label="소개">
+	<!-- 배경 글로우는 Landing.svelte 의 공용 글로우가 슬라이드 위치 따라 흐른다 — 여기엔 YOU 글자만 -->
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
-		<div
-			class="absolute top-5 -right-20 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.35),transparent)] lg:-top-[200px] lg:-right-[170px] lg:size-[780px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,0.5),rgba(255,122,61,0.16)_55%,transparent)] lg:opacity-85"
-		></div>
 		<div class="absolute top-16 left-6 text-[150px] leading-none font-extrabold tracking-[-0.06em] text-white/5 select-none lg:top-auto lg:-right-5 lg:bottom-10 lg:left-auto lg:text-[260px]">YOU</div>
 	</div>
 	<div class={twoCol}>
