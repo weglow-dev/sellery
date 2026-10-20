@@ -44,7 +44,8 @@
 					<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
 						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
 						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
-						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다 -->
+						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다.
+						     떠날 때는 지연 없이 즉시 제자리로 — 되돌아가는 1.5초 안에 다시 들어오면 앞 칩만 다시 건너가고 뒤 칩은 오른쪽에 남는 어긋남을 막는다 -->
 						<button
 							type="button"
 							aria-pressed={on}
@@ -52,7 +53,7 @@
 							class="absolute top-0 left-0 flex h-14 w-[calc(50%-4px)] items-center justify-between rounded-[14px] border px-4 text-[15px] font-bold short:h-[42px] short:rounded-xl short:px-3 short:text-xs lg:w-[calc(50%-6px)] {on
 								? 'border-accent bg-accent/[0.14] text-accent'
 								: 'border-white/[0.12] bg-panel text-fg/85'}"
-							style="transform:{active ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform .55s cubic-bezier(.2,.8,.2,1) {0.3 + i * 0.3}s,background-color .3s,border-color .3s,color .3s"
+							style="transform:{active ? `translateX(calc(100% + ${desktop ? 12 : 8}px))` : 'none'};transition:transform {active ? `.55s cubic-bezier(.2,.8,.2,1) ${0.3 + i * 0.3}s` : '0s'},background-color .3s,border-color .3s,color .3s"
 						>
 							<span>{b.t}</span><span class="text-[13px] font-extrabold opacity-80 short:text-xs">{b.n}</span>
 						</button>
@@ -62,7 +63,7 @@
 			<div class="mt-2.5 grid grid-cols-2 items-stretch gap-2 short:mt-2 lg:mt-3 lg:gap-3">
 				<div
 					class="rounded-2xl bg-accent p-[18px] text-[15px] leading-[1.35] font-extrabold text-bg short:rounded-[14px] short:p-2.5 short:text-xs"
-					style="opacity:{active ? 1 : 0};transform:{active ? 'none' : 'translateY(8px)'};transition:opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s"
+					style="opacity:{active ? 1 : 0};transform:{active ? 'none' : 'translateY(8px)'};transition:{active ? 'opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s' : 'none'}"
 				>
 					브랜드에만<br />집중하기
 				</div>
