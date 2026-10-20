@@ -3,7 +3,8 @@
 
 	/** 타일형 단일 선택 — 퍼널에서는 탭하면 바로 다음 단계로 넘어가므로 라디오 대신 버튼이다(답은 연락처 화면의 hidden input 으로 보낸다).
 	 *  layout 별 모양(모바일 → lg 데스크톱): grid = 아이콘 위·글자 아래 카드 2열 → 4열(카테고리), grid-lg = 60px 아이콘 칸 2열 → 3열(제형),
-	 *  row = 아이콘 왼쪽 가로 카드 → 3열 세로 카드(세부 종류 · 패키지), swatch = 아이콘 위·이름 아래 3열 → 6열(맛). 선택되면 체크 배지가 톡 튀어나온다. */
+	 *  row = 아이콘 왼쪽 가로 카드 → 3열 세로 카드(세부 종류 · 패키지), swatch = 아이콘 위·이름 아래 3열 → 6열(맛).
+ *  선택되면 타일이 살짝 커지며(1.03) 체크 배지가 톡 튀어나온다 — 자동으로 넘어가는 0.28초 동안 "눌렸다"가 보이도록. */
 	let {
 		options,
 		value,
@@ -61,8 +62,8 @@
 			type="button"
 			aria-pressed={on}
 			onclick={() => onpick(opt)}
-			class="relative rounded-[20px] border-[1.5px] text-left text-fg transition-[border-color,background-color,transform] duration-200 active:scale-[0.97] {tile} {on
-				? 'border-accent bg-accent/10'
+			class="relative rounded-[20px] border-[1.5px] text-left text-fg transition-[border-color,background-color,transform,scale] duration-200 active:scale-[0.97] {tile} {on
+				? 'z-10 scale-[1.03] border-accent bg-accent/10'
 				: 'border-white/[0.08] bg-white/[0.03] hover:border-accent/60'}"
 		>
 			{#if layout === 'swatch'}
