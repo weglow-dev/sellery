@@ -99,8 +99,19 @@
 		{#if formError}
 			<p role="alert" class="mb-3 rounded-2xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm font-semibold text-fg lg:max-w-[900px] lg:self-stretch">{formError}</p>
 		{/if}
-		<button type="submit" disabled={submitting} class="{canSubmit ? ctaOn : `${ctaOff} text-fg/60 hover:bg-white/[0.12]`} disabled:pointer-events-none disabled:opacity-60">
-			{submitting ? '접수하는 중…' : '제조의뢰 접수하기'}
+		<!-- 접수 중에는 버튼을 흐리게 하지 않고 포인트색 그대로 둔 채 스피너를 돌린다 — "멈춘 게 아니라 보내는 중"이 보이도록 -->
+		<button
+			type="submit"
+			disabled={submitting}
+			aria-busy={submitting}
+			class="{canSubmit ? ctaOn : `${ctaOff} text-fg/60 hover:bg-white/[0.12]`} disabled:pointer-events-none {submitting ? '' : 'disabled:opacity-60'}"
+		>
+			{#if submitting}
+				<span aria-hidden="true" class="size-[18px] shrink-0 animate-spin rounded-full border-[2.5px] border-current border-t-transparent"></span>
+				<span>접수하는 중…</span>
+			{:else}
+				제조의뢰 접수하기
+			{/if}
 		</button>
 	</div>
 </form>
