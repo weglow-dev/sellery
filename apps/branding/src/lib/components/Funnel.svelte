@@ -3,6 +3,7 @@
 	import { applyAction } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { newEventId, track } from '$lib/meta-pixel';
+	import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 	import Landing from './Landing.svelte';
 	import MobileHeader from './funnel/MobileHeader.svelte';
 	import Rail from './funnel/Rail.svelte';
@@ -209,14 +210,16 @@
 
 	// ── 연락처 · 제출 ─────────────────────────────────────────
 	const digits = $derived(phone.replace(/\D/g, ''));
-	const canSubmit = $derived(name.trim() !== '' && digits.length >= 10 && agree);
+	// 서버(apply-action.ts)와 같은 규칙 — 01x 로 시작하는 휴대폰 번호만
+	const phoneOk = $derived(PHONE_RE.test(formatPhone(phone)));
+	const canSubmit = $derived(name.trim() !== '' && phoneOk && agree);
 
 	// 제출 버튼은 항상 눌리게 두고, 빠진 게 있으면 서버와 같은 문구로 그 칸 아래에 안내한다 — 동의 없이 눌렀을 때 "왜 안 되지?" 가 없도록
 	function validateContact(): ApplyErrors {
 		const e: ApplyErrors = {};
 		if (!name.trim()) e.name = '활동명 또는 채널을 입력해주세요.';
 		if (!digits) e.phone = '연락처를 입력해주세요.';
-		else if (digits.length < 10) e.phone = '연락처는 010-0000-0000 형식으로 입력해주세요.';
+		else if (!phoneOk) e.phone = '연락처는 010-0000-0000 형식으로 입력해주세요.';
 		if (!agree) e.agree = '개인정보 수집에 동의해주세요.';
 		return e;
 	}
@@ -228,7 +231,7 @@
 		if (name.trim()) untrack(() => errors.name && (errors = { ...errors, name: undefined }));
 	});
 	$effect(() => {
-		if (digits.length >= 10) untrack(() => errors.phone && (errors = { ...errors, phone: undefined }));
+		if (phoneOk) untrack(() => errors.phone && (errors = { ...errors, phone: undefined }));
 	});
 
 	// 메타 ViewContent — 랜딩에서 퍼널로 처음 들어온 순간 1회
@@ -240,15 +243,19 @@
 		}
 	});
 
-	/** 연락처 <form> 의 use:enhance — 빠진 칸이 있으면 서버로 보내지 않고 안내 + 그 칸으로 스크롤, 결과는 단계 전환으로 반영 */
+	/** 연락처 <form> 의 use:enhance — 빠진 칸이 있으면 서버로 보내지 않고 안내 + 첫 번째 빈 칸으로 포커스·스크롤, 결과는 단계 전환으로 반영 */
 	const submit: SubmitFunction = ({ cancel, formData }) => {
 		const missing = validateContact();
 		if (Object.keys(missing).length > 0) {
 			errors = { ...errors, ...missing };
 			cancel();
-			// 모바일은 버튼이 아래 고정이라 안내가 화면 밖에 있을 수 있다 — 첫 번째로 빠진 칸으로 데려간다
-			const first = (['name', 'phone', 'agree'] as const).find((k) => missing[k]);
-			tick().then(() => document.getElementById(first === 'agree' ? 'agree-box' : first!)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+			// 활동명 · 연락처 · 동의 순으로 첫 번째 빈 칸에 커서를 옮긴다(모바일은 키보드가 바로 뜬다).
+			// 버튼이 아래 고정이라 안내가 화면 밖에 있을 수 있으니 그 칸(동의는 상자 전체)이 가운데 오게 스크롤
+			const first = (['name', 'phone', 'agree'] as const).find((k) => missing[k])!;
+			tick().then(() => {
+				document.getElementById(first)?.focus({ preventScroll: true });
+				document.getElementById(first === 'agree' ? 'agree-box' : first)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+			});
 			return;
 		}
 		submitting = true;

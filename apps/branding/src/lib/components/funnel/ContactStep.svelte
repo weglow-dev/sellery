@@ -41,13 +41,25 @@
 	<div class="{scrollCls} pb-6">
 		<StepHead eyebrow="마지막 · 연락처" title={['마지막이에요.', '어디로 연락드릴까요?']} help="전담 매니저가 내용을 확인한 뒤 미팅 일정을 제안드려요." />
 		<div class="mt-6 flex flex-col gap-[18px] {bodyCls} lg:mt-7 lg:grid lg:grid-cols-2 lg:gap-x-6">
+			<!-- 활동명 · 연락처 · 동의는 필수 — 비운 채 [접수하기]를 누르면 퍼널(submit)이 서버로 보내지 않고 첫 번째 빈 칸에 포커스를 옮기며 아래 안내를 띄운다 -->
 			<div class="flex flex-col gap-2">
-				<label for="name" class={labelCls}>활동명 또는 채널</label>
-				<input id="name" name="name" bind:value={name} type="text" autocomplete="nickname" placeholder="@instagram 또는 유튜브 채널명" class="{inputCls} h-14" />
-				{#if errors.name}<p class={errCls}>{errors.name}</p>{/if}
+				<label for="name" class={labelCls}>활동명 또는 채널 <span class="font-medium text-accent">(필수)</span></label>
+				<input
+					id="name"
+					name="name"
+					bind:value={name}
+					type="text"
+					autocomplete="nickname"
+					placeholder="@instagram 또는 유튜브 채널명"
+					aria-required="true"
+					aria-invalid={errors.name ? 'true' : undefined}
+					aria-describedby={errors.name ? 'name-error' : undefined}
+					class="{inputCls} h-14 {errors.name ? 'border-accent' : ''}"
+				/>
+				{#if errors.name}<p id="name-error" class={errCls}>{errors.name}</p>{/if}
 			</div>
 			<div class="flex flex-col gap-2">
-				<label for="phone" class={labelCls}>연락처</label>
+				<label for="phone" class={labelCls}>연락처 <span class="font-medium text-accent">(필수)</span></label>
 				<input
 					id="phone"
 					name="phone"
@@ -58,9 +70,12 @@
 					maxlength="13"
 					autocomplete="tel"
 					placeholder="010-0000-0000"
-					class="{inputCls} h-14 tabular-nums"
+					aria-required="true"
+					aria-invalid={errors.phone ? 'true' : undefined}
+					aria-describedby={errors.phone ? 'phone-error' : undefined}
+					class="{inputCls} h-14 tabular-nums {errors.phone ? 'border-accent' : ''}"
 				/>
-				{#if errors.phone}<p class={errCls}>{errors.phone}</p>{/if}
+				{#if errors.phone}<p id="phone-error" class={errCls}>{errors.phone}</p>{/if}
 			</div>
 			<div class="flex flex-col gap-2 lg:col-span-2">
 				<p id="slot-label" class={labelCls}>미팅 선호 시간대 <span class="font-medium text-fg/50">(선택)</span></p>
@@ -87,12 +102,21 @@
 					? 'border-accent bg-accent/[0.06]'
 					: 'border-transparent bg-white/[0.03]'}"
 			>
-				<input name="agree" type="checkbox" bind:checked={agree} class="m-0 size-[22px] shrink-0 accent-[color:var(--color-accent)]" />
+				<input
+					id="agree"
+					name="agree"
+					type="checkbox"
+					bind:checked={agree}
+					aria-required="true"
+					aria-invalid={errors.agree ? 'true' : undefined}
+					aria-describedby={errors.agree ? 'agree-error' : undefined}
+					class="m-0 size-[22px] shrink-0 accent-[color:var(--color-accent)]"
+				/>
 				<span class="text-[13px] leading-[1.55] text-fg/70">
-					<b class="font-bold text-fg">(필수)</b> 남겨주신 연락처는 제조의뢰 상담 목적으로만 사용되며, 상담 종료 후 파기돼요.
+					<b class="font-bold text-accent">(필수)</b> 남겨주신 연락처는 제조의뢰 상담 목적으로만 사용되며, 상담 종료 후 파기돼요.
 				</span>
 			</label>
-			{#if errors.agree}<p role="alert" class="{errCls} -mt-2 lg:col-span-2">{errors.agree}</p>{/if}
+			{#if errors.agree}<p id="agree-error" role="alert" class="{errCls} -mt-2 lg:col-span-2">{errors.agree}</p>{/if}
 		</div>
 	</div>
 	<div class={footCls}>
