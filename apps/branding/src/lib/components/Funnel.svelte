@@ -29,6 +29,7 @@
 	} from '$lib/utils/apply-options';
 
 	/* 한 화면 한 질문 퍼널 — 첫 화면(intro)이 랜딩 슬라이드다. 타일을 고르면 0.28초 뒤 다음 단계로 넘어가고, 헤더의 뒤로 가기로 되돌아온다.
+	   앞으로 갈 때는 새 화면이 오른쪽에서, 되돌아갈 때는 왼쪽에서 들어온다(setStep 이 방향을 정한다).
 	   답은 전부 이 컴포넌트 상태에 모아 두었다가 마지막(연락처) 단계의 <form> 에서 hidden input 으로 한 번에 POST 한다.
 	   여기는 상태 머신(답 · 단계 순서 · 이동 · 제출 결과)과 셸 배치만 맡고, 화면은 funnel/ 의 컴포넌트들이 그린다. */
 
@@ -154,9 +155,16 @@
 	});
 
 	// ── 이동 ─────────────────────────────────────────────────
+	// 전환 방향 — 앞으로 가면 새 화면이 오른쪽에서, [이전]·레일로 되돌아가면 왼쪽에서 들어온다. 단계 순서(steps)의 앞뒤로 정한다
+	let dir = $state<1 | -1>(1);
+	function setStep(next: Step) {
+		if (next === step) return;
+		dir = steps.indexOf(next) < steps.indexOf(step) ? -1 : 1;
+		step = next;
+	}
 	function go(delta: number) {
 		const i = Math.max(0, steps.indexOf(step));
-		step = steps[Math.max(0, Math.min(steps.length - 1, i + delta))];
+		setStep(steps[Math.max(0, Math.min(steps.length - 1, i + delta))]);
 	}
 	let advanceTimer: ReturnType<typeof setTimeout> | undefined;
 	function advance() {
@@ -194,7 +202,7 @@
 	// 랜딩 카테고리 타일 → 그 카테고리가 골라진 채로 첫 질문부터
 	function startWith(cat: string) {
 		category = cat;
-		step = 'category';
+		setStep('category');
 	}
 
 	// ── 연락처 · 제출 ─────────────────────────────────────────
@@ -250,12 +258,12 @@
 			submitting = false;
 			if (result.type === 'success') {
 				errors = {};
-				step = 'done';
+				setStep('done');
 				track('Lead', { content_name: 'oem_apply', content_category: category }, eventId);
 			} else if (result.type === 'failure') {
 				errors = (result.data?.errors as ApplyErrors | undefined) ?? {};
 				const target = stepOfErrors(errors);
-				step = target && steps.includes(target) ? target : 'contact';
+				setStep(target && steps.includes(target) ? target : 'contact');
 			} else if (result.type === 'error') {
 				// 기본 에러 페이지로 넘어가면 입력값이 날아간다 — 폼을 그대로 두고 배너만
 				submitError = '일시적인 오류가 났어요. 잠시 후 다시 시도해주세요';
@@ -299,24 +307,24 @@
 		agree = false;
 		errors = {};
 		submitError = '';
-		step = 'intro';
+		setStep('intro');
 	}
 </script>
 
 <main class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-bg md:border-x md:border-line lg:max-w-none lg:border-0">
 	{#if step === 'intro'}
-		<Landing onstart={() => (step = 'category')} onpick={startWith} />
+		<Landing onstart={() => setStep('category')} onpick={startWith} />
 	{:else}
 		<div class="flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[360px_minmax(0,1fr)]">
 			{#if showHeader}
 				<MobileHeader {questions} {qi} {trail} onback={() => go(-1)} />
 			{/if}
-			<Rail items={rail} {questions} {qi} done={step === 'done'} {stepLabel} onrestart={restart} ongo={(s) => (step = s)} />
+			<Rail items={rail} {questions} {qi} done={step === 'done'} {stepLabel} onrestart={restart} ongo={setStep} />
 
 			<div class="flex min-h-0 flex-1 flex-col">
 				<DesktopBar {trail} showBack={step !== 'done'} onback={() => go(-1)} />
 				{#key step}
-					<section class="flex min-h-0 flex-1 flex-col motion-safe:animate-step">
+					<section class="flex min-h-0 flex-1 flex-col {dir < 0 ? 'motion-safe:animate-step-back' : 'motion-safe:animate-step'}">
 						{#if step === 'category'}
 							<TileStep
 								eyebrow="{q('category')} · 카테고리"
