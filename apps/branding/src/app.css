@@ -24,8 +24,10 @@
 
 	/* pop — 타일의 선택 체크 배지 · 접수 완료 아이콘이 함께 쓰는 "톡 튀어나오는" 등장 */
 	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
-	/* step — 퍼널의 모든 단계 화면과 랜딩 진행 과정 카드가 오른쪽에서 미끄러져 들어오는 등장 */
+	/* step — 퍼널의 모든 단계 화면과 랜딩 진행 과정 카드가 오른쪽에서 미끄러져 들어오는 등장.
+	   step-back — 퍼널에서 [이전]으로 돌아갈 때만 왼쪽에서 들어온다(앞으로 = 오른쪽, 뒤로 = 왼쪽 공간감) */
 	--animate-step: step-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-step-back: step-back 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	/* blink — 랜딩 카테고리 타일의 테두리가 두 번 반짝이며 "눌러보라"고 부르는 연출 (한 번에 한 장) */
 	--animate-blink: blink 1.4s ease-in-out both;
 }
@@ -74,6 +76,17 @@
 	0% {
 		opacity: 0;
 		transform: translateX(28px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes step-back {
+	0% {
+		opacity: 0;
+		transform: translateX(-28px);
 	}
 	100% {
 		opacity: 1;
