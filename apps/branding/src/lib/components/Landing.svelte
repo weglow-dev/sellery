@@ -12,7 +12,7 @@
 	/** 퍼널의 첫 화면 = 랜딩. 가로로 넘기는 7장 슬라이드(스크롤 스냅) + 점 인디케이터 + [제조의뢰 시작하기].
 	 *  모바일은 한 열(아래 정렬), lg 데스크톱은 1120px 두 열(왼쪽 글 · 오른쪽 카드)에 하단 바가 화살표 · 점 · CTA 한 줄로 바뀐다.
 	 *  각 슬라이드는 landing/ 의 컴포넌트 하나씩이고, 자기 연출은 `active`(지금 보이는 장인지)만 받아 스스로 켠다.
-	 *  여기는 현재 슬라이드 번호 · 스크롤/키보드/점 이동 · 상단 바 · 하단 바만 맡는다. */
+	 *  여기는 현재 슬라이드 번호 · 스크롤/휠/키보드/점 이동 · 상단 바 · 하단 바만 맡는다. */
 	let { onstart, onpick }: { onstart: () => void; onpick: (category: string) => void } = $props();
 
 	const SLIDES = 7;
@@ -46,6 +46,27 @@
 		else if (e.key === 'ArrowLeft') goSlide(slide - 1);
 	}
 
+	// 데스크톱: 마우스 휠 세로 스크롤도 슬라이드 이동으로 받는다(가로 스크롤·트랙패드 가로 제스처는 스크롤 스냅이 원래대로 처리).
+	// 한 번의 휠 굴림/제스처에 한 장만 — 이벤트가 끊기지 않고 이어지는 동안(트랙패드 관성 포함)은 한 번 넘긴 뒤 무시하고, 200ms 쉬면 새 제스처로 본다
+	let wheelAcc = 0;
+	let wheelFired = false;
+	let wheelIdle: ReturnType<typeof setTimeout> | undefined;
+	function onwheel(e: WheelEvent) {
+		const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; // Firefox 는 줄 단위
+		if (Math.abs(dy) <= Math.abs(e.deltaX)) return;
+		clearTimeout(wheelIdle);
+		wheelIdle = setTimeout(() => {
+			wheelAcc = 0;
+			wheelFired = false;
+		}, 200);
+		if (wheelFired) return;
+		wheelAcc += dy;
+		if (Math.abs(wheelAcc) < 40) return;
+		wheelFired = true;
+		goSlide(slide + (wheelAcc > 0 ? 1 : -1));
+	}
+	$effect(() => () => clearTimeout(wheelIdle));
+
 	// 진입 연출은 마운트 뒤에 켠다 — 첫 로드 때 1장도 아래에서 올라오도록
 	let ready = $state(false);
 	onMount(() => (ready = true));
@@ -73,7 +94,7 @@
 		<span class="text-xs font-semibold text-fg/50 tabular-nums" aria-live="polite">{slide + 1} / {SLIDES}</span>
 	</div>
 
-	<div bind:this={slider} {onscroll} class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain">
+	<div bind:this={slider} {onscroll} {onwheel} class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain">
 		<HeroSlide active={active(0)} onnext={() => goSlide(1)} />
 		<ZeroSlide active={active(1)} />
 		<BurdenSlide active={active(2)} />
