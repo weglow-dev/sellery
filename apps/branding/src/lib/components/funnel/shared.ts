@@ -10,6 +10,8 @@ export type RailItem = {
 	value: string;
 	on: boolean;
 	past: boolean;
+	/** 번호 원을 포인트색으로 채울지 — 지난 질문이거나, 지금 질문에 답이 들어온 순간 */
+	filled: boolean;
 	locked: boolean;
 	dim: boolean;
 };

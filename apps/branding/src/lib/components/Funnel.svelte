@@ -139,6 +139,8 @@
 				value: vals[st] || (raw[st] === UNSURE ? '미팅 때 결정' : past ? '건너뜀' : on ? '진행 중' : ''),
 				on,
 				past,
+				// 타일을 탭한 순간(넘어가기 전 0.28초) 번호 원이 먼저 채워지도록 — 지금 질문이라도 답이 있으면 채운다
+				filled: past || vals[st] !== '' || raw[st] === UNSURE,
 				locked: step === 'done' || (!past && !on && !reachable),
 				dim: !past && !on && !reachable
 			};

@@ -40,9 +40,10 @@
 					? 'cursor-default'
 					: 'cursor-pointer hover:bg-white/[0.03]'}"
 			>
+				<!-- 번호 원 — 답이 들어온 순간(filled) 살짝 튀며 포인트색으로 채워진다. 지난 질문도 채워진 채로 남는다 -->
 				<span
-					class="grid size-[26px] shrink-0 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold transition-colors {r.past
-						? 'border-accent bg-accent text-bg'
+					class="grid size-[26px] shrink-0 place-items-center rounded-full border-[1.5px] text-[11px] font-extrabold transition-colors {r.filled
+						? 'border-accent bg-accent text-bg motion-safe:animate-fill'
 						: r.on
 							? 'border-accent text-accent'
 							: 'border-white/[0.18] text-fg/40'}"
@@ -51,7 +52,10 @@
 				</span>
 				<span class="flex min-w-0 flex-1 flex-col gap-px">
 					<span class="text-sm font-bold {r.dim ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
-					<span class="truncate text-xs text-fg/50">{r.value}</span>
+					<!-- 값이 바뀔 때마다(답 선택 · 건너뜀 · 진행 중) 아래에서 떠오르며 나타난다 -->
+					{#key r.value}
+						<span class="truncate text-xs text-fg/50 motion-safe:animate-value">{r.value}</span>
+					{/key}
 				</span>
 			</button>
 		{/each}

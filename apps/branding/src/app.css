@@ -30,6 +30,9 @@
 	--animate-step-back: step-back 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	/* blink — 랜딩 카테고리 타일의 테두리가 두 번 반짝이며 "눌러보라"고 부르는 연출 (한 번에 한 장) */
 	--animate-blink: blink 1.4s ease-in-out both;
+	/* fill · value-in — 데스크톱 레일에서 답을 고른 순간: 번호 원이 살짝 튀며 포인트색으로 채워지고, 값 글자가 아래에서 떠오르며 나타난다 */
+	--animate-fill: fill 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+	--animate-value: value-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes float {
@@ -76,6 +79,28 @@
 	0% {
 		opacity: 0;
 		transform: translateX(28px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes fill {
+	0% {
+		transform: scale(0.8);
+		background-color: transparent;
+	}
+	100% {
+		transform: scale(1);
+		background-color: var(--color-accent);
+	}
+}
+
+@keyframes value-in {
+	0% {
+		opacity: 0;
+		transform: translateY(4px);
 	}
 	100% {
 		opacity: 1;
