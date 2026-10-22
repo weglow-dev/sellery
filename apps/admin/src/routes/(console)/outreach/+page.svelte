@@ -40,10 +40,11 @@
 </nav>
 
 <div class="console-inline" style="gap:10px;flex-wrap:wrap;align-items:flex-start">
-	<form method="post" action="?/collect" style="margin:0" title={data.collect.configured ? `${data.collect.provider} 검색 — 조건(팔로워·여성·20~40대·한국·성장률)으로 걸러진 결과 1페이지(≤15건)를 가져와요. 누를 때마다 다음 페이지` : 'Vercel sellery-admin 에 MODASH_API_KEY 를 넣으면 켜져요'}>
+	<form method="post" action="?/collect" style="margin:0" title={data.collect.configured ? `${data.collect.provider === 'meta' ? '메타 공식 크리에이터 마켓플레이스' : 'Modash'} 검색 — 조건(팔로워·여성·20~40대·한국·반응)으로 걸러진 결과 1페이지를 가져와요. 누를 때마다 다음 페이지` : 'Vercel sellery-admin 에 META_PAGE_ACCESS_TOKEN + META_IG_USER_ID(메타 공식 · 무료) 또는 MODASH_API_KEY 를 넣으면 켜져요'}>
 		<input type="hidden" name="page" value={data.collect.nextPage} />
+		<input type="hidden" name="after" value={data.collect.nextAfter} />
 		<button type="submit" class="pri sm" disabled={!data.collect.configured}>⚡ 조건으로 수집{data.collect.configured && data.collect.nextPage ? ` (${data.collect.nextPage + 1}페이지)` : ''}</button>
-		{#if !data.collect.configured}<small style="display:block;color:var(--color-mute);margin-top:4px">수집 제공사 API 키 필요</small>{/if}
+		<small style="display:block;color:var(--color-mute);margin-top:4px">{data.collect.configured ? (data.collect.provider === 'meta' ? '메타 공식 크리에이터 마켓플레이스 API' : 'Modash Discovery API') : '수집 설정 필요 (메타 공식 또는 Modash)'}</small>
 	</form>
 	<form method="get" class="console-inline" style="margin:0">
 		{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
@@ -110,4 +111,4 @@
 		</tbody>
 	</table>
 </div>
-<p class="meta" style="margin:8px 3px 0">[조건으로 수집]은 인플루언서 데이터 제공사(Modash) 검색에 대표 조건을 그대로 보내 걸러진 계정만 받아옵니다(페이지당 ≤15건 · 크레딧 차감) · 여성·연령·국가 비율은 공식 API 로 남의 계정을 조회할 수 없어 제공사 추정값이나 CSV · 운영자 판단으로 채웁니다 · 자동 DM 발송은 메타 약관·정보통신망법 위반이라 하지 않습니다 — 답장이 온 뒤의 자동 응답만 2단계에서 붙입니다.</p>
+<p class="meta" style="margin:8px 3px 0">[조건으로 수집]은 메타 공식 크리에이터 마켓플레이스 API(무료 · 참여 계정의 성별·연령·국가 분포로 다시 거름) 또는 Modash(유료) 검색에 대표 조건을 보내 걸러진 계정만 받아옵니다 · 여성·연령·국가 비율은 공식 API 로 남의 계정을 조회할 수 없어 제공사 추정값이나 CSV · 운영자 판단으로 채웁니다 · 자동 DM 발송은 메타 약관·정보통신망법 위반이라 하지 않습니다 — 답장이 온 뒤의 자동 응답만 2단계에서 붙입니다.</p>

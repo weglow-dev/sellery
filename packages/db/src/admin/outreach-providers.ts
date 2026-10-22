@@ -9,7 +9,7 @@
  */
 import { OUTREACH_FILTER, normalizeHandle, type OutreachAudience, type OutreachCsvRow, type OutreachTrend } from "./outreach-rules";
 
-export const OUTREACH_PROVIDERS = ["modash"] as const;
+export const OUTREACH_PROVIDERS = ["meta", "modash"] as const;
 export type OutreachProvider = (typeof OUTREACH_PROVIDERS)[number];
 
 export type ModashSearchOptions = {
@@ -120,4 +120,133 @@ export function pickKoreaLocationId(json: unknown): number | string | null {
     if (name.includes("korea") && !name.includes("north")) return (o?.id as number | string) ?? null;
   }
   return null;
+}
+
+/* ============================================================
+ * 2호 어댑터 — Meta **Instagram Creator Marketplace API** (공식 · 무료 · 2025-10 공개)
+ *   GET https://graph.facebook.com/v25.0/<IG_USER_ID>/creator_marketplace_creators?…  (Page access token · 브랜드 IG 비즈니스 계정에 연결된 페이지)
+ *   권한 `instagram_creator_marketplace_discovery`(App Review 로 Advanced Access — Standard 는 모의 데이터) · instagram_basic · pages_show_list · pages_manage_metadata · business_management
+ *   필터: creator_min_followers · major_audience_gender · major_audience_age_bucket · major_audience_countries · creator_follower_growth · reels_interaction_rate …
+ *   응답: username · biography · category · insights(total_followers · creator_engaged_accounts breakdown gender/age/top_countries · reels_interaction_rate)
+ *   "major_*" 는 '가장 큰 버킷' 조건이라 우리 임계(여성 60% · 20~40대 80% · 한국 80%)는 **응답 분포로 다시 거른다**(outreachFit).
+ *   분포는 참여 계정(engaged accounts) 기준 — 팔로워 분포의 근사. audience.source = 'meta:engaged'.
+ *   docs: developers.facebook.com/documentation/instagram-platform/instagram-api-with-facebook-login/creator-marketplace
+ * ============================================================ */
+
+export const META_GRAPH_VERSION = "v25.0";
+export const META_CREATOR_FIELDS =
+  "id,username,biography,category,profile_picture_url,is_account_verified,insights.metric(total_followers,reels_interaction_rate,creator_engaged_accounts).breakdown(gender,age,top_countries)";
+
+export type MetaCreatorSearchOptions = { after?: string | null; limit?: number };
+
+/** 대표 조건 → 쿼리 파라미터. 모의/실데이터 모두 같은 모양 */
+export function metaCreatorSearchParams(o: MetaCreatorSearchOptions = {}): URLSearchParams {
+  const q = new URLSearchParams();
+  q.set("creator_min_followers", String(OUTREACH_FILTER.minFollowers));
+  q.set("major_audience_gender", "female");
+  q.set("major_audience_countries", "KR");
+  q.set("creator_countries", "KR");
+  q.set("creator_latest_post_activity", "L90");
+  q.set("exclude_messaged_creators", "true");
+  q.set("limit", String(o.limit ?? 25));
+  q.set("fields", META_CREATOR_FIELDS);
+  if (o.after) q.set("after", o.after);
+  return q;
+}
+
+/** insights 배열 [{name, period, values:[{value, breakdown?}]}] 또는 {data:[…]} 에서 metric 하나 꺼내기 */
+function metricOf(insights: unknown, name: string): Obj | null {
+  const list = Array.isArray(insights) ? insights : (obj(insights)?.data as unknown);
+  for (const x of Array.isArray(list) ? list : []) {
+    const o = obj(x);
+    if (o && (str(o.name) === name || str(o.metric) === name)) return o;
+  }
+  return null;
+}
+function metricValue(m: Obj | null): number | null {
+  if (!m) return null;
+  const direct = num(m.value) ?? num(m.total_value);
+  if (direct !== null) return direct;
+  const vals = Array.isArray(m.values) ? m.values : [];
+  const first = obj(vals[0]);
+  return num(first?.value) ?? num(obj(first?.value)?.value) ?? null;
+}
+/** breakdown 결과를 {key: 비율%} 로 — 다양한 모양(results[{dimension_values,value}] · 객체 맵) 허용 */
+function breakdownPct(m: Obj | null, dimension: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!m) return out;
+  const total = num(m.total_value) ?? null;
+  const tv = obj(m.total_value);
+  const breakdowns = Array.isArray(tv?.breakdowns) ? tv!.breakdowns : Array.isArray(m.breakdowns) ? m.breakdowns : [];
+  let found: unknown = null;
+  for (const b of breakdowns) {
+    const bo = obj(b);
+    const keys = Array.isArray(bo?.dimension_keys) ? bo!.dimension_keys : [];
+    if (keys.map(String).includes(dimension)) found = bo?.results;
+  }
+  if (!found) {
+    // 단순 모양: m.<dimension> = { FEMALE: 0.7 } 또는 m.breakdown[dimension]
+    const direct = obj(m[dimension]) ?? obj(obj(m.breakdown)?.[dimension]) ?? obj(obj((Array.isArray(m.values) ? m.values : [])[0])?.[dimension]);
+    if (direct) {
+      const sum = Object.values(direct).reduce<number>((a, v) => a + (num(v) ?? 0), 0);
+      for (const [k, v] of Object.entries(direct)) {
+        const n = num(v);
+        if (n === null) continue;
+        out[k.toUpperCase()] = sum > 0 && sum > 1.5 ? Math.round((n / sum) * 1000) / 10 : Math.round(n * 1000) / 10;
+      }
+      return out;
+    }
+    return out;
+  }
+  const rows = (Array.isArray(found) ? found : []).map((r) => obj(r)).filter((r): r is Obj => r !== null);
+  const sum = rows.reduce((a, r) => a + (num(r.value) ?? 0), 0);
+  const denom = total && total > 0 ? total : sum;
+  for (const r of rows) {
+    const dv = Array.isArray(r.dimension_values) ? r.dimension_values : [];
+    const key = String(dv[0] ?? "").toUpperCase();
+    const v = num(r.value);
+    if (!key || v === null || !denom) continue;
+    out[key] = Math.round((v / denom) * 1000) / 10;
+  }
+  return out;
+}
+
+/** 크리에이터 마켓플레이스 응답 → 후보 행 (+ 다음 커서) */
+export function parseMetaCreators(json: unknown): { rows: ProviderRow[]; after: string | null; error: string | null } {
+  const o = obj(json);
+  if (!o) return { rows: [], after: null, error: "응답이 비었어요" };
+  const err = obj(o.error);
+  if (err) return { rows: [], after: null, error: `${str(err.message) ?? "Graph API 오류"}${err.code ? ` (code ${err.code})` : ""}` };
+  const rows: ProviderRow[] = [];
+  for (const it of Array.isArray(o.data) ? o.data : []) {
+    const c = obj(it);
+    if (!c) continue;
+    const handle = normalizeHandle(str(c.username) ?? "");
+    if (!handle) continue;
+    const ins = c.insights;
+    const followers = metricValue(metricOf(ins, "total_followers"));
+    const er = metricValue(metricOf(ins, "reels_interaction_rate"));
+    const engaged = metricOf(ins, "creator_engaged_accounts");
+    const g = breakdownPct(engaged, "gender");
+    const ages = breakdownPct(engaged, "age");
+    const geo = breakdownPct(engaged, "top_countries");
+    const female = g.FEMALE ?? g.F ?? null;
+    const bands = ["18-24", "25-34", "35-44"].map((b) => ages[b] ?? 0);
+    const age2040 = bands.some((b) => b > 0) ? Math.round(bands.reduce((x, y) => x + y, 0) * 10) / 10 : null;
+    const kr = geo.KR ?? null;
+    const growth = num(c.creator_follower_growth);
+    rows.push({
+      handle,
+      ig_user_id: str(c.id),
+      name: str(c.name) ?? null,
+      category: str(c.category) ?? null,
+      followers: followers === null ? null : Math.round(followers),
+      engagement_rate: er === null ? null : er > 1 ? Math.round(er * 100) / 10000 : Math.round(er * 10000) / 10000,
+      trend: growth === null ? null : growth > 0.02 ? "up" : growth >= -0.02 ? "flat" : "down",
+      picture: str(c.profile_picture_url),
+      audience: { source: "meta:engaged", female_pct: female, age_20_40_pct: age2040, kr_pct: kr, filtered_by: female === null && age2040 === null && kr === null ? "meta" : null },
+    });
+  }
+  const after = str(obj(obj(o.paging)?.cursors)?.after);
+  return { rows, after, error: null };
 }

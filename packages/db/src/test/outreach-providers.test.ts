@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { outreachFit } from "../admin/outreach-rules";
-import { modashAudience, modashSearchBody, parseModashSearch, pickKoreaLocationId } from "../admin/outreach-providers";
+import { metaCreatorSearchParams, modashAudience, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId } from "../admin/outreach-providers";
 
 describe("modashSearchBody — 대표 조건을 검색 필터로", () => {
   it("팔로워 5만 · 한국 80% · 여성 60% · 20~40대 밴드 · 성장률 ≥ 0", () => {
@@ -44,5 +44,55 @@ describe("pickKoreaLocationId", () => {
     expect(pickKoreaLocationId([{ id: 1, name: "North Korea" }, { id: 2, name: "South Korea", title: "Korea, Republic of" }])).toBe(2);
     expect(pickKoreaLocationId({ locations: [{ id: 9, name: "Korea" }] })).toBe(9);
     expect(pickKoreaLocationId([])).toBeNull();
+  });
+});
+
+describe("Meta Instagram Creator Marketplace — 파라미터 · 응답 파서", () => {
+  it("대표 조건 → 쿼리 (팔로워 하한 · 여성 · 한국 · 최근 90일 활동 · 커서)", () => {
+    const q = metaCreatorSearchParams({ after: "abc" });
+    expect(q.get("creator_min_followers")).toBe("50000");
+    expect(q.get("major_audience_gender")).toBe("female");
+    expect(q.get("major_audience_countries")).toBe("KR");
+    expect(q.get("after")).toBe("abc");
+    expect(q.get("fields")).toContain("creator_engaged_accounts");
+  });
+  it("insights breakdown(results/dimension_values) → 여성 · 20~40대 · 한국 % · 커서", () => {
+    const r = parseMetaCreators({
+      data: [
+        {
+          id: "17841400000000001",
+          username: "Jiyu_Beauty",
+          category: "Beauty",
+          insights: [
+            { name: "total_followers", values: [{ value: 120000 }] },
+            { name: "reels_interaction_rate", values: [{ value: 3.1 }] },
+            {
+              name: "creator_engaged_accounts",
+              total_value: {
+                value: 1000,
+                breakdowns: [
+                  { dimension_keys: ["gender"], results: [{ dimension_values: ["FEMALE"], value: 720 }, { dimension_values: ["MALE"], value: 280 }] },
+                  { dimension_keys: ["age"], results: [{ dimension_values: ["18-24"], value: 300 }, { dimension_values: ["25-34"], value: 400 }, { dimension_values: ["35-44"], value: 150 }, { dimension_values: ["45-54"], value: 150 }] },
+                  { dimension_keys: ["top_countries"], results: [{ dimension_values: ["KR"], value: 910 }, { dimension_values: ["US"], value: 90 }] },
+                ],
+              },
+            },
+          ],
+        },
+        { id: "2", username: "" },
+      ],
+      paging: { cursors: { after: "CURSOR2" } },
+    });
+    expect(r.error).toBeNull();
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0]).toMatchObject({ handle: "jiyu_beauty", ig_user_id: "17841400000000001", followers: 120000, engagement_rate: 0.031, category: "Beauty" });
+    expect(r.rows[0].audience).toEqual({ source: "meta:engaged", female_pct: 72, age_20_40_pct: 85, kr_pct: 91, filtered_by: null });
+    expect(r.after).toBe("CURSOR2");
+  });
+  it("Graph 오류 · 분포 없는 행은 filtered_by 로", () => {
+    expect(parseMetaCreators({ error: { message: "Invalid OAuth access token", code: 190 } }).error).toContain("code 190");
+    const r = parseMetaCreators({ data: [{ id: "3", username: "somin", insights: [{ name: "total_followers", values: [{ value: 60000 }] }] }] });
+    expect(r.rows[0].audience).toMatchObject({ filtered_by: "meta", source: "meta:engaged" });
+    expect(r.after).toBeNull();
   });
 });
