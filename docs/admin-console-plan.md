@@ -395,3 +395,16 @@ app_admin_sample_refund_due()       5영업일 미발송 환불 **대상 목록*
 **남은 것** — 공휴일 반영(`business_days_after` 는 주말만 제외). 환불 실행은 **관리자 버튼이 의도된 설계다**
 — 인플루언서가 기다리겠다고 하면 기한을 넘겨도 환불하지 않아야 하므로, 사람이 큐를 보고 판단한다.
 자동화(크론)를 요구하는 문서·제안서 서술은 없다.
+
+---
+
+## 아웃리치 — 크리에이터 후보 큐 (2026-10-22 · 0055 · `/admin/outreach`)
+
+대표 요청: MYR(Make Your Recipe) 인플루언서 브랜드 제조의뢰(sellery.life/influencer/oem)를 제안할 인스타 크리에이터를 **조건으로 걸러** 연락한다.
+조건(`OUTREACH_FILTER`): 팔로워 5만↑ · 팔로워 여성 60%↑ · 20~40대 80%↑ · 한국 80%↑ · 1년 반응 우상향/유지.
+
+**왜 반자동인가**: 공식 그래프 API 로는 (1) 남의 팔로워 인구통계를 볼 수 없고(본인이 권한을 준 계정만) (2) 먼저 DM 하지 않은 사람에게 메시지를 보낼 수 없다(24시간 창). 비공식 자동 DM 은 메타 약관 위반(계정·광고계정 제재)과 정보통신망법(영리 광고성 정보 사전 동의) 위반 위험. 그래서:
+- 1단계(이 PR): 후보 큐 — 수동 추가 · CSV(분석사 추정값) 가져오기 · 적합 점수(`outreachFit`) · 개인화 DM 초안(`dmDraft`) · 상태(후보→발송 대기→DM 보냄→답장→미팅→합류/거절/제외) · 메모·이력. **DM 은 운영자가 초안을 복사해 @sellery.official 에서 직접 보낸다**(하루 30~50건).
+- 2단계: 그래프 API 수집 — 해시태그 검색(#다이어트 #공구 …) → 비즈니스 디스커버리(팔로워 · 최근 게시물 반응 → 추세) → `upsertOutreachCreators(source:'hashtag')`. 인구통계는 Modash 류 API 연동 시 `audience.source` 에 기록.
+- 3단계: 답장 이후 자동 응답(메시지 API 24시간 창 안) — OEM 링크·FAQ 전송 · 슬랙 알림 · `status: replied` 자동 전이.
+파일: `packages/db/src/admin/outreach-rules.ts`(순수 · 테스트) · `packages/db/src/server/admin/outreach.server.ts` · `apps/admin/src/routes/(console)/outreach/{+page,[id]}` · 배럴 `apps/admin/src/lib/server/outreach.ts` · 탭 `TABS.admin` 'send'.

@@ -5,7 +5,7 @@
 	 * `$app/paths` 의 `base` 를 빼서 맞추면 안 된다 — `paths.relative` 기본값 때문에 SSR 에서 `base` 가 `.` · `..` 다.
 	 * `disabled` 탭(아직 없는 단계 — 브랜드 콘솔 1단계의 상품·캠페인·주문·내 정보)은 링크 대신 `aria-disabled` span 으로 그리고 `title` 로 예고한다.
 	 */
-	export type ConsoleTabIcon = 'home' | 'box' | 'flag' | 'chart' | 'truck' | 'user';
+	export type ConsoleTabIcon = 'home' | 'box' | 'flag' | 'chart' | 'truck' | 'user' | 'send';
 	/**
 	 * `match` — 이 탭에 속하지만 href 아래가 아닌 경로(접두 없는 콘솔 경로). 탭 하나가 여러 화면을 묶을 때 쓴다.
 	 * 예: 관리자 "정산" 탭의 화면 칩은 `/orders` `/payments` `/revenue` `/cs` 로도 간다 — 그 화면에서도 탭이 켜져야 한다.
@@ -40,6 +40,8 @@
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4" /><path d="M5 4h13l-3 4.5 3 4.5H5" /></svg>
 	{:else if t.icon === 'chart'}
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16" /><path d="M7 16v-5M12 16V7M17 16v-8" /></svg>
+	{:else if t.icon === 'send'}
+		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3 3 10.5l8 2.5 2.5 8z" /><path d="M11 13l10-10" /></svg>
 	{:else if t.icon === 'truck'}
 		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3z" /><path d="M14 10h4l3 3v3h-7" /><circle cx="7" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></svg>
 	{:else}
