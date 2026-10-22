@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { asset } from '$app/paths';
 	import type { RailItem, Step } from './shared';
 
 	/** 데스크톱 사이드 레일 — 로고(랜딩으로 · 답은 유지, 접수 완료 뒤에만 초기화 — Funnel.home) · 진행 · 질문 목록(지난/현재/도달 가능한 질문은 눌러 이동, 나머지는 잠금) · 안내 카드 */
@@ -15,7 +16,7 @@
 
 <aside class="hidden min-h-0 flex-col gap-7 border-r border-white/[0.07] px-8 pt-7 pb-8 lg:flex">
 	<button type="button" onclick={onrestart} class="flex items-center gap-2.5 text-left text-[15px] font-bold tracking-tight text-fg">
-		<span class="grid size-7 place-items-center rounded-lg bg-accent text-[15px] font-extrabold text-bg">M</span>
+		<img src={asset('/logo.png')} alt="" width="32" height="32" class="size-8 shrink-0 rounded-full ring-1 ring-white/15" />
 		Make Your Recipe
 	</button>
 	<div>

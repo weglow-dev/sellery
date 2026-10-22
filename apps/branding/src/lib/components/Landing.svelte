@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { asset } from '$app/paths';
 	import ArrowIcon from './landing/ArrowIcon.svelte';
 	import HeroSlide from './landing/HeroSlide.svelte';
 	import ZeroSlide from './landing/ZeroSlide.svelte';
@@ -88,7 +89,8 @@
 	<!-- 상단 바 — 슬라이드 위에 떠 있고 터치는 통과시킨다 -->
 	<div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-[60px] items-center justify-between px-5 lg:h-[72px] lg:px-16">
 		<div class="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-fg">
-			<span class="grid size-7 place-items-center rounded-lg bg-accent text-[15px] font-extrabold text-bg">M</span>
+			<!-- 원형 로고(static/logo.png · MYR) — 배경이 페이지와 같은 어두운색이라 얇은 링으로 윤곽만 잡는다 -->
+			<img src={asset('/logo.png')} alt="" width="32" height="32" class="size-8 shrink-0 rounded-full ring-1 ring-white/15" />
 			Make Your Recipe
 		</div>
 		<span class="text-xs font-semibold text-fg/50 tabular-nums" aria-live="polite">{slide + 1} / {SLIDES}</span>
