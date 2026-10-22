@@ -58,7 +58,7 @@
 		</div>
 		<div class="mt-6 flex flex-col gap-2 lg:mt-0">
 			<label for="note" class={labelCls}>더 전달하고 싶은 내용 <span class="font-medium text-fg/50">(선택)</span></label>
-			<textarea id="note" bind:value={note} rows="3" maxlength={MAX_LEN.note} placeholder="브랜드 컨셉, 참고하는 제품, 론칭 희망 시기 등 편하게 적어주세요" class="{inputCls} resize-none py-3.5 leading-normal lg:min-h-[214px]"></textarea>
+			<textarea id="note" bind:value={note} rows="3" maxlength={MAX_LEN.note} placeholder="제품 컨셉, 참고하는 제품, 론칭 희망 시기 등 편하게 적어주세요" class="{inputCls} resize-none py-3.5 leading-normal lg:min-h-[214px]"></textarea>
 		</div>
 	</div>
 </div>

@@ -44,7 +44,7 @@
 
 	<div class="{bodyCls} lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
 		<div class="mt-6 rounded-[18px] border border-white/[0.07] bg-white/[0.03] px-[18px] pt-1.5 pb-2 lg:mt-0 lg:px-5">
-			<p class="mt-3 mb-1 text-[13px] font-bold text-fg/55">내가 그린 브랜드</p>
+			<p class="mt-3 mb-1 text-[13px] font-bold text-fg/55">내가 만든 레시피</p>
 			<!-- 요약 줄은 위에서부터 한 줄씩(0.09초 간격) 떠오르며 나타난다 — 레일 값과 같은 모션 -->
 			{#each summary as row, i (row.k)}
 				<div class="flex items-baseline justify-between gap-4 border-t border-white/[0.06] py-[11px] text-[15px] motion-safe:animate-value" style="animation-delay:{0.45 + i * 0.09}s">

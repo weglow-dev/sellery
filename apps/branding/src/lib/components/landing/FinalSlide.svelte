@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { d, rise, slideCls, twoCol } from './shared';
 
-	/** 7장 · 마지막 — 통계 4칸 + "다음 웰니스 브랜드의 주인공은 당신이에요". 카드가 떠오르며 숫자가 굴러 멈춘다. */
+	/** 7장 · 마지막 — 통계 4칸 + "당신만의 제품, 주인공은 당신이에요". 카드가 떠오르며 숫자가 굴러 멈춘다. */
 	let { active }: { active: boolean } = $props();
 
 	// from → to 로 굴러간다. 4단계는 0 에서 올라가고, 0원 · 0건은 2장과 짝을 맞춰 예전 값에서 내려오고, 1:1 은 0:0 에서 맞춰진다
@@ -57,7 +57,7 @@
 	</div>
 	<div class="{twoCol} flex flex-col lg:grid">
 		<div class="relative order-2 lg:order-1">
-			<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15] {rise(active)}" style={d(0)}>다음 웰니스 브랜드의<br />주인공은 당신이에요</h2>
+			<h2 class="text-[32px] leading-[1.22] font-extrabold tracking-[-0.035em] text-balance text-fg lg:text-5xl lg:leading-[1.15] {rise(active)}" style={d(0)}>당신만의 제품,<br />주인공은 당신이에요</h2>
 			<p class="mt-3.5 text-[15px] leading-[1.65] text-pretty text-fg/70 lg:max-w-[520px] lg:text-lg {rise(active)}" style={d(1)}>제조의뢰를 남기면 전담 매니저가 사흘 안에 연락드려요. 상담은 무료이고, 아무 의무도 생기지 않아요.</p>
 		</div>
 		<!-- 통계 4칸 — 데스크톱은 카드를 키워 오른쪽 열을 채운다 -->

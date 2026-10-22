@@ -7,7 +7,7 @@
 	let { form }: PageProps = $props();
 
 	const TITLE = `제조의뢰 — ${BRAND_NAME}`;
-	const DESCRIPTION = '웰니스 브랜드 제조의뢰 — 카테고리, 제형, 패키지, 맛을 정하고 연락처를 남기면 전담 매니저가 연락드려요.';
+	const DESCRIPTION = '나만의 웰니스 제품 제조의뢰 — 카테고리, 제형, 패키지, 맛을 정하고 연락처를 남기면 전담 매니저가 연락드려요.';
 	const CANONICAL = `${OEM_PUBLIC_URL}/apply`;
 </script>
 

@@ -6,9 +6,9 @@
 
 	const PROCESS = [
 		{ n: '01', t: '제조의뢰', stage: '지금 여기', d: '만들고 싶은 제품을 알려주세요. 폼 하나 작성이면 충분해요.' },
-		{ n: '02', t: '컨셉 · 샘플', stage: '전담 매니저와', d: '전담 매니저와 브랜드 컨셉을 잡고, 샘플을 직접 받아 확인해요.' },
+		{ n: '02', t: '컨셉 · 샘플', stage: '전담 매니저와', d: '전담 매니저와 레시피를 다듬고, 샘플을 직접 받아 확인해요.' },
 		{ n: '03', t: '생산 · 입고', stage: '검증된 파트너가', d: '검증된 제조 파트너가 생산하고, Make Your Recipe 물류센터로 바로 입고돼요.' },
-		{ n: '04', t: '내 샵 오픈', stage: '판매 시작', d: '내 이름을 건 샵이 열려요. 링크 하나 공유하면 판매 시작이에요.' }
+		{ n: '04', t: '내 샵 오픈', stage: '판매 시작', d: '당신만 팔 수 있는 샵이 열려요. 링크 하나 공유하면 판매 시작이에요.' }
 	];
 	let procSel = $state(0);
 	let procTouched = $state(false);
@@ -40,7 +40,7 @@
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>진행 과정</p>
-			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>브랜드가 되기까지,<br />네 단계면 돼요</h2>
+			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>내 제품이 나오기까지,<br />네 단계면 돼요</h2>
 		</div>
 		<div class="{rightCol} lg:ml-auto lg:w-full lg:max-w-[480px]">
 			<div class="relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-3xl border border-white/[0.08] bg-white/[0.04] px-5 pt-[22px] pb-5 {rise(active)}" style={d(2)}>

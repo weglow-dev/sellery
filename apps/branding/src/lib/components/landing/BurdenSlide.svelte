@@ -8,7 +8,7 @@
 		{ t: '재고 부담', n: '0', d: '생산량 결정도, 창고도, 남는 재고도 Make Your Recipe가 책임져요.' },
 		{ t: '제조비용', n: '0', d: '제조 비용은 Make Your Recipe가 먼저 부담, 판매분만 정산해요.' },
 		{ t: '행정 리스크', n: '0', d: '인허가, 표시·광고 검토 등 전부 대행해요.' },
-		{ t: '전담 매니저', n: '1:1', d: '컨셉부터 론칭까지 담당자가 끝까지 함께해요.' },
+		{ t: '전담 매니저', n: '1:1', d: '레시피부터 첫 판매까지 담당자가 끝까지 함께해요.' },
 		{ t: '샘플 제작', n: '빠름', d: '검증된 제조 파트너와 빠르게 샘플을 확인해요.' }
 	];
 	let burdenSel = $state(0);
@@ -31,7 +31,7 @@
 	<div class={twoColLift}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>부담은 Make Your Recipe가</p>
-			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
+			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>제품을 만들고 파는 데<br />필요한 모든 걸 준비했어요</h2>
 		</div>
 		<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px] {rise(active)}" style={d(2)}>
 			<div class="grid grid-cols-2 gap-2 text-[13px] font-bold tracking-[0.04em] short:text-xs lg:gap-3 lg:text-[13px]">
@@ -65,7 +65,7 @@
 					class="rounded-2xl bg-accent p-[18px] text-[15px] leading-[1.35] font-extrabold text-bg short:rounded-[14px] short:p-2.5 short:text-xs"
 					style="opacity:{active ? 1 : 0};transform:{active ? 'none' : 'translateY(8px)'};transition:{active ? 'opacity .5s 1.9s,transform .5s cubic-bezier(.2,.8,.2,1) 1.9s' : 'none'}"
 				>
-					브랜드에만<br />집중하기
+					내 제품에만<br />집중하기
 				</div>
 				<div class="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-[18px] text-[13px] leading-relaxed text-fg/75 short:rounded-[14px] short:p-2.5 short:text-[11px] short:leading-normal">{BURDENS[burdenSel].d}</div>
 			</div>
