@@ -4,6 +4,12 @@ import { env } from '$env/dynamic/private';
  *  거기서는 "알림"이라 실패를 삼키는 반면 여기서는 **슬랙이 제조의뢰의 유일한 접수 경로**라 결과를 돌려준다.
  *  false 면 호출자(apply/+page.server.ts)가 사용자에게 "접수 실패 — 다시 시도" 를 보여줘 입력이 조용히 사라지지 않게 한다.
  *  SLACK_WEBHOOK_URL 이 없는 것도 실패로 친다 — Vercel 프로젝트 sellery-branding 에 설정돼 있어야 한다(docs/branding-plan.md §5). */
+/** 사용자 입력을 슬랙 텍스트에 넣기 전 이스케이프 — 슬랙 mrkdwn 은 `<!channel>` `<!here>` `<@U…>` 를 제어 시퀀스로 읽어서,
+ *  메모에 `<!channel>` 을 적어 보내면 채널 전체가 호출된다. 슬랙이 요구하는 세 글자(& < >)만 바꾼다. */
+export function escapeSlack(v: string): string {
+	return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 export async function notifySlack(text: string): Promise<boolean> {
 	const url = env.SLACK_WEBHOOK_URL;
 	if (!url) {

@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import StepHead from './StepHead.svelte';
-	import { MEETING_SLOTS, type ApplyErrors } from '$lib/utils/apply-options';
+	import { HONEYPOT_FIELD, MAX_LEN, MEETING_SLOTS, type ApplyErrors } from '$lib/utils/apply-options';
 	import { formatPhone } from '$lib/utils/phone';
 	import { bodyCls, ctaOff, ctaOn, errCls, footCls, inputCls, labelCls, scrollCls } from './shared';
 
@@ -37,6 +37,11 @@
 	{#each Object.entries(hidden) as [key, value] (key)}
 		<input type="hidden" name={key} {value} />
 	{/each}
+	<!-- 허니팟 — 사람에게는 보이지도 않고 탭 순서에도 없다(type=hidden 이 아니라 봇이 "진짜 칸"으로 보고 채운다). 값이 있으면 서버가 접수를 버린다 -->
+	<div aria-hidden="true" class="absolute -left-[9999px] top-0 h-px w-px overflow-hidden opacity-0">
+		<label for={HONEYPOT_FIELD}>웹사이트</label>
+		<input id={HONEYPOT_FIELD} name={HONEYPOT_FIELD} type="text" tabindex="-1" autocomplete="off" />
+	</div>
 
 	<div class="{scrollCls} pb-6">
 		<StepHead eyebrow="마지막 · 연락처" title={['마지막이에요.', '어디로 연락드릴까요?']} help="전담 매니저가 내용을 확인한 뒤 미팅 일정을 제안드려요." />
@@ -49,6 +54,7 @@
 					name="name"
 					bind:value={name}
 					type="text"
+					maxlength={MAX_LEN.name}
 					autocomplete="nickname"
 					placeholder="@instagram 또는 유튜브 채널명"
 					aria-required="true"
@@ -67,7 +73,7 @@
 					oninput={(e) => (phone = formatPhone(e.currentTarget.value))}
 					type="tel"
 					inputmode="numeric"
-					maxlength="13"
+					maxlength={MAX_LEN.phone}
 					autocomplete="tel"
 					placeholder="010-0000-0000"
 					aria-required="true"

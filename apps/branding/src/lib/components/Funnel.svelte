@@ -61,6 +61,8 @@
 	// 서버가 돌려준 필드 오류 → 그 질문이 있는 단계
 	const STEP_OF: Record<string, Step> = {
 		category: 'category',
+		ingredient: 'ingredient',
+		note: 'ingredient',
 		dosageForm: 'form',
 		subType: 'sub',
 		packaging: 'package',

@@ -116,6 +116,14 @@ export const LANDING_CATEGORIES: readonly { title: string; desc: string; icon: s
 	{ title: '맨즈 웰니스', desc: '남성 전용 건강관리', icon: '맨즈', category: '건강' }
 ];
 
+/** 자유 입력 칸의 글자 수 상한 — 입력의 maxlength 와 서버 검증(apply-action.ts)이 같은 값을 쓴다.
+ *  사람은 닿지 않는 길이고, 폼을 직접 치는 봇이 슬랙 채널을 긴 글로 덮는 것을 막는 용도. */
+export const MAX_LEN = { name: 60, phone: 13, ingredient: 120, note: 1000 } as const;
+
+/** 허니팟 — 화면에서 보이지 않고 탭 순서에도 없는 칸. 사람은 비워 두고 폼을 긁어 채우는 봇은 채운다.
+ *  값이 있으면 서버가 슬랙·메타 전환을 보내지 않고 성공 화면만 돌려준다(봇에게 막혔다는 신호를 주지 않는다). */
+export const HONEYPOT_FIELD = 'website';
+
 /** 폼 액션이 돌려주는 모양 — 서버(apply-action.ts)와 퍼널 UI 가 같이 쓴다. */
 export type ApplyValues = {
 	name: string;
