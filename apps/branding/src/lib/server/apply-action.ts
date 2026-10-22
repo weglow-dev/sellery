@@ -15,7 +15,8 @@ import {
 	type ApplyValues
 } from '$lib/utils/apply-options';
 import { escapeSlack, notifySlack } from './slack';
-import { OEM_PUBLIC_URL, sendMetaLeadEvent } from './meta-capi';
+import { sendMetaLeadEvent } from './meta-capi';
+import { publicUrlOf } from '$lib/site';
 import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 import { RATE_LIMIT_MESSAGE, rateLimit } from './rate-limit';
 
@@ -70,7 +71,7 @@ function show(v: string, empty: string) {
 }
 
 export const applyActions: Actions = {
-	default: async ({ request, cookies, getClientAddress }) => {
+	default: async ({ request, url, cookies, getClientAddress }) => {
 		const form = await request.formData();
 		// 메타 전환 API 중복 제거용 — 브라우저(use:enhance)가 넣어 보낸다. JS 없는 제출은 서버가 만든다
 		const eventIdRaw = str(form.get('event_id'));
@@ -151,11 +152,12 @@ export const applyActions: Actions = {
 		}
 
 		// 메타 전환 API(Lead) — 픽셀과 같은 event_id. 실패해도 접수는 성공이다(로그만)
+		// event_source_url 은 실제로 접수한 페이지(홈 `/influencer/oem` 또는 바로 가기 `/influencer/oem/apply`) — 요청 경로를 공개 주소로 바꿔 넣는다
 		await sendMetaLeadEvent({
 			eventId,
 			phone,
 			category,
-			sourceUrl: `${OEM_PUBLIC_URL}/apply`,
+			sourceUrl: publicUrlOf(url.pathname),
 			ip,
 			userAgent: request.headers.get('user-agent'),
 			fbp: cookies.get('_fbp') ?? null,

@@ -102,7 +102,7 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 ## 6. 남은 일
 
 1. 도메인 결정 — 예: `branding.sellery.life` (Vercel 프로젝트 Domains 에 추가 + DNS).
-2. OG 이미지 교체(지금은 og:title/description 만 있고 og:image 없음) · 카피 다듬기.
+2. OG 이미지 교체 — 2026-10-22 에 `static/og.png`(1200×630 · 다크 배경 + 히어로 문구, 임시 제작)와 `canonical` · `og:url` · `og:image` · twitter 카드를 두 라우트에 넣었음(`lib/site.ts` 의 공개 주소 기준 — vercel.app 호스트가 중복 색인되지 않게). 디자이너 이미지가 나오면 같은 경로·크기로 바꿔 끼우면 됨 · 카피 다듬기.
 3. (선택) 제조의뢰 접수 건을 Slack 알림 말고 어딘가에도 durable 하게 남기고 싶다면 — Resend 메일 발송 또는 Supabase 테이블 적재 추가 검토.
 
 ## 7. 개발 · 배포
