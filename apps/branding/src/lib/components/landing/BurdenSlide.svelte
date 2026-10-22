@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { d, eyebrowCls, h2Cls, rightCol, rise, slideCls, twoCol } from './shared';
 
-	/** 3장 · 부담은 셀러리가 — "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너가는 표. 칩을 누르면 아래 설명이 바뀐다. */
+	/** 3장 · 부담은 Make Your Recipe가 — "내가 할 일" 칸의 짐이 "Make Your Recipe가 할 일" 칸으로 하나씩 건너가는 표. 칩을 누르면 아래 설명이 바뀐다. */
 	let { active }: { active: boolean } = $props();
 
 	const BURDENS = [
-		{ t: '재고 부담', n: '0', d: '생산량 결정도, 창고도, 남는 재고도 셀러리가 책임져요.' },
-		{ t: '제조비용', n: '0', d: '제조 비용은 셀러리가 먼저 부담, 판매분만 정산해요.' },
+		{ t: '재고 부담', n: '0', d: '생산량 결정도, 창고도, 남는 재고도 Make Your Recipe가 책임져요.' },
+		{ t: '제조비용', n: '0', d: '제조 비용은 Make Your Recipe가 먼저 부담, 판매분만 정산해요.' },
 		{ t: '행정 리스크', n: '0', d: '인허가, 표시·광고 검토 등 전부 대행해요.' },
 		{ t: '전담 매니저', n: '1:1', d: '컨셉부터 론칭까지 담당자가 끝까지 함께해요.' },
 		{ t: '샘플 제작', n: '빠름', d: '검증된 제조 파트너와 빠르게 샘플을 확인해요.' }
@@ -27,16 +27,16 @@
 	const twoColLift = `${twoCol} mb-2 lg:mb-0`;
 </script>
 
-<section class={slideCls} aria-label="셀러리가 맡는 일">
+<section class={slideCls} aria-label="Make Your Recipe가 맡는 일">
 	<div class={twoColLift}>
 		<div class="relative">
-			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>부담은 셀러리가</p>
+			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>부담은 Make Your Recipe가</p>
 			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>브랜드를 운영하는 데<br />필요한 모든 걸 준비했어요</h2>
 		</div>
 		<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px] {rise(active)}" style={d(2)}>
 			<div class="grid grid-cols-2 gap-2 text-[13px] font-bold tracking-[0.04em] short:text-xs lg:gap-3 lg:text-[13px]">
 				<div class="px-1 text-fg/45">내가 할 일</div>
-				<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>셀러리가 할 일</div>
+				<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>Make Your Recipe가 할 일</div>
 			</div>
 			<div class="mt-2 flex flex-col gap-2 short:mt-1.5 short:gap-1 lg:mt-2.5 lg:gap-2">
 				{#each BURDENS as b, i (b.t)}
@@ -44,7 +44,7 @@
 					<div class="relative grid grid-cols-2 gap-2 lg:gap-3">
 						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
 						<div class="h-14 rounded-[14px] border border-dashed border-white/10 short:h-[42px] short:rounded-xl"></div>
-						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "셀러리가 할 일" 칸으로 하나씩 건너간다.
+						<!-- 슬라이드가 보이면 "내가 할 일" 칸의 짐이 "Make Your Recipe가 할 일" 칸으로 하나씩 건너간다.
 						     떠날 때는 지연 없이 즉시 제자리로 — 되돌아가는 1.5초 안에 다시 들어오면 앞 칩만 다시 건너가고 뒤 칩은 오른쪽에 남는 어긋남을 막는다 -->
 						<button
 							type="button"

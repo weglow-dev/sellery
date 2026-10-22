@@ -15,8 +15,8 @@
 
 <aside class="hidden min-h-0 flex-col gap-7 border-r border-white/[0.07] px-8 pt-7 pb-8 lg:flex">
 	<button type="button" onclick={onrestart} class="flex items-center gap-2.5 text-left text-[15px] font-bold tracking-tight text-fg">
-		<span class="grid size-7 place-items-center rounded-lg bg-accent text-[15px] font-extrabold text-bg">B</span>
-		Sellery Branding
+		<span class="grid size-7 place-items-center rounded-lg bg-accent text-[15px] font-extrabold text-bg">M</span>
+		Make Your Recipe
 	</button>
 	<div>
 		<div class="flex items-baseline justify-between">
