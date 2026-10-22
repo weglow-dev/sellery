@@ -8,15 +8,15 @@ import { env as pub } from '$env/dynamic/public';
  *   개인정보: 전화번호는 숫자만 남기고 국가코드(82)를 붙여 SHA-256 해시로만 보낸다. 활동명은 실명이 아니라 보내지 않는다.
  *   실패해도 접수 결과에는 영향을 주지 않는다(슬랙이 접수 경로) — 로그만 남긴다. 3초 타임아웃.
  */
+import { OEM_PUBLIC_URL } from '$lib/site';
+
 const GRAPH = 'https://graph.facebook.com/v21.0';
-/** 리라이트 뒤라 request.url 은 sellery-branding.vercel.app 이다 — 광고가 가리키는 공개 주소를 쓴다 */
-export const OEM_PUBLIC_URL = 'https://sellery.life/influencer/oem';
 
 export type LeadEventInput = {
 	eventId: string;
 	phone: string;
 	category?: string;
-	/** 공개 주소 기준 페이지 (기본 OEM_PUBLIC_URL) */
+	/** 접수한 페이지의 공개 주소 — 홈(`/influencer/oem`)과 바로 가기(`/influencer/oem/apply`)가 다르다 · 기본 OEM_PUBLIC_URL */
 	sourceUrl?: string;
 	ip?: string | null;
 	userAgent?: string | null;
@@ -61,7 +61,7 @@ export async function sendMetaLeadEvent(i: LeadEventInput): Promise<boolean> {
 				event_time: Math.floor(Date.now() / 1000),
 				event_id: i.eventId,
 				action_source: 'website',
-				event_source_url: i.sourceUrl ?? `${OEM_PUBLIC_URL}/apply`,
+				event_source_url: i.sourceUrl ?? OEM_PUBLIC_URL,
 				user_data,
 				custom_data: { content_name: 'oem_apply', ...(i.category ? { content_category: i.category } : {}) }
 			}
