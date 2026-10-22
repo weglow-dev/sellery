@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { d, eyebrowCls, h2Cls, rightCol, rise, slideCls, twoCol } from './shared';
 
-	/** 5장 · 당신만의 제품이 되는 과정 — 스토리 3줄 + 서비스 칩. ("브랜드를 만들어 준다" 프레임은 2026-10-22 개발팀 요청으로 빼고 "당신이 정하는 당신만의 제품"으로) */
+	/** 5장 · 당신만의 제품이 되는 과정 — 스토리 3줄 + 서비스 칩. ("브랜드를 만들어 준다" 프레임은 2026-10-22 개발팀 요청으로 빼고 "내가 정하는 나만의 제품"으로 — 말투는 랜딩의 1인칭("내 샵" "내가 할 일")에 맞추고 설명 줄은 주어를 뺀다) */
 	let { active }: { active: boolean } = $props();
 
 	const STORY = [
-		{ n: '01', t: '나만의 레시피', d: '성분, 제형, 맛까지 당신이 직접 골라요.' },
-		{ n: '02', t: '패키지 · 라벨', d: '패키지와 라벨도 당신 스타일대로 함께 잡아요.' },
-		{ n: '03', t: '팔로워와의 연결', d: '당신만 팔 수 있는 샵, 첫 판매까지 같이 만들어요.' }
+		{ n: '01', t: '나만의 레시피', d: '성분, 제형, 맛까지 직접 골라요.' },
+		{ n: '02', t: '패키지 · 라벨', d: '패키지와 라벨도 내 스타일대로 함께 잡아요.' },
+		{ n: '03', t: '팔로워와의 연결', d: '내 채널에서만 파는 샵, 첫 판매까지 같이 만들어요.' }
 	];
 	const SERVICES = ['주문·결제 자동화', '포장·출고 대행', '투명한 정산 리포트'];
 </script>
 
-<section class={slideCls} aria-label="당신만의 제품이 되는 과정">
+<section class={slideCls} aria-label="나만의 제품이 되는 과정">
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
 		<div
 			class="absolute bottom-[120px] -left-[60px] size-[300px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.22),transparent)] lg:top-1/2 lg:bottom-auto lg:-left-[120px] lg:size-[760px] lg:-translate-y-[55%]"
@@ -20,8 +20,8 @@
 	</div>
 	<div class={twoCol}>
 		<div class="relative">
-			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>당신만의 제품이 되는 과정</p>
-			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>레시피부터 패키지까지,<br />전부 당신이 정해요</h2>
+			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>나만의 제품이 되는 과정</p>
+			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>레시피부터 패키지까지,<br />전부 내가 정해요</h2>
 		</div>
 		<div class="{rightCol} mt-6 short:mt-4">
 			<div class="flex flex-col">
