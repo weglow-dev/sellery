@@ -315,13 +315,19 @@
 		return rows.map((r) => ({ ...r, muted: r.v === UNDECIDED || r.v === NA || r.v === ANY }));
 	});
 
-	// 완료 화면의 [홈으로] · 레일의 로고 — 답을 비우고 랜딩 첫 장으로
+	// 완료 화면의 [홈으로] — 답을 비우고 랜딩 첫 장으로
 	function restart() {
 		name = phone = category = ingredient = dosageForm = subType = packaging = flavor = note = slot = '';
 		agree = false;
 		errors = {};
 		submitError = '';
 		setStep('intro');
+	}
+	// 레일의 로고 — 랜딩으로만 간다. 답은 그대로 두어 실수로 눌러도 입력이 날아가지 않게(다시 시작하면 고른 값이 채워진 채 이어진다).
+	// 접수가 끝난 뒤에는 같은 답으로 또 접수되지 않도록 [홈으로]와 같이 비운다
+	function home() {
+		if (step === 'done') restart();
+		else setStep('intro');
 	}
 </script>
 
@@ -333,7 +339,7 @@
 			{#if showHeader}
 				<MobileHeader {questions} {qi} {trail} onback={() => go(-1)} />
 			{/if}
-			<Rail items={rail} {questions} {qi} done={step === 'done'} {stepLabel} onrestart={restart} ongo={setStep} />
+			<Rail items={rail} {questions} {qi} done={step === 'done'} {stepLabel} onrestart={home} ongo={setStep} />
 
 			<div class="flex min-h-0 flex-1 flex-col">
 				<DesktopBar {trail} showBack={step !== 'done'} onback={() => go(-1)} />
