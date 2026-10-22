@@ -162,7 +162,11 @@
 	// ── 이동 ─────────────────────────────────────────────────
 	// 전환 방향 — 앞으로 가면 새 화면이 오른쪽에서, [이전]·레일로 되돌아가면 왼쪽에서 들어온다. 단계 순서(steps)의 앞뒤로 정한다
 	let dir = $state<1 | -1>(1);
+	// 타일 자동 전진(advance · 0.28초 뒤 go(1)) 예약 — 어떤 경로로든 단계가 바뀌면 지운다.
+	// 안 지우면 타일을 탭한 직후 [이전]·레일을 눌렀을 때 타이머가 뒤늦게 발사돼 [이전]은 취소되고 레일 점프는 한 단계 더 넘어간다
+	let advanceTimer: ReturnType<typeof setTimeout> | undefined;
 	function setStep(next: Step) {
+		clearTimeout(advanceTimer);
 		if (next === step) return;
 		dir = steps.indexOf(next) < steps.indexOf(step) ? -1 : 1;
 		step = next;
@@ -171,7 +175,6 @@
 		const i = Math.max(0, steps.indexOf(step));
 		setStep(steps[Math.max(0, Math.min(steps.length - 1, i + delta))]);
 	}
-	let advanceTimer: ReturnType<typeof setTimeout> | undefined;
 	function advance() {
 		clearTimeout(advanceTimer);
 		advanceTimer = setTimeout(() => go(1), 280);
