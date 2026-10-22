@@ -59,7 +59,9 @@
 			{ href: '/brands', label: '브랜드', icon: 'flag' },
 			{ href: '/products', label: '상품', icon: 'box' },
 			// 정산 탭 안의 화면 칩(`apps/admin/src/lib/money-nav.ts`)이 가는 곳 — 그 화면에서도 탭이 켜져야 한다
-			{ href: '/settle', label: '정산', icon: 'chart', match: ['/orders', '/payments', '/revenue', '/cs'] }
+			{ href: '/settle', label: '정산', icon: 'chart', match: ['/orders', '/payments', '/revenue', '/cs'] },
+			// 크리에이터 아웃리치(0055) — MYR 제조의뢰 제안 후보 큐 (2026-10-22)
+			{ href: '/outreach', label: '아웃리치', icon: 'send' }
 		]
 	};
 </script>

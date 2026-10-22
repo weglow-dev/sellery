@@ -1329,6 +1329,119 @@ export type Database = {
           },
         ]
       }
+      outreach_creators: {
+        Row: {
+          assigned_to: string | null
+          audience: Json | null
+          bio: string | null
+          category: string | null
+          created_at: string
+          dm_draft: string | null
+          engagement_rate: number | null
+          followers: number | null
+          handle: string
+          id: string
+          ig_user_id: string | null
+          last_checked_at: string | null
+          media_count: number | null
+          name: string | null
+          note: string | null
+          platform: string
+          replied_at: string | null
+          score: number | null
+          sent_at: string | null
+          source: string
+          status: string
+          trend: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          audience?: Json | null
+          bio?: string | null
+          category?: string | null
+          created_at?: string
+          dm_draft?: string | null
+          engagement_rate?: number | null
+          followers?: number | null
+          handle: string
+          id?: string
+          ig_user_id?: string | null
+          last_checked_at?: string | null
+          media_count?: number | null
+          name?: string | null
+          note?: string | null
+          platform?: string
+          replied_at?: string | null
+          score?: number | null
+          sent_at?: string | null
+          source?: string
+          status?: string
+          trend?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          audience?: Json | null
+          bio?: string | null
+          category?: string | null
+          created_at?: string
+          dm_draft?: string | null
+          engagement_rate?: number | null
+          followers?: number | null
+          handle?: string
+          id?: string
+          ig_user_id?: string | null
+          last_checked_at?: string | null
+          media_count?: number | null
+          name?: string | null
+          note?: string | null
+          platform?: string
+          replied_at?: string | null
+          score?: number | null
+          sent_at?: string | null
+          source?: string
+          status?: string
+          trend?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      outreach_events: {
+        Row: {
+          actor: string | null
+          body: string | null
+          created_at: string
+          creator_id: string
+          id: string
+          kind: string
+        }
+        Insert: {
+          actor?: string | null
+          body?: string | null
+          created_at?: string
+          creator_id: string
+          id?: string
+          kind: string
+        }
+        Update: {
+          actor?: string | null
+          body?: string | null
+          created_at?: string
+          creator_id?: string
+          id?: string
+          kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outreach_events_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "outreach_creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payouts: {
         Row: {
           amount: number
