@@ -18,7 +18,7 @@ const MSG: Record<string, string> = {
   imported: '가져오기 완료',
   status: '상태를 바꿨어요',
   collected: '조건으로 수집 완료',
-  not_configured: '수집 제공사 API 키가 없어요 — Vercel sellery-admin 에 MODASH_API_KEY 를 넣으면 버튼이 켜져요',
+  not_configured: '수집 설정이 없어요 — Vercel sellery-admin 에 META_PAGE_ACCESS_TOKEN + META_IG_USER_ID(메타 공식) 또는 MODASH_API_KEY 를 넣으면 버튼이 켜져요',
   provider_error: '제공사 응답 오류',
   err: '처리하지 못했어요 — 입력을 확인해주세요'
 };
@@ -45,6 +45,7 @@ export const load: PageServerLoad = async (event) => {
   const [rows, counts] = await Promise.all([listOutreach({ status, q: q || null }), countOutreachByStatus()]);
   const collect = outreachCollectStatus();
   const cpage = Math.max(0, Number(event.url.searchParams.get('cpage') ?? '0') || 0);
+  const cafter = event.url.searchParams.get('cafter') ?? '';
   const base = adminPath('/outreach');
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const key = event.url.searchParams.get('msg') ?? '';
@@ -61,7 +62,7 @@ export const load: PageServerLoad = async (event) => {
       ...OUTREACH_STATUSES.map((k) => ({ key: k, label: OUTREACH_STATUS_LABEL[k].label, n: counts[k] ?? 0, href: `${base}?status=${k}${q ? `&q=${encodeURIComponent(q)}` : ''}` }))
     ],
     statuses: OUTREACH_STATUSES.map((k) => ({ value: k, label: OUTREACH_STATUS_LABEL[k].label })),
-    collect: { ...collect, nextPage: cpage },
+    collect: { ...collect, nextPage: cpage, nextAfter: cafter },
     rows: rows.map((r) => ({ ...r, fit: outreachFit(r), href: `${base}/${r.id}` }))
   };
 };
@@ -91,13 +92,16 @@ export const actions: Actions = {
     if (!gate.ok) redirect(303, gate.location);
     const form = await event.request.formData();
     const page = Math.max(0, Number(form.get('page') ?? '0') || 0);
-    const r = await collectOutreachCandidates({ page, actor: gate.ctx.user.email ?? null });
+    const after = String(form.get('after') ?? '').trim() || null;
+    const r = await collectOutreachCandidates({ page, after, actor: gate.ctx.user.email ?? null });
     if (!r.ok) {
       const key = r.code === 'NOT_CONFIGURED' ? 'not_configured' : 'provider_error';
       redirect(303, self(event.url, key, r.error ?? undefined));
     }
-    const url = new URL(self(event.url, 'collected', `${r.page + 1}페이지 · 찾음 ${r.found}/${r.total} · 새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}`), 'http://x');
+    const url = new URL(self(event.url, 'collected', `${r.provider === 'meta' ? '메타 공식' : 'Modash'} · 받음 ${r.found} · 조건 통과 ${r.kept} · 새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}${r.provider === 'meta' && !r.after ? ' · 마지막 페이지' : ''}`), 'http://x');
     url.searchParams.set('cpage', String(r.page + 1));
+    if (r.after) url.searchParams.set('cafter', r.after);
+    else url.searchParams.delete('cafter');
     redirect(303, url.pathname + url.search);
   },
   status: async (event) => {
