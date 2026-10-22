@@ -73,8 +73,8 @@ async function addEvent(admin: Admin, creatorId: string, kind: string, body: str
   if (error) console.error("[admin/outreach] event failed:", error.message);
 }
 
-function audienceFrom(r: OutreachCsvRow, prev: OutreachAudience | null): OutreachAudience | null {
-  const a: OutreachAudience = { ...(prev ?? {}) };
+function audienceFrom(r: OutreachCsvRow & { audience?: OutreachAudience | null }, prev: OutreachAudience | null): OutreachAudience | null {
+  const a: OutreachAudience = { ...(prev ?? {}), ...(r.audience ?? {}) };
   if (r.female_pct !== undefined) a.female_pct = r.female_pct;
   if (r.age_20_40_pct !== undefined) a.age_20_40_pct = r.age_20_40_pct;
   if (r.kr_pct !== undefined) a.kr_pct = r.kr_pct;
@@ -84,7 +84,7 @@ function audienceFrom(r: OutreachCsvRow, prev: OutreachAudience | null): Outreac
 
 /** handle 기준 upsert — 새 행은 후보로, 기존 행은 넘어온 지표만 덮어쓴다(빈 값은 유지) */
 export async function upsertOutreachCreators(
-  rows: OutreachCsvRow[],
+  rows: (OutreachCsvRow & { audience?: OutreachAudience | null })[],
   source: "manual" | "csv" | "hashtag" | "discovery",
   actor: string | null,
   admin: Admin = createAdminClient(),
@@ -97,6 +97,7 @@ export async function upsertOutreachCreators(
     const existing = prev ? parseOutreachCreator(prev) : null;
     const merged = {
       handle: r.handle,
+      ig_user_id: r.ig_user_id ?? existing?.ig_user_id ?? null,
       name: r.name ?? existing?.name ?? null,
       followers: r.followers ?? existing?.followers ?? null,
       engagement_rate: r.engagement_rate ?? existing?.engagement_rate ?? null,

@@ -86,6 +86,8 @@ export function parseHandleList(text: string): { handles: string[]; bad: string[
 
 export type OutreachCsvRow = {
   handle: string;
+  /** 제공사 수집 시 (2단계) */
+  ig_user_id?: string | null;
   name?: string | null;
   followers?: number | null;
   engagement_rate?: number | null;
@@ -148,7 +150,7 @@ export function parseCsvRows(text: string): { rows: OutreachCsvRow[]; skipped: n
       else if (k === "followers") r.followers = num(v) === null ? null : Math.round(num(v)!);
       else if (k === "engagement_rate") r.engagement_rate = rate(v);
       else if (k === "trend") r.trend = /up|상승|우상/i.test(v) ? "up" : /down|하락/i.test(v) ? "down" : /flat|유지|보합/i.test(v) ? "flat" : null;
-      else r[k] = pct(v);
+      else if (k === "female_pct" || k === "age_20_40_pct" || k === "kr_pct") r[k] = pct(v);
     });
     if (!r.handle) {
       skipped++;
@@ -161,7 +163,14 @@ export function parseCsvRows(text: string): { rows: OutreachCsvRow[]; skipped: n
 
 /* ---------------- 적합 판정 ---------------- */
 
-export type OutreachAudience = { female_pct?: number | null; age_20_40_pct?: number | null; kr_pct?: number | null; source?: string | null };
+export type OutreachAudience = {
+  female_pct?: number | null;
+  age_20_40_pct?: number | null;
+  kr_pct?: number | null;
+  source?: string | null;
+  /** 제공사 검색 조건으로 이미 걸러진 결과 — 비율 숫자가 없어도 세 조건 충족으로 본다 (outreach-providers) */
+  filtered_by?: string | null;
+};
 
 export type OutreachFit = {
   /** 조건을 전부 알고 전부 충족 */
@@ -186,11 +195,15 @@ export function outreachFit(r: { followers?: number | null; trend?: string | nul
   const missing: string[] = [];
   const unknown: string[] = [];
   let met = 0;
-  for (const c of checks) {
-    if (c.value === null || c.value === undefined) unknown.push(c.label);
-    else if (c.pass(c.value)) met++;
+  const filtered = Boolean(a.filtered_by);
+  checks.forEach((c, i) => {
+    if (c.value === null || c.value === undefined) {
+      // 제공사가 조건으로 걸러 준 결과 — 팔로워 구성 3개(i ≥ 1)는 숫자 없이도 충족
+      if (filtered && i >= 1) met++;
+      else unknown.push(c.label);
+    } else if (c.pass(c.value)) met++;
     else missing.push(c.label);
-  }
+  });
   const trendLabel = "반응 우상향/유지";
   if (!r.trend) unknown.push(trendLabel);
   else if ((OUTREACH_FILTER.trends as readonly string[]).includes(r.trend)) met++;
@@ -251,7 +264,7 @@ const numOrNull = (v: unknown): number | null => (typeof v === "number" && Numbe
 export function parseOutreachAudience(v: unknown): OutreachAudience | null {
   const o = obj(v);
   if (!o) return null;
-  return { female_pct: numOrNull(o.female_pct), age_20_40_pct: numOrNull(o.age_20_40_pct), kr_pct: numOrNull(o.kr_pct), source: str(o.source) };
+  return { female_pct: numOrNull(o.female_pct), age_20_40_pct: numOrNull(o.age_20_40_pct), kr_pct: numOrNull(o.kr_pct), source: str(o.source), filtered_by: str(o.filtered_by) };
 }
 
 export function parseOutreachCreator(raw: unknown): OutreachCreator | null {

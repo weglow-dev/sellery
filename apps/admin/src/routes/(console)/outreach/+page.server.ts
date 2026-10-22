@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { OUTREACH_STATUSES, OUTREACH_STATUS_LABEL, isOutreachStatus, outreachFit, parseCsvRows, parseHandleList, type OutreachStatus } from '@sellery/db/admin/outreach-rules';
 import { adminPath, requireAdmin } from '$lib/server/admin';
-import { countOutreachByStatus, listOutreach, setOutreachStatus, upsertOutreachCreators } from '$lib/server/outreach';
+import { collectOutreachCandidates, countOutreachByStatus, listOutreach, outreachCollectStatus, setOutreachStatus, upsertOutreachCreators } from '$lib/server/outreach';
 
 /**
  * `/outreach` — 크리에이터 아웃리치 큐 (대표 요청 2026-10-22 · docs/admin-console-plan.md "아웃리치").
@@ -10,12 +10,16 @@ import { countOutreachByStatus, listOutreach, setOutreachStatus, upsertOutreachC
  *   ?/add     핸들 목록(줄·쉼표) → 후보 추가 (지표 없음 · 초안 생성)
  *   ?/import  CSV/TSV 붙여넣기(헤더 포함) → upsert (지표 → 적합 점수)
  *   ?/status  행 상태 변경 (select)
+ *   ?/collect 제공사(Modash) 검색 1페이지 → 대표 조건으로 걸러진 후보 upsert (MODASH_API_KEY 없으면 안내)
  * DM 은 자동 발송하지 않는다 — 운영자가 초안을 복사해 @sellery.official 에서 보낸 뒤 "DM 보냄" 으로 바꾼다.
  */
 const MSG: Record<string, string> = {
   added: '후보를 추가했어요',
   imported: '가져오기 완료',
   status: '상태를 바꿨어요',
+  collected: '조건으로 수집 완료',
+  not_configured: '수집 제공사 API 키가 없어요 — Vercel sellery-admin 에 MODASH_API_KEY 를 넣으면 버튼이 켜져요',
+  provider_error: '제공사 응답 오류',
   err: '처리하지 못했어요 — 입력을 확인해주세요'
 };
 
@@ -39,6 +43,8 @@ export const load: PageServerLoad = async (event) => {
   const status: OutreachStatus | null = isOutreachStatus(sRaw) ? sRaw : null;
   const q = (event.url.searchParams.get('q') ?? '').trim();
   const [rows, counts] = await Promise.all([listOutreach({ status, q: q || null }), countOutreachByStatus()]);
+  const collect = outreachCollectStatus();
+  const cpage = Math.max(0, Number(event.url.searchParams.get('cpage') ?? '0') || 0);
   const base = adminPath('/outreach');
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const key = event.url.searchParams.get('msg') ?? '';
@@ -55,6 +61,7 @@ export const load: PageServerLoad = async (event) => {
       ...OUTREACH_STATUSES.map((k) => ({ key: k, label: OUTREACH_STATUS_LABEL[k].label, n: counts[k] ?? 0, href: `${base}?status=${k}${q ? `&q=${encodeURIComponent(q)}` : ''}` }))
     ],
     statuses: OUTREACH_STATUSES.map((k) => ({ value: k, label: OUTREACH_STATUS_LABEL[k].label })),
+    collect: { ...collect, nextPage: cpage },
     rows: rows.map((r) => ({ ...r, fit: outreachFit(r), href: `${base}/${r.id}` }))
   };
 };
@@ -78,6 +85,20 @@ export const actions: Actions = {
     if (!parsed.rows.length) return fail(400, { error: '가져올 행이 없어요 — 첫 줄에 헤더(핸들 · 팔로워 · 여성 · 20~40대 · 한국 · 추세 · 참여율 · 카테고리)가 있어야 해요' });
     const r = await upsertOutreachCreators(parsed.rows, 'csv', gate.ctx.user.email ?? null);
     redirect(303, self(event.url, 'imported', `새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}${parsed.skipped ? ` · 핸들 없는 줄 ${parsed.skipped}` : ''}`));
+  },
+  collect: async (event) => {
+    const gate = await requireAdmin(event);
+    if (!gate.ok) redirect(303, gate.location);
+    const form = await event.request.formData();
+    const page = Math.max(0, Number(form.get('page') ?? '0') || 0);
+    const r = await collectOutreachCandidates({ page, actor: gate.ctx.user.email ?? null });
+    if (!r.ok) {
+      const key = r.code === 'NOT_CONFIGURED' ? 'not_configured' : 'provider_error';
+      redirect(303, self(event.url, key, r.error ?? undefined));
+    }
+    const url = new URL(self(event.url, 'collected', `${r.page + 1}페이지 · 찾음 ${r.found}/${r.total} · 새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}`), 'http://x');
+    url.searchParams.set('cpage', String(r.page + 1));
+    redirect(303, url.pathname + url.search);
   },
   status: async (event) => {
     const gate = await requireAdmin(event);
