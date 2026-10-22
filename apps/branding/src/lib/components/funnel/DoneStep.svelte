@@ -39,7 +39,7 @@
 	</div>
 	<h1 class="mt-[22px] text-[30px] leading-[1.3] font-extrabold tracking-[-0.03em] text-fg lg:text-4xl lg:leading-[1.25]">접수됐어요</h1>
 	<p class="mt-2.5 text-[15px] leading-relaxed text-fg-soft">
-		{name.trim() ? `${name.trim()}님, ` : ''}전담 매니저가 내용을 확인하고 <br class="lg:hidden" />영업일 기준 3일 안에 미팅 일정을 제안드려요.
+		{name.trim() ? `${name.trim()}님, ` : ''}전담 매니저가 내용을 확인하고 <br class="lg:hidden" />사흘 안에 미팅 일정을 제안드려요.
 	</p>
 
 	<div class="{bodyCls} lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
