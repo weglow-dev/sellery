@@ -3,7 +3,7 @@
 	import { LANDING_CATEGORIES } from '$lib/utils/apply-options';
 	import { d, eyebrowCls, h2Cls, rightCol, rise, slideCls, twoCol } from './shared';
 
-	/** 6장 · 브랜드 카테고리 — 타일 4장(2×2). 탭하면 살짝 커지며 체크 배지가 튀어나온 뒤 그 카테고리로 퍼널이 시작된다(onpick). 테두리가 한 장씩 돌아가며 반짝인다. */
+	/** 6장 · 제품 카테고리 — 타일 4장(2×2). 탭하면 살짝 커지며 체크 배지가 튀어나온 뒤 그 카테고리로 퍼널이 시작된다(onpick). 테두리가 한 장씩 돌아가며 반짝인다. */
 	let { active, onpick }: { active: boolean; onpick: (category: string) => void } = $props();
 
 	// 선택 표시를 잠깐 보여준 뒤 그 카테고리로 퍼널을 시작한다
@@ -46,11 +46,11 @@
 	});
 </script>
 
-<section class={slideCls} aria-label="브랜드 카테고리">
+<section class={slideCls} aria-label="제품 카테고리">
 	<div class={twoCol}>
 		<div class="relative">
-			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>이렇게 브랜드가 태어나요</p>
-			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>지금 만들어지고 있는<br />브랜드 카테고리</h2>
+			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>이런 제품이 만들어지고 있어요</p>
+			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>지금 만들어지고 있는<br />제품 카테고리</h2>
 			<p class="mt-2.5 text-sm text-accent lg:text-[17px] {rise(active)}" style={d(2)}>끌리는 걸 탭하면 그 카테고리로 바로 제조의뢰가 시작돼요</p>
 		</div>
 		<!-- 4장 2×2 — 카드가 줄어든 만큼 한 장을 키운다 -->

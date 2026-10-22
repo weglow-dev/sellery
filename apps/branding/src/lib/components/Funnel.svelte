@@ -348,7 +348,7 @@
 						{#if step === 'category'}
 							<TileStep
 								eyebrow="{q('category')} · 카테고리"
-								title={['어떤 웰니스 브랜드를', '만들고 싶으세요?']}
+								title={['어떤 웰니스 제품을', '만들고 싶으세요?']}
 								help="가장 가까운 하나를 골라주세요. 탭하면 바로 넘어가요."
 								options={CATEGORIES}
 								value={category}

@@ -16,7 +16,7 @@ import {
 } from '$lib/utils/apply-options';
 import { escapeSlack, notifySlack } from './slack';
 import { sendMetaLeadEvent } from './meta-capi';
-import { publicUrlOf } from '$lib/site';
+import { BRAND_NAME, publicUrlOf } from '$lib/site';
 import { formatPhone, PHONE_RE } from '$lib/utils/phone';
 import { RATE_LIMIT_MESSAGE, rateLimit } from './rate-limit';
 
@@ -129,7 +129,7 @@ export const applyActions: Actions = {
 
 		const delivered = await notifySlack(
 			[
-				'*새 제조의뢰 접수* [셀러리 브랜딩]',
+				`*새 제조의뢰 접수* [${BRAND_NAME}]`,
 				`• 활동명/채널: ${escapeSlack(name)}`,
 				`• 연락처: ${phone}`,
 				`• 카테고리: ${category}`,

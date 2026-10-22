@@ -56,7 +56,7 @@
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} tracking-[0.08em] {rise(active)}" style={d(0)}>START WITH ZERO</p>
-			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>시작하는 데 필요한 건<br />당신의 이름뿐이에요</h2>
+			<h2 class="{h2Cls} {rise(active)}" style={d(1)}>시작하는 데 필요한 건<br />내 이름뿐이에요</h2>
 		</div>
 		<div class="{rightCol} {rise(active)}" style={d(2)}>
 			<div class="rounded-[22px] border border-white/[0.08] bg-white/[0.03] px-[18px] py-1 lg:ml-auto lg:max-w-[480px] lg:rounded-[26px] lg:px-[26px] lg:py-2">

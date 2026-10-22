@@ -1,3 +1,6 @@
+/** 이 랜딩이 내세우는 서비스 이름 — 2026-10-22 개발팀 결정으로 "셀러리/셀러리 브랜딩" 대신 쓴다. 제목 · og:site_name · 슬랙 접수 태그가 이 값을 쓰고, 화면의 워드마크(Landing · Rail)와 OG 이미지는 같은 글자를 직접 적는다. */
+export const BRAND_NAME = 'Make Your Recipe';
+
 /** 브랜딩 랜딩의 공개 주소 — 광고·제안서·공유 링크가 가리키는 곳 (대표 결정 2026-10-19).
  *  이 앱이 보는 호스트는 리라이트 뒤라 sellery-branding.vercel.app 이므로 request.url 을 그대로 쓰면 안 되고,
  *  canonical · og:url · 메타 전환 API event_source_url 모두 이 값에 경로를 붙여 만든다(브라우저·서버 공용 — 비밀값 없음). */
