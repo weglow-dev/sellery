@@ -40,6 +40,11 @@
 </nav>
 
 <div class="console-inline" style="gap:10px;flex-wrap:wrap;align-items:flex-start">
+	<form method="post" action="?/collect" style="margin:0" title={data.collect.configured ? `${data.collect.provider} 검색 — 조건(팔로워·여성·20~40대·한국·성장률)으로 걸러진 결과 1페이지(≤15건)를 가져와요. 누를 때마다 다음 페이지` : 'Vercel sellery-admin 에 MODASH_API_KEY 를 넣으면 켜져요'}>
+		<input type="hidden" name="page" value={data.collect.nextPage} />
+		<button type="submit" class="pri sm" disabled={!data.collect.configured}>⚡ 조건으로 수집{data.collect.configured && data.collect.nextPage ? ` (${data.collect.nextPage + 1}페이지)` : ''}</button>
+		{#if !data.collect.configured}<small style="display:block;color:var(--color-mute);margin-top:4px">수집 제공사 API 키 필요</small>{/if}
+	</form>
 	<form method="get" class="console-inline" style="margin:0">
 		{#if data.status}<input type="hidden" name="status" value={data.status} />{/if}
 		<input name="q" value={data.q} placeholder="핸들 · 이름 · 카테고리 검색" style="min-width:220px" />
@@ -105,4 +110,4 @@
 		</tbody>
 	</table>
 </div>
-<p class="meta" style="margin:8px 3px 0">여성·연령·국가 비율은 공식 API 로 남의 계정을 조회할 수 없어 분석사 추정값(CSV) 이나 운영자 판단으로 채웁니다 · 자동 DM 발송은 메타 약관·정보통신망법 위반이라 하지 않습니다 — 답장이 온 뒤의 자동 응답만 2단계에서 붙입니다.</p>
+<p class="meta" style="margin:8px 3px 0">[조건으로 수집]은 인플루언서 데이터 제공사(Modash) 검색에 대표 조건을 그대로 보내 걸러진 계정만 받아옵니다(페이지당 ≤15건 · 크레딧 차감) · 여성·연령·국가 비율은 공식 API 로 남의 계정을 조회할 수 없어 제공사 추정값이나 CSV · 운영자 판단으로 채웁니다 · 자동 DM 발송은 메타 약관·정보통신망법 위반이라 하지 않습니다 — 답장이 온 뒤의 자동 응답만 2단계에서 붙입니다.</p>
