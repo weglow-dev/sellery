@@ -51,10 +51,24 @@ describe("Meta Instagram Creator Marketplace — 파라미터 · 응답 파서",
   it("대표 조건 → 쿼리 (팔로워 하한 · 여성 · 한국 · 최근 90일 활동 · 커서)", () => {
     const q = metaCreatorSearchParams({ after: "abc" });
     expect(q.get("creator_min_followers")).toBe("50000");
-    expect(q.get("major_audience_gender")).toBe("female");
-    expect(q.get("major_audience_countries")).toBe("KR");
+    expect(q.get("major_audience_gender")).toBe('["female"]');
+    expect(q.get("major_audience_countries")).toBe('["KR"]');
+    expect(q.get("creator_countries")).toBe('["KR"]');
     expect(q.get("after")).toBe("abc");
-    expect(q.get("fields")).toContain("creator_engaged_accounts");
+    expect(q.get("fields")).toContain("breakdown(GENDER).as(ins_gender)");
+    expect(metaCreatorSearchParams({ breakdown: false }).get("fields")).not.toContain("breakdown");
+  });
+  it("모의 데이터 모양(total_value.value · 별칭 없음) → 팔로워/반응률만, 분포는 filtered_by", () => {
+    const r = parseMetaCreators({
+      data: [{ id: "445537712024094", username: "mocked_username_1", insights: { data: [{ name: "total_followers", period: "overall", total_value: { value: 748 } }, { name: "reels_interaction_rate", total_value: { value: 18.7 } }, { name: "creator_engaged_accounts", total_value: { value: 235 } }] } }],
+    });
+    expect(r.rows[0]).toMatchObject({ handle: "mocked_username_1", followers: 748, engagement_rate: 0.187 });
+    expect(r.rows[0].audience).toMatchObject({ female_pct: null, filtered_by: "meta" });
+  });
+  it("별칭(ins_gender · ins_age · ins_geo) breakdown 응답 → 분포 %", () => {
+    const bd = (dim: string, results: [string, number][]) => ({ data: [{ name: "creator_engaged_accounts", total_value: { value: 1000, breakdowns: [{ dimension_keys: [dim], results: results.map(([k, v]) => ({ dimension_values: [k], value: v })) }] } }] });
+    const r = parseMetaCreators({ data: [{ id: "1", username: "a", insights: { data: [{ name: "total_followers", total_value: { value: 80000 } }] }, ins_gender: bd("GENDER", [["FEMALE", 650], ["MALE", 350]]), ins_age: bd("AGE", [["25-34", 500], ["35-44", 320], ["45-54", 180]]), ins_geo: bd("TOP_COUNTRIES", [["KR", 850], ["JP", 150]]) }] });
+    expect(r.rows[0].audience).toEqual({ source: "meta:engaged", female_pct: 65, age_20_40_pct: 82, kr_pct: 85, filtered_by: null });
   });
   it("insights breakdown(results/dimension_values) → 여성 · 20~40대 · 한국 % · 커서", () => {
     const r = parseMetaCreators({

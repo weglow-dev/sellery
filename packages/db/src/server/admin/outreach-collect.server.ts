@@ -6,7 +6,7 @@
  *   한국 location id 는 한 번 조회(`/v1/instagram/locations?query=Korea`)해 캐시. 조회 실패 시 env 값.
  *   비용: 검색 0.01 크레딧/건(페이지당 ~0.15) — 버튼 1회 = 1페이지. 보고서(상세 인구통계) 호출은 2단계(선택).
  */
-import { META_GRAPH_VERSION, metaCreatorSearchParams, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId, type OutreachProvider } from "../../admin/outreach-providers";
+import { META_GRAPH_VERSION, isMetaBreakdownError, metaCreatorSearchParams, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId, type OutreachProvider } from "../../admin/outreach-providers";
 import { outreachFit } from "../../admin/outreach-rules";
 import { createAdminClient, type Admin } from "../admin.server";
 import { upsertOutreachCreators } from "./outreach.server";
@@ -85,14 +85,21 @@ export async function collectOutreachCandidates(
 
   if (provider === "meta") {
     if (!cfg.metaPageToken || !cfg.metaIgUserId) return { ok: false, code: "NOT_CONFIGURED", provider, ...base };
-    const q = metaCreatorSearchParams({ after: opts.after ?? null });
-    q.set("access_token", cfg.metaPageToken);
+    const token = cfg.metaPageToken;
+    const igId = cfg.metaIgUserId;
+    const call = async (breakdown: boolean) => {
+      const q = metaCreatorSearchParams({ after: opts.after ?? null, breakdown });
+      q.set("access_token", token);
+      const res = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(igId)}/creator_marketplace_creators?${q.toString()}`, { signal: AbortSignal.timeout(20_000) });
+      return { ok: res.ok, json: (await res.json().catch(() => null)) as unknown };
+    };
     let json: unknown;
     let ok = true;
     try {
-      const res = await fetch(`https://graph.facebook.com/${META_GRAPH_VERSION}/${encodeURIComponent(cfg.metaIgUserId)}/creator_marketplace_creators?${q.toString()}`, { signal: AbortSignal.timeout(20_000) });
-      ok = res.ok;
-      json = await res.json().catch(() => null);
+      ({ ok, json } = await call(true));
+      // Standard Access(모의 데이터)는 breakdown 을 거부한다 → 분포 없이 재시도(행은 filtered_by 로 통과)
+      const first = parseMetaCreators(json);
+      if (first.error && isMetaBreakdownError(first.error)) ({ ok, json } = await call(false));
     } catch (e) {
       return { ok: false, code: "PROVIDER_ERROR", provider, ...base, error: e instanceof Error ? e.message : String(e) };
     }
