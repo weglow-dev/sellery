@@ -1,6 +1,6 @@
 <script lang="ts">
 	import StepHead from './StepHead.svelte';
-	import { SUGGESTED_INGREDIENTS, type Category } from '$lib/utils/apply-options';
+	import { MAX_LEN, SUGGESTED_INGREDIENTS, type Category } from '$lib/utils/apply-options';
 	import { bodyCls, ctaOff, ctaOn, footCls, inputCls, labelCls, scrollCls } from './shared';
 
 	/** 메인 성분(선택) + 더 전달하고 싶은 내용(선택). 카테고리별 자주 쓰는 성분 칩은 쉼표로 이어 붙이고, 다시 누르면 뺀다. */
@@ -35,7 +35,7 @@
 		<div>
 			<div class="mt-6 flex flex-col gap-2 lg:mt-0">
 				<label for="ingredient" class={labelCls}>성분 이름</label>
-				<input id="ingredient" bind:value={ingredient} type="text" autocomplete="off" placeholder="예: 가르시니아, 저분자 콜라겐, 밀크씨슬" class="{inputCls} h-14" />
+				<input id="ingredient" bind:value={ingredient} type="text" maxlength={MAX_LEN.ingredient} autocomplete="off" placeholder="예: 가르시니아, 저분자 콜라겐, 밀크씨슬" class="{inputCls} h-14" />
 			</div>
 			{#if suggestions.length > 0}
 				<p class="mt-6 mb-2.5 text-[13px] font-semibold text-fg/55">{category} 제품에 자주 쓰는 성분</p>
@@ -58,7 +58,7 @@
 		</div>
 		<div class="mt-6 flex flex-col gap-2 lg:mt-0">
 			<label for="note" class={labelCls}>더 전달하고 싶은 내용 <span class="font-medium text-fg/50">(선택)</span></label>
-			<textarea id="note" bind:value={note} rows="3" placeholder="브랜드 컨셉, 참고하는 제품, 론칭 희망 시기 등 편하게 적어주세요" class="{inputCls} resize-none py-3.5 leading-normal lg:min-h-[214px]"></textarea>
+			<textarea id="note" bind:value={note} rows="3" maxlength={MAX_LEN.note} placeholder="브랜드 컨셉, 참고하는 제품, 론칭 희망 시기 등 편하게 적어주세요" class="{inputCls} resize-none py-3.5 leading-normal lg:min-h-[214px]"></textarea>
 		</div>
 	</div>
 </div>
