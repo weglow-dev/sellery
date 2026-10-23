@@ -89,10 +89,10 @@
 	<!-- 상단 바 — 슬라이드 위에 떠 있고 터치는 통과시킨다 -->
 	<div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-[60px] items-center justify-between px-5 lg:h-[72px] lg:px-16">
 		<div class="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-fg">
-			<!-- 흰색 워드마크(static/logo-w.svg · "MYR / MAKE YOUR RECIPE" 락업 — viewBox 는 글자 영역으로 잘라 둠) + 옆에 이름 글자.
-			     그림 안 글자는 32px 에서 읽기 어려워 장식으로 두고(alt 빈 값) 이름은 옆 텍스트가 읽힌다. 어두운 원형(logo.png)은 레일·파비콘·OG 에 그대로 -->
-			<img src={asset('/logo-w.svg')} alt="" height="32" class="h-8 w-auto shrink-0" />
-			Make Your Recipe
+			<!-- 흰색 워드마크(static/logo-w.svg · "MYR / MAKE YOUR RECIPE" 락업 — viewBox 는 글자 영역으로 잘라 둠) 28px. 글자가 그림 안에 있어 옆 텍스트는 주석으로 두고 alt 로 읽힌다.
+			     데스크톱 레일(Rail.svelte)도 같은 로고 · 어두운 원형(logo.png)은 파비콘·OG 에 그대로 -->
+			<img src={asset('/logo-w.svg')} alt="Make Your Recipe" height="28" class="h-7 w-auto shrink-0" />
+			<!-- Make Your Recipe -->
 		</div>
 		<span class="text-xs font-semibold text-fg/50 tabular-nums" aria-live="polite">{slide + 1} / {SLIDES}</span>
 	</div>
