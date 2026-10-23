@@ -113,14 +113,15 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
 				<span class={hint} aria-hidden="true"><kbd class={kbd}>←</kbd>이전</span>
 			</button>
-			<div class="flex items-center gap-1.5" role="tablist" aria-label="슬라이드">
+			<!-- 점 인디케이터 = 페이지 이동 버튼 묶음. 탭(tablist/tab)이 아니다 — 슬라이드 섹션에 tabpanel 짝이 없어 보조기기가 연결을 못 찾는다.
+			     현재 장은 aria-current, 전체 중 몇 번째인지는 위 상단 바의 live 영역("n / 7")이 읽어준다 -->
+			<div class="flex items-center gap-1.5" role="group" aria-label="슬라이드 이동">
 				{#each { length: SLIDES } as _, i (i)}
 					{@const w = dotWeight(i)}
 					<!-- 6px 점이 현재 장에서 22px 알약으로 — 스크롤 진행도에 따라 길이와 색이 연속으로 바뀐다 -->
 					<button
 						type="button"
-						role="tab"
-						aria-selected={i === slide}
+						aria-current={i === slide ? 'true' : undefined}
 						aria-label="{i + 1}번째 슬라이드"
 						onclick={() => goSlide(i)}
 						class="relative h-1.5 overflow-hidden rounded-full bg-white/20"
