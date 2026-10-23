@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { applyAction } from '$app/forms';
 	import { pushState, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -29,7 +29,8 @@
 		packagingOptionsFor,
 		subTypesFor,
 		type ApplyErrors,
-		type ApplyResult
+		type ApplyResult,
+		type ApplyValues
 	} from '$lib/utils/apply-options';
 
 	/* 한 화면 한 질문 퍼널 — 첫 화면(intro)이 랜딩 슬라이드다. 타일을 고르면 0.28초 뒤 다음 단계로 넘어가고, 헤더의 뒤로 가기로 되돌아온다.
@@ -54,6 +55,55 @@
 	let note = $state(v0?.note ?? '');
 	let slot = $state(v0?.slot ?? '');
 	let agree = $state(false);
+
+	// ── 답 보존(sessionStorage) ──────────────────────────────
+	// 새로고침·인앱 브라우저의 재로드(다른 앱 갔다 오면 페이지를 다시 그리는 일이 잦다)에도 고른 답이 남게 한다.
+	// 탭 단위라 탭·브라우저를 닫으면 지워지고 다른 탭과 공유되지 않는다. 선택형 답 8개와 있던 단계만 — 이름·연락처·동의는 개인정보라 저장하지 않고,
+	// 접수에 성공하면 바로 지운다. 복원은 하이드레이션 뒤(onMount)에 해서 서버가 그린 화면과 어긋나지 않게 한다.
+	const SAVE_KEY = 'myr-apply-v1';
+	type Saved = Partial<Pick<ApplyValues, 'category' | 'ingredient' | 'dosageForm' | 'subType' | 'packaging' | 'flavor' | 'note' | 'slot'> & { step: Step }>;
+	function loadSaved(): Saved {
+		try {
+			return JSON.parse(sessionStorage.getItem(SAVE_KEY) ?? '{}') as Saved;
+		} catch {
+			return {};
+		}
+	}
+	function clearSaved() {
+		try {
+			sessionStorage.removeItem(SAVE_KEY);
+		} catch {
+			/* 저장소가 막힌 환경(시크릿 · 차단) — 보존 없이 진행 */
+		}
+	}
+	let restored = $state(false);
+	onMount(() => {
+		// JS 없이 제출된 결과(form)로 복원했으면 그쪽이 더 최신이다
+		if (!v0) {
+			const s = loadSaved();
+			category = s.category ?? '';
+			ingredient = s.ingredient ?? '';
+			dosageForm = s.dosageForm ?? '';
+			subType = s.subType ?? '';
+			packaging = s.packaging ?? '';
+			flavor = s.flavor ?? '';
+			note = s.note ?? '';
+			slot = s.slot ?? '';
+			// 있던 질문으로 바로 — 랜딩·완료는 제외하고, 지금 답으로 만들어지는 질문 목록에 있는 단계만
+			if (s.step && s.step !== 'intro' && s.step !== 'done' && steps.includes(s.step)) applyStep(s.step);
+		}
+		restored = true;
+	});
+	$effect(() => {
+		const data: Saved = { step, category, ingredient, dosageForm, subType, packaging, flavor, note, slot };
+		// 복원 전에는 빈 초기값으로 덮어쓰지 않고, 완료 뒤에는 남기지 않는다
+		if (!restored || step === 'done') return;
+		try {
+			sessionStorage.setItem(SAVE_KEY, JSON.stringify(data));
+		} catch {
+			/* 저장 실패는 무시 */
+		}
+	});
 
 	let submitting = $state(false);
 	let errors = $state<ApplyErrors>(untrack(() => form?.errors ?? {}));
@@ -300,6 +350,7 @@
 			submitting = false;
 			if (result.type === 'success') {
 				errors = {};
+				clearSaved();
 				setStep('done', 'replace');
 				track('Lead', { content_name: 'oem_apply', content_category: category }, eventId);
 			} else if (result.type === 'failure') {
@@ -349,6 +400,7 @@
 		agree = false;
 		errors = {};
 		submitError = '';
+		clearSaved();
 		setStep('intro');
 	}
 	// 레일의 로고 — 랜딩으로만 간다. 답은 그대로 두어 실수로 눌러도 입력이 날아가지 않게(다시 시작하면 고른 값이 채워진 채 이어진다).
