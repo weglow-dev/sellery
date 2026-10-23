@@ -88,11 +88,9 @@
 <div class="relative flex min-h-0 flex-1 flex-col">
 	<!-- 상단 바 — 슬라이드 위에 떠 있고 터치는 통과시킨다 -->
 	<div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-[60px] items-center justify-between px-5 lg:h-[72px] lg:px-16">
-		<div class="flex items-center gap-2.5 text-[15px] font-bold tracking-tight text-fg">
-			<!-- 원형 로고(static/logo.png · MYR) — 배경이 페이지와 같은 어두운색이라 얇은 링으로 윤곽만 잡는다 -->
-			<img src={asset('/logo.png')} alt="" width="32" height="32" class="size-8 shrink-0 rounded-full ring-1 ring-white/15" />
-			Make Your Recipe
-		</div>
+		<!-- 흰색 워드마크(static/logo-w.svg · "MYR / MAKE YOUR RECIPE" 락업 — viewBox 는 글자 영역으로 잘라 둠). 글자가 그림 안에 있어 옆에 텍스트를 따로 두지 않고 alt 로만 읽힌다.
+		     원형 로고(logo.png)는 데스크톱 레일·파비콘·OG 에 그대로 -->
+		<img src={asset('/logo-w.svg')} alt="Make Your Recipe" height="36" class="h-9 w-auto" />
 		<span class="text-xs font-semibold text-fg/50 tabular-nums" aria-live="polite">{slide + 1} / {SLIDES}</span>
 	</div>
 
