@@ -15,9 +15,10 @@
 </script>
 
 <aside class="hidden min-h-0 flex-col gap-7 border-r border-white/[0.07] px-8 pt-7 pb-8 lg:flex">
-	<button type="button" onclick={onrestart} class="flex items-center gap-2.5 text-left text-[15px] font-bold tracking-tight text-fg">
-		<img src={asset('/logo.png')} alt="" width="32" height="32" class="size-8 shrink-0 rounded-full ring-1 ring-white/15" />
-		Make Your Recipe
+	<!-- 랜딩 상단 바와 같은 흰색 워드마크(static/logo-w.svg) 28px — 글자는 그림 안에 있어 옆 텍스트는 두지 않고, 버튼 이름은 aria-label 로 -->
+	<button type="button" onclick={onrestart} aria-label="Make Your Recipe — 랜딩으로" class="flex items-center gap-2.5 text-left text-[15px] font-bold tracking-tight text-fg">
+		<img src={asset('/logo-w.svg')} alt="" height="28" class="h-7 w-auto shrink-0" />
+		<!-- Make Your Recipe -->
 	</button>
 	<div>
 		<div class="flex items-baseline justify-between">
