@@ -35,7 +35,7 @@
 		</div>
 		<div class="{rightCol} mt-4 short:mt-3.5 lg:ml-auto lg:w-full lg:max-w-[560px] {rise(active)}" style={d(2)}>
 			<div class="grid grid-cols-2 gap-2 text-[13px] font-bold tracking-[0.04em] short:text-xs lg:gap-3 lg:text-[13px]">
-				<div class="px-1 text-fg/45">내가 할 일</div>
+				<div class="px-1 text-fg/55">내가 할 일</div>
 				<div class="flex items-center gap-1.5 px-1 text-accent"><span class="size-1.5 rounded-full bg-accent"></span>Make Your Recipe가 할 일</div>
 			</div>
 			<div class="mt-2 flex flex-col gap-2 short:mt-1.5 short:gap-1 lg:mt-2.5 lg:gap-2">

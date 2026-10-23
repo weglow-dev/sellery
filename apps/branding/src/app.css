@@ -11,7 +11,9 @@
 	--color-line: rgba(255, 255, 255, 0.08);
 	--color-fg: #ffffff;
 	--color-fg-soft: rgba(255, 255, 255, 0.65);
-	--color-fg-faint: rgba(255, 255, 255, 0.45);
+	/* 보조 글자 하한 — 다크 배경(#0a0b0e) 위 흰색 55% = 6.3:1. 40% 는 3.8:1 로 AA(4.5:1) 미달이라 쓰지 않는다 (2026-10-23).
+	   Tailwind 로 쓸 때도 12~13px 는 text-fg/55 이상, 15px 이상 흐린 값은 text-fg/50(5.3:1) 이상. */
+	--color-fg-faint: rgba(255, 255, 255, 0.55);
 	--color-accent: #ff7a3d;
 	--color-accent-deep: #ff5a1f;
 	--color-accent-soft: rgba(255, 122, 61, 0.16);
