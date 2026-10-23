@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { tick, untrack } from 'svelte';
 	import { applyAction } from '$app/forms';
+	import { pushState, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+	import { browser } from '$app/environment';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { newEventId, track } from '$lib/meta-pixel';
 	import { formatPhone, PHONE_RE } from '$lib/utils/phone';
@@ -165,12 +168,37 @@
 	// 타일 자동 전진(advance · 0.28초 뒤 go(1)) 예약 — 어떤 경로로든 단계가 바뀌면 지운다.
 	// 안 지우면 타일을 탭한 직후 [이전]·레일을 눌렀을 때 타이머가 뒤늦게 발사돼 [이전]은 취소되고 레일 점프는 한 단계 더 넘어간다
 	let advanceTimer: ReturnType<typeof setTimeout> | undefined;
-	function setStep(next: Step) {
+	// 화면만 바꾼다 — 히스토리는 건드리지 않는다(뒤로가기로 되돌아올 때도 이걸 쓴다)
+	function applyStep(next: Step) {
 		clearTimeout(advanceTimer);
 		if (next === step) return;
 		dir = steps.indexOf(next) < steps.indexOf(step) ? -1 : 1;
 		step = next;
 	}
+	// 사용자가 움직인 단계 전환 — 화면을 바꾸고 브라우저 히스토리에 항목을 하나 쌓는다(URL 은 그대로 · SvelteKit shallow routing).
+	// 그래야 광고로 들어온 모바일에서 뒤로가기(안드로이드 제스처 · iOS 스와이프백)가 사이트 이탈이 아니라 "이전 질문"이 된다.
+	// replace 는 접수 완료처럼 "되돌아가면 안 되는" 전환 — 연락처 항목을 완료로 덮어 뒤로가기가 채워진 폼으로 가서 재접수되지 않게
+	function setStep(next: Step, mode: 'push' | 'replace' = 'push') {
+		if (next === step) {
+			clearTimeout(advanceTimer);
+			return;
+		}
+		applyStep(next);
+		if (browser) (mode === 'replace' ? replaceState : pushState)('', { step: next });
+	}
+	// 뒤로/앞으로 가기 — SvelteKit 이 popstate 를 받아 page.state 를 그 항목의 값으로 되돌리면 그 단계로 화면을 맞춘다.
+	// 첫 실행(초기값)은 건너뛴다 — JS 없이 제출된 결과(form)로 복원한 단계를 덮어쓰지 않게. 항목에 단계가 없으면(= 처음 들어온 항목) 시작 단계
+	let histStep: Step | undefined | null = null;
+	$effect(() => {
+		const s = page.state.step;
+		if (histStep === null) {
+			histStep = s;
+			return;
+		}
+		if (s === histStep) return;
+		histStep = s;
+		untrack(() => applyStep(s && steps.includes(s) ? s : startStep));
+	});
 	function go(delta: number) {
 		const i = Math.max(0, steps.indexOf(step));
 		setStep(steps[Math.max(0, Math.min(steps.length - 1, i + delta))]);
@@ -272,7 +300,7 @@
 			submitting = false;
 			if (result.type === 'success') {
 				errors = {};
-				setStep('done');
+				setStep('done', 'replace');
 				track('Lead', { content_name: 'oem_apply', content_category: category }, eventId);
 			} else if (result.type === 'failure') {
 				errors = (result.data?.errors as ApplyErrors | undefined) ?? {};
