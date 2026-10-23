@@ -136,7 +136,7 @@
 			</button>
 		</div>
 		<div class="flex flex-col gap-3.5 short:gap-2.5 lg:flex-row lg:items-center lg:gap-5">
-			<p class="order-2 text-center text-xs text-fg/45 lg:order-1 lg:text-[13px] lg:text-fg/50">약 1분 · 선택형 · 무료 상담</p>
+			<p class="order-2 text-center text-xs text-fg/55 lg:order-1 lg:text-[13px]">약 1분 · 선택형 · 무료 상담</p>
 			<button
 				type="button"
 				onclick={onstart}

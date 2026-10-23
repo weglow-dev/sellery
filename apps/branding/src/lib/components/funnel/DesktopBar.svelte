@@ -10,5 +10,5 @@
 			이전
 		</button>
 	{/if}
-	<span class="ml-auto text-xs text-fg/40">{trail}</span>
+	<span class="ml-auto text-xs text-fg/55">{trail}</span>
 </div>

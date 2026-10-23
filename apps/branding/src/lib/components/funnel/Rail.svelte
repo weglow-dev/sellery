@@ -47,12 +47,13 @@
 						? 'border-accent bg-accent text-bg motion-safe:animate-fill'
 						: r.on
 							? 'border-accent text-accent'
-							: 'border-white/[0.18] text-fg/40'}"
+							: 'border-white/[0.18] text-fg/55'}"
 				>
 					{r.n}
 				</span>
 				<span class="flex min-w-0 flex-1 flex-col gap-px">
-					<span class="text-sm font-bold {r.dim ? 'text-fg/40' : 'text-fg'}">{r.title}</span>
+					<!-- 잠긴/지나간 질문 제목도 /55 — 다크 배경 위 /40 은 3.8:1 로 AA(4.5:1) 미달 -->
+					<span class="text-sm font-bold {r.dim ? 'text-fg/55' : 'text-fg'}">{r.title}</span>
 					<!-- 값이 바뀔 때마다(답 선택 · 건너뜀 · 진행 중) 아래에서 떠오르며 나타난다 -->
 					{#key r.value}
 						<span class="truncate text-xs text-fg/50 motion-safe:animate-value">{r.value}</span>

@@ -63,7 +63,7 @@
 							procSel = i;
 							procTouched = true;
 						}}
-						class="flex flex-col gap-2 text-left transition-colors duration-300 {cur ? 'text-fg' : 'text-fg/40'}"
+						class="flex flex-col gap-2 text-left transition-colors duration-300 {cur ? 'text-fg' : 'text-fg/55'}"
 					>
 						<span class="relative block h-1 overflow-hidden rounded-sm bg-white/10">
 							<!-- 채워질 때만 전환(지난 단계 .3s · 현재 단계 PROC_MS), 비워질 때는 즉시 — 되감기 모션이 없다 -->

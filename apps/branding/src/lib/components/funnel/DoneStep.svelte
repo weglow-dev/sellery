@@ -49,7 +49,7 @@
 			{#each summary as row, i (row.k)}
 				<div class="flex items-baseline justify-between gap-4 border-t border-white/[0.06] py-[11px] text-[15px] motion-safe:animate-value" style="animation-delay:{0.45 + i * 0.09}s">
 					<span class="shrink-0 text-fg/60">{row.k}</span>
-					<span class="text-right font-semibold {row.muted ? 'text-fg/45' : 'text-fg'}">{row.v}</span>
+					<span class="text-right font-semibold {row.muted ? 'text-fg/55' : 'text-fg'}">{row.v}</span>
 				</div>
 			{/each}
 		</div>

@@ -64,7 +64,7 @@
 					{@const done = vals[i] === r.to}
 					<div class="flex items-center gap-3 py-3.5 lg:gap-3.5 lg:py-[26px] {i ? 'border-t border-white/[0.07]' : ''}">
 						<span class="flex-1 text-sm font-semibold text-fg/70 lg:text-base">{r.label}</span>
-						<span class="relative text-[15px] font-bold whitespace-nowrap text-fg/40 tabular-nums lg:text-[17px]">
+						<span class="relative text-[15px] font-bold whitespace-nowrap text-fg/50 tabular-nums lg:text-[17px]">
 							{r.was}
 							<span class="absolute top-1/2 left-0 h-0.5 bg-accent" style="width:{active ? '100%' : '0%'};transition:width .5s cubic-bezier(.2,.8,.2,1) {0.25 + i * 0.35}s"></span>
 						</span>
