@@ -36,9 +36,13 @@ export function loadPixel(): void {
 	window.fbq('init', PIXEL_ID);
 }
 
-/** 표준 이벤트 — eventId 를 주면 서버 전환 API 와 중복 제거 */
+/** 표준 이벤트 — eventId 를 주면 서버 전환 API 와 중복 제거.
+ *  먼저 loadPixel() — 레이아웃의 afterNavigate 보다 자식 컴포넌트의 $effect/onMount 가 먼저 돌기 때문에(/apply 는 첫 단계가 질문이라 바로 ViewContent 를 쏜다),
+ *  여기서 스텁을 만들어 두지 않으면 window.fbq 가 없어 이벤트가 조용히 버려진다. 스텁은 큐라서 fbevents.js 가 로드된 뒤 순서대로 전송된다. */
 export function track(event: string, params: Record<string, unknown> = {}, eventId?: string): void {
-	if (!PIXEL_ID || typeof window === 'undefined' || !window.fbq) return;
+	if (!PIXEL_ID || typeof window === 'undefined') return;
+	loadPixel();
+	if (!window.fbq) return;
 	if (eventId) window.fbq('track', event, params, { eventID: eventId });
 	else window.fbq('track', event, params);
 }
