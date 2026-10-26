@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { asset } from '$app/paths';
 	import ArrowIcon from './landing/ArrowIcon.svelte';
 	import HeroSlide from './landing/HeroSlide.svelte';
@@ -68,10 +67,9 @@
 	}
 	$effect(() => () => clearTimeout(wheelIdle));
 
-	// 진입 연출은 마운트 뒤에 켠다 — 첫 로드 때 1장도 아래에서 올라오도록
-	let ready = $state(false);
-	onMount(() => (ready = true));
-	const active = (i: number) => ready && slide === i;
+	// 1장은 서버 HTML 에서부터 active(.rise-in) — 첫 페인트에 히어로 글자가 보이고 LCP 가 JS 를 기다리지 않는다.
+	// 등장 연출은 .rise-in 이 keyframe 이라(app.css) 마운트를 기다리지 않아도 첫 로드에 그대로 재생된다
+	const active = (i: number) => slide === i;
 
 	// ◀ ▶ — 평소엔 유리 버튼, 마지막 장의 ▶ 만 포인트색으로 채워 "여기서 시작"을 알린다
 	const navBtn = 'group relative hidden size-11 place-items-center rounded-full border transition lg:grid';
