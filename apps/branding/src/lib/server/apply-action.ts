@@ -18,7 +18,7 @@ import { escapeSlack, notifySlack } from './slack';
 import { sendMetaLeadEvent } from './meta-capi';
 import { BRAND_NAME, publicUrlOf } from '$lib/site';
 import { formatPhone, PHONE_RE } from '$lib/utils/phone';
-import { RATE_LIMIT_MESSAGE, rateLimit } from './rate-limit';
+import { countHit, isRateLimited, RATE_LIMIT_MESSAGE } from './rate-limit';
 
 /** 제조의뢰 접수 폼 액션 — `/`(랜딩+퍼널)와 `/apply`(퍼널 바로 진입) 두 라우트가 같은 액션을 re-export 한다.
  *  검증 통과 시 슬랙 웹훅이 유일한 접수 경로라 전송 실패를 성공으로 보여주지 않고 입력값과 함께 돌려보낸다.
@@ -26,6 +26,8 @@ import { RATE_LIMIT_MESSAGE, rateLimit } from './rate-limit';
  *  스팸 방어(메타 광고로 공개 트래픽이 들어오는 폼이라 — 2026-10-22):
  *    1. 허니팟(HONEYPOT_FIELD) 이 채워져 있으면 슬랙·메타 전환을 보내지 않고 성공 화면만 돌려준다.
  *    2. IP 기준 레이트리밋(30분 5회 · shop 의 /orders/lookup 과 같은 값) — 넘으면 429 + 연락처 화면 배너.
+ *       세는 것은 **슬랙까지 간 접수**뿐이다. 검증 실패(400)·슬랙 장애(502)로 돌려받은 시도는 세지 않는다 —
+ *       오타 5번에 30분 차단되거나, 통신사 CGNAT(한 IP 를 수십 명이 공유)에서 남의 오타로 내가 막히지 않게.
  *    3. 자유 입력(활동명 · 성분 · 메모)은 MAX_LEN 을 넘으면 거부, 선택지(카테고리 · 세부 종류 · 패키지 · 맛)는 목록과 대조.
  *    4. 슬랙 텍스트에 넣는 입력값은 escapeSlack — `<!channel>` 같은 제어 시퀀스가 채널을 호출하지 못하게.
  *  막힌 제출은 success 가 아니므로 퍼널의 픽셀 Lead 도 안 나가고, 서버 전환 API 도 호출하지 않는다 — 봇 접수가 메타 Lead 전환으로 잡히지 않는다. */
@@ -101,12 +103,6 @@ export const applyActions: Actions = {
 			return { success: true, values };
 		}
 
-		const ip = clientIp(request, getClientAddress);
-		if (ip && !rateLimit(`apply:${ip}`)) {
-			errors.form = RATE_LIMIT_MESSAGE;
-			return fail(429, { errors, values });
-		}
-
 		if (!name) errors.name = '활동명 또는 채널을 입력해주세요.';
 		else if (name.length > MAX_LEN.name) errors.name = `활동명은 ${MAX_LEN.name}자까지 입력할 수 있어요.`;
 		if (!phone) errors.phone = '연락처를 입력해주세요.';
@@ -123,6 +119,14 @@ export const applyActions: Actions = {
 
 		if (Object.keys(errors).length > 0) {
 			return fail(400, { errors, values });
+		}
+
+		// 레이트리밋은 검증을 통과한 뒤에 본다 — 오타로 돌려받은 시도가 카운트를 갉아먹지 않게. 기록은 슬랙 전송 성공 뒤(아래)
+		const ip = clientIp(request, getClientAddress);
+		const rlKey = ip ? `apply:${ip}` : null;
+		if (rlKey && isRateLimited(rlKey)) {
+			errors.form = RATE_LIMIT_MESSAGE;
+			return fail(429, { errors, values });
 		}
 
 		const flavorLine = needsFlavor(dosageForm, subType) ? show(flavor, '(미정)') : '(해당 없음 — 캡슐 제형)';
@@ -150,6 +154,8 @@ export const applyActions: Actions = {
 			errors.form = '접수 전송에 실패했어요. 잠시 후 다시 시도해주세요 — 입력하신 내용은 그대로 남아 있어요.';
 			return fail(502, { errors, values });
 		}
+		// 접수가 실제로 끝났을 때만 센다 — 위 502 는 "다시 시도" 를 안내하므로 세면 안내대로 누를수록 빨리 막힌다
+		if (rlKey) countHit(rlKey);
 
 		// 메타 전환 API(Lead) — 픽셀과 같은 event_id. 실패해도 접수는 성공이다(로그만)
 		// event_source_url 은 실제로 접수한 페이지(홈 `/influencer/oem` 또는 바로 가기 `/influencer/oem/apply`) — 요청 경로를 공개 주소로 바꿔 넣는다
