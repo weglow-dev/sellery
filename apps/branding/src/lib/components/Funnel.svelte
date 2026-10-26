@@ -238,6 +238,20 @@
 	}
 	// 뒤로/앞으로 가기 — SvelteKit 이 popstate 를 받아 page.state 를 그 항목의 값으로 되돌리면 그 단계로 화면을 맞춘다.
 	// 첫 실행(초기값)은 건너뛴다 — JS 없이 제출된 결과(form)로 복원한 단계를 덮어쓰지 않게. 항목에 단계가 없으면(= 처음 들어온 항목) 시작 단계
+	// 단계가 바뀌면 새 화면의 제목(h1 · tabindex=-1)으로 포커스를 옮긴다 — {#key step} 으로 화면이 통째로 교체되면서 눌렀던 타일·버튼이 사라져
+	// 포커스가 body 로 떨어지면, 키보드는 문서 맨 위부터 다시 Tab 해야 하고 스크린리더는 화면이 바뀐 줄 모른다. 제목으로 가면 새 질문이 읽히고 다음 Tab 이 첫 타일로 간다.
+	// 첫 로드(초기 단계)에는 옮기지 않는다 — 페이지를 열자마자 포커스를 뺏지 않게. preventScroll: 단계 화면은 위에서 시작하므로 스크롤을 건드릴 이유가 없다
+	let focusedStep: Step | null = null;
+	$effect(() => {
+		const cur = step;
+		if (focusedStep === null) {
+			focusedStep = cur;
+			return;
+		}
+		if (cur === focusedStep) return;
+		focusedStep = cur;
+		tick().then(() => document.querySelector<HTMLElement>('main h1[tabindex="-1"]')?.focus({ preventScroll: true }));
+	});
 	let histStep: Step | undefined | null = null;
 	$effect(() => {
 		const s = page.state.step;

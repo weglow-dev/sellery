@@ -37,7 +37,8 @@
 			<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 		</div>
 	</div>
-	<h1 class="mt-[22px] text-[30px] leading-[1.3] font-extrabold tracking-[-0.03em] text-fg lg:text-4xl lg:leading-[1.25]">접수됐어요</h1>
+	<!-- tabindex=-1: 접수 완료로 넘어오면 퍼널이 여기로 포커스를 옮긴다(StepHead 와 같은 이유) -->
+	<h1 tabindex="-1" class="mt-[22px] text-[30px] leading-[1.3] font-extrabold tracking-[-0.03em] text-fg outline-none lg:text-4xl lg:leading-[1.25]">접수됐어요</h1>
 	<p class="mt-2.5 text-[15px] leading-relaxed text-fg-soft">
 		{name.trim() ? `${name.trim()}님, ` : ''}전담 매니저가 내용을 확인하고 <br class="lg:hidden" />사흘 안에 미팅 일정을 제안드려요.
 	</p>
