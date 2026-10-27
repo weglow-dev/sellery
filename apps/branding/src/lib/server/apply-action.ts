@@ -75,7 +75,9 @@ function show(v: string, empty: string) {
 export const applyActions: Actions = {
 	default: async ({ request, url, cookies, getClientAddress }) => {
 		const form = await request.formData();
-		// 메타 전환 API 중복 제거용 — 브라우저(use:enhance)가 넣어 보낸다. JS 없는 제출은 서버가 만든다
+		// 메타 전환 API 중복 제거용이자 슬랙 메시지의 접수 ID — 브라우저(use:enhance)가 넣어 보내고, 전송 실패로 다시 제출해도 같은 값을 보낸다
+		// (Funnel.svelte). 그래서 슬랙 웹훅이 늦게 응답해 "실패" 로 보인 뒤 재접수되면 같은 ID 가 두 번 올라와 운영자가 중복임을 안다.
+		// JS 없는 제출은 서버가 만든다(이때는 재시도마다 다른 값)
 		const eventIdRaw = str(form.get('event_id'));
 		const eventId = /^[A-Za-z0-9-]{8,64}$/.test(eventIdRaw) ? eventIdRaw : crypto.randomUUID();
 
@@ -143,13 +145,16 @@ export const applyActions: Actions = {
 				`• 맛: ${flavorLine}`,
 				`• 미팅 선호 시간대: ${slotDef ? `${slotDef.value}(${slotDef.hint})` : '상관없음'}`,
 				`• 최소수량: ${MIN_QTY.toLocaleString('ko-KR')}개 (고정)`,
-				note ? `• 추가 요청: ${escapeSlack(note)}` : null
+				note ? `• 추가 요청: ${escapeSlack(note)}` : null,
+				// 영숫자·하이픈만 통과한 값이라 이스케이프 불필요. 같은 ID 가 두 번이면 중복 접수(웹훅 응답 지연 뒤 재제출)
+				`• 접수 ID: ${eventId}`
 			]
 				.filter((l): l is string => l !== null)
 				.join('\n')
 		);
 
-		// 슬랙이 유일한 접수 경로라, 전송에 실패하면 성공으로 보여주지 않고 입력값을 돌려보내 다시 시도하게 한다
+		// 슬랙이 유일한 접수 경로라, 전송에 실패하면 성공으로 보여주지 않고 입력값을 돌려보내 다시 시도하게 한다.
+		// 웹훅이 받고도 늦게 응답한 경우(타임아웃)엔 이미 올라간 메시지가 있을 수 있다 — 재제출분은 같은 접수 ID 로 올라가 구분된다
 		if (!delivered) {
 			errors.form = '접수 전송에 실패했어요. 잠시 후 다시 시도해주세요 — 입력하신 내용은 그대로 남아 있어요.';
 			return fail(502, { errors, values });
