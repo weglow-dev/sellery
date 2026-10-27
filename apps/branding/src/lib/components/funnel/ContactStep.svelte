@@ -70,7 +70,13 @@
 					id="phone"
 					name="phone"
 					value={phone}
-					oninput={(e) => (phone = formatPhone(e.currentTarget.value))}
+					oninput={(e) => {
+						// 숫자만 남기고 하이픈을 넣는다. 글자·기호를 쳤을 때 걸러낸 결과가 이전 값과 같으면 상태가 안 바뀌어 Svelte 가 칸을 다시 쓰지 않고
+						// 친 글자가 칸에 그대로 남는다 — 그래서 걸러낸 값을 입력칸에 직접 되쓴다(한글 조합 중 글자도 같이 지워진다)
+						const next = formatPhone(e.currentTarget.value);
+						if (e.currentTarget.value !== next) e.currentTarget.value = next;
+						phone = next;
+					}}
 					type="tel"
 					inputmode="numeric"
 					maxlength={MAX_LEN.phone}
