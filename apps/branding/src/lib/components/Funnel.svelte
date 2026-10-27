@@ -106,6 +106,9 @@
 	});
 
 	let submitting = $state(false);
+	// 이번 접수의 event_id — 첫 제출에서 만들고 성공할 때까지 유지한다. 전송 실패(502)·네트워크 오류로 다시 제출해도 같은 값이 가서
+	// 슬랙 웹훅이 받고도 늦게 응답한 경우 두 메시지에 같은 "접수 ID" 가 찍혀 중복을 알아볼 수 있고, 메타 Lead 도 하나로 합쳐진다
+	let eventId = '';
 	let errors = $state<ApplyErrors>(untrack(() => form?.errors ?? {}));
 	// 서버에 닿지 못했거나(네트워크) 서버가 예외를 낸 경우(500) — 연락처 화면에 배너만 띄운다
 	let submitError = $state('');
@@ -357,16 +360,18 @@
 		}
 		submitting = true;
 		submitError = '';
-		// 메타 전환 — 픽셀(Lead)과 서버 전환 API 가 같은 event_id 를 써서 중복 제거
-		const eventId = newEventId();
-		formData.set('event_id', eventId);
+		// 메타 전환 — 픽셀(Lead)과 서버 전환 API 가 같은 event_id 를 써서 중복 제거. 재시도는 같은 값(위 eventId 설명)
+		if (!eventId) eventId = newEventId();
+		const sentId = eventId;
+		formData.set('event_id', sentId);
 		return async ({ result }) => {
 			submitting = false;
 			if (result.type === 'success') {
 				errors = {};
 				clearSaved();
 				setStep('done', 'replace');
-				track('Lead', { content_name: 'oem_apply', content_category: category }, eventId);
+				track('Lead', { content_name: 'oem_apply', content_category: category }, sentId);
+				eventId = '';
 			} else if (result.type === 'failure') {
 				errors = (result.data?.errors as ApplyErrors | undefined) ?? {};
 				const target = stepOfErrors(errors);
