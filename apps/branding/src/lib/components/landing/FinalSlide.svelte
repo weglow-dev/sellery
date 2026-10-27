@@ -49,7 +49,7 @@
 	});
 </script>
 
-<section class={slideCls} aria-label="시작하기">
+<section class={slideCls} inert={!active} aria-label="시작하기">
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
 		<div
 			class="absolute -top-[200px] left-1/2 size-[520px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.42),transparent)] lg:-top-[520px] lg:h-[1000px] lg:w-[1600px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,0.38),transparent)]"

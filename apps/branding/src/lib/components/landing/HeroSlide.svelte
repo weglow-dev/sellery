@@ -19,7 +19,7 @@
 	const FLOAT = ['motion-safe:animate-float', 'motion-safe:animate-float-delay', 'motion-safe:animate-float-delay-2'];
 </script>
 
-<section class={slideCls} aria-label="소개">
+<section class={slideCls} inert={!active} aria-label="소개">
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
 		<div
 			class="absolute top-5 -right-20 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.35),transparent)] lg:-top-[200px] lg:-right-[170px] lg:size-[780px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,0.5),rgba(255,122,61,0.16)_55%,transparent)] lg:opacity-85"
