@@ -52,7 +52,7 @@
 	});
 </script>
 
-<section class={slideCls} aria-label="초기 비용">
+<section class={slideCls} inert={!active} aria-label="초기 비용">
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} tracking-[0.08em] {rise(active)}" style={d(0)}>START WITH ZERO</p>

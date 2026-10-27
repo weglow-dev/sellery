@@ -36,7 +36,7 @@
 	const procShown = $derived(PROCESS[Math.max(0, procSel)]);
 </script>
 
-<section class={slideCls} aria-label="진행 과정">
+<section class={slideCls} inert={!active} aria-label="진행 과정">
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>진행 과정</p>

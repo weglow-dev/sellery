@@ -12,7 +12,7 @@
 	const SERVICES = ['주문·결제 자동화', '포장·출고 대행', '투명한 정산 리포트'];
 </script>
 
-<section class={slideCls} aria-label="나만의 제품이 되는 과정">
+<section class={slideCls} inert={!active} aria-label="나만의 제품이 되는 과정">
 	<div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
 		<div
 			class="absolute bottom-[120px] -left-[60px] size-[300px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,0.22),transparent)] lg:top-1/2 lg:bottom-auto lg:-left-[120px] lg:size-[760px] lg:-translate-y-[55%]"

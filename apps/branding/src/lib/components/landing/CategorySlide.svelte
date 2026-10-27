@@ -46,7 +46,7 @@
 	});
 </script>
 
-<section class={slideCls} aria-label="제품 카테고리">
+<section class={slideCls} inert={!active} aria-label="제품 카테고리">
 	<div class={twoCol}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>이런 제품이 만들어지고 있어요</p>

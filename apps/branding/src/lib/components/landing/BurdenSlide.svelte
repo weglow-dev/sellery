@@ -27,7 +27,7 @@
 	const twoColLift = `${twoCol} mb-2 lg:mb-0`;
 </script>
 
-<section class={slideCls} aria-label="Make Your Recipe가 맡는 일">
+<section class={slideCls} inert={!active} aria-label="Make Your Recipe가 맡는 일">
 	<div class={twoColLift}>
 		<div class="relative">
 			<p class="{eyebrowCls} {rise(active)}" style={d(0)}>부담은 Make Your Recipe가</p>
