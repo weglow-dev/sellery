@@ -2,7 +2,7 @@
 export const BRAND_NAME = 'Make Your Recipe';
 
 /** 브랜딩 랜딩의 공개 주소 — 광고·제안서·공유 링크가 가리키는 곳 (대표 결정 2026-10-19).
- *  이 앱이 보는 호스트는 리라이트 뒤라 sellery-branding.vercel.app 이므로 request.url 을 그대로 쓰면 안 되고,
+ *  이 앱이 보는 호스트는 리라이트 뒤라 sellery-myr.vercel.app 이므로 request.url 을 그대로 쓰면 안 되고,
  *  canonical · og:url · 메타 전환 API event_source_url 모두 이 값에 경로를 붙여 만든다(브라우저·서버 공용 — 비밀값 없음). */
 export const OEM_PUBLIC_URL = 'https://sellery.life/influencer/oem';
 

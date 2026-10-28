@@ -2,7 +2,7 @@ import { env } from '$env/dynamic/public';
 
 /**
  * 메타(페이스북) 픽셀 — 브랜딩 랜딩(sellery.life/influencer/oem) 전용 (대표 요청 2026-10-19).
- *   PUBLIC_META_PIXEL_ID 가 비어 있으면 아무것도 하지 않는다(로컬·CI). 값은 Vercel 프로젝트 sellery-branding 환경변수.
+ *   PUBLIC_META_PIXEL_ID 가 비어 있으면 아무것도 하지 않는다(로컬·CI). 값은 Vercel 프로젝트 myr(옛 sellery-branding) 환경변수.
  *   브라우저 이벤트: PageView(레이아웃 · 내비게이션마다) · ViewContent(퍼널 첫 진입) · Lead(제조의뢰 접수 성공).
  *   Lead 는 서버 전환 API(src/lib/server/meta-capi.ts)도 같은 event_id 로 보내서 메타가 중복 제거한다.
  */

@@ -20,7 +20,7 @@
    ├─ /auth/{callback,confirm,signout}  /api/{checkout,payments/*,cron/reconcile,health,me}  │
    ├─ /assets/*  /email/celery.png  /favicon.svg  /robots.txt                  (static/)   │
    └─ apps/shop/vercel.json rewrites (프록시 — 브라우저 오리진은 sellery.life 그대로)          │
-        /influencer/oem, /influencer/oem/, /influencer/oem/:path*  ─→ sellery-branding.vercel.app  (브랜딩 랜딩 · base /influencer/oem · 2026-10-19 — 아래 /influencer/* 보다 먼저)
+        /influencer/oem, /influencer/oem/, /influencer/oem/:path*  ─→ sellery-myr.vercel.app  (브랜딩 랜딩 · base /influencer/oem · 2026-10-19 — 아래 /influencer/* 보다 먼저)
         /influencer, /influencer/, /influencer/:path*  ─→ sellery-influencer.vercel.app  (콘솔 SSR · 1~5단계)
         /brand, /brand/, /brand/:path*                 ─→ sellery-brand.vercel.app       (콘솔 SSR · 1~5단계 · 데모는 (demo) 그룹 PUBLIC_DEMO=1)
         /admin, /admin/, /admin/:path*                 ─→ sellery-admin.vercel.app       (데모 · 데모 띠 · noindex)
@@ -76,7 +76,7 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `CRON_SECRET` | **비밀** | — | — | `/api/cron/reconcile` · `/api/cron/campaign-tick` · `/api/cron/grade-tick` · `/api/cron/tracking` Bearer(`openssl rand -hex 32` 로 생성 · Preview 는 별도 값). 없으면 라우트가 503. **Vercel Cron 은 이 이름의 env 가 있으면 `Authorization: Bearer <값>` 을 자동으로 붙인다**(§8.2) |
 | `SWEETTRACKER_API_KEY` | **비밀**(Production 만 · 선택) | — | — | 스마트택배(SweetTracker) API 키 — `/api/cron/tracking` 택배 자동 추적(0049 · §5.8). 없으면 크론이 `{skipped:'NO_KEY'}` 로 건너뛰고 [수령 확인] 수동 흐름만 남는다. **월 5,000회 요금제를 다른 서비스와 공유** — Preview 에는 넣지 않는다(프리뷰 크론은 돌지 않지만 수동 호출로 호출량을 쓰지 않게). 값은 대표의 `.env.cloud.local` `SWEETTRACKER_API_KEY` |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | brand: 선택 · admin: — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] · 브랜드 가입·정지 한 줄(이메일·핸들·사업자번호 없이) |
-| `PUBLIC_META_PIXEL_ID` · `META_CAPI_ACCESS_TOKEN` · `META_CAPI_TEST_EVENT_CODE`(선택) | — | — | — (**`sellery-branding` 프로젝트**에만) | 메타 광고 전환(2026-10-19) — 브랜딩 랜딩 sellery.life/influencer/oem 의 픽셀(PageView · ViewContent · Lead)과 서버 전환 API(Lead · 전화번호 SHA-256 · `_fbp`/`_fbc`) 를 같은 `event_id` 로 중복 제거. 비면 둘 다 조용히 꺼짐 · 테스트 코드는 검증 뒤 삭제 |
+| `PUBLIC_META_PIXEL_ID` · `META_CAPI_ACCESS_TOKEN` · `META_CAPI_TEST_EVENT_CODE`(선택) | — | — | — (**`myr`(옛 `sellery-branding`) 프로젝트**에만) | 메타 광고 전환(2026-10-19) — 브랜딩 랜딩 sellery.life/influencer/oem 의 픽셀(PageView · ViewContent · Lead)과 서버 전환 API(Lead · 전화번호 SHA-256 · `_fbp`/`_fbc`) 를 같은 `event_id` 로 중복 제거. 비면 둘 다 조용히 꺼짐 · 테스트 코드는 검증 뒤 삭제 |
 | `META_PAGE_ACCESS_TOKEN` · `META_IG_USER_ID` | — | — | admin: 선택 | 관리자 아웃리치 [조건으로 수집] **메타 공식** Instagram Creator Marketplace API(무료 · 2026-10-22) — @sellery.official 에 연결된 페이지의 Page 토큰 + IG 사용자 id. 권한 `instagram_creator_marketplace_discovery` 는 App Review 로 Advanced Access(전엔 모의 데이터). 있으면 Modash 보다 우선 |
 | `MODASH_API_KEY` · `MODASH_KR_LOCATION_ID`(선택) | — | — | admin: 선택 | 관리자 아웃리치 [조건으로 수집] 대안(유료) — Modash Discovery API 검색에 대표 조건(팔로워 5만↑ · 여성 60%↑ · 20~40대 80%↑ · 한국 80%↑ · 성장률 ≥0)을 보내 걸러진 후보를 큐에 넣는다. 없으면 버튼만 꺼짐(수동·CSV 는 동작). 페이지당 ≤15건 · 0.01 크레딧/건 |
 | `RESEND_API_KEY` | **필수(비밀)** — 주문 확인(고객+브랜드) · 고객 셀프 환불 · 토스 콘솔 취소 · 문의 접수 메일 | — | **brand: 필수(비밀)** — 배송 시작 · 브랜드 환불 · 문의 답변 · **admin: 선택** — 관리자 환불 | 거래 메일(2026-09-22 · `packages/db/src/mail` · docs/emails/README.md "거래 메일"). Resend → API Keys → Create → Permission **Sending access** · Domain `sellery.life`(§5.7). `$lib/server/env.ts` → `configureMail()`. **없으면 발송 비활성**(서버 로그 1회 안내 · 주문·환불 흐름은 정상) — Preview 는 비워 둔다(테스트 결제로 실제 고객 주소에 메일이 가지 않게) |
@@ -95,7 +95,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 
 | `source` | `destination` | 이유 |
 |---|---|---|
-| `/influencer/oem` · `/influencer/oem/` · `/influencer/oem/:path*` | `https://sellery-branding.vercel.app/influencer/oem…` | 셀러리 브랜딩(인플루언서 PB 제조의뢰) 랜딩 — `apps/branding` · Vercel `sellery-branding`(Root Directory `apps/branding`) · base `/influencer/oem` · **인플루언서 콘솔 규칙보다 앞에 둔다**(순서대로 첫 매치). 공개 주소 sellery.life/influencer/oem (2026-10-19) |
+| `/influencer/oem` · `/influencer/oem/` · `/influencer/oem/:path*` | `https://sellery-myr.vercel.app/influencer/oem…` | 셀러리 브랜딩(인플루언서 PB 제조의뢰) 랜딩 — `apps/myr` · Vercel `myr`(옛 `sellery-branding`)(Root Directory `apps/myr`) · base `/influencer/oem` · **인플루언서 콘솔 규칙보다 앞에 둔다**(순서대로 첫 매치). 공개 주소 sellery.life/influencer/oem (2026-10-19) |
 | `/influencer` · `/influencer/` · `/influencer/:path*` | `https://sellery-influencer.vercel.app/influencer…` | 인플루언서 콘솔(SvelteKit · S5 PR-10 #20 부터). 콘솔 전용 `/influencer/auth/{confirm,signout}` 도 이 줄로 간다(결정 15) |
 | `/brand` · `/brand/` · `/brand/:path*` | `https://sellery-brand.vercel.app/brand…` | **브랜드 콘솔(SvelteKit SSR · 1단계부터)** — 콘솔 전용 `/brand/auth/{confirm,signout}` 도 이 줄로 간다. 데모 화면은 `(demo)` 그룹(`/brand/demo` · `/brand/demo-*` · `/brand/camps` …)으로 옮겨져 `PUBLIC_DEMO=1` 일 때만 열린다(데모 띠 + `noindex` + `/brand/robots.txt` disallow 는 그대로) |
 | `/admin` · `/admin/` · `/admin/:path*` | `https://sellery-admin.vercel.app/admin…` | 결정 D — 데모 노출(데모 띠 + `noindex` + `/admin/robots.txt` disallow) |

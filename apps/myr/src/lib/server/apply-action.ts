@@ -61,7 +61,7 @@ function safeClientAddress(get: () => string): string | null {
 	}
 }
 
-/** 리라이트(sellery.life → sellery-branding) 뒤라 x-forwarded-for 의 첫 값이 방문자 IP — 레이트리밋 키와 메타 전환 API 가 같은 값을 쓴다 */
+/** 리라이트(sellery.life → myr 프로젝트) 뒤라 x-forwarded-for 의 첫 값이 방문자 IP — 레이트리밋 키와 메타 전환 API 가 같은 값을 쓴다 */
 function clientIp(request: Request, getClientAddress: () => string): string | null {
 	return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || safeClientAddress(getClientAddress);
 }
