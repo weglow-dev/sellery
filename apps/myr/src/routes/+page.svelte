@@ -10,7 +10,7 @@
 	const OG_DESCRIPTION = `팔로워가 있다면, 나만의 제품을 만들 수 있어요. 제조·재고·운영은 전부 ${BRAND_NAME}가 할게요.`;
 </script>
 
-<!-- canonical · og:url 은 공개 주소(sellery.life/influencer/oem) — 이 앱의 실제 호스트 sellery-branding.vercel.app 이 중복 주소로 색인되지 않게.
+<!-- canonical · og:url 은 공개 주소(sellery.life/influencer/oem) — 이 앱의 실제 호스트 sellery-myr.vercel.app 이 중복 주소로 색인되지 않게.
      og:image 가 있어야 카카오톡·DM·페이스북 링크 미리보기에 이미지가 뜬다(static/og.png · 1200×630). -->
 <svelte:head>
 	<title>{TITLE}</title>

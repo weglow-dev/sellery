@@ -1,4 +1,4 @@
-# 셀러리 브랜딩 (apps/branding) — 인플루언서 PB 제조의뢰 랜딩
+# 셀러리 브랜딩 (apps/myr) — 인플루언서 PB 제조의뢰 랜딩
 
 > 2026-10-13 시작 · PR #153 · 2026-10-14 다크 테마 개편 · 제조의뢰 폼 · **2026-10-15 전면 재작성 — 랜딩(가로 7슬라이드)과 제조의뢰 퍼널을 한 화면으로 합침**(Claude Design "Sellery Landing Funnel" mobile · PC 두 안을 같은 컴포넌트의 `lg:` 분기로 구현).
 
@@ -11,7 +11,7 @@
 
 기존 4개 앱(shop · influencer · brand · admin)과 **의도적으로 분리된 독립 UI** 입니다.
 
-| 항목 | 기존 4개 앱 | apps/branding |
+| 항목 | 기존 4개 앱 | apps/myr |
 | --- | --- | --- |
 | 디자인 | packages/ui (theme.css · legacy skin) | **자체 테마만** — 다크 베이스 + 웜 앰버(#ff7a3d) 포인트의 프리미엄 무드 |
 | 폰트 | IBM Plex Sans KR (700 최대) | **Pretendard Variable** (실제 100~900 · jsdelivr CDN, `src/app.html`) |
@@ -25,7 +25,7 @@
 ## 2. 파일 맵
 
 ```
-apps/branding/
+apps/myr/
   src/app.html                 문서 셸 — Pretendard 로드 · 파비콘 · theme-color
   src/app.css                  @theme 디자인 토큰 + body 기본 + pop/step 애니메이션 + no-scrollbar 유틸리티 (공유분만)
   src/routes/+layout.svelte    app.css 임포트만
@@ -97,7 +97,7 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 **제출 처리** (`lib/server/apply-action.ts` · 두 라우트가 re-export): 답은 컴포넌트 상태에 모았다가 연락처 화면의 한 `<form>` 에서 hidden input(`category` `ingredient` `dosageForm` `subType` `packaging` `flavor` `note` `slot`)으로 한 번에 POST 합니다(퍼널 특성상 JS 전제). 서버 검증(`fail(400)`) 뒤 **슬랙 웹훅이 유일한 접수 경로** — 메시지 형식은 이전과 같고 `• 미팅 선호 시간대: 오후(13–17시)` 한 줄이 추가됐습니다(`subType` 은 제형 뒤 괄호, 최소수량 1,000개 고정 표기). `notifySlack` 이 false 면 `fail(502)` 로 입력값과 함께 "접수 전송에 실패했어요 — 다시 시도" 배너를 연락처 화면 제출 버튼 위에 띄우고, 네트워크 단절·서버 예외(`result.type === 'error'`)도 `use:enhance` 콜백에서 잡아 폼을 유지합니다. 서버가 필드 오류를 돌려주면 그 질문이 있는 단계로 되돌아갑니다. **스팸 방어(2026-10-22)**: 메타 광고로 공개 트래픽이 들어오는 폼이라 (1) 허니팟 칸(`HONEYPOT_FIELD = 'website'` · 화면 밖 · 탭 순서 제외)이 채워져 있으면 슬랙·메타 전환 없이 성공 화면만 돌려주고 (2) IP 기준 레이트리밋 30분 5회(`lib/server/rate-limit.ts` · shop 의 `/orders/lookup` 과 같은 값, 프로세스 메모리 기준)를 넘으면 `fail(429)` 로 연락처 화면에 배너 — 세는 것은 **슬랙까지 간 접수**뿐(2026-10-26 · `isRateLimited` 는 검증 통과 뒤 확인, `countHit` 은 슬랙 전송 성공 뒤 기록). 연락처 오타(400)·슬랙 장애(502)로 돌려받은 시도는 세지 않는다 — 오타 5번에 30분 차단되거나, 통신사 CGNAT(한 IP 를 수십 명이 공유)에서 남의 오타로 내가 막히는 것을 피하려고 (3) 활동명 60 · 성분 120 · 메모 1,000자(`MAX_LEN` — input `maxlength` 와 서버 검증이 같은 값)를 넘거나 카테고리가 목록에 없으면 거부, 세부 종류·패키지·맛은 목록에 없는 값을 빈 값으로 (4) 슬랙 텍스트의 입력값은 `escapeSlack` 으로 `& < >` 를 치환해 `<!channel>` 같은 호출을 막습니다. 막힌 제출은 success 가 아니라 픽셀 Lead 도 나가지 않고, 서버 전환 API 도 호출하지 않습니다 — 봇 접수가 메타 Lead 전환으로 집계되지 않습니다. 레이트리밋 키는 전환 API 와 같은 `x-forwarded-for` 첫 값(리라이트 뒤 방문자 IP)입니다. 결과 처리는 `use:enhance` 콜백에서 직접 하고(`form` prop 은 JS 없이 제출된 경우의 초기 복원에만 사용), 슬랙 전송 코드는 `lib/server/slack.ts` 그대로입니다. **중복 접수 방지(2026-10-27)**: 슬랙 웹훅이 메시지를 받고도 응답이 3초를 넘기는 일이 확인돼 — 그러면 "전송 실패" 로 보여 사용자가 다시 제출하고 같은 접수가 두 번 올라감 — 타임아웃을 **8초**로 올리고, 슬랙 메시지 끝에 `• 접수 ID: <event_id>` 를 붙입니다. 퍼널은 `event_id` 를 첫 제출에서 만들어 **성공할 때까지 같은 값**을 보내므로(502·네트워크 오류 뒤 재제출 포함) 같은 접수 ID 가 두 번 보이면 중복입니다 — 운영자는 뒤 것을 무시하면 됩니다. 메타 Lead 도 같은 id 라 하나로 합쳐집니다. JS 없는 제출은 서버가 매번 새 id 를 만듭니다.
 
-**환경변수**: `SLACK_WEBHOOK_URL` 은 2026-10-14 에 Vercel 프로젝트 `sellery-branding` 의 Production·Preview 에 Sensitive 로 넣었습니다(값은 Vercel 에만 — 저장소·문서에 적지 않음). **이 변수가 비거나 웹훅이 죽으면 접수가 "전송 실패" 로 막힙니다**(조용히 유실되지 않도록 의도한 동작). 웹훅을 교체·회전할 때는 반드시 같이 갱신할 것. 다른 4개 앱에는 이 변수가 없어서 거기의 가입·채널 인증 슬랙 알림은 아직 휴면 상태입니다.
+**환경변수**: `SLACK_WEBHOOK_URL` 은 2026-10-14 에 Vercel 프로젝트 `myr`(옛 `sellery-branding`) 의 Production·Preview 에 Sensitive 로 넣었습니다(값은 Vercel 에만 — 저장소·문서에 적지 않음). **이 변수가 비거나 웹훅이 죽으면 접수가 "전송 실패" 로 막힙니다**(조용히 유실되지 않도록 의도한 동작). 웹훅을 교체·회전할 때는 반드시 같이 갱신할 것. 다른 4개 앱에는 이 변수가 없어서 거기의 가입·채널 인증 슬랙 알림은 아직 휴면 상태입니다.
 
 **둘 다 서버 렌더링**: 폼 액션이 있는 라우트는 프리렌더할 수 없어서 `/` 와 `/apply` 모두 `prerender = false` 이고, `vercel build` 결과물은 `.vercel/output/functions/{index,apply}.func` 두 함수입니다(옛 `+layout.ts` 의 `prerender = true` 는 삭제).
 
@@ -109,9 +109,9 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 ## 7. 개발 · 배포
 
-- 로컬: 루트에서 `npm run dev:branding` → http://localhost:5177 (접수는 `apps/branding/.env.local` 에 `SLACK_WEBHOOK_URL=...` 이 있어야 통과함 — 없으면 "전송 실패" 배너. 값이 있으면 **로컬 제출도 실제 슬랙 채널로 나가니** 주의. 실패 경로만 보려면 `SLACK_WEBHOOK_URL=http://127.0.0.1:9/ npm run dev:branding`)
-- 검사: `npm run check -w apps/branding` · 빌드: `npm run build -w apps/branding` — CI(`프로토타입 점검`)에 자동 포함됨
-- **Vercel**: team `weglow-team` · 프로젝트 `sellery-branding` · Root Directory `apps/branding` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://sellery-branding.vercel.app**
+- 로컬: 루트에서 `npm run dev:myr` → http://localhost:5177 (접수는 `apps/myr/.env.local` 에 `SLACK_WEBHOOK_URL=...` 이 있어야 통과함 — 없으면 "전송 실패" 배너. 값이 있으면 **로컬 제출도 실제 슬랙 채널로 나가니** 주의. 실패 경로만 보려면 `SLACK_WEBHOOK_URL=http://127.0.0.1:9/ npm run dev:myr`)
+- 검사: `npm run check -w apps/myr` · 빌드: `npm run build -w apps/myr` — CI(`프로토타입 점검`)에 자동 포함됨
+- **Vercel**: team `weglow-team` · 프로젝트 `myr`(옛 `sellery-branding`) · Root Directory `apps/myr` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://sellery-myr.vercel.app**
   - 고유 배포 URL(`…-weglow-team.vercel.app`)은 팀 SSO 보호가 걸려 302 — 정상입니다. 공개 확인은 위 주소로.
-  - **트러블슈팅 기록**: 프로젝트를 CLI(`vercel link`/`vercel deploy`)로 먼저 만든 뒤 나중에 대시보드에서 GitHub 저장소를 연결하면, Root Directory 가 `.`(저장소 루트)로 남아 있을 수 있다 — 이 경우 push 때마다 `apps/branding` 만이 아니라 루트의 `npm run build --workspaces`(모노레포 4개 앱 전체)가 돌다가 다른 앱(`apps/shop` 등)의 환경변수가 없어서 빌드가 실패한다. 대시보드에서 안 고쳐지면 `vercel project update sellery-branding --root-directory apps/branding --scope weglow-team` 로 직접 설정.
+  - **트러블슈팅 기록**: 프로젝트를 CLI(`vercel link`/`vercel deploy`)로 먼저 만든 뒤 나중에 대시보드에서 GitHub 저장소를 연결하면, Root Directory 가 `.`(저장소 루트)로 남아 있을 수 있다 — 이 경우 push 때마다 `apps/myr` 만이 아니라 루트의 `npm run build --workspaces`(모노레포 4개 앱 전체)가 돌다가 다른 앱(`apps/shop` 등)의 환경변수가 없어서 빌드가 실패한다. 대시보드에서 안 고쳐지면 `vercel project update myr --root-directory apps/myr --scope weglow-team` 로 직접 설정.
 - sellery.life 아래로 넣으려면(`sellery.life/branding`): base 경로 `/branding` 설정 + `apps/shop/vercel.json` 리라이트 추가가 필요 — 현재는 독립 오리진 방침이라 안 함.
