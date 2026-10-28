@@ -32,7 +32,7 @@
 			<!-- tabindex=-1: 퍼널에서 [홈으로]·로고로 랜딩에 돌아오면 퍼널이 여기로 포커스를 옮긴다(첫 로드에는 옮기지 않는다) -->
 			<h1 tabindex="-1" class="mt-3 text-[38px] leading-[1.2] font-extrabold tracking-[-0.035em] text-balance text-fg outline-none lg:text-6xl lg:leading-[1.12] {rise(active)}" style={d(1)}>팔로워가 있다면,<br />나만의 제품을<br />만들 수 있어요</h1>
 			<p class="mt-[18px] text-[15px] leading-[1.65] text-pretty text-accent lg:max-w-[520px] lg:text-lg {rise(active)}" style={d(2)}>
-				다이어트, 이너뷰티 — 성분부터 맛까지 내가 고른 나만의 레시피. 만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 MYR이 맡을게요.
+				다이어트, 이너뷰티 — 성분부터 맛까지 내가 고른 나만의 레시피. 만드는 일도, 쌓이는 재고도, 복잡한 행정도 전부 MYR 이 맡을게요.
 			</p>
 			<button type="button" onclick={onnext} class="mt-[22px] flex items-center gap-2 text-[13px] font-semibold text-fg/50 hover:text-fg/80 {rise(active)}" style={d(3)}>
 				<span class="lg:hidden">옆으로 넘겨 어떻게 진행되는지 보기</span>
