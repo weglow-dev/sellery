@@ -1,6 +1,6 @@
 # MYR(Make Your Recipe) 전체 구현 방향 — apps/myr · myr-shop · myr-influencer · myr-admin
 
-> **상태(2026-10-28): 방향 결정 문서. 구현 전.** "Make Your Recipe(MYR)" 로 만든 인플루언서 PB 제품을 **한 샵에서 모아 팔고, 인플루언서가 자기 제품의 등록·판매실적·CS 를 직접 맡고, 운영팀이 검수해 샵에 오픈하는** 구조를 정한다. 셀러리(캠페인 모델)의 결제·주문·CS 코드를 **복사해 쓰되 import 로 섞지 않는다** — MYR 이 완성되면 셀러리 쪽 앱·기능은 쓰지 않게 될 전망이라, 나중에 셀러리 폴더만 지워도 MYR 이 남도록 경계를 둔다.
+> **상태(2026-10-28 · 2026-10-29 장바구니/줄 단위 정산 반영): 방향 결정 문서. 구현 전.** "Make Your Recipe(MYR)" 로 만든 인플루언서 PB 제품을 **한 샵에서 모아 팔고, 인플루언서가 자기 제품의 등록·판매실적·CS 를 직접 맡고, 운영팀이 검수해 샵에 오픈하는** 구조를 정한다. 셀러리(캠페인 모델)의 결제·주문·CS 코드를 **복사해 쓰되 import 로 섞지 않는다** — MYR 이 완성되면 셀러리 쪽 앱·기능은 쓰지 않게 될 전망이라, 나중에 셀러리 폴더만 지워도 MYR 이 남도록 경계를 둔다.
 >
 > 근거(저장소 안): `apps/shop/src/routes/{api,checkout,cs,orders,account}/**` · `packages/payments/src/server/*` · `packages/db/src/server/{brand,partner,admin}/*.server.ts` · `supabase/migrations/{0004,0005,0008,0015,0018,0020,0021,0041}` · `docs/branding-plan.md`(랜딩 `apps/myr`) · `docs/brand-console-plan.md` · `docs/admin-console-plan.md`(콘솔 골격) · `docs/deploy.md`(외부 서비스 등록).
 >
@@ -13,13 +13,14 @@
 | # | 결정 | 이유 |
 |---|---|---|
 | 1 | **앱 4개** — `apps/myr`(랜딩 · 기존) · `apps/myr-shop`(고객 샵) · `apps/myr-influencer`(인플루언서 콘솔) · `apps/myr-admin`(운영 콘솔). 각각 Vercel 프로젝트 1개, **도메인은 새로 연다**(§2) | 셀러리 4앱(`shop` `influencer` `brand` `admin`) 과 이름·배포·도메인을 완전히 분리. 셀러리 `apps/admin` 에 탭을 얹지 않는다. |
-| 2 | **판매 단위 = 상품.** 캠페인 테이블을 만들지 않는다. `myr_products.seller_id`(not null) 가 주인이고, 주문·문의는 그 값을 복사해 가진다 | MYR 은 "나만 팔 수 있는 내 레시피 제품" — 상품 하나에 셀러 하나. 셀러리의 캠페인은 "같은 상품을 여러 인플루언서가 기간을 나눠 파는" 문제를 풀려고 있었고 MYR 엔 그 문제가 없다. 셀러 한 명이 상품 여러 개는 당연히 된다(1:N). |
+| 2 | **판매 단위 = 상품.** 캠페인 테이블을 만들지 않는다. `myr_products.seller_id`(not null) 가 주인이고, 주문 줄·문의는 그 값을 복사해 가진다 | MYR 은 "나만 팔 수 있는 내 레시피 제품" — 상품 하나에 셀러 하나. 셀러리의 캠페인은 "같은 상품을 여러 인플루언서가 기간을 나눠 파는" 문제를 풀려고 있었고 MYR 엔 그 문제가 없다. 셀러 한 명이 상품 여러 개는 당연히 된다(1:N). |
+| 2-1 | **장바구니 — 결제 1건에 여러 셀러의 상품을 담고 한 번에 결제한다(2026-10-29).** 고객에게는 **주문 1건**(주문번호 하나 · 배송 하나) 으로 보이고, 셀러별로 나누는 건 **주문 줄(`myr_order_items.seller_id`)** 이다 — 정산 · 환불 · CS · 실적은 줄 단위, 배송 · 주문번호 · 결제는 주문 단위 | 디자인(Claude Design "MYR Shop") 이 장바구니를 전제한다. 셀러리 체크아웃은 "상품 1 × 옵션 1 × 수량" 한 줄이었고, MYR 은 그 한 줄을 "줄 여러 개" 로 바꾼 것뿐이라 토스 승인·복구·웹훅·비회원 토큰은 결제 단위에 그대로 붙는다. 고객에게 셀러별 배송 N건을 보여주지 않기로 했으므로(아래 8) 주문 행을 셀러별로 쪼개지 않는다. |
 | 3 | **`seller_id` 는 폼 값이 아니라 세션 값.** 상품 등록은 `requireSeller()` 가 돌려준 `seller.id` 로 서버가 insert · 체크아웃은 `product_id` 만 받고 서버가 `products.seller_id` 를 세션·주문에 복사 · 문의도 같다 | 브랜드 콘솔이 `brand_id` 로 하는 방식 그대로. 클라이언트가 보낸 소유자 값은 받지 않는다 → 남의 상품·주문·문의는 URL 을 바꿔도 안 보인다. |
 | 4 | **상품 등록은 인플루언서가 한다**(가격 · 소개글 · 이미지 · 옵션 · 판매/일시중지). 등록 직후 상태는 `pending` 이고 **운영팀 검수(`listed`) 를 통과해야 샵에 보인다.** 반려는 사유 필수 | 셀러리 `products.status` 게이트(0002 · `app_admin_review_product` 0015) 와 같은 패턴. 표시광고·건기식 문구는 사람이 봐야 한다. |
 | 5 | **같은 Supabase 프로젝트(`sellery`), 새 테이블**(`myr_` 접두사 · 함수 `myr_app_*`) · 공유하는 것 = `auth` · `profiles` · `sellers` · `customers` · `payment_events` · 비회원 토큰 RPC(0021) · `platform_settings` | 로그인·고객·토스 키·지급대행을 둘로 나누지 않는다. 셀러리 전용 테이블(`campaigns` `orders` `cs_conversations` …)은 건드리지 않는다. |
 | 6 | **결제·주문 코드는 그대로, SQL 함수만 다시.** `/api/checkout` `/api/payments/{confirm,webhook}` `/api/cron/reconcile` · `toss.server.ts` · `checkout-sync` 흐름 · `checkout_sessions` 상태 기계는 복사. `app_confirm_checkout` · `app_checkout_reserved` · `app_refund_precheck` 를 상품 축으로 재작성, `campaign_card` → `myr_product_card` | 결합은 "무엇을 검사하느냐"(캠페인 LIVE·기간·배정 재고 → 상품 listed·stock) 뿐이고 전부 DB 함수 안에 있다. |
-| 7 | **CS·환불은 인플루언서가 한다.** 문의함 · 스레드 · 답변 · 종료 · 환불(발송 전 전액) 을 `seller_id` 게이트로. 발송 뒤 환불·교환은 1차에서 **CS 스레드로 처리 + 재발송 운송장 1칸**(§6.4) | 브랜드 콘솔 `cs.server.ts` · `brand-refund.server.ts` 를 `brand_id → seller_id` 로 복사. 셀러리에도 교환 상태 기계는 없다. |
-| 8 | **발송(운송장) 주체는 미정** — 1차는 인플루언서 콘솔 "주문" 탭에 운송장 단건/CSV 등록을 넣고, MYR 물류센터가 맡게 되면 `myr-admin` 으로 옮긴다 | 랜딩은 "MYR 물류센터" 를 말하지만 운영 방식이 확정되지 않았다(§9). 기능은 브랜드 콘솔 `orders.server.ts` 복사라 어느 쪽에 둬도 비용이 같다. |
+| 7 | **CS·환불은 인플루언서가 한다.** 문의함 · 스레드 · 답변 · 종료 · 환불을 `seller_id` 게이트로. 환불은 **내 줄(order_items) 단위의 토스 부분 취소**(§6.3). 교환은 1차에서 **CS 스레드로 처리 + 재발송 운송장 1칸**(§6.4) | 브랜드 콘솔 `cs.server.ts` · `brand-refund.server.ts` 를 `brand_id → seller_id` 로 복사하되, 결제 1건에 셀러가 여럿이라 전액 취소가 아니라 `cancelAmount` 부분 취소가 된다. 셀러리에도 교환 상태 기계는 없다. |
+| 8 | **발송은 MYR 물류센터가 주문 단위로 한 번에 한다**(2026-10-29 전제 — 고객에게 주문 1건 · 배송 1건). 운송장 입력 · 발주서는 `myr-admin`, 배송비는 **결제당 1건**(무료배송 기준도 장바구니 합계 기준). 인플루언서 콘솔 "주문" 탭은 내 줄의 **열람 · 환불 · CS** 만 | 랜딩이 "재고·물류는 MYR 이 맡는다" 를 약속하고, 셀러별 배송 N건을 고객에게 보여주지 않기로 했다. 셀러가 각자 보내는 방식으로 바꾸면 배송비 · 무료배송 · 운송장이 전부 셀러별(= 줄 묶음별) 로 갈라진다(§9-9 에 되돌릴 조건을 적어 둔다). |
 | 9 | **운영 콘솔 `myr-admin` 1차 = 상품 검수 + 주문/문의 열람 + 환불 대행.** 게이트는 `profiles.role='admin'`(`requireAdmin()` 복사) | 셀러리 관리자 계정을 그대로 쓴다(같은 Supabase). 정산 실행·지급은 2차. |
 | 10 | **정산은 1차 범위 밖.** 주문에 `seller_margin_rate` 스냅샷만 남기고, 실적 화면은 매출·환불·순매출·예상 정산액을 보여준다 | 요율·주기·지급 방식이 미정. 셀러리 0053 수식(3%+3%+5%) 을 가져오지 않는다. 지급대행(`payouts.server.ts` · 0042) 은 나중에 재사용 가능. |
 | 11 | **셀러리 코드와의 경계** — 서버 모듈은 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 에 복사본. 셀러리 모듈(`brand/*` `partner/*` `campaign*`) 을 import 하지 않는다(`scripts/check-boundaries.mjs` 에 규칙 추가). 순수 모듈(`text` `dates` `carriers` `guest-order` `money` `auth`) 과 `mail/{resend,layout}` 은 공유 | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 서버 폴더만 지우면 되게. |
@@ -37,11 +38,13 @@
                                        반려 → rejected(사유) ◀─ 수정 후 재제출(pending)
   ├ 판매 중 / 일시중지 토글 (listed ↔ paused · 검수 재요청 없음)
   ├ 가격·소개글 수정 ─ 가격 변경은 pending 재검수 (§9)
-  │                                                                     주문 → 토스 결제 → myr_orders(seller_id)
-  ├ 주문 탭: 미발송 → 운송장 등록(단건/CSV) ─────────────────────────▶ 배송 시작 메일
+  │                                                                     장바구니(여러 셀러) → 토스 결제 1건
+  │                                                                       → myr_orders 1건 + myr_order_items(줄마다 seller_id)
+  │                                    주문 → 운송장 등록(단건/CSV) ──▶ 배송 시작 메일 (주문 단위 · 물류센터)
+  ├ 주문 탭: 내 줄 열람 · 줄 환불(부분 취소) · 문의 연결
   ├ 문의 탭: 고객 문의(seller_id) 답변·종료 ◀──────────────────────── /cs/new?product=<code>(&order=)
-  ├ 환불: 발송 전 전액(토스 취소) · 발송 뒤 CS 처리    열람·환불 대행     고객 셀프 환불(발송 전) /api/payments/cancel
-  └ 실적 탭: 매출·환불·순매출·상품별 집계
+  ├ 환불: 내 줄 → 토스 cancelAmount 부분 취소        열람·환불 대행     고객 셀프 환불(발송 전 · 줄 또는 전체) /api/payments/cancel
+  └ 실적 탭: 내 줄 기준 매출·환불·순매출·상품별 집계
 ```
 
 ---
@@ -88,14 +91,27 @@ myr_products
   reject_reason · reviewed_at · reviewed_by · submitted_at
   seller_margin_rate numeric(5,4)(정산 스냅샷용 · 운영 설정값 복사) · deleted_at · created/updated_at
 
-myr_checkout_sessions   ← 0008 checkout_sessions 와 동일 컬럼, campaign_id → product_id · seller_id
-myr_orders              ← 0004 orders 와 동일 컬럼, campaign_id → product_id · seller_id
-                          status('WAITING_DEPOSIT'|'PAID'|'REFUNDED'|'CANCELED') · deposit_due_at(§6.7 가상계좌)
-                          + exchange_courier · exchange_tracking_no · exchange_shipped_at(§6.4)
-                          + seller_margin_rate 스냅샷 · refund_amount(0050 의 것) · delivered_at(0049)
-myr_cs_conversations    ← 0005 cs_conversations, brand_id → seller_id · campaign_id → product_id
+-- 결제 단위 (셀러리 checkout_sessions 의 "한 줄" 을 "줄 여러 개" 로 — 상태 기계 · 멱등 선점 · 비회원 쿠키 · 만료는 0008 그대로)
+myr_checkouts           ← 0008 checkout_sessions 의 결제 컬럼: toss_order_id · user_id/customer_id · buyer_* · shipping jsonb
+                          items_amount · shipping_fee · amount(=합 · 토스에 보내는 값) · status(PENDING→CONFIRMING→CONFIRMED|FAILED|EXPIRED)
+                          payment_key · fail_* · raw_payment · link 없음 · expires_at
+myr_checkout_items        checkout_id · product_id · seller_id(서버가 products 에서 복사) · option_index · option_name · qty · unit_price
+                          (소프트 재고 예약은 이 줄의 product_id 합으로 — myr_app_checkout_reserved(product_id))
+
+-- 주문 단위 = 결제 1건 = 고객에게 보이는 주문 1건 (결정 2-1 · 8)
+myr_orders              code('o' || seq · 주문번호 하나) · checkout_id · user_id/customer_id · buyer_* · shipping jsonb(수취인 원문)
+                          items_amount · shipping_fee · amount · refund_amount(줄 환불 누적) · status('WAITING_DEPOSIT'|'PAID'|'PARTIAL_REFUNDED'|'REFUNDED'|'CANCELED')
+                          payment_key · payment_method · paid_at · deposit_due_at(§6.7) · raw_payment
+                          courier · tracking_no · shipped_at · delivered_at(0049) — **주문 단위 1건 · 물류센터가 입력**
+                          exchange_courier · exchange_tracking_no · exchange_shipped_at(§6.4)
+myr_order_items         order_id · seller_id · product_id · option_name · qty · unit_price · amount
+                          seller_margin_rate 스냅샷(정산 기준) · status('PAID'|'REFUNDED') · refund_amount · refunded_at · refund_reason · refund_actor
+                          → **정산 · 환불 · CS · 실적의 단위.** 셀러 콘솔은 `seller_id = 내 id` 인 줄만 본다
+myr_cs_conversations    ← 0005 cs_conversations, brand_id → seller_id · campaign_id → product_id · order_id + order_item_id(소유 증명될 때만)
 myr_cs_messages         ← 0005 cs_messages, sender('customer'|'seller'|'admin')
 ```
+
+주문 상태는 줄에서 파생한다 — 모든 줄 REFUNDED 면 `REFUNDED`, 일부면 `PARTIAL_REFUNDED`(토스 `PARTIAL_CANCELED` 와 1:1). `sold_qty` 트리거는 `myr_order_items`(PAID) 에서 상품별로 재계산.
 
 RLS: 전부 `revoke all from anon, authenticated` · service role 만. 고객 공개 읽기는 `myr_product_card(code)` · `myr_home_products()` RPC(security definer · anon 실행 허용) 로만 — `products` 의 공개 grant 열 목록(0002) 과 같은 원칙으로 재고·마진·반려 사유는 내지 않는다. 주문 본인 조회는 `myr_orders_select_own`(`auth.uid() = user_id`) 요약 컬럼만(0004 와 동일).
 
@@ -106,9 +122,9 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 상품 | `myr_app_upsert_product(seller, …)` · `myr_app_set_product_status(seller, code, 'listed'|'paused')` · `myr_app_submit_product(seller, code)`(rejected → pending) | 0015 `app_brand_upsert_product` |
 | 검수 | `myr_app_admin_products(status?)` · `myr_app_admin_review_product(id, 'approve'|'reject', reason)` · `myr_app_admin_force_status` | 0015 `app_admin_review_product` |
 | 공개 | `myr_product_card(code)` · `myr_home_products(category?)` | 0003/0008 `campaign_card` |
-| 결제 | `myr_app_checkout_reserved(product_id)` · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(products 행 `for update` · listed · stock − sold_qty ≥ qty · 가상계좌면 `WAITING_DEPOSIT` 주문 §6.7) · `myr_app_deposit_done(order)` · `myr_app_deposit_expire(order)` | 0008 (+ 가상계좌 신규) |
-| 환불 | `myr_app_refund_precheck(order_id, actor, actor_id)` · `myr_app_refund_record(order_id, actor, …)` — **한 벌.** actor 별 가드: customer = 본인 · 발송 전 / seller = 내 상품 · 발송 뒤 허용 / admin = 전부 | 0008 · 0018 · 0020 을 합침 |
-| 주문 | `myr_app_orders(actor, actor_id, filter)` · `myr_app_order(actor, actor_id, code)` · `myr_app_ship_order(actor, actor_id, code, courier, tracking)` · `myr_app_ship_orders`(CSV) · `myr_app_exchange_ship` · `myr_app_po_rows` — seller 는 `seller_id = actor_id` 행만, admin 은 전부 | 0018 `app_brand_*` · 0020 `app_admin_orders` 를 합침 |
+| 결제 | `myr_app_checkout_reserved(product_id)` · `myr_app_create_checkout(items[], …)`(줄마다 listed · 재고 · 가격 서버 검증 → 세션 + 줄 insert · 한 줄이라도 미달이면 전체 거절) · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(**줄의 products 행 전부 `for update` — id 순서로 잠가 교착 방지** · 전부 통과해야 주문 1건 + 줄 N건 insert · 하나라도 품절이면 ok:false → 호출부가 토스 전액 취소 · 가상계좌면 `WAITING_DEPOSIT` §6.7) · `myr_app_deposit_done(order)` · `myr_app_deposit_expire(order)` | 0008 (+ 다중 줄 · 가상계좌) |
+| 환불 | `myr_app_refund_precheck(order_item_ids[], actor, actor_id)` · `myr_app_refund_record(order_item_ids[], actor, cancel_amount, raw, …)` — **한 벌 · 줄 단위.** 고객의 "전체 환불" 은 모든 줄을 넘기는 것. actor 별 가드: customer = 본인 주문의 줄 · 발송 전 / seller = `seller_id = actor_id` 인 줄만 · 발송 뒤 허용 / admin = 전부. 기록은 줄 `REFUNDED` + 주문 `refund_amount` 누적 + 주문 status 파생 | 0008 · 0018 · 0020 을 합치고 부분 취소로 |
+| 주문 | `myr_app_orders(actor, actor_id, filter)` · `myr_app_order(actor, actor_id, code)` — seller 는 **내 줄이 있는 주문만, 응답도 내 줄 + 배송 상태(수취인 원문 없음)** · admin 은 전부 + 수취인 원문 · `myr_app_ship_order(admin, code, courier, tracking)` · `myr_app_ship_orders`(CSV) · `myr_app_exchange_ship(admin, …)` · `myr_app_po_rows(admin)` — **운송장·발주서는 admin 만**(결정 8) | 0018 `app_brand_*` · 0020 `app_admin_orders` 를 합침 |
 | CS | `myr_app_cs_open(product_id, …)`(0041 소유 증명 그대로) · `myr_app_cs_thread(actor, …)`(customer = client_token · seller = 내 것 · admin = 전부) · `myr_app_cs_reply(actor, actor_id, …)`(customer 추가 문의 · seller 답변 · admin 대행 답변 `sender='seller'`) · `myr_app_cs_list(actor, actor_id, status?)` · `myr_app_cs_close(actor, …)` | 0018 · 0041 · 0020 을 합침 |
 | 실적 | `myr_app_seller_sales(seller)` — gross · refunds · net · 상품별 · 예상 정산액 = net × margin · admin 은 `myr_app_admin_sales(seller?)` 로 같은 집계 | 0013 `app_seller_sales` 의 축소판 |
 | 비회원 | 기존 `app_guest_customer_upsert` · `app_guest_order_*` 를 그대로 호출(주문 테이블이 달라 `myr_` 변형 필요하면 그때) | 0021 |
@@ -119,8 +135,8 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 |---|---|---|---|
 | 토스 승인 · 취소 · 조회 | `packages/payments/src/server/myr/toss.server.ts`(기존 `toss.server.ts` 그대로) | — | 전부(간접) |
 | 체크아웃 세션 · 승인 확정 · 복구 | `payments/server/myr/checkout.server.ts` — `createCheckout` · `confirmCheckout` · `syncFromToss` | `myr_app_claim/confirm_checkout` · `myr_app_deposit_*` | shop(고객 · 웹훅 · reconcile) |
-| 환불 | `payments/server/myr/refund.server.ts` — `refundOrder({ actor, actorId, orderCode, reason })` 하나. 토스 취소 Idempotency-Key 는 `${order.id}` 고정(actor 와 무관 · 같은 주문의 두 번째 호출은 토스가 ALREADY_CANCELED) | `myr_app_refund_precheck/record` | shop `/api/payments/cancel`(customer) · influencer `/orders ?/refund`(seller) · admin `/orders/[code] ?/refund`(admin) |
-| 운송장 · 교환 발송 · 발주서 | `db/server/myr/orders.server.ts` — `listOrders` · `shipOrder` · `shipOrdersCsv` · `exchangeShip` · `poRows`(전부 `{ actor, actorId }` 첫 인자) | `myr_app_orders/ship_*` | influencer(seller) · admin(admin) |
+| 환불 | `payments/server/myr/refund.server.ts` — `refundItems({ actor, actorId, orderCode, itemIds, reason })` 하나. precheck 가 돌려준 줄 합계를 토스 `cancelAmount` 로 **부분 취소**(마지막 줄이면 토스가 전액 취소로 처리). Idempotency-Key 는 **`${order.id}:${정렬한 itemIds 해시}`**(같은 줄 묶음의 재시도는 같은 키 · 다른 줄은 다른 키) | `myr_app_refund_precheck/record` | shop `/api/payments/cancel`(customer · 전체 또는 줄) · influencer `/orders/[code] ?/refund`(seller · 내 줄) · admin `/orders/[code] ?/refund`(admin) |
+| 운송장 · 교환 발송 · 발주서 | `db/server/myr/orders.server.ts` — `listOrders` · `getOrder`(`{ actor, actorId }`) · `shipOrder` · `shipOrdersCsv` · `exchangeShip` · `poRows`(admin 전용) | `myr_app_orders/ship_*` | 열람 influencer(seller) · admin / 발송 admin 만 |
 | 문의 | `db/server/myr/cs.server.ts` — `openCs`(고객만) · `listCs` · `getCsThread` · `replyCs` · `closeCs`(`{ actor, actorId \| clientToken }`) | `myr_app_cs_*` | shop(customer) · influencer(seller) · admin(admin) |
 | 상품 | `db/server/myr/products.server.ts` — `upsertProduct`(seller) · `setProductStatus({ actor })`(seller = listed↔paused · admin = 전부) · `reviewProduct`(admin) · `productCard` · `homeProducts`(anon) | `myr_app_*product*` | influencer · admin · shop |
 | 메일 훅 | `db/server/myr/mail-events.server.ts` — `notifyOrderPaid/Shipped/Refunded/ExchangeShipped/DepositPending` · `notifyCsOpened/Replied` | — | 위 함수들이 내부에서 호출 — 앱이 직접 부르지 않는다 |
@@ -134,8 +150,8 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 
    | 동작 | customer | seller | admin |
    |---|---|---|---|
-   | 환불(전액) | 본인 주문 · PAID · 발송 전 | 내 상품 주문 · PAID · 발송 뒤 허용(`after_ship` 기록) | 전부 |
-   | 운송장 · 교환 발송 | — | 내 상품 주문 | 전부 |
+   | 환불(줄 단위 부분 취소) | 본인 주문의 줄(전체 = 모든 줄) · PAID · 발송 전 | `seller_id = 내 id` 인 줄만 · PAID · 발송 뒤 허용(`after_ship` 기록) | 전부 |
+   | 운송장 · 교환 발송 · 발주서 | — | — (열람만 · 수취인 원문 없음) | 전부(물류센터) |
    | 문의 열람·답글 | 본인(토큰·user) · 추가 문의 | 내 상품 문의 · 답변·종료 | 전부 · 대행 답변(`sender='seller'` `actor_role='admin'`) |
    | 상품 상태 | — | 내 상품 · listed ↔ paused · rejected → pending | 전부 · pending → listed/rejected · 강제 전환 |
 
@@ -168,14 +184,14 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 가입·로그인 | `/signup` `/verify-sent` `/login` `/password/*` `/auth/confirm` | 이메일+비밀번호 · token_hash · `sellers` 행 생성(`createSellerFromSignup`) | `apps/influencer` 그대로 |
 | 홈 | `/home` | 검수 상태 · 미발송 · 미답변 문의 · 오늘 매출 카드 | `partner/home.server.ts` 축소 |
 | 상품 | `/products` `/products/new` `/products/[code]` | 목록(상태 칩) · 등록 · 수정 · 판매중/일시중지 · 반려 사유 · 재제출 | `apps/brand/(console)/products/*` |
-| 주문 | `/orders` | 주문표 · 운송장 단건/CSV · 발주서 · 환불(발송 전) · 교환 재발송 운송장 | `apps/brand/(console)/orders` |
+| 주문 | `/orders` `/orders/[code]` | 내 줄이 있는 주문 목록(줄 · 수량 · 금액 · 배송 상태 읽기) · 내 줄 환불(부분 취소) · 문의 연결. **운송장 입력 없음**(물류센터 · 결정 8) | `apps/brand/(console)/orders` 에서 발송 기능 제거 |
 | 문의 | `/cs` `/cs/[code]` | 문의함(OPEN → ANSWERED → CLOSED) · 답변 · 종료 | `apps/brand/(console)/cs/*` |
 | 실적 | `/sales` | 기간별 매출·환불·순매출 · 상품별 · 예상 정산액 | `apps/influencer/(console)/sales` 축소 |
 | 내 정보 | `/my` | 프로필(핸들 · 아바타 · 소개) · 정산 계좌 · 알림 이메일 | `apps/influencer/(console)/my` |
 
 게이트: `requireSeller()` 그대로(`sellers.user_id and active`). 도메인이 분리되므로 `foreign` 상태는 "파트너 아닌 세션" 하나로 줄어든다.
 
-PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소 원문이 포함된다 — **1차는 인플루언서가 발송·CS 를 맡으므로 원문을 보여준다**(결정 8 에 따라 발송이 물류센터로 가면 주소는 마스킹으로 되돌린다). 열람 로그는 `sensitive_access_log`(0013) 재사용.
+PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 **수취인 실명·연락처·주소 원문을 넣지 않는다**(셀러리 0004 "인플루언서 응답에서 제거" 규칙 유지 · 구매자 표시명은 `김*은` 마스킹). CS 에서 주소가 필요하면 문의 스레드 안에서 고객이 적거나 운영팀이 대행한다. 수취인 원문은 admin 응답에만, 열람 로그는 `sensitive_access_log`(0013) 재사용.
 
 ### 4.3 `apps/myr-admin` (운영)
 
@@ -184,7 +200,7 @@ PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소
 | `/login` | 이메일 로그인 · `requireAdmin()`(`profiles.role='admin'`) | `apps/admin` |
 | `/home` | 검수 대기 수 · 오늘 주문 · 미답변 문의 | |
 | `/products` `/products/[code]` | 검수 대기 목록(pending 우선) · 상세(이미지 · 문구 · 옵션 · 셀러) · 승인/반려(사유) · listed/paused 강제 전환 | `apps/admin` 상품 검수(파트너 관리) 패턴 |
-| `/orders` `/orders/[code]` | 열람 · 환불 대행(`actor='admin'`) | `apps/admin/(console)/(money)/orders` |
+| `/orders` `/orders/[code]` | 주문표(수취인 원문) · **운송장 단건/CSV · 발주서 · 교환 재발송**(물류센터 · 결정 8) · 환불 대행(`actor='admin'`) | `apps/brand/(console)/orders`(발송) + `apps/admin/(console)/(money)/orders`(열람·환불) |
 | `/cs` `/cs/[code]` | 열람 · 대행 답변(`sender='seller'`, `actor_role='admin'`) | `(money)/cs` |
 | `/sellers` | 인플루언서 목록 · 정지/복구 | `partner-admin.mjs` 기능의 화면판 |
 | (2차) `/settle` | 정산 실행 · 지급 | 0020 패턴 |
@@ -206,29 +222,37 @@ PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소
 ### 6.1 상품 상태
 `pending`(등록·재제출) → 검수 → `listed`(샵 노출) ↔ `paused`(인플루언서 토글 · 노출 중단 · 진행 중 주문 영향 없음) / `rejected`(사유 · 수정 후 `pending`). 삭제는 `deleted_at` 소프트(주문이 참조). 가격·옵션 변경 시 재검수 여부는 §9-3.
 
-### 6.2 체크아웃 가드
-`listed` 이고 `stock − sold_qty − 예약(미만료 PENDING 세션 qty 합) ≥ qty` · 단가 = `options[optionIndex].price`(서버 값) · qty 1..10 · 금액 ≥ 100. 그 외(멱등 선점 · 불명 재조회 · 자동 취소 · 비회원 쿠키 · 레이트리밋) 는 0008 과 `apps/shop` 라우트 주석 그대로.
+### 6.2 장바구니 · 체크아웃 가드
+- 장바구니는 **브라우저(localStorage)** 에만 둔다(셀러리 `sellery-cart` 와 같은 방식 · 서버 테이블 없음). 줄 = `{ productCode, optionIndex, qty }`. 체크아웃 때 서버가 줄마다 상품을 다시 읽어 검증하므로 장바구니 안의 가격은 표시용이다.
+- `/api/checkout` 입력 `{ items:[{code, optionIndex, qty}], recipient, … }` · 줄 1~20개 · 같은 (상품, 옵션) 은 합친다. 줄마다 `listed` · `stock − sold_qty − 예약 ≥ qty` · 단가 = `options[optionIndex].price`(서버 값) · qty 1..10. **한 줄이라도 미달이면 세션을 만들지 않고 어느 줄이 왜 안 되는지 돌려준다**(`{ok:false, code:'SOLD_OUT', items:[{code, left}]}`) — 장바구니 화면이 그 줄만 표시.
+- 금액: `items_amount = Σ(단가 × qty)` · `shipping_fee` = 서버 규칙(§9-11 · 기본 "장바구니 합계 ≥ 무료배송 기준이면 0") · `amount = items_amount + shipping_fee` 가 토스에 보내는 값이고 confirm 이 대조하는 값. 금액 ≥ 100.
+- `myr_app_confirm_checkout` 은 줄의 상품 행을 **id 순서로 전부 잠근 뒤** 재고를 다시 보고, 전부 통과해야 주문 1건 + 줄 N건을 만든다. 하나라도 모자라면 `ok:false` → 호출부가 토스 **전액** 취소(셀러리 "DONE 뒤 주문 실패 = 자동 취소" 규칙 그대로 · 부분 성공 없음).
+- 그 외(멱등 선점 · 불명 재조회 · 비회원 쿠키 · 레이트리밋 · 30분 만료 · 본인 PENDING 세션 supersede) 는 0008 과 `apps/shop` 라우트 주석 그대로 — 결제 단위(`myr_checkouts`) 에 붙는다.
 
-### 6.3 환불
-- 고객 셀프: 발송 전 · PAID · 전액 → 토스 취소 → `myr_app_refund_record(actor='customer')` → 환불 메일.
-- 인플루언서: `myr_app_seller_refund_precheck(seller_id, code)`(소유 · PAID) → 같은 취소·기록 경로(Idempotency-Key `${order.id}:seller`). **발송 뒤도 허용**(회수 확인은 인플루언서 판단 · 기록에 `after_ship`).
-- 운영 대행: `actor='admin'` · 같은 경로.
-- 부분 환불은 1차 없음(토스 콘솔 부분취소는 0008 과 같이 운영 큐).
+### 6.3 환불 — 줄 단위 부분 취소
+- 결제 1건에 셀러가 여럿이므로 환불 단위는 **주문 줄**이다. 토스에는 `cancelAmount = 환불 줄 합계` 로 **부분 취소**를 보낸다. 마지막 남은 줄까지 취소되면 토스가 전액 취소(`CANCELED`) 로 처리한다.
+- **`PARTIAL_CANCELED` 는 MYR 에서 정상 상태**다. 셀러리는 "콘솔에서 누가 건드린 이상 상태" 로 보고 운영 큐에 넣었지만(0008 §7.3), MYR 의 reconcile · 웹훅은 토스 `cancels[]` 합계를 `myr_orders.refund_amount` 와 대조해 **줄 기록이 빠진 만큼만** 운영 큐에 올린다(토스 콘솔에서 금액만 취소한 경우 — 어느 줄인지 모르므로 사람이 지정).
+- 고객 셀프: 본인 주문 · 발송 전 · 줄 선택(기본 전체) → 부분/전액 취소 → `myr_app_refund_record(item_ids, actor='customer')` → 환불 메일. 발송 뒤는 "고객센터(문의)" 로.
+- 인플루언서: `seller_id = 내 id` 인 줄만 · **발송 뒤도 허용**(회수 확인은 인플루언서 판단 · `after_ship` 기록). 남의 줄은 `FORBIDDEN`.
+- 운영 대행: `actor='admin'` · 아무 줄.
+- 기록: 줄 `status='REFUNDED'` · `refund_amount` · `refund_actor` · 주문 `refund_amount` 누적 · 주문 status 파생(`PARTIAL_REFUNDED` / `REFUNDED`) · `sold_qty` 재계산 · 실적·정산은 줄의 `REFUNDED` 를 뺀다.
+- 배송비: 줄 환불 때 배송비는 **돌려주지 않는다**(기본) · 모든 줄이 환불되면 배송비까지 전액. 남은 줄 합계가 무료배송 기준 아래로 떨어져도 배송비를 사후 청구하지 않는다(§9-11 에 대안).
+- 가상계좌 `WAITING_DEPOSIT` 은 토스 호출 없이 상태만 취소(§6.7).
 
 ### 6.4 교환(1차 최소안)
-문의 유형 '교환·반품' 스레드에서 처리. 인플루언서가 재발송하면 주문 탭에서 `exchange_courier` · `exchange_tracking_no` 입력 → 고객 주문 상세에 "교환 발송" 줄 + 메일. 주문 `status` 는 바꾸지 않는다(PAID 유지). 상태 기계(`EXCHANGE_REQUESTED → EXCHANGED`) 는 운영해 보고 필요하면 2차.
+문의 유형 '교환·반품' 스레드에서 인플루언서가 판단하고, **재발송은 물류센터(admin)** 가 주문 단위로 `exchange_courier` · `exchange_tracking_no` 입력 → 고객 주문 상세에 "교환 발송" 줄 + 메일. 주문 · 줄 `status` 는 바꾸지 않는다(PAID 유지). 상태 기계(`EXCHANGE_REQUESTED → EXCHANGED`) 는 운영해 보고 필요하면 2차.
 
 ### 6.5 메일(Resend · 기존 템플릿)
-주문 확인(고객 + **셀러** `sellers.email`) · 배송 시작 · 환불 완료 · 교환 발송 · 문의 접수(셀러) · 문의 답변(고객). `mail-events.server.ts` 복사본에서 `brands.email → sellers.email`. 발신은 MYR 도메인 인증 전까지 `noreply@sellery.life`.
+주문 확인(고객 1통 + **줄의 셀러마다 1통** — 내 줄만 담아 `sellers.email`) · 배송 시작(고객) · 환불 완료(고객 + 해당 줄 셀러) · 교환 발송(고객) · 입금 안내(가상계좌) · 문의 접수(셀러) · 문의 답변(고객). `mail-events.server.ts` 복사본에서 `brands.email → sellers.email`. 발신은 MYR 도메인 인증 전까지 `noreply@sellery.life`.
 
 ### 6.6 소유 증명(문의 ↔ 주문)
-0041 그대로: 회원 `user_id` · 고객 행 `customer_id` · 비회원 조회 토큰(`app_guest_order_verify`) 중 하나가 맞을 때만 `order_id` 연결. 증명 못 하면 `order_code` 원문만 남기고 콘솔에 "(미확인)".
+0041 그대로: 회원 `user_id` · 고객 행 `customer_id` · 비회원 조회 토큰(`app_guest_order_verify`) 중 하나가 맞을 때만 `order_id` 연결. 증명 못 하면 `order_code` 원문만 남기고 콘솔에 "(미확인)". 문의는 상품(= 셀러) 단위로 열리므로, 증명된 주문 안에서 **그 상품의 줄**(`order_item_id`) 을 함께 연결한다 — 다른 셀러의 줄 금액·수량은 응답에 담지 않는다.
 
 ### 6.7 결제수단 · 가상계좌
 - 결제 UI 는 **토스 결제위젯**(`@tosspayments/tosspayments-sdk` · `CheckoutClient.svelte` 복사) 이라 결제수단 목록은 코드가 아니라 **토스 개발자센터의 위젯 UI 설정 + 가맹점 계약**이 정한다. 카드 · 간편결제(토스페이 · 네이버페이 · 카카오페이 등) · 계좌이체 · 휴대폰은 거기서 켜면 바로 뜨고, 승인 흐름은 수단과 무관하게 같다. 주문에는 토스가 돌려준 `method` 가 `payment_method` 로 저장된다. 배치는 `PUBLIC_TOSS_WIDGET_VARIANT`.
 - **가상계좌는 셀러리가 거부한다**(`WAITING_FOR_DEPOSIT` → 즉시 취소 · `VIRTUAL_ACCOUNT_NOT_SUPPORTED` · 0009). "승인 즉시 DONE" 전제로 주문을 만들기 때문. MYR 은 **처음부터 열어 둔다**(건기식·식품은 가상계좌 비중이 있다):
   - `myr_orders.status` 에 `WAITING_DEPOSIT` 추가 · `deposit_due_at`(토스 `virtualAccount.dueDate`) · 가상계좌 번호·은행은 `raw_payment` 에.
-  - `myr_app_confirm_checkout`: 승인 결과가 `WAITING_FOR_DEPOSIT` 이면 주문을 `WAITING_DEPOSIT` 으로 만들고 **재고는 예약**(sold_qty 계산에 포함 · 입금 전 품절 방지). 성공 페이지는 입금 계좌·기한을 보여주고 입금 안내 메일(`notifyDepositPending`).
+  - `myr_app_confirm_checkout`: 승인 결과가 `WAITING_FOR_DEPOSIT` 이면 주문(+ 줄) 을 `WAITING_DEPOSIT` 으로 만들고 **재고는 예약**(sold_qty 계산에 포함 · 입금 전 품절 방지). 성공 페이지는 입금 계좌·기한을 보여주고 입금 안내 메일(`notifyDepositPending`).
   - `/api/payments/webhook` 의 `DEPOSIT_CALLBACK`(수신 분기는 셀러리에 이미 있다 · `source='deposit_callback'`) → `myr_app_deposit_done` → `PAID` · `paid_at` · 주문 확인 메일. 상태 `CANCELED`(기한 만료) → `myr_app_deposit_expire` → `CANCELED` · 재고 반환.
   - reconcile 크론이 `WAITING_DEPOSIT` 이고 `deposit_due_at` 지난 주문을 토스 재조회로 종결한다(웹훅 유실 대비).
   - 환불 가드: `WAITING_DEPOSIT` 은 "취소"(토스 취소 호출 없이 상태만) · `PAID` 이후는 §6.3. 셀러 주문표·실적은 `WAITING_DEPOSIT` 을 매출에 넣지 않는다.
@@ -244,9 +268,10 @@ PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소
 | M1 스키마 | 0056 `myr_products` · 상품/검수 RPC · `myr_product_card` · `myr_home_products` | 마이그레이션 1개 · `gen:types` |
 | M2 인플루언서 콘솔 1 | `apps/myr-influencer` 생성(가입·로그인·홈·상품 등록/수정/토글) | 앱 1 |
 | M3 운영 콘솔 1 | `apps/myr-admin` 생성(로그인 · 상품 검수) | 앱 1 |
-| M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkout_sessions` `myr_orders`(가상계좌 상태·컬럼 포함) · 결제 RPC · 환불 RPC(actor 한 벌) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백) |
-| M5 인플루언서 콘솔 2 | 주문(운송장 · 발주서 · 환불 · 교환 발송) · 문의(0058 `myr_cs_*`) · 메일 훅 | 마이그레이션 1개 |
-| M6 운영 콘솔 2 · 실적 | admin 주문/문의 열람 · 환불 대행 · 인플루언서 `/sales` · `seller_margin_rate` 스냅샷 | |
+| M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 장바구니 · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkouts` `myr_checkout_items` `myr_orders` `myr_order_items`(가상계좌 상태·컬럼 포함) · 다중 줄 결제 RPC · 줄 단위 환불 RPC(actor 한 벌 · 부분 취소) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백 · **두 셀러 담아 한 줄만 환불**) |
+| M4-UI(선행) | 디자인(Claude Design "MYR Shop" · `~/Downloads/MYR · 제조의뢰 & Shop.html` 내보내기) 을 **목 데이터로 먼저 화면만** — 홈 · 카테고리 · 상품 · 장바구니 · 체크아웃 · 주문완료 · 마이 · 탭바. 결제 위젯 자리는 비워 둔다(§6.7) | 앱 골격 · 컴포넌트 · 테마 |
+| M5 인플루언서 콘솔 2 | 주문(내 줄 열람 · 줄 환불) · 문의(0058 `myr_cs_*`) · 메일 훅 | 마이그레이션 1개 |
+| M6 운영 콘솔 2 · 실적 | admin 주문표 · **운송장 · 발주서 · 교환 발송**(물류센터) · 문의 열람 · 환불 대행 · 인플루언서 `/sales`(줄 기준) · `seller_margin_rate` 스냅샷 | |
 | M7 운영 전환 | 토스 라이브 키 · 크론 · `check-boundaries` 규칙 · 랜딩 루트 이전(§2) · 옛 주소 리다이렉트 | |
 
 M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 결제 리허설 전까지만 끝나면 되지만 도메인 이름은 M2 의 메일 링크·`PUBLIC_*_URL` 에 들어가므로 일찍 정하는 게 좋다. M4 가 가장 크다(`apps/shop` 복사 뒤 캠페인 흔적 제거).
@@ -275,5 +300,8 @@ M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 �
 6. **정산** — 인플루언서 마진율(상품별 vs 전역 `platform_settings`) · 지급 주기 · 지급대행(0042) 재사용 여부 · 토스 상점(MID) 을 MYR 사업자로 따로 낼지. 1차는 스냅샷 컬럼만.
 7. **제조의뢰 접수 → 상품 연결** — §5 의 2차(`myr_applications` + 초대 가입).
 8. **디자인** — `packages/ui` 셀러리 테마 vs `apps/myr` 다크·앰버 테마. 콘솔은 전자(빠름), 샵은 후자(브랜드 일관) 가 자연스럽지만 미정.
-9. **발송 주체** — 인플루언서 직접 vs MYR 물류센터(결정 8).
+9. **발송 주체** — 2026-10-29 전제는 MYR 물류센터 일괄 발송(결정 8). 셀러가 각자 보내는 방식으로 바꾸면 배송비·무료배송·운송장이 셀러별 줄 묶음 단위가 되고(`myr_shipments` 테이블 추가), 고객 화면에 "배송 N건" 이 다시 필요해진다 — 그때 결정 2-1 과 함께 고친다.
 10. **결제수단 범위** — 1차에 켤 수단(카드 · 간편결제 종류 · 계좌이체 · 가상계좌 · 휴대폰). 간편결제·휴대폰·가상계좌는 토스 가맹점 계약에 포함돼야 위젯에 뜬다(§6.7). 가상계좌를 1차에 켤지, 상태·컬럼만 준비하고 미룰지.
+11. **배송비 규칙** — 무료배송 기준 금액(디자인 Tweaks `freeShipping`) · 기본 배송비 · 도서산간 추가 여부 · 줄 환불 뒤 남은 합계가 기준 아래로 떨어질 때(§6.3 기본 = 사후 청구 없음 · 대안 = 마지막 줄 환불 시 배송비 차감) · 배송비 정산 귀속(MYR 수입 vs 셀러 분배).
+12. **찜 · 포인트** — 디자인 "마이" 에 찜 목록·포인트가 있다. 찜은 셀러리 팔로우(0045) 를 상품 단위로 바꾸면 되지만(`myr_wishes`), 포인트는 🥬 를 가져오지 않기로 했으므로 디자인에서 빼거나 별도 적립 정책을 정해야 한다. 1차 = 찜만(브라우저 저장) · 포인트 없음.
+13. **결제수단 UI 영역** — 디자인의 "결제수단 선택" 은 그려진 그림이고, 실제로는 토스 위젯이 그 자리를 렌더한다(§6.7). 위젯 variant 로 디자인에 가깝게 맞추되 완전히 같게는 안 된다.
