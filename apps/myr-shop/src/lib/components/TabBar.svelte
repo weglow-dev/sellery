@@ -3,7 +3,7 @@
 	import { shop } from '$lib/state.svelte';
 	import Icon from './Icon.svelte';
 
-	/** 하단 플로팅 탭바 — 홈 · 카테고리 · 장바구니(뱃지) · 마이. 홈 · 카테고리 · 마이에서만 보인다(레이아웃이 결정) */
+	/** 모바일 하단 플로팅 탭바 — 홈 · 카테고리 · 장바구니(뱃지) · 마이. 홈 · 카테고리 · 마이에서만(레이아웃이 결정) · PC 는 상단 내비 */
 	const tabs = [
 		{ href: '/', name: '홈', ic: 'home' },
 		{ href: '/category', name: '카테고리', ic: 'grid' },
@@ -13,7 +13,7 @@
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 </script>
 
-<nav class="pointer-events-none fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-gradient-to-b from-bg/0 to-bg to-40% px-5 pt-2.5 pb-6" aria-label="주요 메뉴">
+<nav class="pointer-events-none fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-gradient-to-b from-bg/0 to-bg to-40% px-5 pt-2.5 pb-6 lg:hidden" aria-label="주요 메뉴">
 	<div class="pointer-events-auto grid h-16 grid-cols-4 items-center rounded-[22px] border border-white/8 bg-panel px-1.5 shadow-[0_10px_30px_rgba(0,0,0,.4)]">
 		{#each tabs as t (t.href)}
 			{@const on = active(t.href)}

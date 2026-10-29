@@ -1,15 +1,22 @@
 <script lang="ts">
-	import { creatorOf, won } from '$lib/data';
+	import { DETAIL_ANCHORS, catName, creatorOf, infoRowsOf, relatedOf, won } from '$lib/data';
 	import { goBack } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import CartButton from '$lib/components/CartButton.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import QtyStepper from '$lib/components/QtyStepper.svelte';
+	import Tile from '$lib/components/Tile.svelte';
 
+	/** 상품 페이지 — 모바일: 풀블리드 타일 → 구매 정보 → 상세 섹션(스크롤) + 하단 고정 담기 바.
+	 *  PC(lg): 왼쪽 상세 스크롤 + 오른쪽 고정 구매 패널(280~360px) (디자인 "MYR Shop PC" 상세).
+	 *  상세 섹션 01~05 는 인플루언서가 상품 등록 때 채우는 템플릿 — 각 섹션이 입력 필드가 된다(docs/myr.md §4.2). */
 	let { data } = $props();
 	const p = $derived(data.product);
 	const creator = $derived(creatorOf(p.creator));
+	const infoRows = $derived(infoRowsOf(p));
+	const related = $derived(relatedOf(p));
+	const liked = $derived(shop.liked(p.id));
 
 	let qty = $state(1);
 	let added = $state(false);
@@ -21,6 +28,10 @@
 		clearTimeout(timer);
 		timer = setTimeout(() => (added = false), 1600);
 	}
+
+	const label = 'text-[12px] font-bold tracking-[.08em] text-accent';
+	const h2 = 'mt-3 text-[22px] leading-[1.3] font-extrabold tracking-[-.03em] lg:text-[30px]';
+	const card = 'rounded-[20px] border border-white/8 bg-white/4';
 </script>
 
 <svelte:head>
@@ -29,67 +40,219 @@
 </svelte:head>
 
 <!-- 등장 애니메이션(transform)은 스크롤 내용에만 — 조상에 걸면 아래 fixed 바의 기준이 그 요소가 돼 화면 밖으로 밀린다 -->
-<div class="min-h-dvh">
-	<div class="animate-slide-in pb-[120px]">
-		<!-- 풀블리드 타일 -->
-		<div class="relative flex aspect-square items-center justify-center text-white/95" style="background:{p.tile}">
-			<div class="absolute -right-[60px] -bottom-[60px] h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,.14),rgba(255,255,255,0))]"></div>
-			<span class="relative"><Icon id={p.ic} size={150} /></span>
-			<div class="absolute top-2.5 right-3 left-3 flex justify-between">
+<div class="min-h-dvh lg:mx-auto lg:grid lg:min-h-0 lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_clamp(280px,30%,360px)] lg:items-start lg:gap-10 lg:px-10 lg:pt-6 lg:pb-20">
+	<div class="animate-slide-in pb-[120px] lg:min-w-0 lg:pb-0">
+		<!-- PC 브레드크럼 -->
+		<nav class="hidden items-center gap-2 text-[13px] text-fg-faint lg:flex" aria-label="현재 위치">
+			<a href="/" class="hover:text-fg">홈</a><span>/</span>
+			<a href="/category?cat={p.cat}" class="hover:text-fg">{catName(p.cat)}</a><span>/</span>
+			<span class="text-white/85">{p.name}</span>
+		</nav>
+
+		<!-- 타일: 모바일 풀블리드 정사각 / PC 16:10 둥근 카드 -->
+		<div class="relative flex aspect-square items-center justify-center overflow-hidden text-white/95 lg:mt-[18px] lg:aspect-[16/10] lg:rounded-[30px]" style="background:{p.tile}">
+			<div class="absolute -right-[60px] -bottom-[60px] h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,.14),rgba(255,255,255,0))] lg:-right-[100px] lg:-bottom-[100px] lg:h-[460px] lg:w-[460px]"></div>
+			<span class="relative lg:[&>svg]:h-[260px] lg:[&>svg]:w-[260px]"><Icon id={p.ic} size={150} /></span>
+			<div class="absolute top-2.5 right-3 left-3 flex justify-between lg:hidden">
 				<button type="button" onclick={goBack} aria-label="뒤로" class="flex h-11 w-11 items-center justify-center rounded-[14px] bg-bg/45 text-fg backdrop-blur-md">
 					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
 				</button>
 				<CartButton glass />
 			</div>
-			<div class="absolute bottom-3.5 left-4 flex gap-1.5">
+			<div class="absolute bottom-3.5 left-4 flex gap-1.5 lg:bottom-[18px] lg:left-5">
 				{#each p.chips as ch (ch)}
-					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md">{ch}</span>
+					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md lg:px-3 lg:py-[7px] lg:text-[13px]">{ch}</span>
 				{/each}
 			</div>
 		</div>
 
-		<div class="px-5 pt-5">
-			<a href="/category?creator={creator.id}" class="flex items-center gap-2.5 text-left text-fg">
-				<Avatar bg={creator.bg} initial={creator.initial} size={34} />
-				<span><span class="block text-[14px] font-bold">{creator.name}</span><span class="block text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-			</a>
-			<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
-			<p class="mt-1.5 text-[14px] text-fg-soft">{p.sub}</p>
-			<div class="mt-3.5 flex items-baseline gap-2">
-				<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
-				<span class="text-[13px] text-white/45">{p.unit}</span>
+		<div class="px-5 pt-5 lg:px-0 lg:pt-0">
+			<!-- 모바일 구매 정보 (PC 는 오른쪽 패널) -->
+			<div class="lg:hidden">
+				<a href="/category?creator={creator.id}" class="flex items-center gap-2.5 text-left text-fg">
+					<Avatar bg={creator.bg} initial={creator.initial} size={34} />
+					<span><span class="block text-[14px] font-bold">{creator.name}</span><span class="block text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+				</a>
+				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
+				<p class="mt-1.5 text-[14px] text-fg-soft">{p.sub}</p>
+				<div class="mt-3.5 flex items-baseline gap-2">
+					<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
+					<span class="text-[13px] text-white/45">{p.unit}</span>
+				</div>
 			</div>
 
-			<div class="mt-5 rounded-[20px] border border-accent/22 bg-accent/8 p-[18px]">
-				<p class="text-[12px] font-bold tracking-[.04em] text-accent">{creator.name}의 레시피 노트</p>
-				<p class="mt-2 text-[14px] leading-[1.6] text-white/85 text-pretty">"{p.note}"</p>
+			<!-- 섹션 앵커 -->
+			<div class="no-bar mt-5 flex gap-1.5 overflow-x-auto lg:mt-7 lg:flex-wrap lg:overflow-visible">
+				{#each DETAIL_ANCHORS as an (an.id)}
+					<a href="#{an.id}" class="shrink-0 rounded-full border border-white/10 bg-white/3 px-3 py-1.5 text-[12px] font-bold text-white/75 hover:text-fg lg:px-3.5 lg:py-2 lg:text-[13px]">{an.name}</a>
+				{/each}
 			</div>
 
-			<div class="mt-5 grid grid-cols-3 gap-2">
-				{#each p.specs as sp (sp.k)}
-					<div class="flex flex-col items-start gap-1.5 rounded-2xl border border-white/8 bg-white/4 px-3 py-3.5">
-						<span class="text-white/90"><Icon id={sp.ic} size={22} /></span>
-						<span class="text-[11px] text-fg-faint">{sp.k}</span>
-						<span class="text-[13px] font-bold">{sp.v}</span>
+			<!-- 레시피 노트 (크리에이터가 작성) -->
+			<section id="note" class="mt-5 scroll-mt-24 rounded-[20px] border border-accent/22 bg-accent/8 p-[18px] lg:mt-9 lg:rounded-[26px] lg:p-8">
+				<div class="flex items-center gap-3">
+					<Avatar bg={creator.bg} initial={creator.initial} size={36} class="hidden lg:flex lg:h-11 lg:w-11 lg:text-[14px]" />
+					<span>
+						<span class="block text-[12px] font-bold tracking-[.04em] text-accent">{creator.name}의 레시피 노트</span>
+						<span class="mt-0.5 hidden text-[13px] text-fg-faint lg:block">{creator.handle}</span>
+					</span>
+				</div>
+				<p class="mt-2 text-[14px] leading-[1.6] text-white/85 text-pretty lg:mt-5 lg:max-w-[680px] lg:text-[24px] lg:leading-[1.5] lg:font-bold lg:tracking-[-.02em] lg:text-fg">"{p.note}"</p>
+			</section>
+
+			<!-- 01 왜 만들었나 -->
+			<section id="why" class="mt-10 scroll-mt-24 lg:mt-14 lg:max-w-[720px]">
+				<p class={label}>01 · 왜 만들었나요</p>
+				<h2 class={h2}>{p.storyTitle}</h2>
+				<p class="mt-3 text-[14px] leading-[1.75] text-white/72 text-pretty lg:mt-4 lg:text-[16px] lg:leading-[1.8]">{p.story}</p>
+			</section>
+			<div class="mt-4 grid grid-cols-3 gap-2 lg:mt-6 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] lg:gap-3">
+				{#each p.points as pt (pt.t)}
+					<div class="{card} px-3 py-3.5 lg:p-[22px]">
+						<span class="block text-[20px] font-extrabold tracking-[-.04em] text-accent lg:text-[26px]">{pt.big}</span>
+						<span class="mt-1 block text-[13px] font-bold lg:mt-1.5 lg:text-[14px]">{pt.t}</span>
+						<span class="mt-0.5 block text-[11px] leading-[1.45] text-fg-faint lg:mt-1 lg:text-[13px] lg:leading-[1.5]">{pt.d}</span>
 					</div>
 				{/each}
 			</div>
 
-			<h3 class="mt-6 mb-2.5 text-[15px] font-extrabold">주요 성분</h3>
-			<div class="flex flex-wrap gap-1.5">
-				{#each p.ingredients as ig (ig)}
-					<span class="rounded-full border border-white/12 px-3 py-2 text-[13px] font-semibold text-white/80">{ig}</span>
-				{/each}
-			</div>
+			<!-- 02 성분 -->
+			<section id="ingredients" class="mt-10 scroll-mt-24 lg:mt-14">
+				<p class={label}>02 · 무엇이 들어있나요</p>
+				<h2 class={h2}>성분표에 모르는 이름이 없게</h2>
+				<div class="mt-4 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-5 lg:rounded-[22px]">
+					{#each p.ingredientRows as row, i (row.name)}
+						<div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 bg-white/2 px-4 py-3.5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_auto] lg:items-center lg:gap-5 lg:px-[22px] lg:py-[18px] {i ? 'border-t border-white/7' : ''}">
+							<span class="col-start-1 row-start-1 text-[14px] font-bold lg:text-[16px]">{row.name}</span>
+							<span class="col-start-2 row-start-1 justify-self-end text-[12px] font-bold whitespace-nowrap text-accent lg:col-start-3 lg:text-[13px]">{row.amount}</span>
+							<span class="col-span-2 col-start-1 row-start-2 text-[13px] leading-[1.5] text-fg-soft lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:text-[14px]">{row.why}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
 
-			<h3 class="mt-6 mb-2.5 text-[15px] font-extrabold">이렇게 드세요</h3>
-			<p class="text-[14px] leading-[1.65] text-white/70">{p.howto}</p>
+			<!-- 03 섭취법 -->
+			<section id="howto" class="mt-10 scroll-mt-24 lg:mt-14">
+				<p class={label}>03 · 이렇게 드세요</p>
+				<h2 class={h2}>{p.howtoTitle}</h2>
+				<div class="mt-4 flex flex-col gap-2 lg:mt-5 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] lg:gap-3">
+					{#each p.howtoSteps as s, i (s.t)}
+						<div class="{card} flex gap-3.5 p-4 lg:flex-col lg:gap-3 lg:p-[22px]">
+							<span class="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] bg-accent/14 text-[13px] font-extrabold text-accent">{String(i + 1).padStart(2, '0')}</span>
+							<span class="flex flex-col gap-1 lg:gap-3">
+								<span class="text-[15px] font-bold lg:text-[16px]">{s.t}</span>
+								<span class="text-[13px] leading-[1.55] text-fg-soft lg:text-[14px]">{s.d}</span>
+							</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+
+			<!-- 04 제품 정보 -->
+			<section id="info" class="mt-10 scroll-mt-24 lg:mt-14">
+				<p class={label}>04 · 제품 정보</p>
+				<div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] lg:gap-2.5">
+					{#each p.specs as sp (sp.k)}
+						<div class="{card} flex flex-col items-start gap-1.5 px-3 py-3.5 lg:gap-2 lg:rounded-[18px] lg:p-[18px]">
+							<span class="text-white/90"><Icon id={sp.ic} size={22} /></span>
+							<span class="text-[11px] text-fg-faint lg:text-[12px]">{sp.k}</span>
+							<span class="text-[13px] font-bold lg:text-[15px]">{sp.v}</span>
+						</div>
+					{/each}
+				</div>
+				<div class="mt-2.5 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-3">
+					{#each infoRows as r, i (r.k)}
+						<div class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 bg-white/2 px-4 py-3 text-[13px] lg:grid-cols-[160px_minmax(0,1fr)] lg:gap-4 lg:px-5 lg:py-3.5 lg:text-[14px] {i ? 'border-t border-white/7' : ''}">
+							<span class="text-fg-faint">{r.k}</span><span class="text-white/85">{r.v}</span>
+						</div>
+					{/each}
+				</div>
+			</section>
+
+			<!-- 05 FAQ -->
+			<section id="faq" class="mt-10 scroll-mt-24 lg:mt-14 lg:max-w-[760px]">
+				<p class={label}>05 · 자주 묻는 질문</p>
+				<div class="mt-4 flex flex-col gap-2">
+					{#each p.faq as f (f.q)}
+						<div class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 lg:px-[22px] lg:py-[18px]">
+							<p class="text-[14px] font-bold lg:text-[15px]"><span class="mr-2 text-accent">Q</span>{f.q}</p>
+							<p class="mt-1.5 ml-[22px] text-[13px] leading-[1.6] text-fg-soft lg:mt-2 lg:text-[14px]">{f.a}</p>
+						</div>
+					{/each}
+				</div>
+			</section>
+
+			<!-- 함께 보면 좋은 레시피 -->
+			{#if related.length}
+				<h2 class="mt-12 mb-3 text-[18px] font-extrabold tracking-[-.02em] lg:mt-16 lg:mb-4 lg:text-[22px]">함께 보면 좋은 레시피</h2>
+				<div class="grid grid-cols-1 gap-2.5 lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] lg:gap-3.5">
+					{#each related as r (r.id)}
+						<a href="/p/{r.code}" class="flex items-center gap-3.5 rounded-[20px] border border-white/8 bg-white/3 p-3 text-left text-fg transition-colors lg:hover:border-white/25">
+							<Tile tile={r.tile} ic={r.ic} icon={44} class="h-[72px] w-[72px] rounded-2xl" />
+							<span class="flex min-w-0 flex-col gap-[3px]">
+								<span class="text-[11px] font-bold text-accent">{creatorOf(r.creator).name}</span>
+								<span class="text-[14px] leading-[1.3] font-bold">{r.name}</span>
+								<span class="mt-0.5 text-[14px] font-extrabold">{won(r.price)}</span>
+							</span>
+						</a>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	</div>
 
-	<!-- 하단 담기 바 -->
-	<div class="fixed bottom-0 left-1/2 flex w-full max-w-[430px] -translate-x-1/2 items-center gap-2.5 bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-7">
+	<!-- PC 고정 구매 패널 -->
+	<aside class="hidden lg:sticky lg:top-[106px] lg:flex lg:flex-col lg:gap-5">
+		<a href="/category?creator={creator.id}" class="flex items-center gap-3 text-left text-fg">
+			<Avatar bg={creator.bg} initial={creator.initial} size={40} />
+			<span><span class="block text-[15px] font-bold">{creator.name}</span><span class="block text-[13px] text-fg-faint">{creator.handle} · 레시피 더 보기</span></span>
+		</a>
+		<div>
+			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
+			<p class="mt-2 text-[15px] text-fg-soft">{p.sub}</p>
+			<div class="mt-4 flex items-baseline gap-2.5">
+				<span class="text-[30px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
+				<span class="text-[14px] text-white/45">{p.unit}</span>
+			</div>
+		</div>
+		<div class="flex flex-wrap gap-1.5">
+			{#each p.chips as ch (ch)}
+				<span class="rounded-full border border-white/12 px-[11px] py-[7px] text-[12px] font-semibold text-white/75">{ch}</span>
+			{/each}
+		</div>
+		<div class="flex items-center gap-2.5">
+			<QtyStepper {qty} onchange={(q) => (qty = q)} />
+			<button
+				type="button"
+				onclick={() => shop.toggleLike(p.id)}
+				aria-label={liked ? '찜 해제' : '찜'}
+				aria-pressed={liked}
+				class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/4 {liked ? 'text-accent' : 'text-fg'}"
+			>
+				<svg width="20" height="20" viewBox="0 0 24 24" fill={liked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" /></svg>
+			</button>
+		</div>
+		<button
+			type="button"
+			onclick={add}
+			class="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold whitespace-nowrap transition-colors duration-250 {added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg hover:bg-[#ff8f5c]'}"
+		>
+			{#if added}
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
+			{:else}
+				<span>{won(p.price * qty)} 담기</span>
+			{/if}
+		</button>
+		<div class="flex flex-col gap-2.5 rounded-2xl border border-white/7 bg-white/3 p-4 text-[13px] text-fg-soft">
+			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h13v10H3z" /><path d="M16 10h4l1 3v4h-5" /></svg>5만원 이상 무료배송</span>
+			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>영업일 2~3일 도착</span>
+			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></svg>식약처 인증 제조시설 생산</span>
+		</div>
+	</aside>
+
+	<!-- 모바일 하단 담기 바 -->
+	<div class="fixed bottom-0 left-1/2 flex w-full max-w-[430px] -translate-x-1/2 items-center gap-2.5 bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-7 lg:hidden">
 		<QtyStepper {qty} onchange={(q) => (qty = q)} />
 		<button
 			type="button"

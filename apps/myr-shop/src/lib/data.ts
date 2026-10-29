@@ -1,15 +1,24 @@
-/** 목 데이터 — 디자인(Claude Design "MYR Shop")의 제품 8개 · 크리에이터 4명 · 카테고리 6개 그대로.
- *  M4 에서 `myr_home_products` · `myr_product_card` RPC 응답으로 바뀐다(docs/myr.md §3). 필드 이름은 그때 맞춘다. */
+/** 목 데이터 — 디자인(Claude Design "MYR Shop" · "MYR Shop PC")의 제품 8개 · 크리에이터 4명 · 카테고리 6개 그대로.
+ *  M4 에서 `myr_home_products` · `myr_product_card` RPC 응답으로 바뀐다(docs/myr.md §3). 필드 이름은 그때 맞춘다.
+ *  상세페이지 섹션(story · points · ingredientRows · howtoSteps · faq)은 인플루언서가 상품 등록 때 채우는 템플릿이다 —
+ *  민지 젤리·하루 콜라겐은 실제 문구, 나머지는 기본 템플릿(`genericDetail`). */
 
 export type Cat = { id: string; name: string; ic: string };
-export type Creator = {
-	id: string;
-	name: string;
-	handle: string;
-	bg: string;
-	initial: string;
-};
+export type Creator = { id: string; name: string; handle: string; bg: string; initial: string };
 export type Spec = { ic: string; k: string; v: string };
+export type Point = { big: string; t: string; d: string };
+export type IngredientRow = { name: string; why: string; amount: string };
+export type Step = { t: string; d: string };
+export type Faq = { q: string; a: string };
+export type Detail = {
+	storyTitle: string;
+	story: string;
+	points: Point[];
+	ingredientRows: IngredientRow[];
+	howtoTitle: string;
+	howtoSteps: Step[];
+	faq: Faq[];
+};
 export type Product = {
 	id: string;
 	/** 상품 페이지 경로 `/p/<code>` — 실서비스의 myr_products.code 자리 */
@@ -32,7 +41,7 @@ export type Product = {
 	note: string;
 	howto: string;
 	specs: Spec[];
-};
+} & Detail;
 
 export const CATS: Cat[] = [
 	{ id: 'all', name: '전체', ic: 'grid' },
@@ -45,34 +54,10 @@ export const CATS: Cat[] = [
 ];
 
 export const CREATORS: Creator[] = [
-	{
-		id: 'c1',
-		name: '민지 루틴',
-		handle: '@minji.routine',
-		bg: '#FFB088',
-		initial: 'M'
-	},
-	{
-		id: 'c2',
-		name: '하루 웰',
-		handle: '@haru.well',
-		bg: '#C4B5FD',
-		initial: 'H'
-	},
-	{
-		id: 'c3',
-		name: '준 피트',
-		handle: '@jun.fit',
-		bg: '#86EFAC',
-		initial: 'J'
-	},
-	{
-		id: 'c4',
-		name: '소이 클린',
-		handle: '@soy.clean',
-		bg: '#FDE68A',
-		initial: 'S'
-	}
+	{ id: 'c1', name: '민지 루틴', handle: '@minji.routine', bg: '#FFB088', initial: 'M' },
+	{ id: 'c2', name: '하루 웰', handle: '@haru.well', bg: '#C4B5FD', initial: 'H' },
+	{ id: 'c3', name: '준 피트', handle: '@jun.fit', bg: '#86EFAC', initial: 'J' },
+	{ id: 'c4', name: '소이 클린', handle: '@soy.clean', bg: '#FDE68A', initial: 'S' }
 ];
 
 const T = {
@@ -86,9 +71,14 @@ const T = {
 	slate: 'linear-gradient(145deg,#6b7280,#262a33)'
 };
 
+type Base = Omit<Product, keyof Detail>;
 const spec = (ic: string, k: string, v: string): Spec => ({ ic, k, v });
+const pt = (big: string, t: string, d: string): Point => ({ big, t, d });
+const ig = (name: string, why: string, amount: string): IngredientRow => ({ name, why, amount });
+const st = (t: string, d: string): Step => ({ t, d });
+const qa = (q: string, a: string): Faq => ({ q, a });
 
-export const PRODUCTS: Product[] = [
+const BASE: Base[] = [
 	{
 		id: 'p1',
 		code: 'minji-grape-jelly',
@@ -257,6 +247,101 @@ export const PRODUCTS: Product[] = [
 		howto: '하루 1정을 아침 식사 후 드세요.',
 		specs: [spec('clock', '섭취', '하루 1정'), spec('pill', '제형', '타정'), spec('bottle', '구성', '30정 보틀')]
 	}
+];
+
+/** 크리에이터가 직접 쓴 상세 — 지금은 두 제품만 */
+const DETAIL: Record<string, Detail> = {
+	p1: {
+		storyTitle: '다이어트 중에도 입은 즐거워야 하니까',
+		story:
+			'다이어트 콘텐츠를 5년 넘게 하면서 가장 많이 받은 질문이 "뭐 먹어요?"였어요. 참는 다이어트는 결국 요요로 돌아왔고, 저는 "식사 후 입가심" 하나를 바꾸는 걸로 습관을 만들었어요. 그 루틴을 그대로 제품으로 옮긴 게 이 젤리예요. 설탕 대신 알룰로스, 포도 향은 천연 농축과즙만 썼어요.',
+		points: [pt('0g', '설탕', '알룰로스로 단맛만'), pt('14일', '루틴', '한 박스 = 2주 챌린지'), pt('9kcal', '한 포', '간식 죄책감 없이')],
+		ingredientRows: [
+			ig('가르시니아 HCA', '탄수화물이 지방으로 합성되는 걸 억제해요', '750mg'),
+			ig('녹차추출물', '카테킨으로 체지방 감소를 도와요', '300mg'),
+			ig('차전자피', '포만감을 오래 유지해줘요', '500mg'),
+			ig('비타민B군', '에너지 대사에 필요해요', '1일 권장량 100%')
+		],
+		howtoTitle: '점심 후 30분, 한 포면 충분해요',
+		howtoSteps: [
+			st('식사 후 30분', '점심 식사를 마친 뒤 30분 안에 드세요.'),
+			st('차갑게', '냉장 보관하면 포도 젤리 식감이 더 좋아요.'),
+			st('14일 루틴', '하루 한 포, 2주를 채우면 습관이 돼요.')
+		],
+		faq: [
+			qa('식사 대용인가요?', '아니요. 식사 뒤 입가심으로 드시는 보조 제품이에요. 끼니를 거르지 마세요.'),
+			qa('임산부도 먹어도 되나요?', '가르시니아가 들어 있어 임신·수유 중에는 권하지 않아요.'),
+			qa('하루 두 포 먹어도 되나요?', '1일 1포를 권장해요. 그 이상은 효과가 더 커지지 않아요.')
+		]
+	},
+	p2: {
+		storyTitle: '물 없이, 어디서든 끝나는 콜라겐',
+		story:
+			'촬영 다니면서 콜라겐 젤리나 앰플을 챙기는 게 생각보다 번거로웠어요. 가방에서 새고, 물이 필요하고. "혀에 올리면 끝"인 필름 제형을 알게 됐을 때 바로 이거다 싶었죠. 복숭아 향은 제가 가장 좋아하는 맛으로 골랐어요.',
+		points: [pt('3초', '녹는 시간', '물 없이 혀 위에서'), pt('1,000mg', '저분자 콜라겐', '한 장에 가득'), pt('30매', '한 달', '얇은 케이스 하나')],
+		ingredientRows: [
+			ig('저분자 피쉬콜라겐', '흡수가 빠른 500Da 이하 분자', '1,000mg'),
+			ig('히알루론산', '피부 수분 유지를 도와요', '120mg'),
+			ig('비오틴', '피부·모발 건강 유지', '1일 권장량 100%'),
+			ig('비타민C', '콜라겐 합성에 필요해요', '100mg')
+		],
+		howtoTitle: '자기 전, 혀 위에 한 장',
+		howtoSteps: [
+			st('한 장 꺼내기', '케이스에서 필름 한 장을 꺼내요.'),
+			st('혀 위에', '혀 위에 올리면 3초 안에 녹아요.'),
+			st('매일 밤', '자기 전 루틴으로 꾸준히 드세요.')
+		],
+		faq: [
+			qa('맛이 쓰지 않나요?', '복숭아 향으로 쓴맛을 거의 느끼지 못해요.'),
+			qa('언제 먹는 게 좋아요?', '피부 재생이 활발한 밤에 드시는 걸 권해요.'),
+			qa('다른 콜라겐과 같이 먹어도 되나요?', '네, 함량이 과하지 않아 함께 드셔도 괜찮아요.')
+		]
+	}
+};
+
+/** 아직 상세를 안 쓴 제품의 기본 템플릿 — 실제 등록 시 각 섹션이 입력 필드가 된다 */
+function genericDetail(p: Base): Detail {
+	const why = ['핵심 기능성 성분이에요', '흡수와 효과를 돕는 보조 성분이에요', '매일 필요한 기본 영양소예요', '안정성과 밸런스를 위해 넣었어요'];
+	const role = ['주성분', '보조', '기본', '밸런스'];
+	return {
+		storyTitle: '매일 챙기기 쉬운 것만 남겼어요',
+		story:
+			'제가 직접 매일 먹고 바르는 것 중에서 꼭 필요한 것만 골랐어요. 성분은 단순하게, 함량은 타협 없이. 팔로워분들이 "이건 뭐예요?" 물어보던 질문에 제품으로 답한 거예요.',
+		points: [pt('1일 1회', '루틴', '복잡하지 않게'), pt(`${p.ingredients.length}가지`, '핵심 성분', '필요한 것만'), pt('100%', '함량 공개', '숨기지 않아요')],
+		ingredientRows: p.ingredients.map((n, i) => ig(n, why[i % 4], role[i % 4])),
+		howtoTitle: '이렇게 드세요',
+		howtoSteps: [st('하루 한 번', p.howto), st('꾸준히', '최소 4주 이상 루틴으로 이어가 주세요.'), st('보관', '직사광선을 피해 서늘한 곳에 보관하세요.')],
+		faq: [
+			qa('언제 먹는 게 좋아요?', p.howto),
+			qa('다른 영양제와 같이 먹어도 되나요?', '네, 일반적인 영양제와 함께 드셔도 괜찮아요. 복용 중인 약이 있다면 전문가와 상의하세요.'),
+			qa('환불·교환이 되나요?', '미개봉 제품은 수령 후 7일 이내 교환·환불이 가능해요.')
+		]
+	};
+}
+
+export const PRODUCTS: Product[] = BASE.map((p) => ({ ...p, ...(DETAIL[p.id] ?? genericDetail(p)) }));
+
+/** 04 제품 정보 표 — 공통 항목(제조·유통기한·보관)은 서버 정책이라 상품 입력이 아니다 */
+export const infoRowsOf = (p: Product): { k: string; v: string }[] => [
+	{ k: '제품명', v: p.name },
+	{ k: '제형 / 포장', v: `${p.form} / ${p.pack}` },
+	{ k: '내용량', v: p.unit },
+	{ k: '제조', v: 'MYR 파트너 제조시설 (식약처 인증)' },
+	{ k: '유통기한', v: '제조일로부터 24개월' },
+	{ k: '보관', v: '직사광선을 피해 서늘한 곳' }
+];
+
+/** 상세 하단 "함께 보면 좋은 레시피" — 같은 카테고리 또는 같은 크리에이터 · 최대 4 */
+export const relatedOf = (p: Product): Product[] => PRODUCTS.filter((x) => x.id !== p.id && (x.cat === p.cat || x.creator === p.creator)).slice(0, 4);
+
+/** 상세 섹션 앵커 칩 */
+export const DETAIL_ANCHORS = [
+	{ id: 'note', name: '레시피 노트' },
+	{ id: 'why', name: '왜 만들었나요' },
+	{ id: 'ingredients', name: '성분' },
+	{ id: 'howto', name: '섭취법' },
+	{ id: 'info', name: '제품 정보' },
+	{ id: 'faq', name: 'FAQ' }
 ];
 
 /** 정책 숫자 — 실서비스에서는 서버 규칙(docs/myr.md §6.2 · §9-11). 디자인 Tweaks 의 freeShipping 기본값 */
