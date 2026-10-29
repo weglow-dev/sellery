@@ -1,9 +1,9 @@
 // MYR 상품 운영 스크립트 순수 부분 — packages/db/scripts/lib/myr-products-plan.mjs (myr-products.mjs import 가 쓴다)
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CATEGORIES, CODE_RE, normHandle, toRow, validateProduct, withDetail } from "../../scripts/lib/myr-products-plan.mjs";
+import seedJson from "../../scripts/myr-products.seed.json";
 
-const seed = JSON.parse(readFileSync(new URL("../../scripts/myr-products.seed.json", import.meta.url), "utf8")) as { creators: { handle: string }[]; products: Record<string, unknown>[] };
+const seed = seedJson as { creators: { handle: string }[]; products: Record<string, unknown>[] };
 
 describe("normHandle", () => {
   it("'@' 하나 + 소문자 · 공백 제거", () => {
