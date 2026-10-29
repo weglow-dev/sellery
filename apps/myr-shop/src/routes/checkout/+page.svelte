@@ -34,9 +34,9 @@
 
 <svelte:head><title>주문 · 결제 — MYR Shop</title></svelte:head>
 
-<!-- 모바일 하단 결제 바는 `sticky bottom-0`(문서 흐름의 마지막 · 상품 상세와 같은 이유). 버튼은 form 밖이라 form 속성으로 연결 -->
-<div class="flex min-h-dvh flex-col lg:mx-auto lg:block lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
-	<div class="flex-1 animate-slide-in">
+<!-- 모바일: 화면 높이를 채우는 세로 flex — 내용만 스크롤, 결제 바는 바닥에 보통 흐름으로 (+layout.svelte 주석). 버튼은 form 밖이라 form 속성으로 연결 -->
+<div class="flex h-full flex-col lg:mx-auto lg:block lg:h-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
+	<div class="no-bar min-h-0 flex-1 animate-slide-in overflow-y-auto overscroll-y-contain lg:overflow-visible">
 		<BackHeader title="주문 · 결제" />
 		<h1 class="hidden text-[32px] font-extrabold tracking-[-.03em] lg:block">주문 · 결제</h1>
 
@@ -133,7 +133,7 @@
 	</div>
 
 	<!-- 모바일 하단 결제 바 -->
-	<div class="sticky bottom-0 z-10 w-full border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
+	<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
 		<button type="submit" form="checkout-form" disabled={!canPay} class="{payBtn} {canPay ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{won(shop.total)} 결제하기</button>
 	</div>
 </div>
