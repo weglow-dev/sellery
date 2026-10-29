@@ -111,7 +111,7 @@ Tailwind v4 라서 토큰이 곧 유틸리티가 됩니다 (`bg-accent` `text-fg
 
 - 로컬: 루트에서 `npm run dev:myr` → http://localhost:5177 (접수는 `apps/myr/.env.local` 에 `SLACK_WEBHOOK_URL=...` 이 있어야 통과함 — 없으면 "전송 실패" 배너. 값이 있으면 **로컬 제출도 실제 슬랙 채널로 나가니** 주의. 실패 경로만 보려면 `SLACK_WEBHOOK_URL=http://127.0.0.1:9/ npm run dev:myr`)
 - 검사: `npm run check -w apps/myr` · 빌드: `npm run build -w apps/myr` — CI(`프로토타입 점검`)에 자동 포함됨
-- **Vercel**: team `weglow-team` · 프로젝트 `myr`(옛 `sellery-branding`) · Root Directory `apps/myr` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://sellery-myr.vercel.app**
+- **Vercel**: team `weglow-team` · 프로젝트 `myr`(옛 `sellery-branding`) · Root Directory `apps/myr` · **GitHub 연동 완료(2026-10-14)** — `main` 병합마다 자동 프로덕션 배포, PR 마다 프리뷰 배포. 공개 주소 **https://makeyourrecipe.vercel.app**
   - 고유 배포 URL(`…-weglow-team.vercel.app`)은 팀 SSO 보호가 걸려 302 — 정상입니다. 공개 확인은 위 주소로.
   - **트러블슈팅 기록**: 프로젝트를 CLI(`vercel link`/`vercel deploy`)로 먼저 만든 뒤 나중에 대시보드에서 GitHub 저장소를 연결하면, Root Directory 가 `.`(저장소 루트)로 남아 있을 수 있다 — 이 경우 push 때마다 `apps/myr` 만이 아니라 루트의 `npm run build --workspaces`(모노레포 4개 앱 전체)가 돌다가 다른 앱(`apps/shop` 등)의 환경변수가 없어서 빌드가 실패한다. 대시보드에서 안 고쳐지면 `vercel project update myr --root-directory apps/myr --scope weglow-team` 로 직접 설정.
 - sellery.life 아래로 넣으려면(`sellery.life/branding`): base 경로 `/branding` 설정 + `apps/shop/vercel.json` 리라이트 추가가 필요 — 현재는 독립 오리진 방침이라 안 함.
