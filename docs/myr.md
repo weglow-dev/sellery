@@ -23,6 +23,7 @@
 | 9 | **운영 콘솔 `myr-admin` 1차 = 상품 검수 + 주문/문의 열람 + 환불 대행.** 게이트는 `profiles.role='admin'`(`requireAdmin()` 복사) | 셀러리 관리자 계정을 그대로 쓴다(같은 Supabase). 정산 실행·지급은 2차. |
 | 10 | **정산은 1차 범위 밖.** 주문에 `seller_margin_rate` 스냅샷만 남기고, 실적 화면은 매출·환불·순매출·예상 정산액을 보여준다 | 요율·주기·지급 방식이 미정. 셀러리 0053 수식(3%+3%+5%) 을 가져오지 않는다. 지급대행(`payouts.server.ts` · 0042) 은 나중에 재사용 가능. |
 | 11 | **셀러리 코드와의 경계** — 서버 모듈은 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 에 복사본. 셀러리 모듈(`brand/*` `partner/*` `campaign*`) 을 import 하지 않는다(`scripts/check-boundaries.mjs` 에 규칙 추가). 순수 모듈(`text` `dates` `carriers` `guest-order` `money` `auth`) 과 `mail/{resend,layout}` 은 공유 | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 서버 폴더만 지우면 되게. |
+| 12 | **단일 함수 원칙** — 같은 동작(환불 · 운송장 · 문의 답변 · 상품 상태 변경)은 **패키지 함수 하나 + SQL 함수 하나**로 두고 `actor`('customer' · 'seller' · 'admin') 매개변수로 권한만 가른다. 앱 라우트는 세션에서 actor 를 정해 그 함수를 부르는 얇은 껍데기. 외부가 부르는 HTTP 엔드포인트(토스 웹훅 · 크론) 는 `myr-shop` 에만 둔다(§3.1) | 셀러리는 고객 `/api/payments/cancel` · 브랜드 `refundOrderAsBrand` · 관리자 `admin-refund` 로 같은 토스 취소가 세 벌이다. MYR 은 앱이 넷이라 그대로 가면 네 벌이 된다. 앱끼리 HTTP 로 부르지 않는다 — 같은 Supabase 를 service role 로 직접 쓰므로 CORS·인증 전달이 필요 없다. |
 
 ---
 
@@ -89,6 +90,7 @@ myr_products
 
 myr_checkout_sessions   ← 0008 checkout_sessions 와 동일 컬럼, campaign_id → product_id · seller_id
 myr_orders              ← 0004 orders 와 동일 컬럼, campaign_id → product_id · seller_id
+                          status('WAITING_DEPOSIT'|'PAID'|'REFUNDED'|'CANCELED') · deposit_due_at(§6.7 가상계좌)
                           + exchange_courier · exchange_tracking_no · exchange_shipped_at(§6.4)
                           + seller_margin_rate 스냅샷 · refund_amount(0050 의 것) · delivered_at(0049)
 myr_cs_conversations    ← 0005 cs_conversations, brand_id → seller_id · campaign_id → product_id
@@ -104,13 +106,42 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 상품 | `myr_app_upsert_product(seller, …)` · `myr_app_set_product_status(seller, code, 'listed'|'paused')` · `myr_app_submit_product(seller, code)`(rejected → pending) | 0015 `app_brand_upsert_product` |
 | 검수 | `myr_app_admin_products(status?)` · `myr_app_admin_review_product(id, 'approve'|'reject', reason)` · `myr_app_admin_force_status` | 0015 `app_admin_review_product` |
 | 공개 | `myr_product_card(code)` · `myr_home_products(category?)` | 0003/0008 `campaign_card` |
-| 결제 | `myr_app_checkout_reserved(product_id)` · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(products 행 `for update` · listed · stock − sold_qty ≥ qty) | 0008 |
-| 환불 | `myr_app_refund_precheck(order, actor)` · `myr_app_refund_record` · `myr_app_seller_refund_precheck(seller, code)` | 0008 · 0018 |
-| 주문 | `myr_app_seller_orders(seller, filter)` · `myr_app_seller_ship_order` · `myr_app_seller_ship_orders` · `myr_app_seller_exchange_ship` · `myr_app_seller_po_rows` | 0018 `app_brand_*` |
-| CS | `myr_app_cs_open(product_id, …)`(0041 소유 증명 그대로) · `myr_app_cs_thread` · `myr_app_cs_customer_reply` · `myr_app_seller_cs_list/thread/reply/close` | 0018 · 0041 |
-| 운영 열람 | `myr_app_admin_orders` · `myr_app_admin_order` · `myr_app_admin_cs_list/thread` | 0020 |
-| 실적 | `myr_app_seller_sales(seller)` — gross · refunds · net · 상품별 · 예상 정산액 = net × margin | 0013 `app_seller_sales` 의 축소판 |
+| 결제 | `myr_app_checkout_reserved(product_id)` · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(products 행 `for update` · listed · stock − sold_qty ≥ qty · 가상계좌면 `WAITING_DEPOSIT` 주문 §6.7) · `myr_app_deposit_done(order)` · `myr_app_deposit_expire(order)` | 0008 (+ 가상계좌 신규) |
+| 환불 | `myr_app_refund_precheck(order_id, actor, actor_id)` · `myr_app_refund_record(order_id, actor, …)` — **한 벌.** actor 별 가드: customer = 본인 · 발송 전 / seller = 내 상품 · 발송 뒤 허용 / admin = 전부 | 0008 · 0018 · 0020 을 합침 |
+| 주문 | `myr_app_orders(actor, actor_id, filter)` · `myr_app_order(actor, actor_id, code)` · `myr_app_ship_order(actor, actor_id, code, courier, tracking)` · `myr_app_ship_orders`(CSV) · `myr_app_exchange_ship` · `myr_app_po_rows` — seller 는 `seller_id = actor_id` 행만, admin 은 전부 | 0018 `app_brand_*` · 0020 `app_admin_orders` 를 합침 |
+| CS | `myr_app_cs_open(product_id, …)`(0041 소유 증명 그대로) · `myr_app_cs_thread(actor, …)`(customer = client_token · seller = 내 것 · admin = 전부) · `myr_app_cs_reply(actor, actor_id, …)`(customer 추가 문의 · seller 답변 · admin 대행 답변 `sender='seller'`) · `myr_app_cs_list(actor, actor_id, status?)` · `myr_app_cs_close(actor, …)` | 0018 · 0041 · 0020 을 합침 |
+| 실적 | `myr_app_seller_sales(seller)` — gross · refunds · net · 상품별 · 예상 정산액 = net × margin · admin 은 `myr_app_admin_sales(seller?)` 로 같은 집계 | 0013 `app_seller_sales` 의 축소판 |
 | 비회원 | 기존 `app_guest_customer_upsert` · `app_guest_order_*` 를 그대로 호출(주문 테이블이 달라 `myr_` 변형 필요하면 그때) | 0021 |
+
+### 3.1 단일 함수 원칙 (결정 12) — 동작 하나 = 패키지 함수 하나 = SQL 함수 하나
+
+| 동작 | 패키지 함수(한 곳) | SQL | 부르는 앱 · actor |
+|---|---|---|---|
+| 토스 승인 · 취소 · 조회 | `packages/payments/src/server/myr/toss.server.ts`(기존 `toss.server.ts` 그대로) | — | 전부(간접) |
+| 체크아웃 세션 · 승인 확정 · 복구 | `payments/server/myr/checkout.server.ts` — `createCheckout` · `confirmCheckout` · `syncFromToss` | `myr_app_claim/confirm_checkout` · `myr_app_deposit_*` | shop(고객 · 웹훅 · reconcile) |
+| 환불 | `payments/server/myr/refund.server.ts` — `refundOrder({ actor, actorId, orderCode, reason })` 하나. 토스 취소 Idempotency-Key 는 `${order.id}` 고정(actor 와 무관 · 같은 주문의 두 번째 호출은 토스가 ALREADY_CANCELED) | `myr_app_refund_precheck/record` | shop `/api/payments/cancel`(customer) · influencer `/orders ?/refund`(seller) · admin `/orders/[code] ?/refund`(admin) |
+| 운송장 · 교환 발송 · 발주서 | `db/server/myr/orders.server.ts` — `listOrders` · `shipOrder` · `shipOrdersCsv` · `exchangeShip` · `poRows`(전부 `{ actor, actorId }` 첫 인자) | `myr_app_orders/ship_*` | influencer(seller) · admin(admin) |
+| 문의 | `db/server/myr/cs.server.ts` — `openCs`(고객만) · `listCs` · `getCsThread` · `replyCs` · `closeCs`(`{ actor, actorId \| clientToken }`) | `myr_app_cs_*` | shop(customer) · influencer(seller) · admin(admin) |
+| 상품 | `db/server/myr/products.server.ts` — `upsertProduct`(seller) · `setProductStatus({ actor })`(seller = listed↔paused · admin = 전부) · `reviewProduct`(admin) · `productCard` · `homeProducts`(anon) | `myr_app_*product*` | influencer · admin · shop |
+| 메일 훅 | `db/server/myr/mail-events.server.ts` — `notifyOrderPaid/Shipped/Refunded/ExchangeShipped/DepositPending` · `notifyCsOpened/Replied` | — | 위 함수들이 내부에서 호출 — 앱이 직접 부르지 않는다 |
+| 게이트 | 기존 `requireSeller()` · `requireAdmin()` · `safeGetSession` → actor 결정은 **라우트가** 한다(`seller.id` · `user.id` · 비회원 토큰) | — | 각 앱 |
+
+규칙 — 함수 하나에 권한이 모이므로 아래 넷이 보안의 전부다:
+
+1. **actor · actorId 는 서버 세션에서만 결정한다. 요청 본문·쿼리·쿠키 값에서 받지 않는다.** customer = `safeGetSession().user.id`(또는 서버가 심은 HttpOnly 비회원 토큰의 검증 결과) · seller = `requireSeller().seller.id` · admin = `requireAdmin()` 통과한 `user.id`. 라우트가 `actor` 를 문자열로 조립하는 자리는 이 세 헬퍼 뒤 한 줄뿐이고, 폼에 `actor` 필드가 있으면 무시한다.
+2. **SQL 함수가 마지막 방어선이다.** 패키지 함수는 service role 로 부르므로 RLS 를 통과한다 — 권한 검사는 `myr_app_*` 본문에서 `p_actor` · `p_actor_id` 로 한다(seller 면 `seller_id = p_actor_id` · customer 면 `user_id = p_actor_id` 또는 토큰 검증 · admin 은 `profiles.role='admin'` 재확인). 함수는 `security definer set search_path = public`, **`revoke all … from public, anon, authenticated` · `grant execute … to service_role`** — 브라우저의 anon 키로는 직접 못 부른다(셀러리 0007 · 0052 와 같은 조치). anon 에 여는 건 `myr_product_card` · `myr_home_products` 같은 읽기 전용 공개 함수뿐. 권한 미달은 `{ok:false, code:'FORBIDDEN'}`(존재 여부를 흘리지 않게 NOT_FOUND 와 같은 응답으로 묶는 곳은 함수 주석에 적는다).
+3. **actor 로 가르는 건 "허용 조건·한도" 까지만.** 고객은 발송 전 전액만 · 셀러는 발송 뒤도 · 관리자는 언제든 같은 차이는 함수 머리의 **허용 조건 표** 한 곳에서 관리한다(아래). 흐름 자체가 달라지면(예: 부분 환불 · 가상계좌 입금 전 취소 · 교환 재발송) 함수 하나에 if 를 쌓지 말고 **별도 동작**으로 쪼갠다(`myr_app_refund_record` 와 `myr_app_deposit_expire` 가 따로인 이유).
+
+   | 동작 | customer | seller | admin |
+   |---|---|---|---|
+   | 환불(전액) | 본인 주문 · PAID · 발송 전 | 내 상품 주문 · PAID · 발송 뒤 허용(`after_ship` 기록) | 전부 |
+   | 운송장 · 교환 발송 | — | 내 상품 주문 | 전부 |
+   | 문의 열람·답글 | 본인(토큰·user) · 추가 문의 | 내 상품 문의 · 답변·종료 | 전부 · 대행 답변(`sender='seller'` `actor_role='admin'`) |
+   | 상품 상태 | — | 내 상품 · listed ↔ paused · rejected → pending | 전부 · pending → listed/rejected · 강제 전환 |
+
+4. **HTTP 엔드포인트는 `myr-shop` 한 곳.** 외부가 부르는 것(토스 웹훅 · `DEPOSIT_CALLBACK` · 크론 reconcile/tracking) 만 라우트로 열고, influencer/admin 은 같은 패키지 함수를 서버 load/action 에서 직접 호출한다. 앱 사이 HTTP 호출은 하지 않는다(다른 도메인이라 CORS·세션 전달이 생기고, 같은 DB 를 service role 로 쓰므로 이득이 없다).
+
+같이 배포되지 않는 창: 앱 넷이 같은 패키지 함수를 쓰면 `main` 병합 한 번에 Vercel 프로젝트 넷이 **따로** 빌드·배포되고, 몇 분 동안 shop 은 새 코드 · admin 은 옛 코드인 순간이 생긴다. HTTP 로 묶지 않았으니 코드끼리는 문제없지만 **DB 는 그 창 동안 양쪽 코드와 호환돼야 한다** — 컬럼 삭제·이름 변경·함수 시그니처 변경은 두 단계로(① 새 컬럼/새 함수 추가 + 양쪽 읽기 → 전 앱 배포 확인 → ② 옛 것 제거), `{ok, code}` 반환에 새 code 를 더할 때도 옛 파서가 `default` 로 받게 둔다. `supabase db push` 는 ① 과 ② 를 다른 PR 로.
 
 ---
 
@@ -193,6 +224,16 @@ PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소
 ### 6.6 소유 증명(문의 ↔ 주문)
 0041 그대로: 회원 `user_id` · 고객 행 `customer_id` · 비회원 조회 토큰(`app_guest_order_verify`) 중 하나가 맞을 때만 `order_id` 연결. 증명 못 하면 `order_code` 원문만 남기고 콘솔에 "(미확인)".
 
+### 6.7 결제수단 · 가상계좌
+- 결제 UI 는 **토스 결제위젯**(`@tosspayments/tosspayments-sdk` · `CheckoutClient.svelte` 복사) 이라 결제수단 목록은 코드가 아니라 **토스 개발자센터의 위젯 UI 설정 + 가맹점 계약**이 정한다. 카드 · 간편결제(토스페이 · 네이버페이 · 카카오페이 등) · 계좌이체 · 휴대폰은 거기서 켜면 바로 뜨고, 승인 흐름은 수단과 무관하게 같다. 주문에는 토스가 돌려준 `method` 가 `payment_method` 로 저장된다. 배치는 `PUBLIC_TOSS_WIDGET_VARIANT`.
+- **가상계좌는 셀러리가 거부한다**(`WAITING_FOR_DEPOSIT` → 즉시 취소 · `VIRTUAL_ACCOUNT_NOT_SUPPORTED` · 0009). "승인 즉시 DONE" 전제로 주문을 만들기 때문. MYR 은 **처음부터 열어 둔다**(건기식·식품은 가상계좌 비중이 있다):
+  - `myr_orders.status` 에 `WAITING_DEPOSIT` 추가 · `deposit_due_at`(토스 `virtualAccount.dueDate`) · 가상계좌 번호·은행은 `raw_payment` 에.
+  - `myr_app_confirm_checkout`: 승인 결과가 `WAITING_FOR_DEPOSIT` 이면 주문을 `WAITING_DEPOSIT` 으로 만들고 **재고는 예약**(sold_qty 계산에 포함 · 입금 전 품절 방지). 성공 페이지는 입금 계좌·기한을 보여주고 입금 안내 메일(`notifyDepositPending`).
+  - `/api/payments/webhook` 의 `DEPOSIT_CALLBACK`(수신 분기는 셀러리에 이미 있다 · `source='deposit_callback'`) → `myr_app_deposit_done` → `PAID` · `paid_at` · 주문 확인 메일. 상태 `CANCELED`(기한 만료) → `myr_app_deposit_expire` → `CANCELED` · 재고 반환.
+  - reconcile 크론이 `WAITING_DEPOSIT` 이고 `deposit_due_at` 지난 주문을 토스 재조회로 종결한다(웹훅 유실 대비).
+  - 환불 가드: `WAITING_DEPOSIT` 은 "취소"(토스 취소 호출 없이 상태만) · `PAID` 이후는 §6.3. 셀러 주문표·실적은 `WAITING_DEPOSIT` 을 매출에 넣지 않는다.
+- 1차에 가상계좌를 미루더라도 **상태값과 컬럼은 M4 스키마에 넣어 둔다** — 나중에 열 때 마이그레이션 없이 위젯 설정 + 함수 분기만 추가하면 된다.
+
 ---
 
 ## 7. 단계 (PR 순서)
@@ -203,7 +244,7 @@ PII: 브랜드 콘솔 응답을 복사하면 수취인 실명·연락처·주소
 | M1 스키마 | 0056 `myr_products` · 상품/검수 RPC · `myr_product_card` · `myr_home_products` | 마이그레이션 1개 · `gen:types` |
 | M2 인플루언서 콘솔 1 | `apps/myr-influencer` 생성(가입·로그인·홈·상품 등록/수정/토글) | 앱 1 |
 | M3 운영 콘솔 1 | `apps/myr-admin` 생성(로그인 · 상품 검수) | 앱 1 |
-| M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 로그인 · 체크아웃 · 결제 API · 주문 조회) + 0057 `myr_checkout_sessions` `myr_orders` · 결제 RPC 3개 · 환불 RPC | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설 |
+| M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkout_sessions` `myr_orders`(가상계좌 상태·컬럼 포함) · 결제 RPC · 환불 RPC(actor 한 벌) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백) |
 | M5 인플루언서 콘솔 2 | 주문(운송장 · 발주서 · 환불 · 교환 발송) · 문의(0058 `myr_cs_*`) · 메일 훅 | 마이그레이션 1개 |
 | M6 운영 콘솔 2 · 실적 | admin 주문/문의 열람 · 환불 대행 · 인플루언서 `/sales` · `seller_margin_rate` 스냅샷 | |
 | M7 운영 전환 | 토스 라이브 키 · 크론 · `check-boundaries` 규칙 · 랜딩 루트 이전(§2) · 옛 주소 리다이렉트 | |
@@ -235,3 +276,4 @@ M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 �
 7. **제조의뢰 접수 → 상품 연결** — §5 의 2차(`myr_applications` + 초대 가입).
 8. **디자인** — `packages/ui` 셀러리 테마 vs `apps/myr` 다크·앰버 테마. 콘솔은 전자(빠름), 샵은 후자(브랜드 일관) 가 자연스럽지만 미정.
 9. **발송 주체** — 인플루언서 직접 vs MYR 물류센터(결정 8).
+10. **결제수단 범위** — 1차에 켤 수단(카드 · 간편결제 종류 · 계좌이체 · 가상계좌 · 휴대폰). 간편결제·휴대폰·가상계좌는 토스 가맹점 계약에 포함돼야 위젯에 뜬다(§6.7). 가상계좌를 1차에 켤지, 상태·컬럼만 준비하고 미룰지.
