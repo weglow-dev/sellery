@@ -12,7 +12,7 @@
 	const featured = PRODUCTS[0];
 </script>
 
-<div class="animate-up-in pb-[110px] lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-20">
+<div class="animate-up-in pb-5 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-20">
 	<header class="flex h-[60px] items-center justify-between px-5 lg:hidden">
 		<img src="/myr-logo.svg" alt="MYR" class="block h-8 w-auto" />
 		<CartButton />

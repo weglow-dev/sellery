@@ -21,7 +21,7 @@
 
 <svelte:head><title>마이페이지 — MYR Shop</title></svelte:head>
 
-<div class="animate-up-in px-5 pb-[110px] lg:mx-auto lg:grid lg:max-w-[1240px] lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-8 lg:pb-20">
+<div class="animate-up-in px-5 pb-5 lg:mx-auto lg:grid lg:max-w-[1240px] lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-8 lg:pb-20">
 	<div class="flex h-[60px] items-center justify-between lg:hidden">
 		<span class="text-[16px] font-bold">마이페이지</span>
 		<button type="button" aria-label="설정" class="flex h-11 w-11 items-center justify-center text-white/70">

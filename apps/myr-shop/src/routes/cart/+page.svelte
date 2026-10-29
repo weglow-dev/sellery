@@ -12,9 +12,9 @@
 
 <svelte:head><title>장바구니 — MYR Shop</title></svelte:head>
 
-<!-- 등장 애니메이션은 내용에만 — fixed 하단 바는 애니메이션 요소 밖(상품 상세와 같은 이유) -->
-<div class="min-h-dvh lg:mx-auto lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
-	<div class="animate-slide-in">
+<!-- 모바일 하단 합계 바는 `sticky bottom-0`(문서 흐름의 마지막) — 상품 상세와 같은 이유로 fixed 를 쓰지 않는다 -->
+<div class="flex min-h-dvh flex-col lg:mx-auto lg:block lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
+	<div class="flex-1 animate-slide-in">
 		<BackHeader title="장바구니">
 			{#snippet right()}<span class="text-[13px] text-fg-faint">{shop.cartCount}개</span>{/snippet}
 		</BackHeader>
@@ -30,7 +30,7 @@
 			</div>
 		{/if}
 
-		<div class="px-5 pt-1.5 pb-[220px] lg:grid lg:grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] lg:items-start lg:gap-8 lg:px-0 lg:pt-6 lg:pb-0">
+		<div class="px-5 pt-1.5 pb-4 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] lg:items-start lg:gap-8 lg:px-0 lg:pt-6 lg:pb-0">
 			<div class="flex flex-col gap-2.5 lg:gap-3">
 				{#each shop.cartItems as it (it.id)}
 					<div class="flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/3 p-3 lg:grid lg:grid-cols-[96px_minmax(0,1fr)_40px] lg:gap-4 lg:rounded-[22px] lg:p-4">
@@ -71,7 +71,7 @@
 
 	<!-- 모바일 하단 합계 바 -->
 	{#if shop.cartItems.length}
-		<div class="fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-gradient-to-b from-bg/0 to-bg to-25% px-5 pt-4 pb-7 lg:hidden">
+		<div class="sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-25% px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
 			<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{won(shop.total)} 주문하기</a>
 		</div>

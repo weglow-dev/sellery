@@ -34,9 +34,9 @@
 
 <svelte:head><title>주문 · 결제 — MYR Shop</title></svelte:head>
 
-<!-- 등장 애니메이션은 내용에만 — fixed 하단 바는 애니메이션 요소 밖. 버튼은 form 밖이라 form 속성으로 연결 -->
-<div class="min-h-dvh lg:mx-auto lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
-	<div class="animate-slide-in">
+<!-- 모바일 하단 결제 바는 `sticky bottom-0`(문서 흐름의 마지막 · 상품 상세와 같은 이유). 버튼은 form 밖이라 form 속성으로 연결 -->
+<div class="flex min-h-dvh flex-col lg:mx-auto lg:block lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
+	<div class="flex-1 animate-slide-in">
 		<BackHeader title="주문 · 결제" />
 		<h1 class="hidden text-[32px] font-extrabold tracking-[-.03em] lg:block">주문 · 결제</h1>
 
@@ -48,7 +48,7 @@
 			</div>
 		{/if}
 		<div class="lg:mt-6 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] lg:items-start lg:gap-8 {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
-			<form id="checkout-form" class="px-5 pt-1.5 pb-[130px] lg:flex lg:flex-col lg:gap-7 lg:px-0 lg:pt-0 lg:pb-0" onsubmit={(e) => { e.preventDefault(); placeOrder(); }}>
+			<form id="checkout-form" class="px-5 pt-1.5 pb-4 lg:flex lg:flex-col lg:gap-7 lg:px-0 lg:pt-0 lg:pb-0" onsubmit={(e) => { e.preventDefault(); placeOrder(); }}>
 				<div class="no-bar flex gap-2 overflow-x-auto pb-1 lg:hidden">
 					{#each shop.cartItems as it (it.id)}
 						<div class="relative shrink-0">
@@ -133,7 +133,7 @@
 	</div>
 
 	<!-- 모바일 하단 결제 바 -->
-	<div class="fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-7 lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
+	<div class="sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
 		<button type="submit" form="checkout-form" disabled={!canPay} class="{payBtn} {canPay ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{won(shop.total)} 결제하기</button>
 	</div>
 </div>

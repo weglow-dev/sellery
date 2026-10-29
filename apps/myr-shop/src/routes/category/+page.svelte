@@ -17,7 +17,7 @@
 
 <svelte:head><title>{title} — MYR Shop</title></svelte:head>
 
-<div class="flex min-h-dvh animate-slide-in flex-col lg:mx-auto lg:grid lg:min-h-0 lg:max-w-[1240px] lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-7 lg:pb-20">
+<div class="flex animate-slide-in flex-col lg:mx-auto lg:grid lg:min-h-0 lg:max-w-[1240px] lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-7 lg:pb-20">
 	<BackHeader {title} home>
 		{#snippet right()}<span class="text-[13px] text-fg-faint">{list.length}개</span>{/snippet}
 	</BackHeader>
@@ -39,7 +39,7 @@
 		{/each}
 	</nav>
 
-	<div class="px-5 pb-[110px] lg:min-w-0 lg:px-0 lg:pb-0">
+	<div class="px-5 pb-5 lg:min-w-0 lg:px-0 lg:pb-0">
 		<div class="hidden items-baseline justify-between lg:flex">
 			<h1 class="text-[32px] font-extrabold tracking-[-.03em]">{title}</h1>
 			<span class="text-[14px] text-fg-faint">{list.length}개 제품</span>
