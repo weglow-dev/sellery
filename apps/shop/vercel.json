@@ -6,15 +6,15 @@
   "rewrites": [
     {
       "source": "/influencer/oem",
-      "destination": "https://sellery-myr.vercel.app/influencer/oem"
+      "destination": "https://makeyourrecipe.vercel.app/influencer/oem"
     },
     {
       "source": "/influencer/oem/",
-      "destination": "https://sellery-myr.vercel.app/influencer/oem/"
+      "destination": "https://makeyourrecipe.vercel.app/influencer/oem/"
     },
     {
       "source": "/influencer/oem/:path*",
-      "destination": "https://sellery-myr.vercel.app/influencer/oem/:path*"
+      "destination": "https://makeyourrecipe.vercel.app/influencer/oem/:path*"
     },
     {
       "source": "/influencer",
