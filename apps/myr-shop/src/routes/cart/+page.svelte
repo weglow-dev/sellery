@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { creatorOf, won } from '$lib/data';
+	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import PriceSummary from '$lib/components/PriceSummary.svelte';
@@ -32,19 +32,19 @@
 
 		<div class="px-5 pt-1.5 pb-4 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] lg:items-start lg:gap-8 lg:px-0 lg:pt-6 lg:pb-0">
 			<div class="flex flex-col gap-2.5 lg:gap-3">
-				{#each shop.cartItems as it (it.id)}
+				{#each shop.cartItems as it (it.code)}
 					<div class="flex items-center gap-3 rounded-[20px] border border-white/8 bg-white/3 p-3 lg:grid lg:grid-cols-[96px_minmax(0,1fr)_40px] lg:gap-4 lg:rounded-[22px] lg:p-4">
-						<a href="/p/{it.code}" aria-label={it.name}><Tile tile={it.tile} ic={it.ic} icon={44} class="h-[72px] w-[72px] rounded-[14px] lg:h-24 lg:w-24 lg:rounded-[18px]" /></a>
+						<a href="/p/{it.code}" aria-label={it.name}><Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt={it.name} icon={44} class="h-[72px] w-[72px] rounded-[14px] lg:h-24 lg:w-24 lg:rounded-[18px]" /></a>
 						<div class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-							<span class="text-[11px] font-bold text-accent lg:text-[12px]">{creatorOf(it.creator).name}</span>
+							<span class="text-[11px] font-bold text-accent lg:text-[12px]">{it.creator.name}</span>
 							<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{it.name}</span>
 							<span class="hidden text-[13px] text-fg-faint lg:block">{it.unit}</span>
 							<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
-								<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.id, q)} />
+								<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
 								<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
 							</div>
 						</div>
-						<button type="button" onclick={() => shop.remove(it.id)} aria-label="{it.name} 삭제" class="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-[10px] text-white/40 lg:h-10 lg:w-10 lg:self-center lg:rounded-xl lg:hover:bg-white/6 lg:hover:text-fg">
+						<button type="button" onclick={() => shop.remove(it.code)} aria-label="{it.name} 삭제" class="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-[10px] text-white/40 lg:h-10 lg:w-10 lg:self-center lg:rounded-xl lg:hover:bg-white/6 lg:hover:text-fg">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
 						</button>
 					</div>

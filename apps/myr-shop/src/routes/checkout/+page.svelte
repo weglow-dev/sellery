@@ -50,7 +50,7 @@
 		<div class="lg:mt-6 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] lg:items-start lg:gap-8 {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
 			<form id="checkout-form" class="px-5 pt-1.5 pb-4 lg:flex lg:flex-col lg:gap-7 lg:px-0 lg:pt-0 lg:pb-0" onsubmit={(e) => { e.preventDefault(); placeOrder(); }}>
 				<div class="no-bar flex gap-2 overflow-x-auto pb-1 lg:hidden">
-					{#each shop.cartItems as it (it.id)}
+					{#each shop.cartItems as it (it.code)}
 						<div class="relative shrink-0">
 							<Tile tile={it.tile} ic={it.ic} icon={26} class="h-14 w-14 rounded-[14px]" />
 							<span class="absolute -right-1 -bottom-1 flex h-5 min-w-5 items-center justify-center rounded-[10px] border-[1.5px] border-white/15 bg-bg px-[5px] text-[11px] font-extrabold">{it.qty}</span>
@@ -99,7 +99,7 @@
 				<div class="hidden lg:block">
 					<h3 class="mb-3 text-[17px] font-extrabold">주문 상품</h3>
 					<div class="flex flex-col gap-2">
-						{#each shop.cartItems as it (it.id)}
+						{#each shop.cartItems as it (it.code)}
 							<div class="flex items-center gap-3.5 rounded-2xl border border-white/8 bg-white/3 px-3.5 py-3">
 								<Tile tile={it.tile} ic={it.ic} icon={26} class="h-[52px] w-[52px] rounded-xl" />
 								<span class="min-w-0 flex-1 text-[14px] font-bold">{it.name}<span class="font-semibold text-fg-faint"> × {it.qty}</span></span>

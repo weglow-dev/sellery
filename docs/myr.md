@@ -129,6 +129,8 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 실적 | `myr_app_seller_sales(seller)` — gross · refunds · net · 상품별 · 예상 정산액 = net × margin · admin 은 `myr_app_admin_sales(seller?)` 로 같은 집계 | 0013 `app_seller_sales` 의 축소판 |
 | 비회원 | 기존 `app_guest_customer_upsert` · `app_guest_order_*` 를 그대로 호출(주문 테이블이 달라 `myr_` 변형 필요하면 그때) | 0021 |
 
+**S1 적용(2026-10-29 · `supabase/migrations/0056_myr_products.sql`)** — 위 설계 중 상품 표만 먼저. 실제 컬럼은 디자인 필드 그대로(`sub` · `unit` · `price` + `options` · `tile` · `thumb_url` · `icon` · `form` · `pack` · `flavor` · `tag` · `chips` · `ingredients` · `note` · `howto` · `specs` · 상세 `story_title` `story` `points` `ingredient_rows` `howto_title` `howto_steps` `faq`) + `stock` `sold_qty` `status` `reject_reason` `submitted_at` `reviewed_at` `reviewed_by` `seller_margin_rate` `deleted_at`. `category` 는 MYR 6개(`diet` `inner` `derma` `hair` `mental` `mens` — §9-5 는 이걸로 결정). 공개 RPC `myr_home_products()` · `myr_product_card(code)`(related ≤4 포함 · 재고·마진·검수 정보 제외 · `sold_out` 만) · 운영 RPC `myr_app_admin_review_product(id, approve|reject|pause, reason, reviewer)`. 콘솔 전까지 투입·검수는 **`packages/db/scripts/myr-products.mjs`**(`import <json> [--listed]` · `list` · `review` · `delete` · `creators` — 크리에이터는 `sellers` 에 handle 기준 upsert, 계정 미연결 행은 `partner-admin.mjs invite --link` 로 연결) · 시드 `myr-products.seed.json`(디자인 8개). 적용 절차는 셀러리와 같다 — 병합 → 링크된 PC 에서 `npx supabase db push --linked` → `node packages/db/scripts/myr-products.mjs import packages/db/scripts/myr-products.seed.json --listed`. **2026-10-29 적용 완료**: 클라우드 `sellery` 에 0056 push + 시드(크리에이터 4 · 제품 8 `listed`) 투입. 주의 — 루트 `.env.local` 의 Supabase 주소가 로컬 인스턴스(`127.0.0.1:54321`)라 스크립트는 로컬 DB 에 들어간다. 클라우드 시드는 CLI 의 DB 연결(`npx supabase db query --linked --file …`)로 같은 내용의 SQL 을 넣었고, 로컬에도 `supabase migration up --local` + 스크립트로 같은 8개를 넣었다. 시드는 디자인용 가짜 제품이라 실제 제품이 들어오면 `myr-products.mjs delete <code>` 로 지운다.
+
 ### 3.1 단일 함수 원칙 (결정 12) — 동작 하나 = 패키지 함수 하나 = SQL 함수 하나
 
 | 동작 | 패키지 함수(한 곳) | SQL | 부르는 앱 · actor |
@@ -265,8 +267,9 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 
 | 단계 | 내용 | 산출 |
 |---|---|---|
-| M0 도메인·외부 등록 | 도메인 결정 · Vercel 프로젝트 3개 · Supabase Redirect URLs · 카카오 사이트 도메인 · 토스 웹훅 · (Resend 도메인) — §2.1 | docs/deploy.md MYR 열 |
-| M1 스키마 | 0056 `myr_products` · 상품/검수 RPC · `myr_product_card` · `myr_home_products` | 마이그레이션 1개 · `gen:types` |
+| M0 도메인·외부 등록 | 도메인 결정 · Vercel 프로젝트 3개 · Supabase Redirect URLs · 카카오 사이트 도메인 · 토스 웹훅 · (Resend 도메인) — §2.1. **샵 몫(S0 · 2026-10-29)**: Vercel `myr-shop` 생성 · Root `apps/myr-shop` · SvelteKit · Node 22 까지 CLI 로 완료(docs/deploy.md §1.1 MYR 표). GitHub 연결 · Include source files ON 도 완료(첫 배포 `https://myr-shop.vercel.app`). 남은 것 = Supabase Redirect URLs(`localhost:5178` · `myr-shop.vercel.app`) — 계정 역할이 Developer 라 조직 Owner 가 추가하거나 Administrator 로 올려야 한다(S3 전까지만 필요) | docs/deploy.md MYR 표 |
+| M1 스키마 · **S1 완료(2026-10-29 · PR 대기)** | 0056 `myr_products` · 검수 RPC · `myr_product_card` · `myr_home_products` · 운영 스크립트 `myr-products.mjs` + 시드(§3 "S1 적용"). `gen:types` 는 안 했다 — 샵이 RPC JSON 을 자기 타입(`lib/data.ts` `Product`)으로 파싱하므로 database.types 에 의존하지 않는다 | 마이그레이션 1개 · 스크립트 · 클라우드 적용은 `db push --linked` 뒤 |
+| **S2 샵 데이터 연결 · 완료(2026-10-29)** | `apps/myr-shop` 홈 · 카테고리 · 상품이 `lib/server/db.ts`(anon 키 · `@supabase/supabase-js` · 세션 없음) 로 0056 RPC 를 읽는다. `PUBLIC_SUPABASE_*` 가 비면 목 데이터 폴백(CI · 키 없는 로컬) · RPC 오류면 빈 목록/404. 장바구니·찜은 상품 **스냅샷**(`myr-shop-v2`) 으로 저장 — M4 에서 code 로 서버 재검증. 크리에이터 아바타는 사진(`avatar_url`) 또는 이니셜 + 핸들 해시 색. Vercel `myr-shop` 에 `PUBLIC_SUPABASE_URL` · `PUBLIC_SUPABASE_ANON_KEY`(production · preview · 셀러리와 같은 값) 넣음 | 환경변수 2개 · `svelte.config.js` `env.dir '../..'` |
 | M2 인플루언서 콘솔 1 | `apps/myr-influencer` 생성(가입·로그인·홈·상품 등록/수정/토글) | 앱 1 |
 | M3 운영 콘솔 1 | `apps/myr-admin` 생성(로그인 · 상품 검수) | 앱 1 |
 | M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 장바구니 · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkouts` `myr_checkout_items` `myr_orders` `myr_order_items`(가상계좌 상태·컬럼 포함) · 다중 줄 결제 RPC · 줄 단위 환불 RPC(actor 한 벌 · 부분 취소) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백 · **두 셀러 담아 한 줄만 환불**) |

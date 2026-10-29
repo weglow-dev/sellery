@@ -1,54 +1,31 @@
 /** 샵 클라이언트 상태 — 장바구니 · 찜 · 주문자 정보 · (목) 주문 · 토스트.
- *  장바구니와 찜은 브라우저(localStorage)에만 둔다(docs/myr.md §6.2 · §9-12). 주문은 M4 에서 서버 주문으로 바뀌고
- *  여기서는 "주문 완료" 화면을 보여주기 위한 목이다. 상태 변경은 전부 이 모듈의 메서드로만. */
+ *  장바구니와 찜은 브라우저(localStorage)에만 둔다(docs/myr.md §6.2 · §9-12) — 상품은 **스냅샷**(이름·가격·타일·크리에이터) 으로 저장하고
+ *  체크아웃 때 서버가 code 로 다시 검증한다(M4). 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
+ *  상태 변경은 전부 이 모듈의 메서드로만. */
 import { browser } from '$app/environment';
-import { FREE_SHIPPING, MAX_QTY, PRODUCTS, SHIPPING_FEE, productOf, won } from './data';
+import { FREE_SHIPPING, MAX_QTY, SHIPPING_FEE, won, type Product } from './data';
 
-const LS_KEY = 'myr-shop-v1';
+const LS_KEY = 'myr-shop-v2';
 
-export type CartLine = { id: string; qty: number };
-export type OrderLine = {
-	id: string;
-	name: string;
-	qty: number;
-	amount: number;
-	tile: string;
-	ic: string;
-};
-export type Order = {
-	no: string;
-	lines: OrderLine[];
-	subtotal: number;
-	shipping: number;
-	total: number;
-	address: string;
-	pay: string;
-	at: string;
-};
+export type CartLine = { product: Product; qty: number };
+export type OrderLine = { code: string; name: string; qty: number; amount: number; tile: string; ic: string };
+export type Order = { no: string; lines: OrderLine[]; subtotal: number; shipping: number; total: number; address: string; pay: string; at: string };
 export type Buyer = { name: string; phone: string; address: string };
 
-type Persisted = {
-	cart: CartLine[];
-	likes: string[];
-	buyer: Buyer;
-	orders: Order[];
-};
+type Persisted = { cart: CartLine[]; likes: Product[]; buyer: Buyer; orders: Order[] };
+
+const isProduct = (p: unknown): p is Product => !!p && typeof p === 'object' && typeof (p as Product).code === 'string' && typeof (p as Product).price === 'number';
 
 function load(): Persisted {
-	const empty: Persisted = {
-		cart: [],
-		likes: [],
-		buyer: { name: '', phone: '', address: '' },
-		orders: []
-	};
+	const empty: Persisted = { cart: [], likes: [], buyer: { name: '', phone: '', address: '' }, orders: [] };
 	if (!browser) return empty;
 	try {
 		const raw = localStorage.getItem(LS_KEY);
 		if (!raw) return empty;
 		const v = JSON.parse(raw) as Partial<Persisted>;
 		return {
-			cart: (v.cart ?? []).filter((l) => productOf(l.id)),
-			likes: (v.likes ?? []).filter((id) => productOf(id)),
+			cart: (v.cart ?? []).filter((l) => isProduct(l?.product) && Number.isInteger(l.qty) && l.qty > 0),
+			likes: (v.likes ?? []).filter(isProduct),
 			buyer: { ...empty.buyer, ...(v.buyer ?? {}) },
 			orders: v.orders ?? []
 		};
@@ -59,7 +36,7 @@ function load(): Persisted {
 
 class ShopState {
 	cart = $state<CartLine[]>([]);
-	likes = $state<string[]>([]);
+	likes = $state<Product[]>([]);
 	buyer = $state<Buyer>({ name: '', phone: '', address: '' });
 	orders = $state<Order[]>([]);
 	toast = $state<string | null>(null);
@@ -79,12 +56,7 @@ class ShopState {
 	persist() {
 		if (!browser || !this.ready) return;
 		try {
-			const v: Persisted = {
-				cart: this.cart,
-				likes: this.likes,
-				buyer: this.buyer,
-				orders: this.orders
-			};
+			const v: Persisted = { cart: this.cart, likes: this.likes, buyer: this.buyer, orders: this.orders };
 			localStorage.setItem(LS_KEY, JSON.stringify(v));
 		} catch {
 			/* 사생활 모드 등 — 저장 실패는 조용히 */
@@ -93,41 +65,35 @@ class ShopState {
 
 	// ---- 장바구니 ----
 	cartCount = $derived(this.cart.reduce((n, l) => n + l.qty, 0));
-	cartItems = $derived(
-		this.cart.flatMap((l) => {
-			const p = productOf(l.id);
-			return p ? [{ ...p, qty: l.qty, lineAmount: p.price * l.qty }] : [];
-		})
-	);
+	cartItems = $derived(this.cart.map((l) => ({ ...l.product, qty: l.qty, lineAmount: l.product.price * l.qty })));
 	subtotal = $derived(this.cartItems.reduce((n, it) => n + it.lineAmount, 0));
 	shipping = $derived(this.subtotal === 0 || this.subtotal >= FREE_SHIPPING ? 0 : SHIPPING_FEE);
 	total = $derived(this.subtotal + this.shipping);
 	shippingMsg = $derived(this.shipping ? `${won(FREE_SHIPPING - this.subtotal)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요');
 
-	add(id: string, qty: number) {
-		const p = productOf(id);
-		if (!p) return;
-		const line = this.cart.find((l) => l.id === id);
-		if (line) line.qty = Math.min(MAX_QTY, line.qty + qty);
-		else this.cart.push({ id, qty: Math.min(MAX_QTY, qty) });
-		this.showToast(`${p.name} ${qty}개를 담았어요`);
+	add(product: Product, qty: number) {
+		const line = this.cart.find((l) => l.product.code === product.code);
+		if (line) {
+			line.qty = Math.min(MAX_QTY, line.qty + qty);
+			line.product = product; // 최신 가격·이름 스냅샷으로
+		} else this.cart.push({ product, qty: Math.min(MAX_QTY, qty) });
+		this.showToast(`${product.name} ${qty}개를 담았어요`);
 	}
-	setQty(id: string, qty: number) {
-		const line = this.cart.find((l) => l.id === id);
+	setQty(code: string, qty: number) {
+		const line = this.cart.find((l) => l.product.code === code);
 		if (line) line.qty = Math.max(1, Math.min(MAX_QTY, qty));
 	}
-	remove(id: string) {
-		this.cart = this.cart.filter((l) => l.id !== id);
+	remove(code: string) {
+		this.cart = this.cart.filter((l) => l.product.code !== code);
 	}
 
 	// ---- 찜 ----
-	liked(id: string) {
-		return this.likes.includes(id);
+	liked(code: string) {
+		return this.likes.some((p) => p.code === code);
 	}
-	toggleLike(id: string) {
-		this.likes = this.liked(id) ? this.likes.filter((x) => x !== id) : [...this.likes, id];
+	toggleLike(product: Product) {
+		this.likes = this.liked(product.code) ? this.likes.filter((p) => p.code !== product.code) : [...this.likes, product];
 	}
-	likedProducts = $derived(PRODUCTS.filter((p) => this.likes.includes(p.id)));
 
 	// ---- 주문(목) ----
 	/** M4 에서 /api/checkout → 토스 → confirm 으로 바뀐다. 지금은 주문번호를 만들고 장바구니를 비우는 것까지. */
@@ -135,14 +101,7 @@ class ShopState {
 		const no = 'MYR-' + String(Date.now()).slice(-6);
 		const order: Order = {
 			no,
-			lines: this.cartItems.map((it) => ({
-				id: it.id,
-				name: it.name,
-				qty: it.qty,
-				amount: it.lineAmount,
-				tile: it.tile,
-				ic: it.ic
-			})),
+			lines: this.cartItems.map((it) => ({ code: it.code, name: it.name, qty: it.qty, amount: it.lineAmount, tile: it.tile, ic: it.ic })),
 			subtotal: this.subtotal,
 			shipping: this.shipping,
 			total: this.total,

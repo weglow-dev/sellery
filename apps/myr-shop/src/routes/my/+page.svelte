@@ -71,7 +71,7 @@
 					<div class="flex items-center justify-between lg:hidden"><span class="text-[12px] text-fg-faint">{o.no}</span><span class="rounded-full bg-accent/12 px-2 py-1 text-[11px] font-bold text-accent">배송 준비중</span></div>
 					<div class="mt-2.5 flex items-center gap-2.5 lg:contents">
 						<div class="flex gap-1.5">
-							{#each o.lines.slice(0, 2) as l (l.id)}
+							{#each o.lines.slice(0, 2) as l (l.code)}
 								<Tile tile={l.tile} ic={l.ic} icon={22} class="h-10 w-10 rounded-xl lg:h-12 lg:w-12 lg:rounded-[14px]" />
 							{/each}
 						</div>
@@ -84,13 +84,13 @@
 		</div>
 
 		<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">찜한 레시피</h3>
-		{#if shop.ready && shop.likedProducts.length === 0}
+		{#if shop.ready && shop.likes.length === 0}
 			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-fg-faint lg:rounded-[20px] lg:py-10">하트를 눌러 레시피를 저장해보세요</div>
 		{/if}
 		<div class="grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
-			{#each shop.likedProducts as p (p.id)}
+			{#each shop.likes as p (p.code)}
 				<a href="/p/{p.code}" class="flex items-center gap-2.5 rounded-[18px] border border-white/8 bg-white/3 p-3 text-left text-fg transition-colors lg:gap-3 lg:hover:border-white/25">
-					<Tile tile={p.tile} ic={p.ic} icon={26} class="h-11 w-11 rounded-xl lg:h-14 lg:w-14 lg:rounded-[14px]" />
+					<Tile tile={p.tile} ic={p.ic} thumbUrl={p.thumbUrl} alt={p.name} icon={26} class="h-11 w-11 rounded-xl lg:h-14 lg:w-14 lg:rounded-[14px]" />
 					<span class="flex min-w-0 flex-col gap-0.5"><span class="truncate text-[13px] font-bold lg:text-[14px]">{p.name}</span><span class="text-[12px] text-fg-faint lg:text-[13px]">{won(p.price)}</span></span>
 				</a>
 			{/each}
