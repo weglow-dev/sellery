@@ -2,6 +2,10 @@
 //
 //   node packages/db/scripts/myr-products.mjs <cmd> [args]   (저장소 루트에서 · .env.local 의 PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY)
 //
+//   ⚠ 루트 .env.local 이 **로컬 Supabase(127.0.0.1:54321)** 를 가리키면 이 스크립트도 로컬 DB 에 넣는다(2026-10-29 에 그랬다).
+//     클라우드(운영)에 넣으려면 env 를 덮어쓴다: PUBLIC_SUPABASE_URL=https://ocxppeuoiysnkwwujvko.supabase.co SUPABASE_SERVICE_ROLE_KEY=<운영 키> node … import …
+//     service role 키가 없으면 CLI 의 DB 연결로 SQL 을 직접 넣어도 된다(0056 시드 투입 때 그렇게 했다 — docs/myr.md §3 "S1 적용").
+//
 //   import <file.json> [--listed]     creators[] 를 sellers 에 handle 기준 upsert(없으면 생성 · user_id 없는 "운영팀이 미리 만든 셀러 행" — 나중에 partner-admin.mjs invite --link 로 계정 연결)
 //                                     → products[] 를 myr_products 에 code 기준 upsert(creator 는 handle). 기본 status 는 pending(검수 대기) · --listed 면 바로 listed.
 //                                     상세(story_title · points · ingredient_rows · howto_title · howto_steps · faq)가 없으면 기본 템플릿을 채운다(샵 lib/data.ts genericDetail 과 같은 문구).

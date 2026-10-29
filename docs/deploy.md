@@ -68,7 +68,8 @@
 | Include source files outside of the Root Directory | ON | **ON**(2026-10-29 확인 · 새 프로젝트 기본값이 Enabled) — M4 에서 `packages/*` 를 쓰므로 필수 |
 | Git | `weglow-dev/sellery` · Production `main` | `weglow-dev/sellery` · Production Branch `main`(Settings → Environments). `vercel git connect` 는 **Vercel 계정에 GitHub 로그인 연결이 없으면 400** → 2026-10-29 대시보드 Account → Authentication 에서 GitHub 연결 뒤 Settings → Git 으로 연결. 연결 직후 `feat/myr-shop-ui` 푸시가 한 번 **Production** 으로 배포돼 `myr-shop.vercel.app` 이 그 브랜치를 보여줬다(`main` 에 앱이 없을 때의 첫 배포) — #226 병합 뒤 `main` 배포가 덮는다 |
 | 환경변수 | `SLACK_WEBHOOK_URL` · 메타 픽셀(§1.2) | **`PUBLIC_SUPABASE_URL` · `PUBLIC_SUPABASE_ANON_KEY`**(2026-10-29 S2 · production + preview · 셀러리와 같은 값 · `vercel env add … --type config`). S5 부터 `SUPABASE_SERVICE_ROLE_KEY` · 토스 · Resend · `CRON_SECRET`(비밀은 직접 넣을 것) |
-| Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가(프리뷰는 기존 `https://*-weglow-team.vercel.app/**` 가 덮는다) |
+| Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가(프리뷰는 기존 `https://*-weglow-team.vercel.app/**` 가 덮는다) — 조직 Owner 권한 필요(2026-10-29 미완) |
+| Supabase 스키마 | — | 0056 `myr_products` 클라우드 적용 + 시드 8개(2026-10-29). **루트 `.env.local` 은 로컬 Supabase(`127.0.0.1:54321`) 를 가리킨다** — 운영에 쓰는 값은 `vercel env pull --cwd apps/shop` 으로 `sellery-shop` 의 값을 가져와 넣었다(anon 키는 공개값). `vercel env add` 로 복사할 때 `.env.local` 값을 그대로 쓰면 로컬 주소가 운영에 들어간다(한 번 그랬다 · 같은 날 교체) |
 | 공개 주소 | `https://makeyourrecipe.vercel.app/influencer/oem/` · `https://sellery-branding.vercel.app/influencer/oem/`(옛 별칭) | `https://myr-shop.vercel.app`(도메인 결정 전) |
 
 CLI 로 만들 때 `vercel link` 가 `apps/<앱>/.gitignore`(`.vercel` `.env*`) 와 `.env.local` 을 만들어 두는데, 루트 `.gitignore` 가 이미 둘 다 덮으므로 지운다. 프로젝트 안의 `.vercel/project.json` 은 커밋하지 않는다.
