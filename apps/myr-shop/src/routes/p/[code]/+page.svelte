@@ -39,9 +39,9 @@
 	<meta name="description" content={p.sub} />
 </svelte:head>
 
-<!-- 모바일 하단 담기 바는 `sticky bottom-0`(문서 흐름의 마지막) — fixed 는 transform 조상·iOS 툴바에 잘리거나 떠 있어서 쓰지 않는다 -->
-<div class="flex min-h-dvh flex-col lg:mx-auto lg:grid lg:min-h-0 lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_clamp(280px,30%,360px)] lg:items-start lg:gap-10 lg:px-10 lg:pt-6 lg:pb-20">
-	<div class="flex-1 animate-slide-in pb-4 lg:min-w-0 lg:pb-0">
+<!-- 모바일: 화면 높이(앱 셸 <main>) 를 꽉 채우는 세로 flex — 내용만 스크롤, 담기 바는 바닥에 보통 흐름으로 (+layout.svelte 주석) -->
+<div class="flex h-full flex-col lg:mx-auto lg:grid lg:h-auto lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_clamp(280px,30%,360px)] lg:items-start lg:gap-10 lg:px-10 lg:pt-6 lg:pb-20">
+	<div class="no-bar min-h-0 flex-1 animate-slide-in overflow-y-auto overscroll-y-contain pb-4 lg:min-w-0 lg:overflow-visible lg:pb-0">
 		<!-- PC 브레드크럼 -->
 		<nav class="hidden items-center gap-2 text-[13px] text-fg-faint lg:flex" aria-label="현재 위치">
 			<a href="/" class="hover:text-fg">홈</a><span>/</span>
@@ -252,7 +252,7 @@
 	</aside>
 
 	<!-- 모바일 하단 담기 바 -->
-	<div class="sticky bottom-0 z-10 flex w-full items-center gap-2.5 bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
+	<div class="flex w-full shrink-0 items-center gap-2.5 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 		<QtyStepper {qty} onchange={(q) => (qty = q)} />
 		<button
 			type="button"

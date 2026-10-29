@@ -10,8 +10,8 @@
 
 <svelte:head><title>주문 완료 — MYR Shop</title></svelte:head>
 
-<div class="flex min-h-dvh animate-slide-in flex-col lg:mx-auto lg:min-h-0 lg:max-w-[760px] lg:animate-up-in lg:px-10 lg:pt-[72px] lg:pb-20 lg:text-center">
-	<div class="flex-1 px-5 pt-16 pb-5 lg:px-0 lg:pt-0">
+<div class="flex h-full animate-slide-in flex-col lg:mx-auto lg:h-auto lg:max-w-[760px] lg:animate-up-in lg:px-10 lg:pt-[72px] lg:pb-20 lg:text-center">
+	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-16 pb-5 lg:overflow-visible lg:px-0 lg:pt-0">
 		<div class="flex h-16 w-16 animate-pop items-center justify-center rounded-full bg-accent lg:mx-auto lg:h-[72px] lg:w-[72px]">
 			<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0a0b0e" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 		</div>

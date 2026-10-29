@@ -13,8 +13,8 @@
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 </script>
 
-<!-- `sticky bottom-0` — 레이아웃이 화면 내용 뒤에 두어 문서 흐름의 마지막이 된다. fixed 는 iOS 툴바에 가려지거나 잘려서 쓰지 않는다 -->
-<nav class="pointer-events-none sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-40% px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden" aria-label="주요 메뉴">
+<!-- 앱 셸(+layout.svelte) 바닥에 보통 흐름으로 놓인다 — fixed/sticky 는 모바일 브라우저에서 잘려서 쓰지 않는다 -->
+<nav class="pointer-events-none w-full shrink-0 bg-bg px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden" aria-label="주요 메뉴">
 	<div class="pointer-events-auto grid h-16 grid-cols-4 items-center rounded-[22px] border border-white/8 bg-panel px-1.5 shadow-[0_10px_30px_rgba(0,0,0,.4)]">
 		{#each tabs as t (t.href)}
 			{@const on = active(t.href)}

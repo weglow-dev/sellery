@@ -10,6 +10,7 @@
 	import Toast from '$lib/components/Toast.svelte';
 
 	let { children } = $props();
+	let main: HTMLElement | undefined = $state();
 
 	// 장바구니·찜은 브라우저 저장 — 마운트 뒤 읽고, 그 뒤 바뀔 때마다 저장
 	onMount(() => shop.hydrate());
@@ -17,8 +18,10 @@
 		void [shop.cart, shop.likes, shop.buyer, shop.orders];
 		shop.persist();
 	});
-	afterNavigate(({ from }) => {
+	afterNavigate(({ from, to }) => {
 		if (from) bumpDepth();
+		// 모바일은 문서가 아니라 <main> 이 스크롤 컨테이너라 화면이 바뀔 때 직접 맨 위로 (해시 이동은 제외)
+		if (main && !to?.url.hash) main.scrollTo(0, 0);
 	});
 
 	const TAB_ROUTES = ['/', '/category', '/my'];
@@ -30,15 +33,19 @@
 	<meta name="description" content="인플루언서가 레시피부터 패키지까지 직접 고른 제품만 모았어요. Make Your Recipe." />
 </svelte:head>
 
-<!-- 모바일(~lg): 430px 폰 프레임을 가운데 · 각 화면이 자기 헤더와 하단 바. PC(lg~): 상단 내비 + 1240px 컨테이너 (디자인 "MYR Shop PC") -->
+<!--
+	모바일(~lg): 앱 셸 — 높이 100dvh(보이는 영역) 의 세로 flex. 내용(<main>)만 안에서 스크롤하고 탭바·하단 바는 셸 바닥에 놓인다.
+	  position: fixed/sticky bottom:0 은 쓰지 않는다 — 모바일 브라우저(DevTools 기기 모드 · 주소창이 있는 실기기)에서는 그 기준인
+	  layout viewport(innerHeight) 가 보이는 영역(visualViewport · dvh) 보다 커서 바가 아래로 잘린다(2026-10-29 iPhone SE 에뮬레이션: 717 vs 667).
+	PC(lg~): 보통 문서 흐름 — 상단 내비 + 1240px 컨테이너 · 문서 스크롤 · sticky 패널 (디자인 "MYR Shop PC")
+-->
 <SiteHeader />
-<!-- 탭바가 있는 화면은 flex 세로 — 화면 내용이 flex-1, 탭바가 마지막(sticky bottom) -->
-<div class="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-bg lg:block lg:min-h-0 lg:max-w-none">
-	<div class="flex-1">
+<div class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col bg-bg lg:static lg:block lg:h-auto lg:max-w-none">
+	<main bind:this={main} class="no-bar min-h-0 flex-1 overflow-y-auto overscroll-y-contain lg:overflow-visible">
 		{#key page.url.pathname}
 			{@render children()}
 		{/key}
-	</div>
+	</main>
 	{#if showTabs}
 		<TabBar />
 	{/if}

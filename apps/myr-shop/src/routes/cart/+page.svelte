@@ -12,9 +12,9 @@
 
 <svelte:head><title>장바구니 — MYR Shop</title></svelte:head>
 
-<!-- 모바일 하단 합계 바는 `sticky bottom-0`(문서 흐름의 마지막) — 상품 상세와 같은 이유로 fixed 를 쓰지 않는다 -->
-<div class="flex min-h-dvh flex-col lg:mx-auto lg:block lg:min-h-0 lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
-	<div class="flex-1 animate-slide-in">
+<!-- 모바일: 화면 높이를 채우는 세로 flex — 내용만 스크롤, 합계 바는 바닥에 보통 흐름으로 (+layout.svelte 주석) -->
+<div class="flex h-full flex-col lg:mx-auto lg:block lg:h-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
+	<div class="no-bar min-h-0 flex-1 animate-slide-in overflow-y-auto overscroll-y-contain lg:overflow-visible">
 		<BackHeader title="장바구니">
 			{#snippet right()}<span class="text-[13px] text-fg-faint">{shop.cartCount}개</span>{/snippet}
 		</BackHeader>
@@ -71,7 +71,7 @@
 
 	<!-- 모바일 하단 합계 바 -->
 	{#if shop.cartItems.length}
-		<div class="sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-25% px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
+		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
 			<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{won(shop.total)} 주문하기</a>
 		</div>
