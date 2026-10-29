@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/* MYR 샵 테마 — 랜딩(apps/myr/src/app.css)과 같은 다크 베이스 + 웜 앰버 포인트.
+   디자인(Claude Design "MYR Shop")의 인라인 값을 토큰으로 옮겼다. 레이아웃·색은 컴포넌트 안에서 Tailwind 유틸리티로. */
+@theme {
+	--font-sans: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', sans-serif;
+
+	--color-bg: #0a0b0e;
+	--color-panel: #15161a;
+	--color-panel-2: #1d1f25;
+	--color-line: rgba(255, 255, 255, 0.08);
+	--color-fg: #ffffff;
+	--color-fg-soft: rgba(255, 255, 255, 0.65);
+	/* 보조 글자 하한 — 흰색 55% = 6.3:1 (AA). 12~13px 는 이 값 이상 (랜딩과 같은 규칙) */
+	--color-fg-faint: rgba(255, 255, 255, 0.55);
+	--color-accent: #ff7a3d;
+	--color-accent-deep: #ff5a1f;
+
+	/* 화면 등장 — 홈·마이는 아래에서(up-in), 상세·장바구니·결제는 오른쪽에서(slide-in). 토스트는 up-in 짧게 */
+	--animate-up-in: up-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-slide-in: slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-toast: up-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	/* 주문 완료 체크 배지 "톡" 등장 */
+	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes up-in {
+	0% {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes slide-in {
+	0% {
+		opacity: 0;
+		transform: translateX(28px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes pop {
+	0% {
+		opacity: 0;
+		transform: scale(0.3);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@layer base {
+	html,
+	body {
+		margin: 0;
+		background: var(--color-bg);
+		color: var(--color-fg);
+		font-family: var(--font-sans);
+		word-break: keep-all;
+	}
+	input,
+	textarea,
+	button {
+		font-family: inherit;
+	}
+	input::placeholder {
+		color: rgba(255, 255, 255, 0.34);
+	}
+	/* 가로 스크롤 줄(카테고리 칩 · 크리에이터 카드)은 스크롤바를 감춘다 */
+	.no-bar {
+		scrollbar-width: none;
+	}
+	.no-bar::-webkit-scrollbar {
+		display: none;
+	}
+}

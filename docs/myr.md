@@ -270,7 +270,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 | M2 인플루언서 콘솔 1 | `apps/myr-influencer` 생성(가입·로그인·홈·상품 등록/수정/토글) | 앱 1 |
 | M3 운영 콘솔 1 | `apps/myr-admin` 생성(로그인 · 상품 검수) | 앱 1 |
 | M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 장바구니 · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkouts` `myr_checkout_items` `myr_orders` `myr_order_items`(가상계좌 상태·컬럼 포함) · 다중 줄 결제 RPC · 줄 단위 환불 RPC(actor 한 벌 · 부분 취소) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백 · **두 셀러 담아 한 줄만 환불**) |
-| M4-UI(선행) | 디자인(Claude Design "MYR Shop" · `~/Downloads/MYR · 제조의뢰 & Shop.html` 내보내기) 을 **목 데이터로 먼저 화면만** — 홈 · 카테고리 · 상품 · 장바구니 · 체크아웃 · 주문완료 · 마이 · 탭바. 결제 위젯 자리는 비워 둔다(§6.7) | 앱 골격 · 컴포넌트 · 테마 |
+| M4-UI(선행) · **2026-10-29 완료** | 디자인(Claude Design "MYR Shop" 프로젝트 파일 `MYR Shop.dc.html` 2026-10-28 판) 을 **목 데이터로 화면만** — `apps/myr-shop`: `/` 홈 · `/category?cat=&creator=` · `/p/[code]` · `/cart` · `/checkout` · `/checkout/done` · `/my` · 탭바 · 토스트. 장바구니·찜·주문자·목 주문은 `localStorage`(`myr-shop-v1` · `lib/state.svelte.ts`), 데이터는 `lib/data.ts`. 결제 수단 칸은 디자인 그림(§6.7 위젯 자리) · 포인트 칸은 뺌(§9-12) · 뒤로가기는 `lib/nav.ts`(앱 안에서 온 길이 없으면 홈) | 앱 골격 · 컴포넌트 · 테마(`app.css` 토큰은 `apps/myr` 와 같은 값) · `npm run dev:myr-shop`(5178) |
 | M5 인플루언서 콘솔 2 | 주문(내 줄 열람 · 줄 환불) · 문의(0058 `myr_cs_*`) · 메일 훅 | 마이그레이션 1개 |
 | M6 운영 콘솔 2 · 실적 | admin 주문표 · **운송장 · 발주서 · 교환 발송**(물류센터) · 문의 열람 · 환불 대행 · 인플루언서 `/sales`(줄 기준) · `seller_margin_rate` 스냅샷 | |
 | M7 운영 전환 | 토스 라이브 키 · 크론 · `check-boundaries` 규칙 · 랜딩 루트 이전(§2) · 옛 주소 리다이렉트 | |

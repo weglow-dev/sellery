@@ -13,6 +13,7 @@
     "dev:admin": "npm run dev -w apps/admin",
     "dev:shop": "npm run dev -w apps/shop",
     "dev:myr": "npm run dev -w apps/myr",
+    "dev:myr-shop": "npm run dev -w apps/myr-shop",
     "check": "npm run check --workspaces --if-present",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
