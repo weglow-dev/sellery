@@ -126,7 +126,22 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 메일 훅 | `db/server/myr/mail-events.server.ts` — `notifyOrderPaid/Shipped/Refunded/ExchangeShipped/DepositPending` · `notifyCsOpened/Replied` | — | 위 함수들이 내부에서 호출 — 앱이 직접 부르지 않는다 |
 | 게이트 | 기존 `requireSeller()` · `requireAdmin()` · `safeGetSession` → actor 결정은 **라우트가** 한다(`seller.id` · `user.id` · 비회원 토큰) | — | 각 앱 |
 
-규칙: SQL 함수 안에서 `p_actor` 로 분기하고 권한 미달은 `{ok:false, code:'FORBIDDEN'}`. 라우트는 actor 를 세션에서만 만든다(클라이언트가 보낸 actor 값은 받지 않는다). HTTP 엔드포인트가 꼭 필요한 것(토스 웹훅 · `DEPOSIT_CALLBACK` · 크론 reconcile/tracking) 은 **`myr-shop` 한 곳**에만 두고, influencer/admin 은 같은 패키지 함수를 서버 load/action 에서 직접 호출한다. 앱 사이 HTTP 호출은 하지 않는다(다른 도메인이라 CORS·세션 전달이 생기고, 같은 DB 를 service role 로 쓰므로 이득이 없다).
+규칙 — 함수 하나에 권한이 모이므로 아래 넷이 보안의 전부다:
+
+1. **actor · actorId 는 서버 세션에서만 결정한다. 요청 본문·쿼리·쿠키 값에서 받지 않는다.** customer = `safeGetSession().user.id`(또는 서버가 심은 HttpOnly 비회원 토큰의 검증 결과) · seller = `requireSeller().seller.id` · admin = `requireAdmin()` 통과한 `user.id`. 라우트가 `actor` 를 문자열로 조립하는 자리는 이 세 헬퍼 뒤 한 줄뿐이고, 폼에 `actor` 필드가 있으면 무시한다.
+2. **SQL 함수가 마지막 방어선이다.** 패키지 함수는 service role 로 부르므로 RLS 를 통과한다 — 권한 검사는 `myr_app_*` 본문에서 `p_actor` · `p_actor_id` 로 한다(seller 면 `seller_id = p_actor_id` · customer 면 `user_id = p_actor_id` 또는 토큰 검증 · admin 은 `profiles.role='admin'` 재확인). 함수는 `security definer set search_path = public`, **`revoke all … from public, anon, authenticated` · `grant execute … to service_role`** — 브라우저의 anon 키로는 직접 못 부른다(셀러리 0007 · 0052 와 같은 조치). anon 에 여는 건 `myr_product_card` · `myr_home_products` 같은 읽기 전용 공개 함수뿐. 권한 미달은 `{ok:false, code:'FORBIDDEN'}`(존재 여부를 흘리지 않게 NOT_FOUND 와 같은 응답으로 묶는 곳은 함수 주석에 적는다).
+3. **actor 로 가르는 건 "허용 조건·한도" 까지만.** 고객은 발송 전 전액만 · 셀러는 발송 뒤도 · 관리자는 언제든 같은 차이는 함수 머리의 **허용 조건 표** 한 곳에서 관리한다(아래). 흐름 자체가 달라지면(예: 부분 환불 · 가상계좌 입금 전 취소 · 교환 재발송) 함수 하나에 if 를 쌓지 말고 **별도 동작**으로 쪼갠다(`myr_app_refund_record` 와 `myr_app_deposit_expire` 가 따로인 이유).
+
+   | 동작 | customer | seller | admin |
+   |---|---|---|---|
+   | 환불(전액) | 본인 주문 · PAID · 발송 전 | 내 상품 주문 · PAID · 발송 뒤 허용(`after_ship` 기록) | 전부 |
+   | 운송장 · 교환 발송 | — | 내 상품 주문 | 전부 |
+   | 문의 열람·답글 | 본인(토큰·user) · 추가 문의 | 내 상품 문의 · 답변·종료 | 전부 · 대행 답변(`sender='seller'` `actor_role='admin'`) |
+   | 상품 상태 | — | 내 상품 · listed ↔ paused · rejected → pending | 전부 · pending → listed/rejected · 강제 전환 |
+
+4. **HTTP 엔드포인트는 `myr-shop` 한 곳.** 외부가 부르는 것(토스 웹훅 · `DEPOSIT_CALLBACK` · 크론 reconcile/tracking) 만 라우트로 열고, influencer/admin 은 같은 패키지 함수를 서버 load/action 에서 직접 호출한다. 앱 사이 HTTP 호출은 하지 않는다(다른 도메인이라 CORS·세션 전달이 생기고, 같은 DB 를 service role 로 쓰므로 이득이 없다).
+
+같이 배포되지 않는 창: 앱 넷이 같은 패키지 함수를 쓰면 `main` 병합 한 번에 Vercel 프로젝트 넷이 **따로** 빌드·배포되고, 몇 분 동안 shop 은 새 코드 · admin 은 옛 코드인 순간이 생긴다. HTTP 로 묶지 않았으니 코드끼리는 문제없지만 **DB 는 그 창 동안 양쪽 코드와 호환돼야 한다** — 컬럼 삭제·이름 변경·함수 시그니처 변경은 두 단계로(① 새 컬럼/새 함수 추가 + 양쪽 읽기 → 전 앱 배포 확인 → ② 옛 것 제거), `{ok, code}` 반환에 새 code 를 더할 때도 옛 파서가 `default` 로 받게 둔다. `supabase db push` 는 ① 과 ② 를 다른 PR 로.
 
 ---
 
