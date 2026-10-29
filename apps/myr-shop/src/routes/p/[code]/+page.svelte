@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { DETAIL_ANCHORS, catName, creatorOf, infoRowsOf, relatedOf, won } from '$lib/data';
+	import { DETAIL_ANCHORS, catName, handleSlug, infoRowsOf, won } from '$lib/data';
 	import { goBack } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
@@ -13,17 +13,17 @@
 	 *  상세 섹션 01~05 는 인플루언서가 상품 등록 때 채우는 템플릿 — 각 섹션이 입력 필드가 된다(docs/myr.md §4.2). */
 	let { data } = $props();
 	const p = $derived(data.product);
-	const creator = $derived(creatorOf(p.creator));
+	const creator = $derived(p.creator);
 	const infoRows = $derived(infoRowsOf(p));
-	const related = $derived(relatedOf(p));
-	const liked = $derived(shop.liked(p.id));
+	const related = $derived(data.related);
+	const liked = $derived(shop.liked(p.code));
 
 	let qty = $state(1);
 	let added = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	function add() {
-		if (added) return;
-		shop.add(p.id, qty);
+		if (added || p.soldOut) return;
+		shop.add(p, qty);
 		added = true;
 		clearTimeout(timer);
 		timer = setTimeout(() => (added = false), 1600);
@@ -69,8 +69,8 @@
 		<div class="px-5 pt-5 lg:px-0 lg:pt-0">
 			<!-- 모바일 구매 정보 (PC 는 오른쪽 패널) -->
 			<div class="lg:hidden">
-				<a href="/category?creator={creator.id}" class="flex items-center gap-2.5 text-left text-fg">
-					<Avatar bg={creator.bg} initial={creator.initial} size={34} />
+				<a href="/category?creator={handleSlug(creator.handle)}" class="flex items-center gap-2.5 text-left text-fg">
+					<Avatar {creator} size={34} />
 					<span><span class="block text-[14px] font-bold">{creator.name}</span><span class="block text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 				</a>
@@ -92,7 +92,7 @@
 			<!-- 레시피 노트 (크리에이터가 작성) -->
 			<section id="note" class="mt-5 scroll-mt-24 rounded-[20px] border border-accent/22 bg-accent/8 p-[18px] lg:mt-9 lg:rounded-[26px] lg:p-8">
 				<div class="flex items-center gap-3">
-					<Avatar bg={creator.bg} initial={creator.initial} size={36} class="hidden lg:flex lg:h-11 lg:w-11 lg:text-[14px]" />
+					<Avatar {creator} size={36} class="hidden lg:flex lg:h-11 lg:w-11 lg:text-[14px]" />
 					<span>
 						<span class="block text-[12px] font-bold tracking-[.04em] text-accent">{creator.name}의 레시피 노트</span>
 						<span class="mt-0.5 hidden text-[13px] text-fg-faint lg:block">{creator.handle}</span>
@@ -189,9 +189,9 @@
 				<div class="grid grid-cols-1 gap-2.5 lg:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] lg:gap-3.5">
 					{#each related as r (r.id)}
 						<a href="/p/{r.code}" class="flex items-center gap-3.5 rounded-[20px] border border-white/8 bg-white/3 p-3 text-left text-fg transition-colors lg:hover:border-white/25">
-							<Tile tile={r.tile} ic={r.ic} icon={44} class="h-[72px] w-[72px] rounded-2xl" />
+							<Tile tile={r.tile} ic={r.ic} thumbUrl={r.thumbUrl} alt={r.name} icon={44} class="h-[72px] w-[72px] rounded-2xl" />
 							<span class="flex min-w-0 flex-col gap-[3px]">
-								<span class="text-[11px] font-bold text-accent">{creatorOf(r.creator).name}</span>
+								<span class="text-[11px] font-bold text-accent">{r.creator.name}</span>
 								<span class="text-[14px] leading-[1.3] font-bold">{r.name}</span>
 								<span class="mt-0.5 text-[14px] font-extrabold">{won(r.price)}</span>
 							</span>
@@ -204,8 +204,8 @@
 
 	<!-- PC 고정 구매 패널 -->
 	<aside class="hidden lg:sticky lg:top-[106px] lg:flex lg:flex-col lg:gap-5">
-		<a href="/category?creator={creator.id}" class="flex items-center gap-3 text-left text-fg">
-			<Avatar bg={creator.bg} initial={creator.initial} size={40} />
+		<a href="/category?creator={handleSlug(creator.handle)}" class="flex items-center gap-3 text-left text-fg">
+			<Avatar {creator} size={40} />
 			<span><span class="block text-[15px] font-bold">{creator.name}</span><span class="block text-[13px] text-fg-faint">{creator.handle} · 레시피 더 보기</span></span>
 		</a>
 		<div>
@@ -225,7 +225,7 @@
 			<QtyStepper {qty} onchange={(q) => (qty = q)} />
 			<button
 				type="button"
-				onclick={() => shop.toggleLike(p.id)}
+				onclick={() => shop.toggleLike(p)}
 				aria-label={liked ? '찜 해제' : '찜'}
 				aria-pressed={liked}
 				class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/4 {liked ? 'text-accent' : 'text-fg'}"
@@ -236,12 +236,13 @@
 		<button
 			type="button"
 			onclick={add}
+			disabled={p.soldOut}
 			class="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold whitespace-nowrap transition-colors duration-250 {added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg hover:bg-[#ff8f5c]'}"
 		>
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
 			{:else}
-				<span>{won(p.price * qty)} 담기</span>
+				<span>{p.soldOut ? '품절' : `${won(p.price * qty)} 담기`}</span>
 			{/if}
 		</button>
 		<div class="flex flex-col gap-2.5 rounded-2xl border border-white/7 bg-white/3 p-4 text-[13px] text-fg-soft">
@@ -257,13 +258,14 @@
 		<button
 			type="button"
 			onclick={add}
+			disabled={p.soldOut}
 			class="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg'}"
 		>
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 				<span>담았어요</span>
 			{:else}
-				<span>{won(p.price * qty)} 담기</span>
+				<span>{p.soldOut ? '품절' : `${won(p.price * qty)} 담기`}</span>
 			{/if}
 		</button>
 	</div>

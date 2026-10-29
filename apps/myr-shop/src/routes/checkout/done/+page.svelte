@@ -21,7 +21,7 @@
 			<div class="lg:mt-8 lg:grid lg:grid-cols-2 lg:gap-3.5 lg:text-left">
 				<div class="mt-6 rounded-[18px] border border-white/7 bg-white/3 px-[18px] pt-1.5 pb-2 lg:mt-0 lg:rounded-[20px] lg:px-5">
 					<p class="mt-3 mb-1 text-[13px] font-bold text-fg-faint lg:mt-3.5 lg:mb-1.5">주문 내역</p>
-					{#each order.lines as l (l.id)}
+					{#each order.lines as l (l.code)}
 						<div class="flex items-baseline justify-between gap-4 border-t border-white/6 py-[11px] text-[14px]"><span class="text-white/75">{l.name} × {l.qty}</span><span class="font-bold whitespace-nowrap">{won(l.amount)}</span></div>
 					{/each}
 					{#if order.shipping}

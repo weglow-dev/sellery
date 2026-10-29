@@ -67,7 +67,7 @@
 | Root Directory · Preset · Node | `apps/myr` · SvelteKit · 24.x | `apps/myr-shop` · SvelteKit · **22.x** |
 | Include source files outside of the Root Directory | ON | **ON**(2026-10-29 확인 · 새 프로젝트 기본값이 Enabled) — M4 에서 `packages/*` 를 쓰므로 필수 |
 | Git | `weglow-dev/sellery` · Production `main` | `weglow-dev/sellery` · Production Branch `main`(Settings → Environments). `vercel git connect` 는 **Vercel 계정에 GitHub 로그인 연결이 없으면 400** → 2026-10-29 대시보드 Account → Authentication 에서 GitHub 연결 뒤 Settings → Git 으로 연결. 연결 직후 `feat/myr-shop-ui` 푸시가 한 번 **Production** 으로 배포돼 `myr-shop.vercel.app` 이 그 브랜치를 보여줬다(`main` 에 앱이 없을 때의 첫 배포) — #226 병합 뒤 `main` 배포가 덮는다 |
-| 환경변수 | `SLACK_WEBHOOK_URL` · 메타 픽셀(§1.2) | UI 단계(docs/myr.md §7 M4-UI)는 **없음**. S2 부터 `PUBLIC_SUPABASE_*` · S5 부터 토스 · Resend |
+| 환경변수 | `SLACK_WEBHOOK_URL` · 메타 픽셀(§1.2) | **`PUBLIC_SUPABASE_URL` · `PUBLIC_SUPABASE_ANON_KEY`**(2026-10-29 S2 · production + preview · 셀러리와 같은 값 · `vercel env add … --type config`). S5 부터 `SUPABASE_SERVICE_ROLE_KEY` · 토스 · Resend · `CRON_SECRET`(비밀은 직접 넣을 것) |
 | Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가(프리뷰는 기존 `https://*-weglow-team.vercel.app/**` 가 덮는다) |
 | 공개 주소 | `https://makeyourrecipe.vercel.app/influencer/oem/` · `https://sellery-branding.vercel.app/influencer/oem/`(옛 별칭) | `https://myr-shop.vercel.app`(도메인 결정 전) |
 

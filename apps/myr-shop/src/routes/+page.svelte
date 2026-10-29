@@ -1,15 +1,17 @@
 <script lang="ts">
-	import { CATS, CREATORS, PRODUCTS, creatorOf, won } from '$lib/data';
+	import { CATS, handleSlug, won } from '$lib/data';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import CartButton from '$lib/components/CartButton.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ProductCard from '$lib/components/ProductCard.svelte';
 
-	/** 홈 — 히어로 → 카테고리 → 크리에이터 브랜드 → 제품 그리드 (docs/myr.md §4.1 `/`).
-	 *  PC(lg): 히어로 + "이번 주 레시피" 카드 2단, 카테고리·브랜드·제품은 auto-fill 그리드 */
+	/** 홈 — 히어로 → 카테고리 → 크리에이터 브랜드 → 제품 그리드 (docs/myr.md §4.1 `/`). 데이터는 +page.server.ts(0056 RPC).
+	 *  PC(lg): 히어로 + "이번 주 레시피"(첫 제품) 2단, 카테고리·브랜드·제품은 auto-fill 그리드 */
+	let { data } = $props();
+	const products = $derived(data.products);
+	const creators = $derived(data.creators);
+	const featured = $derived(products[0] ?? null);
 	const homeCats = CATS.filter((c) => c.id !== 'all');
-	const countOf = (creatorId: string) => PRODUCTS.filter((p) => p.creator === creatorId).length;
-	const featured = PRODUCTS[0];
 </script>
 
 <div class="animate-up-in pb-5 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-20">
@@ -29,20 +31,26 @@
 				<a href="/category" class="hidden h-[52px] items-center gap-2 rounded-[14px] bg-accent px-6 text-[15px] font-extrabold whitespace-nowrap text-bg transition-colors hover:bg-[#ff8f5c] lg:flex">
 					전체 레시피 보기<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
 				</a>
-				<div class="flex items-center gap-2">
-					{#each CREATORS.slice(0, 3) as c, i (c.id)}
-						<Avatar bg={c.bg} initial={c.initial} size={30} class="border-2 border-panel {i ? '-ml-2.5' : ''}" />
-					{/each}
-					<span class="ml-1 text-[12px] whitespace-nowrap text-fg-faint lg:text-[13px]">{CREATORS.length}명의 크리에이터 브랜드</span>
-				</div>
+				{#if creators.length}
+					<div class="flex items-center gap-2">
+						{#each creators.slice(0, 3) as c, i (c.id)}
+							<Avatar creator={c} size={30} class="border-2 border-panel {i ? '-ml-2.5' : ''}" />
+						{/each}
+						<span class="ml-1 text-[12px] whitespace-nowrap text-fg-faint lg:text-[13px]">{creators.length}명의 크리에이터 브랜드</span>
+					</div>
+				{/if}
 			</div>
 		</div>
 		<!-- PC 전용: 이번 주 레시피 -->
-		<a href="/p/{featured.code}" class="relative hidden min-h-[420px] flex-col justify-between overflow-hidden rounded-[30px] border border-white/8 p-7 text-fg lg:flex" style="background:{featured.tile}">
-			<span class="flex items-center justify-between"><span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-extrabold backdrop-blur-sm">이번 주 레시피</span><span class="text-[13px] font-bold opacity-85">{creatorOf(featured.creator).name}</span></span>
-			<span class="flex flex-1 items-center justify-center text-white/95"><Icon id={featured.ic} size={150} /></span>
-			<span class="flex items-end justify-between gap-3"><span><span class="block text-[20px] font-extrabold tracking-[-.02em]">{featured.name}</span><span class="mt-1 block text-[13px] opacity-75">{featured.sub}</span></span><span class="text-[20px] font-extrabold whitespace-nowrap">{won(featured.price)}</span></span>
-		</a>
+		{#if featured}
+			<a href="/p/{featured.code}" class="relative hidden min-h-[420px] flex-col justify-between overflow-hidden rounded-[30px] border border-white/8 p-7 text-fg lg:flex" style="background:{featured.tile}">
+				<span class="flex items-center justify-between"><span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-extrabold backdrop-blur-sm">이번 주 레시피</span><span class="text-[13px] font-bold opacity-85">{featured.creator.name}</span></span>
+				<span class="flex flex-1 items-center justify-center text-white/95">
+					{#if featured.thumbUrl}<img src={featured.thumbUrl} alt="" class="max-h-[220px] rounded-2xl object-cover" />{:else}<Icon id={featured.ic} size={150} />{/if}
+				</span>
+				<span class="flex items-end justify-between gap-3"><span><span class="block text-[20px] font-extrabold tracking-[-.02em]">{featured.name}</span><span class="mt-1 block text-[13px] opacity-75">{featured.sub}</span></span><span class="text-[20px] font-extrabold whitespace-nowrap">{won(featured.price)}</span></span>
+			</a>
+		{/if}
 	</section>
 
 	<section class="mt-[26px] lg:mt-11">
@@ -63,36 +71,42 @@
 		</div>
 	</section>
 
-	<section class="mt-7 lg:mt-11">
-		<div class="flex items-baseline justify-between px-5 lg:px-0">
-			<h2 class="text-[18px] font-extrabold tracking-[-.02em] lg:text-[24px] lg:tracking-[-.025em]">지금 뜨는 브랜드</h2>
-		</div>
-		<div class="no-bar mt-3 flex gap-2.5 overflow-x-auto px-5 lg:mt-4 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] lg:gap-3 lg:overflow-visible lg:px-0">
-			{#each CREATORS as cr (cr.id)}
-				<a
-					href="/category?creator={cr.id}"
-					class="flex w-[150px] shrink-0 flex-col gap-2.5 rounded-[20px] border border-white/8 bg-white/3 p-3.5 text-left text-fg transition-colors lg:w-auto lg:flex-row lg:items-center lg:gap-4 lg:rounded-[22px] lg:p-5 lg:hover:border-white/25"
-				>
-					<Avatar bg={cr.bg} initial={cr.initial} size={44} class="lg:h-14 lg:w-14 lg:text-[18px]" />
-					<span class="min-w-0">
-						<span class="block text-[15px] font-bold lg:text-[16px]">{cr.name}</span>
-						<span class="mt-0.5 block text-[12px] text-fg-faint lg:text-[13px]">{cr.handle}</span>
-						<span class="mt-2.5 block text-[12px] font-bold text-accent lg:mt-1.5">{countOf(cr.id)}개 제품</span>
-					</span>
-				</a>
-			{/each}
-		</div>
-	</section>
+	{#if creators.length}
+		<section class="mt-7 lg:mt-11">
+			<div class="flex items-baseline justify-between px-5 lg:px-0">
+				<h2 class="text-[18px] font-extrabold tracking-[-.02em] lg:text-[24px] lg:tracking-[-.025em]">지금 뜨는 브랜드</h2>
+			</div>
+			<div class="no-bar mt-3 flex gap-2.5 overflow-x-auto px-5 lg:mt-4 lg:grid lg:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] lg:gap-3 lg:overflow-visible lg:px-0">
+				{#each creators as cr (cr.id)}
+					<a
+						href="/category?creator={handleSlug(cr.handle)}"
+						class="flex w-[150px] shrink-0 flex-col gap-2.5 rounded-[20px] border border-white/8 bg-white/3 p-3.5 text-left text-fg transition-colors lg:w-auto lg:flex-row lg:items-center lg:gap-4 lg:rounded-[22px] lg:p-5 lg:hover:border-white/25"
+					>
+						<Avatar creator={cr} size={44} class="lg:h-14 lg:w-14 lg:text-[18px]" />
+						<span class="min-w-0">
+							<span class="block text-[15px] font-bold lg:text-[16px]">{cr.name}</span>
+							<span class="mt-0.5 block text-[12px] text-fg-faint lg:text-[13px]">{cr.handle}</span>
+							<span class="mt-2.5 block text-[12px] font-bold text-accent lg:mt-1.5">{cr.count}개 제품</span>
+						</span>
+					</a>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<section class="mt-7 lg:mt-11">
 		<div class="flex items-baseline justify-between px-5 lg:px-0">
 			<h2 class="text-[18px] font-extrabold tracking-[-.02em] lg:text-[24px] lg:tracking-[-.025em]">새로 나온 레시피</h2>
-			<span class="text-[13px] text-fg-faint lg:text-[14px]">{PRODUCTS.length}개</span>
+			<span class="text-[13px] text-fg-faint lg:text-[14px]">{products.length}개</span>
 		</div>
-		<div class="mt-3 grid grid-cols-2 gap-2.5 px-5 lg:mt-4 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] lg:gap-3.5 lg:px-0">
-			{#each PRODUCTS as p (p.id)}
-				<ProductCard {p} />
-			{/each}
-		</div>
+		{#if products.length}
+			<div class="mt-3 grid grid-cols-2 gap-2.5 px-5 lg:mt-4 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] lg:gap-3.5 lg:px-0">
+				{#each products as p (p.code)}
+					<ProductCard {p} />
+				{/each}
+			</div>
+		{:else}
+			<div class="mx-5 mt-3 rounded-[18px] border border-dashed border-white/14 px-4 py-10 text-center text-[14px] text-fg-faint lg:mx-0">아직 올라온 레시피가 없어요.<br />곧 첫 제품이 열려요.</div>
+		{/if}
 	</section>
 </div>
