@@ -71,6 +71,7 @@
 | Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가 완료(2026-10-29 · Owner 가 넣음 · 프리뷰는 기존 `https://*-weglow-team.vercel.app/**`). 카카오 provider 는 셀러리와 공유(동의 화면 앱 이름 "셀러리" — docs/myr.md §9-2). Preview 에서 카카오 없이 로그인하려면 `PUBLIC_DEV_LOGIN=1` + 클라우드에 dev 계정(`dev-user.mjs` 는 service role 필요) — 아직 안 넣음 |
 | Supabase 스키마 | — | 0056 `myr_products` 클라우드 적용 + 시드 8개(2026-10-29). **루트 `.env.local` 은 로컬 Supabase(`127.0.0.1:54321`) 를 가리킨다** — 운영에 쓰는 값은 `vercel env pull --cwd apps/shop` 으로 `sellery-shop` 의 값을 가져와 넣었다(anon 키는 공개값). `vercel env add` 로 복사할 때 `.env.local` 값을 그대로 쓰면 로컬 주소가 운영에 들어간다(한 번 그랬다 · 같은 날 교체) |
 | 공개 주소 | `https://makeyourrecipe.vercel.app/influencer/oem/` · `https://sellery-branding.vercel.app/influencer/oem/`(옛 별칭) | `https://myr-shop.vercel.app`(도메인 결정 전) |
+| 로컬 로그인 테스트 | — | 루트 `.env.local` 은 **로컬 Supabase** 라 카카오 provider 가 없다(`Unsupported provider`). ① 카카오 없이: `/login` 의 Dev login 폼(`PUBLIC_DEV_LOGIN=1`) + `dev-user.mjs` 로 만든 로컬 계정 ② 카카오까지: 루트 `.env.cloud.local`(gitignore · 클라우드 `PUBLIC_SUPABASE_*` · `PUBLIC_DEV_LOGIN=0`) 을 두고 **`npm run dev:myr-shop:cloud`**(Vite `--mode cloud`) — Redirect URL 에 `localhost:5178` 이 있어 로그인 뒤 로컬로 돌아온다. 클라우드 값은 `vercel env pull --cwd apps/shop` 으로 |
 
 CLI 로 만들 때 `vercel link` 가 `apps/<앱>/.gitignore`(`.vercel` `.env*`) 와 `.env.local` 을 만들어 두는데, 루트 `.gitignore` 가 이미 둘 다 덮으므로 지운다. 프로젝트 안의 `.vercel/project.json` 은 커밋하지 않는다.
 
