@@ -19,6 +19,7 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test": "vitest run",
+    "test:db": "npx supabase test db --local",
     "gen:types": "npm run gen:types -w packages/db",
     "build": "npm run build --workspaces --if-present",
     "build:apps": "npm run build --workspaces --if-present"

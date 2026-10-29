@@ -69,8 +69,9 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 4. **계산 결과가 바뀌면 안 되는 변경은 "계산 결과 불변" 을 PR 에 명시하고 근거를 적는다** — 테스트, 또는 같은 입력의 전후 비교.
 5. **성능은 쿼리 수만 보지 않는다** — 루프 안에서 전체 컬렉션을 다시 훑는 순회(N×M)를 본다. 전체 순회·배치 경로(CSV 내보내기 · 크론 · 정산 실행)를 바꿨으면 운영 규모 시드로 전후 시간·메모리를 재서 PR 에 적는다.
 6. **권한은 서버 세션에서만 정한다** — actor(고객·인플루언서·브랜드·관리자)와 그 ID 는 요청 본문·쿼리에서 받지 않는다. service role 은 RLS 를 통과하므로 RPC 의 권한 검사가 마지막 방어선이다: `security definer` 함수는 본문에서 권한을 검사하고, anon·authenticated 의 EXECUTE 를 회수한다(0007 · 0052 와 같은 방식).
+7. **백엔드를 바꾸면 테스트를 같이 쓰고 돌린다**(2026-10-29) — 규칙·계산·매핑은 `$env`·`$app`·DB 를 import 하지 않는 순수 모듈로 떼어 vitest(`npm test` · `packages/*/src/test` · `apps/*/src/test`), 마이그레이션의 RPC·권한·상태 전이는 pgTAP(`npm run test:db` · `supabase/tests/*.test.sql` · 로컬 Supabase 에서 트랜잭션 롤백)으로. 새 `security definer` RPC 는 **anon·authenticated EXECUTE 없음** 과 **거부 코드(`{ ok:false, code }`) 전부**를 pgTAP 으로 고정한다. 둘 다 돌린 결과를 PR 본문에 적는다. 절차·패턴은 docs/testing.md.
 
-이 원칙은 CI 가 검사하지 못한다. PR 템플릿 "백엔드를 건드렸다면" 칸을 비워 두지 말 것.
+1~6 은 CI 가 검사하지 못한다(7 의 vitest · pgTAP 은 CI 가 돌린다). PR 템플릿 "백엔드를 건드렸다면" 칸을 비워 두지 말 것.
 
 ## 핵심 정책 (숫자는 코드 상수가 정답 · 사람용 설명은 docs/)
 

@@ -3,18 +3,17 @@
  *  체크아웃 때 서버가 code 로 다시 검증한다(M4). 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
  *  상태 변경은 전부 이 모듈의 메서드로만. */
 import { browser } from '$app/environment';
-import { FREE_SHIPPING, MAX_QTY, SHIPPING_FEE, won, type Product } from './data';
+import { cartTotals, isProduct, mergeLine, removeLine, sanitizeLines, setLineQty, type CartLine } from './cart';
+import type { Product } from './data';
 
 const LS_KEY = 'myr-shop-v2';
 
-export type CartLine = { product: Product; qty: number };
+export type { CartLine };
 export type OrderLine = { code: string; name: string; qty: number; amount: number; tile: string; ic: string };
 export type Order = { no: string; lines: OrderLine[]; subtotal: number; shipping: number; total: number; address: string; pay: string; at: string };
 export type Buyer = { name: string; phone: string; address: string };
 
 type Persisted = { cart: CartLine[]; likes: Product[]; buyer: Buyer; orders: Order[] };
-
-const isProduct = (p: unknown): p is Product => !!p && typeof p === 'object' && typeof (p as Product).code === 'string' && typeof (p as Product).price === 'number';
 
 function load(): Persisted {
 	const empty: Persisted = { cart: [], likes: [], buyer: { name: '', phone: '', address: '' }, orders: [] };
@@ -24,7 +23,7 @@ function load(): Persisted {
 		if (!raw) return empty;
 		const v = JSON.parse(raw) as Partial<Persisted>;
 		return {
-			cart: (v.cart ?? []).filter((l) => isProduct(l?.product) && Number.isInteger(l.qty) && l.qty > 0),
+			cart: sanitizeLines(v.cart),
 			likes: (v.likes ?? []).filter(isProduct),
 			buyer: { ...empty.buyer, ...(v.buyer ?? {}) },
 			orders: v.orders ?? []
@@ -63,28 +62,24 @@ class ShopState {
 		}
 	}
 
-	// ---- 장바구니 ----
-	cartCount = $derived(this.cart.reduce((n, l) => n + l.qty, 0));
+	// ---- 장바구니 (계산은 전부 lib/cart.ts — 테스트 src/test/cart.test.ts) ----
 	cartItems = $derived(this.cart.map((l) => ({ ...l.product, qty: l.qty, lineAmount: l.product.price * l.qty })));
-	subtotal = $derived(this.cartItems.reduce((n, it) => n + it.lineAmount, 0));
-	shipping = $derived(this.subtotal === 0 || this.subtotal >= FREE_SHIPPING ? 0 : SHIPPING_FEE);
-	total = $derived(this.subtotal + this.shipping);
-	shippingMsg = $derived(this.shipping ? `${won(FREE_SHIPPING - this.subtotal)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요');
+	totals = $derived(cartTotals(this.cart));
+	cartCount = $derived(this.totals.count);
+	subtotal = $derived(this.totals.subtotal);
+	shipping = $derived(this.totals.shipping);
+	total = $derived(this.totals.total);
+	shippingMsg = $derived(this.totals.shippingMsg);
 
 	add(product: Product, qty: number) {
-		const line = this.cart.find((l) => l.product.code === product.code);
-		if (line) {
-			line.qty = Math.min(MAX_QTY, line.qty + qty);
-			line.product = product; // 최신 가격·이름 스냅샷으로
-		} else this.cart.push({ product, qty: Math.min(MAX_QTY, qty) });
+		this.cart = mergeLine(this.cart, product, qty); // 같은 상품이면 합산 + 최신 가격·이름 스냅샷으로
 		this.showToast(`${product.name} ${qty}개를 담았어요`);
 	}
 	setQty(code: string, qty: number) {
-		const line = this.cart.find((l) => l.product.code === code);
-		if (line) line.qty = Math.max(1, Math.min(MAX_QTY, qty));
+		this.cart = setLineQty(this.cart, code, qty);
 	}
 	remove(code: string) {
-		this.cart = this.cart.filter((l) => l.product.code !== code);
+		this.cart = removeLine(this.cart, code);
 	}
 
 	// ---- 찜 ----
