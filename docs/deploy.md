@@ -58,6 +58,21 @@
 | Git | 같은 저장소 · Production Branch `main` · PR = Preview(앱별 URL 댓글) | 〃 | 〃 | 〃 | 연결은 남아 있으나 위 스킵으로 무효 |
 | 삭제 시점 | — | — | — | — | **2026-09-21 삭제 완료**(전환 당일 — 결제·환불·가입·채널 인증까지 실서비스 확인 뒤 1주 대기 없이 정리). 같은 날 옛 Supabase secret key(`default`) 삭제 · Redirect URLs 에서 `https://sellery-app.vercel.app/**` 제거 |
 
+**MYR 프로젝트(같은 팀 · 같은 저장소 · 셀러리 리라이트에 안 물림 — docs/myr.md §2)**
+
+| 항목 | `myr`(옛 `sellery-branding`) | `myr-shop` |
+|---|---|---|
+| 역할 | 제조의뢰 랜딩 `apps/myr`(base `/influencer/oem` · sellery.life 가 리라이트) | MYR 고객 샵 `apps/myr-shop`(base `''` · 자기 도메인 예정) |
+| 생성 | 2026-10-14 CLI → 대시보드 Git 연결 | **2026-10-29 CLI**(`vercel project add myr-shop --scope weglow-team` · `vercel link --project myr-shop` · `vercel project update myr-shop --root-directory apps/myr-shop --framework sveltekit-1 --node-version 22.x --yes`) |
+| Root Directory · Preset · Node | `apps/myr` · SvelteKit · 24.x | `apps/myr-shop` · SvelteKit · **22.x** |
+| Include source files outside of the Root Directory | ON | ON 으로 둘 것(대시보드만 가능 · M4 에서 `packages/*` 를 쓰므로 필수) |
+| Git | `weglow-dev/sellery` · Production `main` | `vercel git connect` 는 **Vercel 계정에 GitHub 로그인 연결이 없으면 400** — 대시보드 Account → Authentication 에서 GitHub 연결 뒤 다시 `vercel git connect --scope weglow-team --yes`, 또는 프로젝트 Settings → Git 에서 연결 |
+| 환경변수 | `SLACK_WEBHOOK_URL` · 메타 픽셀(§1.2) | UI 단계(docs/myr.md §7 M4-UI)는 **없음**. S2 부터 `PUBLIC_SUPABASE_*` · S5 부터 토스 · Resend |
+| Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가(프리뷰는 기존 `https://*-weglow-team.vercel.app/**` 가 덮는다) |
+| 공개 주소 | `https://makeyourrecipe.vercel.app/influencer/oem/` · `https://sellery-branding.vercel.app/influencer/oem/`(옛 별칭) | `https://myr-shop.vercel.app`(도메인 결정 전) |
+
+CLI 로 만들 때 `vercel link` 가 `apps/<앱>/.gitignore`(`.vercel` `.env*`) 와 `.env.local` 을 만들어 두는데, 루트 `.gitignore` 가 이미 둘 다 덮으므로 지운다. 프로젝트 안의 `.vercel/project.json` 은 커밋하지 않는다.
+
 Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자기 base). shop Preview 의 리라이트는 **프로덕션** 콘솔·데모를 가리킨다(결정 H). 정적 자산(`/assets/*`)은 shop 만 응답하므로 다른 앱 Preview 에서는 이미지 대신 이모지 폴백. Preview 의 결제 테스트는 브랜치 고정 도메인(`sellery-shop-git-<branch>-weglow-team.vercel.app`)을 쓰면 Supabase Redirect URL(와일드카드) · 토스 웹훅 URL 을 매번 바꾸지 않아도 된다.
 
 ### 1.2 환경변수 (이름만 · Production + Preview 둘 다 · 비밀은 "Sensitive")

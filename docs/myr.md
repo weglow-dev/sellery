@@ -265,7 +265,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 
 | 단계 | 내용 | 산출 |
 |---|---|---|
-| M0 도메인·외부 등록 | 도메인 결정 · Vercel 프로젝트 3개 · Supabase Redirect URLs · 카카오 사이트 도메인 · 토스 웹훅 · (Resend 도메인) — §2.1 | docs/deploy.md MYR 열 |
+| M0 도메인·외부 등록 | 도메인 결정 · Vercel 프로젝트 3개 · Supabase Redirect URLs · 카카오 사이트 도메인 · 토스 웹훅 · (Resend 도메인) — §2.1. **샵 몫(S0 · 2026-10-29)**: Vercel `myr-shop` 생성 · Root `apps/myr-shop` · SvelteKit · Node 22 까지 CLI 로 완료(docs/deploy.md §1.1 MYR 표). 남은 것 = GitHub 연결(계정 GitHub 로그인 연결 필요) · "Include source files outside of the Root Directory" ON · Supabase Redirect URLs(`localhost:5178` · `myr-shop.vercel.app`) | docs/deploy.md MYR 표 |
 | M1 스키마 | 0056 `myr_products` · 상품/검수 RPC · `myr_product_card` · `myr_home_products` | 마이그레이션 1개 · `gen:types` |
 | M2 인플루언서 콘솔 1 | `apps/myr-influencer` 생성(가입·로그인·홈·상품 등록/수정/토글) | 앱 1 |
 | M3 운영 콘솔 1 | `apps/myr-admin` 생성(로그인 · 상품 검수) | 앱 1 |
