@@ -252,7 +252,7 @@
 	</aside>
 
 	<!-- 모바일 하단 담기 바 -->
-	<div class="sticky bottom-0 z-10 flex w-full items-center gap-2.5 bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
+	<div class="sticky bottom-0 z-10 flex w-full items-center gap-2.5 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 		<QtyStepper {qty} onchange={(q) => (qty = q)} />
 		<button
 			type="button"

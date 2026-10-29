@@ -71,7 +71,7 @@
 
 	<!-- 모바일 하단 합계 바 -->
 	{#if shop.cartItems.length}
-		<div class="sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-25% px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
+		<div class="sticky bottom-0 z-10 w-full border-t border-white/6 bg-bg px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
 			<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{won(shop.total)} 주문하기</a>
 		</div>

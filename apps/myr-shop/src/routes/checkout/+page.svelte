@@ -133,7 +133,7 @@
 	</div>
 
 	<!-- 모바일 하단 결제 바 -->
-	<div class="sticky bottom-0 z-10 w-full bg-gradient-to-b from-bg/0 to-bg to-35% px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
+	<div class="sticky bottom-0 z-10 w-full border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden {shop.ready && shop.cartItems.length === 0 ? 'hidden' : ''}">
 		<button type="submit" form="checkout-form" disabled={!canPay} class="{payBtn} {canPay ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{won(shop.total)} 결제하기</button>
 	</div>
 </div>
