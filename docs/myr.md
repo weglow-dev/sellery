@@ -105,7 +105,7 @@ myr_orders              code('o' || seq · 주문번호 하나) · checkout_id �
                           courier · tracking_no · shipped_at · delivered_at(0049) — **주문 단위 1건 · 물류센터가 입력**
                           exchange_courier · exchange_tracking_no · exchange_shipped_at(§6.4)
 myr_order_items         order_id · seller_id · product_id · option_name · qty · unit_price · amount
-                          seller_margin_rate 스냅샷(정산 기준) · status('PAID'|'REFUNDED') · refund_amount · refunded_at · refund_reason · refund_actor
+                          seller_margin_rate 스냅샷(정산 기준) · status('PAID'|'PARTIAL_REFUNDED'|'REFUNDED') · refunded_qty · refund_amount(= unit_price × refunded_qty 누적) · refunded_at · refund_reason · refund_actor
                           → **정산 · 환불 · CS · 실적의 단위.** 셀러 콘솔은 `seller_id = 내 id` 인 줄만 본다
 myr_cs_conversations    ← 0005 cs_conversations, brand_id → seller_id · campaign_id → product_id · order_id + order_item_id(소유 증명될 때만)
 myr_cs_messages         ← 0005 cs_messages, sender('customer'|'seller'|'admin')
@@ -123,7 +123,7 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 검수 | `myr_app_admin_products(status?)` · `myr_app_admin_review_product(id, 'approve'|'reject', reason)` · `myr_app_admin_force_status` | 0015 `app_admin_review_product` |
 | 공개 | `myr_product_card(code)` · `myr_home_products(category?)` | 0003/0008 `campaign_card` |
 | 결제 | `myr_app_checkout_reserved(product_id)` · `myr_app_create_checkout(items[], …)`(줄마다 listed · 재고 · 가격 서버 검증 → 세션 + 줄 insert · 한 줄이라도 미달이면 전체 거절) · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(**줄의 products 행 전부 `for update` — id 순서로 잠가 교착 방지** · 전부 통과해야 주문 1건 + 줄 N건 insert · 하나라도 품절이면 ok:false → 호출부가 토스 전액 취소 · 가상계좌면 `WAITING_DEPOSIT` §6.7) · `myr_app_deposit_done(order)` · `myr_app_deposit_expire(order)` | 0008 (+ 다중 줄 · 가상계좌) |
-| 환불 | `myr_app_refund_precheck(order_item_ids[], actor, actor_id)` · `myr_app_refund_record(order_item_ids[], actor, cancel_amount, raw, …)` — **한 벌 · 줄 단위.** 고객의 "전체 환불" 은 모든 줄을 넘기는 것. actor 별 가드: customer = 본인 주문의 줄 · 발송 전 / seller = `seller_id = actor_id` 인 줄만 · 발송 뒤 허용 / admin = 전부. 기록은 줄 `REFUNDED` + 주문 `refund_amount` 누적 + 주문 status 파생 | 0008 · 0018 · 0020 을 합치고 부분 취소로 |
+| 환불 | `myr_app_refund_precheck(items[{item_id, qty}], actor, actor_id)` · `myr_app_refund_record(items[], actor, cancel_amount, raw, …)` — **한 벌 · 줄 × 수량 단위.** 고객의 "전체 환불" 은 모든 줄의 남은 수량을 넘기는 것. actor 별 가드: customer = 본인 주문의 줄 · 발송 전 / seller = `seller_id = actor_id` 인 줄만 · 발송 뒤 허용 / admin = 전부. 기록은 줄 `REFUNDED` + 주문 `refund_amount` 누적 + 주문 status 파생 | 0008 · 0018 · 0020 을 합치고 부분 취소로 |
 | 주문 | `myr_app_orders(actor, actor_id, filter)` · `myr_app_order(actor, actor_id, code)` — seller 는 **내 줄이 있는 주문만, 응답도 내 줄 + 배송 상태(수취인 원문 없음)** · admin 은 전부 + 수취인 원문 · `myr_app_ship_order(admin, code, courier, tracking)` · `myr_app_ship_orders`(CSV) · `myr_app_exchange_ship(admin, …)` · `myr_app_po_rows(admin)` — **운송장·발주서는 admin 만**(결정 8) | 0018 `app_brand_*` · 0020 `app_admin_orders` 를 합침 |
 | CS | `myr_app_cs_open(product_id, …)`(0041 소유 증명 그대로) · `myr_app_cs_thread(actor, …)`(customer = client_token · seller = 내 것 · admin = 전부) · `myr_app_cs_reply(actor, actor_id, …)`(customer 추가 문의 · seller 답변 · admin 대행 답변 `sender='seller'`) · `myr_app_cs_list(actor, actor_id, status?)` · `myr_app_cs_close(actor, …)` | 0018 · 0041 · 0020 을 합침 |
 | 실적 | `myr_app_seller_sales(seller)` — gross · refunds · net · 상품별 · 예상 정산액 = net × margin · admin 은 `myr_app_admin_sales(seller?)` 로 같은 집계 | 0013 `app_seller_sales` 의 축소판 |
@@ -135,7 +135,7 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 |---|---|---|---|
 | 토스 승인 · 취소 · 조회 | `packages/payments/src/server/myr/toss.server.ts`(기존 `toss.server.ts` 그대로) | — | 전부(간접) |
 | 체크아웃 세션 · 승인 확정 · 복구 | `payments/server/myr/checkout.server.ts` — `createCheckout` · `confirmCheckout` · `syncFromToss` | `myr_app_claim/confirm_checkout` · `myr_app_deposit_*` | shop(고객 · 웹훅 · reconcile) |
-| 환불 | `payments/server/myr/refund.server.ts` — `refundItems({ actor, actorId, orderCode, itemIds, reason })` 하나. precheck 가 돌려준 줄 합계를 토스 `cancelAmount` 로 **부분 취소**(마지막 줄이면 토스가 전액 취소로 처리). Idempotency-Key 는 **`${order.id}:${정렬한 itemIds 해시}`**(같은 줄 묶음의 재시도는 같은 키 · 다른 줄은 다른 키) | `myr_app_refund_precheck/record` | shop `/api/payments/cancel`(customer · 전체 또는 줄) · influencer `/orders/[code] ?/refund`(seller · 내 줄) · admin `/orders/[code] ?/refund`(admin) |
+| 환불 | `payments/server/myr/refund.server.ts` — `refundItems({ actor, actorId, orderCode, items:[{itemId, qty}], reason })` 하나. precheck 가 돌려준 `Σ(unit_price × qty)` 를 토스 `cancelAmount` 로 **부분 취소**(남은 수량이 0이 되면 토스가 전액 취소로 처리). Idempotency-Key 는 **`${order.id}:${정렬한 items 해시}`**(같은 줄·수량 묶음의 재시도는 같은 키 · 다른 묶음은 다른 키) | `myr_app_refund_precheck/record` | shop `/api/payments/cancel`(customer · 전체 또는 줄) · influencer `/orders/[code] ?/refund`(seller · 내 줄) · admin `/orders/[code] ?/refund`(admin) |
 | 운송장 · 교환 발송 · 발주서 | `db/server/myr/orders.server.ts` — `listOrders` · `getOrder`(`{ actor, actorId }`) · `shipOrder` · `shipOrdersCsv` · `exchangeShip` · `poRows`(admin 전용) | `myr_app_orders/ship_*` | 열람 influencer(seller) · admin / 발송 admin 만 |
 | 문의 | `db/server/myr/cs.server.ts` — `openCs`(고객만) · `listCs` · `getCsThread` · `replyCs` · `closeCs`(`{ actor, actorId \| clientToken }`) | `myr_app_cs_*` | shop(customer) · influencer(seller) · admin(admin) |
 | 상품 | `db/server/myr/products.server.ts` — `upsertProduct`(seller) · `setProductStatus({ actor })`(seller = listed↔paused · admin = 전부) · `reviewProduct`(admin) · `productCard` · `homeProducts`(anon) | `myr_app_*product*` | influencer · admin · shop |
@@ -230,12 +230,13 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 - 그 외(멱등 선점 · 불명 재조회 · 비회원 쿠키 · 레이트리밋 · 30분 만료 · 본인 PENDING 세션 supersede) 는 0008 과 `apps/shop` 라우트 주석 그대로 — 결제 단위(`myr_checkouts`) 에 붙는다.
 
 ### 6.3 환불 — 줄 단위 부분 취소
-- 결제 1건에 셀러가 여럿이므로 환불 단위는 **주문 줄**이다. 토스에는 `cancelAmount = 환불 줄 합계` 로 **부분 취소**를 보낸다. 마지막 남은 줄까지 취소되면 토스가 전액 취소(`CANCELED`) 로 처리한다.
+- 여러 품목을 한 번에 주문하므로 **부분 환불이 기본**이다. 단위는 **주문 줄 × 수량** — 입력은 `[{ item_id, qty }]`(줄 전체 = 그 줄의 남은 수량 · 주문 전체 = 모든 줄). 토스에는 `cancelAmount = Σ(unit_price × qty)` 로 **부분 취소**를 보낸다(같은 결제에 부분 취소 여러 번 가능). 마지막 남은 수량까지 취소되면 토스가 전액 취소(`CANCELED`) 로 처리한다.
+- 수량 일부 환불은 `refunded_qty` 를 올리고 줄은 `PARTIAL_REFUNDED`, 남은 수량이 0이면 `REFUNDED`. `sold_qty` · 실적 · 정산은 `qty − refunded_qty` 기준.
 - **`PARTIAL_CANCELED` 는 MYR 에서 정상 상태**다. 셀러리는 "콘솔에서 누가 건드린 이상 상태" 로 보고 운영 큐에 넣었지만(0008 §7.3), MYR 의 reconcile · 웹훅은 토스 `cancels[]` 합계를 `myr_orders.refund_amount` 와 대조해 **줄 기록이 빠진 만큼만** 운영 큐에 올린다(토스 콘솔에서 금액만 취소한 경우 — 어느 줄인지 모르므로 사람이 지정).
 - 고객 셀프: 본인 주문 · 발송 전 · 줄 선택(기본 전체) → 부분/전액 취소 → `myr_app_refund_record(item_ids, actor='customer')` → 환불 메일. 발송 뒤는 "고객센터(문의)" 로.
 - 인플루언서: `seller_id = 내 id` 인 줄만 · **발송 뒤도 허용**(회수 확인은 인플루언서 판단 · `after_ship` 기록). 남의 줄은 `FORBIDDEN`.
 - 운영 대행: `actor='admin'` · 아무 줄.
-- 기록: 줄 `status='REFUNDED'` · `refund_amount` · `refund_actor` · 주문 `refund_amount` 누적 · 주문 status 파생(`PARTIAL_REFUNDED` / `REFUNDED`) · `sold_qty` 재계산 · 실적·정산은 줄의 `REFUNDED` 를 뺀다.
+- 기록: 줄 `refunded_qty` · `refund_amount` · `refund_actor` · status 파생 · 주문 `refund_amount` 누적 · 주문 status 파생(`PARTIAL_REFUNDED` / `REFUNDED`) · `sold_qty` 재계산 · 실적·정산은 환불 수량을 뺀다.
 - 배송비: 줄 환불 때 배송비는 **돌려주지 않는다**(기본) · 모든 줄이 환불되면 배송비까지 전액. 남은 줄 합계가 무료배송 기준 아래로 떨어져도 배송비를 사후 청구하지 않는다(§9-11 에 대안).
 - 가상계좌 `WAITING_DEPOSIT` 은 토스 호출 없이 상태만 취소(§6.7).
 
