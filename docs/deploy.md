@@ -65,8 +65,8 @@
 | 역할 | 제조의뢰 랜딩 `apps/myr`(base `/influencer/oem` · sellery.life 가 리라이트) | MYR 고객 샵 `apps/myr-shop`(base `''` · 자기 도메인 예정) |
 | 생성 | 2026-10-14 CLI → 대시보드 Git 연결 | **2026-10-29 CLI**(`vercel project add myr-shop --scope weglow-team` · `vercel link --project myr-shop` · `vercel project update myr-shop --root-directory apps/myr-shop --framework sveltekit-1 --node-version 22.x --yes`) |
 | Root Directory · Preset · Node | `apps/myr` · SvelteKit · 24.x | `apps/myr-shop` · SvelteKit · **22.x** |
-| Include source files outside of the Root Directory | ON | ON 으로 둘 것(대시보드만 가능 · M4 에서 `packages/*` 를 쓰므로 필수) |
-| Git | `weglow-dev/sellery` · Production `main` | `vercel git connect` 는 **Vercel 계정에 GitHub 로그인 연결이 없으면 400** — 대시보드 Account → Authentication 에서 GitHub 연결 뒤 다시 `vercel git connect --scope weglow-team --yes`, 또는 프로젝트 Settings → Git 에서 연결 |
+| Include source files outside of the Root Directory | ON | **ON**(2026-10-29 확인 · 새 프로젝트 기본값이 Enabled) — M4 에서 `packages/*` 를 쓰므로 필수 |
+| Git | `weglow-dev/sellery` · Production `main` | `weglow-dev/sellery` · Production Branch `main`(Settings → Environments). `vercel git connect` 는 **Vercel 계정에 GitHub 로그인 연결이 없으면 400** → 2026-10-29 대시보드 Account → Authentication 에서 GitHub 연결 뒤 Settings → Git 으로 연결. 연결 직후 `feat/myr-shop-ui` 푸시가 한 번 **Production** 으로 배포돼 `myr-shop.vercel.app` 이 그 브랜치를 보여줬다(`main` 에 앱이 없을 때의 첫 배포) — #226 병합 뒤 `main` 배포가 덮는다 |
 | 환경변수 | `SLACK_WEBHOOK_URL` · 메타 픽셀(§1.2) | UI 단계(docs/myr.md §7 M4-UI)는 **없음**. S2 부터 `PUBLIC_SUPABASE_*` · S5 부터 토스 · Resend |
 | Supabase Redirect URLs | — | `http://localhost:5178/**` · `https://myr-shop.vercel.app/**` 추가(프리뷰는 기존 `https://*-weglow-team.vercel.app/**` 가 덮는다) |
 | 공개 주소 | `https://makeyourrecipe.vercel.app/influencer/oem/` · `https://sellery-branding.vercel.app/influencer/oem/`(옛 별칭) | `https://myr-shop.vercel.app`(도메인 결정 전) |
