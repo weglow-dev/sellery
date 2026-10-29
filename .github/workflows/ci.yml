@@ -44,3 +44,19 @@ jobs:
         run: node scripts/check-migrations.mjs
       - name: build (apps/*/.vercel/output)
         run: npm run build
+
+  # 마이그레이션의 RPC · 권한 · 상태 전이를 pgTAP 으로 (docs/testing.md §2). 빈 로컬 Postgres 에 supabase/migrations 전부를 적용한 뒤
+  # supabase/tests/*.test.sql 을 돌린다 — 마이그레이션이 빈 DB 에서 순서대로 적용되는지도 같이 검증된다. 비밀키 없음 (로컬 컨테이너 기본값).
+  # 브랜치 보호의 required check 는 아직 "프로토타입 점검" 뿐 — 이 job 이 안정되면 추가한다.
+  db-test:
+    name: DB 테스트 (pgTAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: 로컬 Postgres 시작 + 마이그레이션 적용
+        run: supabase db start
+      - name: pgTAP (supabase/tests)
+        run: supabase test db --local

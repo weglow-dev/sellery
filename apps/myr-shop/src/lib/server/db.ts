@@ -9,64 +9,24 @@
 import { dev } from '$app/environment';
 import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { MOCK_PRODUCTS, genericDetail, relatedOf, type Creator, type Product } from '$lib/data';
+import { MOCK_PRODUCTS, relatedOf, type Product } from '$lib/data';
+import { fromRow, type Row } from '$lib/product-row';
 
 export type Source = 'db' | 'mock';
+export { fromRow };
 
 let client: SupabaseClient | null | undefined;
 function supabase(): SupabaseClient | null {
 	if (client !== undefined) return client;
-	client = PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY ? createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
+	client =
+		PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY
+			? createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+			: null;
 	if (!client) console.warn('[myr-shop] PUBLIC_SUPABASE_URL/ANON_KEY 가 비어 있어 목 데이터로 렌더합니다');
 	return client;
 }
 
-type Row = Record<string, unknown>;
-const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
-
-function creatorOfRow(c: unknown): Creator {
-	const r = (c ?? {}) as Row;
-	return { id: str(r.id), name: str(r.name, '크리에이터'), handle: str(r.handle, '@'), avatarUrl: typeof r.avatar_url === 'string' ? r.avatar_url : null };
-}
-
-/** RPC 응답 1건 → Product. 상세 섹션이 비어 있으면 기본 템플릿(운영 스크립트가 채우지만 방어) */
-export function fromRow(r: Row): Product {
-	const ingredients = arr<string>(r.ingredients);
-	const howto = str(r.howto);
-	const fallback = genericDetail({ ingredients, howto });
-	const tag = str(r.tag);
-	return {
-		id: str(r.id),
-		code: str(r.code),
-		cat: str(r.category),
-		creator: creatorOfRow(r.creator),
-		name: str(r.name),
-		sub: str(r.sub),
-		price: typeof r.price === 'number' ? r.price : 0,
-		unit: str(r.unit),
-		tile: str(r.tile, 'linear-gradient(145deg,#6b7280,#262a33)'),
-		thumbUrl: typeof r.thumb_url === 'string' ? r.thumb_url : null,
-		ic: str(r.icon, 'pill'),
-		form: str(r.form),
-		pack: str(r.pack),
-		flavor: str(r.flavor),
-		tag: tag === 'BEST' || tag === 'NEW' ? tag : '',
-		chips: arr<string>(r.chips),
-		ingredients,
-		note: str(r.note),
-		howto,
-		specs: arr(r.specs),
-		soldOut: r.sold_out === true,
-		storyTitle: str(r.story_title) || fallback.storyTitle,
-		story: str(r.story) || fallback.story,
-		points: arr(r.points).length ? arr(r.points) : fallback.points,
-		ingredientRows: arr(r.ingredient_rows).length ? arr(r.ingredient_rows) : fallback.ingredientRows,
-		howtoTitle: str(r.howto_title) || fallback.howtoTitle,
-		howtoSteps: arr(r.howto_steps).length ? arr(r.howto_steps) : fallback.howtoSteps,
-		faq: arr(r.faq).length ? arr(r.faq) : fallback.faq
-	};
-}
 
 export async function listProducts(): Promise<{ products: Product[]; source: Source }> {
 	const sb = supabase();

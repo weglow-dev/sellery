@@ -21,6 +21,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { normHandle, toRow, validateProduct } from "./lib/myr-products-plan.mjs";
 
 function loadEnv() {
   if (process.env.PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
@@ -57,41 +58,9 @@ for (let i = 1; i < argv.length; i++) {
   } else args.push(a);
 }
 
-const CATEGORIES = ["diet", "inner", "derma", "hair", "mental", "mens"];
-const CODE_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
-const normHandle = (h) => "@" + String(h ?? "").trim().replace(/^@+/, "").toLowerCase();
-
 function fail(msg) {
   console.error(`[myr-products] ${msg}`);
   process.exit(1);
-}
-
-/** 상세 섹션이 비어 있으면 기본 템플릿 — apps/myr-shop lib/data.ts genericDetail 과 같은 문구 */
-function withDetail(p) {
-  const why = ["핵심 기능성 성분이에요", "흡수와 효과를 돕는 보조 성분이에요", "매일 필요한 기본 영양소예요", "안정성과 밸런스를 위해 넣었어요"];
-  const role = ["주성분", "보조", "기본", "밸런스"];
-  const ingredients = p.ingredients ?? [];
-  return {
-    story_title: p.story_title ?? "매일 챙기기 쉬운 것만 남겼어요",
-    story: p.story ?? '제가 직접 매일 먹고 바르는 것 중에서 꼭 필요한 것만 골랐어요. 성분은 단순하게, 함량은 타협 없이. 팔로워분들이 "이건 뭐예요?" 물어보던 질문에 제품으로 답한 거예요.',
-    points: p.points ?? [
-      { big: "1일 1회", t: "루틴", d: "복잡하지 않게" },
-      { big: `${ingredients.length}가지`, t: "핵심 성분", d: "필요한 것만" },
-      { big: "100%", t: "함량 공개", d: "숨기지 않아요" },
-    ],
-    ingredient_rows: p.ingredient_rows ?? ingredients.map((n, i) => ({ name: n, why: why[i % 4], amount: role[i % 4] })),
-    howto_title: p.howto_title ?? "이렇게 드세요",
-    howto_steps: p.howto_steps ?? [
-      { t: "하루 한 번", d: p.howto ?? "" },
-      { t: "꾸준히", d: "최소 4주 이상 루틴으로 이어가 주세요." },
-      { t: "보관", d: "직사광선을 피해 서늘한 곳에 보관하세요." },
-    ],
-    faq: p.faq ?? [
-      { q: "언제 먹는 게 좋아요?", a: p.howto ?? "" },
-      { q: "다른 영양제와 같이 먹어도 되나요?", a: "네, 일반적인 영양제와 함께 드셔도 괜찮아요. 복용 중인 약이 있다면 전문가와 상의하세요." },
-      { q: "환불·교환이 되나요?", a: "미개봉 제품은 수령 후 7일 이내 교환·환불이 가능해요." },
-    ],
-  };
 }
 
 async function sellerByHandle(handle) {
@@ -131,51 +100,23 @@ async function cmdImport() {
     console.log(`creator  ${handle}  생성 ${data.id.slice(0, 8)}  (계정 미연결 — partner-admin.mjs invite <email> --link <id> 로 연결)`);
   }
 
-  // 2) 상품 → myr_products (code 기준 upsert)
+  // 2) 상품 → myr_products (code 기준 upsert). 검증 · 행 조립은 lib/myr-products-plan.mjs(테스트됨) — 하나라도 틀리면 아무것도 넣지 않는다.
+  const problems = products.flatMap((p, i) => validateProduct(p).map((m) => `products[${i}] ${p?.code ?? "?"}: ${m}`));
+  if (problems.length) fail(`시드 파일 검증 실패\n  ${problems.join("\n  ")}`);
   let n = 0;
   for (const p of products) {
-    const code = String(p.code ?? "").trim().toLowerCase();
-    if (!CODE_RE.test(code)) fail(`product code 형식: ${p.code}`);
     const handle = normHandle(p.creator);
     let sellerId = sellerIds.get(handle);
     if (!sellerId) {
       const s = await sellerByHandle(handle);
-      if (!s) fail(`product ${code}: creator ${handle} 가 sellers 에 없음 — creators[] 에 넣거나 먼저 만들 것`);
+      if (!s) fail(`product ${p.code}: creator ${handle} 가 sellers 에 없음 — creators[] 에 넣거나 먼저 만들 것`);
       sellerId = s.id;
     }
-    if (!CATEGORIES.includes(p.category)) fail(`product ${code}: category 는 ${CATEGORIES.join("|")} 중 하나`);
-    if (!Number.isInteger(p.price) || p.price < 0) fail(`product ${code}: price 정수 필요`);
-    const row = {
-      code,
-      seller_id: sellerId,
-      category: p.category,
-      name: String(p.name ?? "").trim(),
-      sub: p.sub ?? "",
-      unit: p.unit ?? "",
-      price: p.price,
-      options: Array.isArray(p.options) ? p.options : [],
-      tile: p.tile ?? null,
-      thumb_url: p.thumb_url ?? null,
-      icon: p.icon ?? "pill",
-      form: p.form ?? "",
-      pack: p.pack ?? "",
-      flavor: p.flavor ?? "",
-      tag: p.tag ?? "",
-      chips: p.chips ?? [],
-      ingredients: p.ingredients ?? [],
-      note: p.note ?? "",
-      howto: p.howto ?? "",
-      specs: Array.isArray(p.specs) ? p.specs : [],
-      ...withDetail(p),
-      stock: Number.isInteger(p.stock) ? p.stock : 0,
-      status,
-      seller_margin_rate: typeof p.seller_margin_rate === "number" ? p.seller_margin_rate : null,
-    };
-    if (!row.name) fail(`product ${code}: name 필요`);
+    const row = toRow(p, sellerId, status);
     const { error } = await db.from("myr_products").upsert(row, { onConflict: "code" });
-    if (error) fail(`myr_products upsert 실패(${code}): ${error.message}`);
+    if (error) fail(`myr_products upsert 실패(${row.code}): ${error.message}`);
     n++;
-    console.log(`product  ${code.padEnd(28)} ${row.name}  ${status}`);
+    console.log(`product  ${row.code.padEnd(28)} ${row.name}  ${status}`);
   }
   console.log(`\n완료 — 크리에이터 ${creators.length} · 상품 ${n} (status ${status})`);
 }

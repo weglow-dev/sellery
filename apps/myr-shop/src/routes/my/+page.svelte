@@ -3,10 +3,12 @@
 	import { shop } from '$lib/state.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 마이 — 프로필 카드 · 주문/찜 수 · 최근 주문 · 찜한 레시피 · 메뉴.
-	 *  로그인은 M4(카카오 · 비회원) — 지금은 결제 때 적은 이름·연락처를 보여준다. 포인트는 1차 범위 밖(docs/myr.md §9-12)이라 칸을 두지 않는다.
+	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문 · 찜한 레시피 · 메뉴.
+	 *  로그인은 레이아웃 data.user(카카오 · S3). 비로그인이면 로그인 CTA. 포인트는 1차 범위 밖(docs/myr.md §9-12)이라 칸을 두지 않는다.
 	 *  PC(lg): 왼쪽 sticky 프로필+메뉴 · 오른쪽 주문/찜 */
-	const name = $derived(shop.buyer.name.trim());
+	let { data } = $props();
+	const user = $derived(data.user);
+	const name = $derived(user?.name ?? shop.buyer.name.trim());
 	const LANDING = 'https://sellery.life/influencer/oem';
 	const menu = [
 		{ name: '배송지 관리', href: '/checkout' },
@@ -32,8 +34,24 @@
 	<!-- 프로필 + 메뉴 (PC 는 왼쪽 sticky) -->
 	<aside class="contents lg:sticky lg:top-[104px] lg:flex lg:flex-col lg:gap-3">
 		<div class="mt-2 flex items-center gap-3.5 rounded-3xl border border-white/7 bg-panel p-5 lg:mt-0 lg:flex-col lg:items-start lg:gap-3.5 lg:p-6">
-			<span class="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-accent text-[18px] font-extrabold text-bg lg:h-[60px] lg:w-[60px] lg:text-[22px]" aria-hidden="true">{(name || 'M')[0].toUpperCase()}</span>
-			<div class="min-w-0 flex-1"><p class="text-[17px] font-extrabold lg:text-[19px]">{name || 'MYR 멤버'}</p><p class="mt-[3px] text-[13px] text-fg-faint lg:mt-1">{shop.buyer.phone || '로그인하고 혜택을 받아보세요'}</p></div>
+			{#if user?.avatar}
+				<img src={user.avatar} alt="" class="h-[52px] w-[52px] rounded-full object-cover lg:h-[60px] lg:w-[60px]" />
+			{:else}
+				<span class="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-accent text-[18px] font-extrabold text-bg lg:h-[60px] lg:w-[60px] lg:text-[22px]" aria-hidden="true">{(name || 'M')[0].toUpperCase()}</span>
+			{/if}
+			<div class="min-w-0 flex-1">
+				<p class="text-[17px] font-extrabold lg:text-[19px]">{name || 'MYR 멤버'}</p>
+				{#if user}
+					<p class="mt-[3px] truncate text-[13px] text-fg-faint lg:mt-1">{user.email ?? shop.buyer.phone ?? '카카오 계정'}</p>
+				{:else}
+					<a href="/login?next=/my" class="mt-1 inline-flex h-8 items-center rounded-[10px] bg-accent px-3 text-[12.5px] font-extrabold text-bg">카카오로 로그인</a>
+				{/if}
+			</div>
+			{#if user}
+				<form method="post" action="/auth/signout" class="shrink-0 lg:self-end">
+					<button type="submit" class="h-8 rounded-[10px] border border-white/12 px-3 text-[12px] font-bold text-fg-faint hover:text-fg">로그아웃</button>
+				</form>
+			{/if}
 			<div class="hidden w-full grid-cols-2 gap-2 border-t border-white/7 pt-1.5 lg:grid">
 				<div><p class="mt-2 text-[20px] font-extrabold text-accent">{shop.orders.length}</p><p class="mt-0.5 text-[12px] text-fg-faint">주문</p></div>
 				<div><p class="mt-2 text-[20px] font-extrabold">{shop.likes.length}</p><p class="mt-0.5 text-[12px] text-fg-faint">찜</p></div>
