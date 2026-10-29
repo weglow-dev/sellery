@@ -3,8 +3,10 @@
  *   listProducts()         `myr_home_products()` — 홈 · 카테고리
  *   getProductCard(code)   `myr_product_card(code)` — 상품 페이지 + 함께 보면 좋은 레시피
  * `PUBLIC_SUPABASE_*` 가 비면(키 없는 로컬 · CI 더미) **목 데이터**로 돌아간다 — 응답의 `source` 로 화면이 알 수 있다.
+ * dev 서버는 RPC 가 실패해도(0056 미적용 등) 목 데이터로 떨어진다. 프로덕션은 빈 목록/404 + 에러 로그.
  * 세션·쿠키는 아직 없다(S3). 서버 전용(`$lib/server`) — 브라우저 번들에 anon 키가 실리지 않게.
  */
+import { dev } from '$app/environment';
 import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { MOCK_PRODUCTS, genericDetail, relatedOf, type Creator, type Product } from '$lib/data';
@@ -71,7 +73,8 @@ export async function listProducts(): Promise<{ products: Product[]; source: Sou
 	if (!sb) return { products: MOCK_PRODUCTS, source: 'mock' };
 	const { data, error } = await sb.rpc('myr_home_products');
 	if (error) {
-		console.error('[myr-shop] myr_home_products failed:', error.message);
+		console.error('[myr-shop] myr_home_products failed:', error.message, dev ? '— dev 라 목 데이터로' : '');
+		if (dev) return { products: MOCK_PRODUCTS, source: 'mock' };
 		return { products: [], source: 'db' };
 	}
 	return { products: arr<Row>(data).map(fromRow), source: 'db' };
@@ -85,7 +88,11 @@ export async function getProductCard(code: string): Promise<{ product: Product; 
 	}
 	const { data, error } = await sb.rpc('myr_product_card', { p_code: code });
 	if (error) {
-		console.error('[myr-shop] myr_product_card failed:', error.message);
+		console.error('[myr-shop] myr_product_card failed:', error.message, dev ? '— dev 라 목 데이터로' : '');
+		if (dev) {
+			const p = MOCK_PRODUCTS.find((x) => x.code === code);
+			return p ? { product: p, related: relatedOf(p, MOCK_PRODUCTS), source: 'mock' } : null;
+		}
 		return null;
 	}
 	if (!data || typeof data !== 'object') return null;
