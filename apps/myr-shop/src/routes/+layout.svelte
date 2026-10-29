@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import { bumpDepth } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
+	import SiteHeader from '$lib/components/SiteHeader.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 
@@ -29,11 +30,15 @@
 	<meta name="description" content="인플루언서가 레시피부터 패키지까지 직접 고른 제품만 모았어요. Make Your Recipe." />
 </svelte:head>
 
-<!-- 폰 프레임 — 데스크톱에서는 430px 폭으로 가운데. 각 화면이 자기 상단 헤더와 하단 바를 가진다 -->
-<div class="relative mx-auto min-h-dvh w-full max-w-[430px] bg-bg">
-	{#key page.url.pathname}
-		{@render children()}
-	{/key}
+<!-- 모바일(~lg): 430px 폰 프레임을 가운데 · 각 화면이 자기 헤더와 하단 바. PC(lg~): 상단 내비 + 1240px 컨테이너 (디자인 "MYR Shop PC") -->
+<SiteHeader />
+<!-- 탭바가 있는 화면은 flex 세로 — 화면 내용이 flex-1, 탭바가 마지막(sticky bottom) -->
+<div class="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-bg lg:block lg:min-h-0 lg:max-w-none">
+	<div class="flex-1">
+		{#key page.url.pathname}
+			{@render children()}
+		{/key}
+	</div>
 	{#if showTabs}
 		<TabBar />
 	{/if}
