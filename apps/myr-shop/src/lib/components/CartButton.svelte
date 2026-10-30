@@ -15,6 +15,6 @@
 	>
 	{#if shop.cartCount}
 		<!-- 버튼 모서리 바깥쪽에 걸치게 두고 ring 으로 배경과 분리 — 아이콘을 가리지 않는다. 9 넘으면 '9+' -->
-		<span class="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg"><span class="mt-px">{shop.cartBadge}</span></span>
+		<span class="absolute -top-0.5 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg"><span class="mt-px">{shop.cartBadge}</span></span>
 	{/if}
 </a>
