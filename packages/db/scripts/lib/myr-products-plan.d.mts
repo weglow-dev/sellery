@@ -31,7 +31,6 @@ export type ProductRow = Detail & {
   ingredients: string[];
   note: string;
   howto: string;
-  specs: unknown[];
   stock: number;
   status: string;
   seller_margin_rate: number | null;

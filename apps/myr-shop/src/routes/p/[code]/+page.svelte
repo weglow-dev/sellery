@@ -140,16 +140,7 @@
 			<!-- 04 제품 정보 -->
 			<section id="info" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>04 · 제품 정보</p>
-				<div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] lg:gap-2.5">
-					{#each p.specs as sp (sp.k)}
-						<div class="{card} flex flex-col items-start gap-1.5 px-3 py-3.5 lg:gap-2 lg:rounded-[18px] lg:p-[18px]">
-							<span class="text-white/90"><Icon id={sp.ic} size={22} /></span>
-							<span class="text-[11px] text-fg-faint lg:text-[12px]">{sp.k}</span>
-							<span class="text-[13px] font-bold lg:text-[15px]">{sp.v}</span>
-						</div>
-					{/each}
-				</div>
-				<div class="mt-2.5 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-3">
+				<div class="mt-4 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-5">
 					{#each infoRows as r, i (r.k)}
 						<div class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 bg-white/2 px-4 py-3 text-[13px] lg:grid-cols-[160px_minmax(0,1fr)] lg:gap-4 lg:px-5 lg:py-3.5 lg:text-[14px] {i ? 'border-t border-white/7' : ''}">
 							<span class="text-fg-faint">{r.k}</span><span class="text-white/85">{r.v}</span>

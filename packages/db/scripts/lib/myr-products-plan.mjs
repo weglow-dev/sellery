@@ -68,7 +68,6 @@ export function toRow(p, sellerId, status) {
     ingredients: p.ingredients ?? [],
     note: p.note ?? "",
     howto: p.howto ?? "",
-    specs: Array.isArray(p.specs) ? p.specs : [],
     ...withDetail(p),
     stock: Number.isInteger(p.stock) ? p.stock : 0,
     status,

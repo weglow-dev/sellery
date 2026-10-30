@@ -20,7 +20,6 @@ const row = {
 	ingredients: ['가르시니아 HCA', '녹차추출물'],
 	note: '노트',
 	howto: '하루 1포',
-	specs: [{ ic: 'clock', k: '섭취', v: '하루 1포' }],
 	story_title: '제목',
 	story: '본문',
 	ingredient_rows: [{ name: '가르시니아 HCA', why: '…', amount: '750mg' }],
