@@ -14,6 +14,6 @@
 		><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg
 	>
 	{#if shop.cartCount}
-		<span class="absolute top-1.5 right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold text-bg">{shop.cartCount}</span>
+		<span class="absolute top-1.5 right-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] leading-none font-extrabold tabular-nums text-bg">{shop.cartCount}</span>
 	{/if}
 </a>
