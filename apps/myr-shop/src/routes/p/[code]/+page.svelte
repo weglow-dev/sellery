@@ -59,9 +59,9 @@
 				</button>
 				<CartButton glass />
 			</div>
-			<div class="absolute bottom-3.5 left-4 flex gap-1.5 lg:bottom-[18px] lg:left-5">
+			<div class="absolute bottom-3.5 left-4 flex gap-1.5 lg:hidden">
 				{#each p.chips as ch (ch)}
-					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md lg:px-3 lg:py-[7px] lg:text-[13px]">{ch}</span>
+					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md">{ch}</span>
 				{/each}
 			</div>
 		</div>
