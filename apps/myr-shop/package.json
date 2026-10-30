@@ -13,7 +13,8 @@
 	},
 	"dependencies": {
 		"@supabase/ssr": "^0.12.7",
-		"@supabase/supabase-js": "^2.116.0"
+		"@supabase/supabase-js": "^2.116.0",
+		"@tosspayments/tosspayments-sdk": "^2.10.0"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-vercel": "^6.3.4",
