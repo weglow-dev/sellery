@@ -39,10 +39,15 @@
 							<span class="text-[11px] font-bold text-accent lg:text-[12px]">{it.creator.name}</span>
 							<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{it.name}</span>
 							<span class="hidden text-[13px] text-fg-faint lg:block">{it.unit}</span>
-							<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
-								<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
-								<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
-							</div>
+							{#if it.available}
+								<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
+									<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
+									<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
+								</div>
+							{:else}
+								<!-- 계정 장바구니(0057)에서 담은 뒤 품절·판매중지된 줄 — 합계에서 빠지고 삭제만 된다 -->
+								<p class="mt-1.5 text-[12px] font-bold text-white/45 lg:mt-2 lg:text-[13px]">지금은 살 수 없어요 · 합계에서 뺐어요</p>
+							{/if}
 						</div>
 						<button type="button" onclick={() => shop.remove(it.code)} aria-label="{it.name} 삭제" class="flex h-8 w-8 shrink-0 items-center justify-center self-start rounded-[10px] text-white/40 lg:h-10 lg:w-10 lg:self-center lg:rounded-xl lg:hover:bg-white/6 lg:hover:text-fg">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>

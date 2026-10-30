@@ -12,8 +12,10 @@
 	let { children, data } = $props();
 	let main: HTMLElement | undefined = $state();
 
-	// 장바구니·찜은 브라우저 저장 — 마운트 뒤 읽고, 그 뒤 바뀔 때마다 저장
-	onMount(() => shop.hydrate());
+	// 장바구니·찜 — 마운트 뒤 읽는다(로그인이면 계정 장바구니를 서버에서 · 브라우저에 남은 비회원 장바구니는 합친다), 그 뒤 바뀔 때마다 저장(비회원만 브라우저에)
+	onMount(() => {
+		void shop.hydrate(!!data.user);
+	});
 	$effect(() => {
 		void [shop.cart, shop.likes, shop.buyer, shop.orders];
 		shop.persist();
