@@ -8,7 +8,7 @@
 //
 //   import <file.json> [--listed]     creators[] 를 sellers 에 handle 기준 upsert(없으면 생성 · user_id 없는 "운영팀이 미리 만든 셀러 행" — 나중에 partner-admin.mjs invite --link 로 계정 연결)
 //                                     → products[] 를 myr_products 에 code 기준 upsert(creator 는 handle). 기본 status 는 pending(검수 대기) · --listed 면 바로 listed.
-//                                     상세(story_title · points · ingredient_rows · howto_title · howto_steps · faq)가 없으면 기본 템플릿을 채운다(샵 lib/data.ts genericDetail 과 같은 문구).
+//                                     상세(story_title · story · ingredient_rows · howto_title · howto_steps · faq)가 없으면 기본 템플릿을 채운다(샵 lib/data.ts genericDetail 과 같은 문구).
 //                                     파일 형식은 myr-products.seed.json 참고.
 //   list [--status pending|listed|paused|rejected] [--creator <@handle>]   상품 표(최신순 · 삭제 제외)
 //   review <code> approve|reject|pause ["<사유>"]   myr_app_admin_review_product — approve → listed · reject → rejected(사유 필수) · pause: listed → paused

@@ -40,14 +40,14 @@ describe("withDetail · toRow", () => {
   it("상세가 없으면 템플릿 — 성분 수 포인트 · 성분별 행 · 섭취법 재사용", () => {
     const d = withDetail({ ingredients: ["A", "B", "C"], howto: "하루 1포" });
     expect(d.story_title).toBe("매일 챙기기 쉬운 것만 남겼어요");
-    expect(d.points[1]).toEqual({ big: "3가지", t: "핵심 성분", d: "필요한 것만" });
+    expect(d).not.toHaveProperty("points"); // 숫자 포인트 3칸은 0059 에서 삭제
     expect(d.ingredient_rows.map((r) => r.amount)).toEqual(["주성분", "보조", "기본"]);
     expect(d.howto_steps[0]).toEqual({ t: "하루 한 번", d: "하루 1포" });
     expect(d.faq[0].a).toBe("하루 1포");
   });
   it("상세가 있으면 그대로", () => {
-    const d = withDetail({ story_title: "X", story: "Y", points: [], ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
-    expect(d).toEqual({ story_title: "X", story: "Y", points: [], ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
+    const d = withDetail({ story_title: "X", story: "Y", ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
+    expect(d).toEqual({ story_title: "X", story: "Y", ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
   });
   it("toRow — code 소문자 · 기본값 · status · 잘못된 status 는 throw", () => {
     const row = toRow({ code: " ABC-1 ", name: " 이름 ", category: "diet", price: 100, ingredients: ["x"], howto: "h" }, "seller-uuid", "pending");

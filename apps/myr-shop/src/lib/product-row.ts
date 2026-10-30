@@ -40,7 +40,6 @@ export function fromRow(r: Row): Product {
 		soldOut: r.sold_out === true,
 		storyTitle: str(r.story_title) || fallback.storyTitle,
 		story: str(r.story) || fallback.story,
-		points: arr(r.points).length ? arr(r.points) : fallback.points,
 		ingredientRows: arr(r.ingredient_rows).length ? arr(r.ingredient_rows) : fallback.ingredientRows,
 		howtoTitle: str(r.howto_title) || fallback.howtoTitle,
 		howtoSteps: arr(r.howto_steps).length ? arr(r.howto_steps) : fallback.howtoSteps,

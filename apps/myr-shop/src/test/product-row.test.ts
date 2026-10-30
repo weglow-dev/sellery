@@ -23,7 +23,6 @@ const row = {
 	specs: [{ ic: 'clock', k: '섭취', v: '하루 1포' }],
 	story_title: '제목',
 	story: '본문',
-	points: [{ big: '0g', t: '설탕', d: '알룰로스' }],
 	ingredient_rows: [{ name: '가르시니아 HCA', why: '…', amount: '750mg' }],
 	howto_title: '점심 후',
 	howto_steps: [{ t: '식사 후', d: '30분' }],
@@ -46,13 +45,12 @@ describe('fromRow', () => {
 			howtoTitle: '점심 후'
 		});
 		expect(p.creator).toEqual({ id: 's-1', name: '민지 루틴', handle: '@minji.routine', avatarUrl: null });
-		expect(p.points).toHaveLength(1);
 		expect(p.faq[0]).toEqual({ q: 'q', a: 'a' });
 	});
 	it('상세가 비어 있으면 기본 템플릿 — 성분 수로 포인트를 만들고 섭취법을 재사용', () => {
-		const p = fromRow({ ...row, story_title: '', story: null, points: [], ingredient_rows: undefined, howto_title: '', howto_steps: [], faq: null });
+		const p = fromRow({ ...row, story_title: '', story: null, ingredient_rows: undefined, howto_title: '', howto_steps: [], faq: null });
 		expect(p.storyTitle).toBe('매일 챙기기 쉬운 것만 남겼어요');
-		expect(p.points[1]).toMatchObject({ big: '2가지', t: '핵심 성분' });
+		expect(p).not.toHaveProperty('points'); // 숫자 포인트 3칸은 0059 에서 삭제
 		expect(p.ingredientRows.map((r) => r.name)).toEqual(['가르시니아 HCA', '녹차추출물']);
 		expect(p.howtoSteps[0]).toEqual({ t: '하루 한 번', d: '하루 1포' });
 		expect(p.faq).toHaveLength(3);

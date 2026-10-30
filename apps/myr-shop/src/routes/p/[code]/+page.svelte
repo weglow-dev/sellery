@@ -106,16 +106,6 @@
 				<h2 class={h2}>{p.storyTitle}</h2>
 				<p class="mt-3 text-[14px] leading-[1.75] text-white/72 text-pretty lg:mt-4 lg:text-[16px] lg:leading-[1.8]">{p.story}</p>
 			</section>
-			<div class="mt-4 grid grid-cols-3 gap-2 lg:mt-6 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] lg:gap-3">
-				{#each p.points as pt (pt.t)}
-					<div class="{card} px-3 py-3.5 lg:p-[22px]">
-						<span class="block text-[20px] font-extrabold tracking-[-.04em] text-accent lg:text-[26px]">{pt.big}</span>
-						<span class="mt-1 block text-[13px] font-bold lg:mt-1.5 lg:text-[14px]">{pt.t}</span>
-						<span class="mt-0.5 block text-[11px] leading-[1.45] text-fg-faint lg:mt-1 lg:text-[13px] lg:leading-[1.5]">{pt.d}</span>
-					</div>
-				{/each}
-			</div>
-
 			<!-- 02 성분 -->
 			<section id="ingredients" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>02 · 무엇이 들어있나요</p>

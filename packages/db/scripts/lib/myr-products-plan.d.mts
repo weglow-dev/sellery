@@ -8,7 +8,6 @@ export type SeedProduct = Record<string, unknown>;
 export type Detail = {
   story_title: string;
   story: string;
-  points: { big: string; t: string; d: string }[];
   ingredient_rows: { name: string; why: string; amount: string }[];
   howto_title: string;
   howto_steps: { t: string; d: string }[];
