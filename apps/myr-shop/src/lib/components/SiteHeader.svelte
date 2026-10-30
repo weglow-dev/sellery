@@ -46,8 +46,8 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
 				<span>장바구니</span>
 				{#if shop.cartCount}
-					<!-- leading-none + tabular-nums: 본문 한글 폰트의 줄높이 때문에 숫자가 아래로 처지는 것을 막는다 -->
-					<span class="absolute -top-2 -right-2 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-bg bg-accent px-1 text-[11px] leading-none font-extrabold tabular-nums text-bg">{shop.cartCount}</span>
+					<!-- 뱃지: 테두리 대신 ring(상자 크기에 안 들어감) · leading-none · 두 자리면 알약으로 늘어난다 -->
+					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg">{shop.cartCount}</span>
 				{/if}
 			</a>
 		</div>
