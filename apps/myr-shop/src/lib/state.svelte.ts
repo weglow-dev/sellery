@@ -150,31 +150,13 @@ class ShopState {
 			.catch(() => this.showToast('찜을 저장하지 못했어요'));
 	}
 
-	// ---- 주문(목) ----
-	/** M4 에서 /api/checkout → 토스 → confirm 으로 바뀐다. 지금은 주문번호를 만들고 장바구니를 비우는 것까지(살 수 없는 줄은 주문에 넣지 않는다). */
-	placeOrder(payName: string): Order {
-		const no = 'MYR-' + String(Date.now()).slice(-6);
-		const order: Order = {
-			no,
-			lines: this.cartItems
-				.filter((it) => it.available)
-				.map((it) => ({ code: it.code, name: it.name, qty: it.qty, amount: it.lineAmount, tile: it.tile, ic: it.ic })),
-			subtotal: this.subtotal,
-			shipping: this.shipping,
-			total: this.total,
-			address: this.buyer.address,
-			pay: payName,
-			at: new Date().toISOString()
-		};
-		this.orders = [order, ...this.orders];
+	// ---- 주문 ----
+	/** 결제 확정(/checkout/success) 뒤 — 브라우저 장바구니를 비운다. 계정 장바구니는 /api/payments/confirm 이 서버에서 비웠다(0057 myr_cart_clear).
+	 *  주문 목록은 서버(myr_orders)가 진실이다 — `orders` 는 옛 목 데이터 자리(마이 화면 · 다음 단계에서 서버 주문으로 교체). */
+	afterOrder() {
+		++this.cartSeq;
 		this.cart = [];
-		if (this.synced) {
-			++this.cartSeq;
-			api('/api/cart', 'DELETE').catch(() => this.showToast('장바구니를 비우지 못했어요'));
-		}
-		return order;
 	}
-	lastOrder = $derived(this.orders[0] ?? null);
 
 	// ---- 토스트 ----
 	showToast(msg: string) {
