@@ -96,7 +96,8 @@ class ShopState {
 	// ---- 장바구니 (계산은 전부 lib/cart.ts — 테스트 src/test/cart.test.ts) ----
 	cartItems = $derived(this.cart.map((l) => ({ ...l.product, qty: l.qty, available: canBuy(l), lineAmount: l.product.price * l.qty })));
 	totals = $derived(cartTotals(this.cart));
-	cartCount = $derived(this.totals.count);
+	/** 뱃지·"N개" 는 **상품 종류 수**(줄 수) — 같은 상품 수량을 올려도 늘지 않는다(2026-10-30 대표 결정). 수량 합은 totals.count */
+	cartCount = $derived(this.cart.length);
 	subtotal = $derived(this.totals.subtotal);
 	shipping = $derived(this.totals.shipping);
 	total = $derived(this.totals.total);
