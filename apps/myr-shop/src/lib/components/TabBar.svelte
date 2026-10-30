@@ -26,7 +26,7 @@
 				<Icon id={t.ic} tab size={22} />
 				<span class="text-[11px] font-bold">{t.name}</span>
 				{#if t.href === '/cart' && shop.cartCount}
-					<span class="absolute top-2 right-[calc(50%-16px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold text-bg">{shop.cartCount}</span>
+					<span class="absolute top-2 right-[calc(50%-16px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg"><span class="-mt-px">{shop.cartBadge}</span></span>
 				{/if}
 			</a>
 		{/each}

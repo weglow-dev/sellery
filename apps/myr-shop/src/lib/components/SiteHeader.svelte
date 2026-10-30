@@ -5,7 +5,7 @@
 	/** PC(lg 이상) 상단 내비 — 로고 · 홈/전체 제품 · 검색(자리) · 마이(로그인 상태면 아바타) · 장바구니. 모바일은 각 화면 헤더 + 하단 탭바 */
 	let { user = null }: { user?: { name: string; avatar: string | null } | null } = $props();
 	const links = [
-		{ href: '/', name: '홈' },
+		{ href: '/', name: 'HOME' },
 		{ href: '/category', name: '전체 제품' }
 	];
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
@@ -41,11 +41,15 @@
 			{:else}
 				<a href="/login" class="flex h-11 items-center rounded-[14px] bg-white/5 px-4 text-[14px] font-bold text-fg transition-colors hover:bg-white/10">로그인</a>
 			{/if}
-			<a href="/cart" class="flex h-11 items-center gap-2 rounded-[14px] bg-accent pr-4 pl-3.5 text-[14px] font-extrabold text-bg transition-colors hover:bg-[#ff8f5c]">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
+			<!-- 외곽선 버튼 + 오른쪽 위 주황 뱃지 (디자인 2026-10-30) -->
+			<a href="/cart" class="relative flex h-11 items-center gap-2 rounded-[14px] border border-white/14 pr-4 pl-3.5 text-[14px] font-bold text-fg transition-colors hover:bg-white/6">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
 				<span>장바구니</span>
 				{#if shop.cartCount}
-					<span class="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-bg px-1.5 text-[11px] font-extrabold text-fg">{shop.cartCount}</span>
+					<!-- 뱃지: 테두리 대신 ring(상자 크기에 안 들어감) · leading-none · 두 자리면 알약으로 늘어난다 -->
+					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg">
+						<span class="mt-0.5">{shop.cartBadge}</span>
+					</span>
 				{/if}
 			</a>
 		</div>
