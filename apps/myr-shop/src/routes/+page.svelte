@@ -48,7 +48,7 @@
 				<span class="flex flex-1 items-center justify-center text-white/95">
 					{#if featured.thumbUrl}<img src={featured.thumbUrl} alt="" class="max-h-[220px] rounded-2xl object-cover" />{:else}<Icon id={featured.ic} size={150} />{/if}
 				</span>
-				<span class="flex items-end justify-between gap-3"><span><span class="block text-[20px] font-extrabold tracking-[-.02em]">{featured.name}</span><span class="mt-1 block text-[13px] opacity-75">{featured.sub}</span></span><span class="text-[20px] font-extrabold whitespace-nowrap">{won(featured.price)}</span></span>
+				<span class="flex items-end justify-between gap-3"><span><span class="block text-[20px] font-extrabold tracking-[-.02em]">{featured.name}</span><span class="mt-1 block text-[13px] opacity-75">{featured.form}{featured.unit ? ` · ${featured.unit}` : ''}</span></span><span class="text-[20px] font-extrabold whitespace-nowrap">{won(featured.price)}</span></span>
 			</a>
 		{/if}
 	</section>

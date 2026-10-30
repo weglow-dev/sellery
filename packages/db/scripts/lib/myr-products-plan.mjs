@@ -60,7 +60,6 @@ export function toRow(p, sellerId, status) {
     seller_id: sellerId,
     category: p.category,
     name: String(p.name).trim(),
-    sub: p.sub ?? "",
     unit: p.unit ?? "",
     price: p.price,
     options: Array.isArray(p.options) ? p.options : [],

@@ -7,7 +7,6 @@ const row = {
 	code: 'minji-grape-jelly',
 	category: 'diet',
 	name: '민지의 포도 다이어트 젤리',
-	sub: '가르시니아',
 	unit: '14포',
 	price: 32000,
 	tile: 'linear-gradient(145deg,#5b3cc4,#2a1a5e)',

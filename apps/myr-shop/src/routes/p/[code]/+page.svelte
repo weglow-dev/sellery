@@ -36,7 +36,7 @@
 
 <svelte:head>
 	<title>{p.name} · {creator.name} — MYR Shop</title>
-	<meta name="description" content={p.sub} />
+	<meta name="description" content="{creator.name}의 {p.name} — {p.form}{p.unit ? ` · ${p.unit}` : ''}" />
 </svelte:head>
 
 <!-- 모바일: 화면 높이(앱 셸 <main>) 를 꽉 채우는 세로 flex — 내용만 스크롤, 담기 바는 바닥에 보통 흐름으로 (+layout.svelte 주석) -->
@@ -75,7 +75,6 @@
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 				</a>
 				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
-				<p class="mt-1.5 text-[14px] text-fg-soft">{p.sub}</p>
 				<div class="mt-3.5 flex items-baseline gap-2">
 					<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
 					<span class="text-[13px] text-white/45">{p.unit}</span>
@@ -210,7 +209,6 @@
 		</a>
 		<div>
 			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
-			<p class="mt-2 text-[15px] text-fg-soft">{p.sub}</p>
 			<div class="mt-4 flex items-baseline gap-2.5">
 				<span class="text-[30px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
 				<span class="text-[14px] text-white/45">{p.unit}</span>

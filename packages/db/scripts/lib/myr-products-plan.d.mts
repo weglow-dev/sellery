@@ -19,7 +19,6 @@ export type ProductRow = Detail & {
   seller_id: string;
   category: string;
   name: string;
-  sub: string;
   unit: string;
   price: number;
   options: unknown[];

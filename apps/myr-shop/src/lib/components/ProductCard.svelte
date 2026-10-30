@@ -20,7 +20,7 @@
 		<span class="flex flex-col gap-1 px-3 pt-3 pb-3.5 lg:px-4 lg:pt-4 lg:pb-[18px]">
 			<span class="text-[11px] font-bold text-accent lg:text-[12px]">{p.creator.name}</span>
 			<span class="text-[14px] leading-[1.35] font-bold lg:text-[15px]">{p.name}</span>
-			<span class="text-[12px] text-fg-faint lg:text-[13px]">{p.sub}{wide ? ` · ${p.form}` : ''}</span>
+			<span class="text-[12px] text-fg-faint lg:text-[13px]">{p.form}{wide && p.unit ? ` · ${p.unit}` : ''}</span>
 			<span class="mt-1 text-[15px] font-extrabold tracking-[-.01em] lg:mt-1.5 lg:text-[17px]">{won(p.price)}</span>
 		</span>
 	</a>

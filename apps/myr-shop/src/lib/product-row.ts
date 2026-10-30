@@ -23,7 +23,6 @@ export function fromRow(r: Row): Product {
 		cat: str(r.category),
 		creator: creatorOfRow(r.creator),
 		name: str(r.name),
-		sub: str(r.sub),
 		price: typeof r.price === 'number' ? r.price : 0,
 		unit: str(r.unit),
 		tile: str(r.tile, 'linear-gradient(145deg,#6b7280,#262a33)'),

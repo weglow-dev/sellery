@@ -1,7 +1,7 @@
 -- pgTAP — 0056 myr_products: 권한 · 공개 RPC · 검수 RPC (docs/myr.md §3 · §3.1 규칙 2)
 -- 실행: npm run test:db  (= npx supabase test db — 로컬 Supabase · 트랜잭션 안에서 돌고 롤백된다. 운영 DB 는 건드리지 않는다)
 begin;
-select plan(28);
+select plan(30);
 
 -- ---------- 표 · 권한 ----------
 select has_table('public', 'myr_products', 'myr_products 표가 있다');
@@ -37,6 +37,8 @@ select ok(not exists (select 1 from jsonb_array_elements(public.myr_home_product
 select is((select e->'creator'->>'handle' from jsonb_array_elements(public.myr_home_products()) e where e->>'code' = 'pgtap-listed'), '@pgtap.seller', '크리에이터 핸들이 실린다');
 select ok((select e ? 'stock' from jsonb_array_elements(public.myr_home_products()) e where e->>'code' = 'pgtap-listed') = false, '재고 수치는 응답에 없다');
 select ok((select e ? 'seller_margin_rate' from jsonb_array_elements(public.myr_home_products()) e where e->>'code' = 'pgtap-listed') = false, '마진율은 응답에 없다');
+select ok((select e ? 'sub' from jsonb_array_elements(public.myr_home_products()) e where e->>'code' = 'pgtap-listed') = false, '한 줄 소개(sub)는 0059 에서 삭제 — 응답에 없다');
+select hasnt_column('public', 'myr_products', 'sub', 'myr_products.sub 컬럼 없음(0059)');
 select is((select (e->>'sold_out')::boolean from jsonb_array_elements(public.myr_home_products()) e where e->>'code' = 'pgtap-same-cat'), true, 'stock − sold_qty ≤ 0 이면 sold_out');
 
 -- ---------- myr_product_card ----------
