@@ -41,11 +41,12 @@
 			{:else}
 				<a href="/login" class="flex h-11 items-center rounded-[14px] bg-white/5 px-4 text-[14px] font-bold text-fg transition-colors hover:bg-white/10">로그인</a>
 			{/if}
-			<a href="/cart" class="flex h-11 items-center gap-2 rounded-[14px] bg-accent pr-4 pl-3.5 text-[14px] font-extrabold text-bg transition-colors hover:bg-[#ff8f5c]">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
+			<!-- 외곽선 버튼 + 오른쪽 위 주황 뱃지 (디자인 2026-10-30) -->
+			<a href="/cart" class="relative flex h-11 items-center gap-2 rounded-[14px] border border-white/14 pr-4 pl-3.5 text-[14px] font-bold text-fg transition-colors hover:bg-white/6">
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l1 13H5z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></svg>
 				<span>장바구니</span>
 				{#if shop.cartCount}
-					<span class="flex h-5 min-w-5 items-center justify-center rounded-[10px] bg-bg px-1.5 text-[11px] font-extrabold text-fg">{shop.cartCount}</span>
+					<span class="absolute -top-2 -right-2 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-bg bg-accent px-1.5 text-[11px] font-extrabold text-bg">{shop.cartCount}</span>
 				{/if}
 			</a>
 		</div>
