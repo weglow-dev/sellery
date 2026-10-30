@@ -98,6 +98,8 @@ class ShopState {
 	totals = $derived(cartTotals(this.cart));
 	/** 뱃지·"N개" 는 **상품 종류 수**(줄 수) — 같은 상품 수량을 올려도 늘지 않는다(2026-10-30 대표 결정). 수량 합은 totals.count */
 	cartCount = $derived(this.cart.length);
+	/** 뱃지 글자 — 9 를 넘으면 '9+' (두 자리가 들어가면 아이콘 버튼 위에서 알약이 아이콘을 가린다) */
+	cartBadge = $derived(this.cartCount > 9 ? '9+' : String(this.cartCount));
 	subtotal = $derived(this.totals.subtotal);
 	shipping = $derived(this.totals.shipping);
 	total = $derived(this.totals.total);

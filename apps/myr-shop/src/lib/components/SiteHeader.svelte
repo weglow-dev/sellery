@@ -5,7 +5,7 @@
 	/** PC(lg 이상) 상단 내비 — 로고 · 홈/전체 제품 · 검색(자리) · 마이(로그인 상태면 아바타) · 장바구니. 모바일은 각 화면 헤더 + 하단 탭바 */
 	let { user = null }: { user?: { name: string; avatar: string | null } | null } = $props();
 	const links = [
-		{ href: '/', name: '홈' },
+		{ href: '/', name: 'HOME' },
 		{ href: '/category', name: '전체 제품' }
 	];
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
@@ -47,7 +47,9 @@
 				<span>장바구니</span>
 				{#if shop.cartCount}
 					<!-- 뱃지: 테두리 대신 ring(상자 크기에 안 들어감) · leading-none · 두 자리면 알약으로 늘어난다 -->
-					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg">{shop.cartCount}</span>
+					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg">
+						<span class="mt-0.5">{shop.cartBadge}</span>
+					</span>
 				{/if}
 			</a>
 		</div>
