@@ -8,82 +8,70 @@
 	],
 	"products": [
 		{
-			"code": "minji-grape-jelly", "creator": "@minji.routine", "category": "diet", "name": "민지의 포도 다이어트 젤리", "sub": "가르시니아 · 하루 한 포", "price": 32000, "unit": "14포 / 2주분", "stock": 200,
+			"code": "minji-grape-jelly", "creator": "@minji.routine", "category": "diet", "name": "민지의 포도 다이어트 젤리", "price": 32000, "unit": "14포 / 2주분", "stock": 200,
 			"tile": "linear-gradient(145deg,#5b3cc4,#2a1a5e)", "icon": "grape", "form": "젤리", "pack": "스틱포", "flavor": "포도", "tag": "BEST", "chips": ["젤리", "스틱포", "포도맛"],
 			"ingredients": ["가르시니아 HCA", "녹차추출물", "차전자피", "비타민B군"],
 			"note": "먹는 게 스트레스가 되면 안 되잖아요. 식사 대신이 아니라, 식사 뒤에 입가심처럼 먹는 포도젤리로 만들었어요.",
 			"howto": "하루 1포, 점심 식사 후 30분 안에 드세요. 차갑게 먹으면 더 맛있어요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "하루 1포" }, { "ic": "jelly", "k": "제형", "v": "스틱 젤리" }, { "ic": "box", "k": "구성", "v": "14포" }],
 			"story_title": "다이어트 중에도 입은 즐거워야 하니까",
 			"story": "다이어트 콘텐츠를 5년 넘게 하면서 가장 많이 받은 질문이 \"뭐 먹어요?\"였어요. 참는 다이어트는 결국 요요로 돌아왔고, 저는 \"식사 후 입가심\" 하나를 바꾸는 걸로 습관을 만들었어요. 그 루틴을 그대로 제품으로 옮긴 게 이 젤리예요. 설탕 대신 알룰로스, 포도 향은 천연 농축과즙만 썼어요.",
-			"points": [{ "big": "0g", "t": "설탕", "d": "알룰로스로 단맛만" }, { "big": "14일", "t": "루틴", "d": "한 박스 = 2주 챌린지" }, { "big": "9kcal", "t": "한 포", "d": "간식 죄책감 없이" }],
 			"ingredient_rows": [{ "name": "가르시니아 HCA", "why": "탄수화물이 지방으로 합성되는 걸 억제해요", "amount": "750mg" }, { "name": "녹차추출물", "why": "카테킨으로 체지방 감소를 도와요", "amount": "300mg" }, { "name": "차전자피", "why": "포만감을 오래 유지해줘요", "amount": "500mg" }, { "name": "비타민B군", "why": "에너지 대사에 필요해요", "amount": "1일 권장량 100%" }],
-			"howto_title": "점심 후 30분, 한 포면 충분해요",
 			"howto_steps": [{ "t": "식사 후 30분", "d": "점심 식사를 마친 뒤 30분 안에 드세요." }, { "t": "차갑게", "d": "냉장 보관하면 포도 젤리 식감이 더 좋아요." }, { "t": "14일 루틴", "d": "하루 한 포, 2주를 채우면 습관이 돼요." }],
 			"faq": [{ "q": "식사 대용인가요?", "a": "아니요. 식사 뒤 입가심으로 드시는 보조 제품이에요. 끼니를 거르지 마세요." }, { "q": "임산부도 먹어도 되나요?", "a": "가르시니아가 들어 있어 임신·수유 중에는 권하지 않아요." }, { "q": "하루 두 포 먹어도 되나요?", "a": "1일 1포를 권장해요. 그 이상은 효과가 더 커지지 않아요." }]
 		},
 		{
-			"code": "haru-collagen-film", "creator": "@haru.well", "category": "inner", "name": "하루 콜라겐 필름", "sub": "저분자 콜라겐 · 혀에 녹는", "price": 28000, "unit": "30매 / 1개월", "stock": 200,
+			"code": "haru-collagen-film", "creator": "@haru.well", "category": "inner", "name": "하루 콜라겐 필름", "price": 28000, "unit": "30매 / 1개월", "stock": 200,
 			"tile": "linear-gradient(145deg,#ff9a62,#8a3d1a)", "icon": "film", "form": "필름", "pack": "개별 포장", "flavor": "복숭아", "tag": "NEW", "chips": ["필름", "복숭아맛", "물 없이"],
 			"ingredients": ["저분자 피쉬콜라겐", "히알루론산", "비오틴", "비타민C"],
 			"note": "물 없이 어디서든. 지하철에서도, 촬영장에서도 혀에 올리면 끝나는 콜라겐을 원했어요.",
 			"howto": "하루 1매, 자기 전에 혀 위에 올려 녹여 드세요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "하루 1매" }, { "ic": "film", "k": "제형", "v": "구강용해 필름" }, { "ic": "box", "k": "구성", "v": "30매" }],
 			"story_title": "물 없이, 어디서든 끝나는 콜라겐",
 			"story": "촬영 다니면서 콜라겐 젤리나 앰플을 챙기는 게 생각보다 번거로웠어요. 가방에서 새고, 물이 필요하고. \"혀에 올리면 끝\"인 필름 제형을 알게 됐을 때 바로 이거다 싶었죠. 복숭아 향은 제가 가장 좋아하는 맛으로 골랐어요.",
-			"points": [{ "big": "3초", "t": "녹는 시간", "d": "물 없이 혀 위에서" }, { "big": "1,000mg", "t": "저분자 콜라겐", "d": "한 장에 가득" }, { "big": "30매", "t": "한 달", "d": "얇은 케이스 하나" }],
 			"ingredient_rows": [{ "name": "저분자 피쉬콜라겐", "why": "흡수가 빠른 500Da 이하 분자", "amount": "1,000mg" }, { "name": "히알루론산", "why": "피부 수분 유지를 도와요", "amount": "120mg" }, { "name": "비오틴", "why": "피부·모발 건강 유지", "amount": "1일 권장량 100%" }, { "name": "비타민C", "why": "콜라겐 합성에 필요해요", "amount": "100mg" }],
-			"howto_title": "자기 전, 혀 위에 한 장",
 			"howto_steps": [{ "t": "한 장 꺼내기", "d": "케이스에서 필름 한 장을 꺼내요." }, { "t": "혀 위에", "d": "혀 위에 올리면 3초 안에 녹아요." }, { "t": "매일 밤", "d": "자기 전 루틴으로 꾸준히 드세요." }],
 			"faq": [{ "q": "맛이 쓰지 않나요?", "a": "복숭아 향으로 쓴맛을 거의 느끼지 못해요." }, { "q": "언제 먹는 게 좋아요?", "a": "피부 재생이 활발한 밤에 드시는 걸 권해요." }, { "q": "다른 콜라겐과 같이 먹어도 되나요?", "a": "네, 함량이 과하지 않아 함께 드셔도 괜찮아요." }]
 		},
 		{
-			"code": "jun-protein-vanilla", "creator": "@jun.fit", "category": "diet", "name": "준의 프로틴 스틱 — 바닐라", "sub": "단백질 20g · 물에 타는", "price": 39000, "unit": "10포", "stock": 200,
+			"code": "jun-protein-vanilla", "creator": "@jun.fit", "category": "diet", "name": "준의 프로틴 스틱 — 바닐라", "price": 39000, "unit": "10포", "stock": 200,
 			"tile": "linear-gradient(145deg,#6b7280,#262a33)", "icon": "powder", "form": "분말", "pack": "스틱포", "flavor": "바닐라", "tag": "", "chips": ["분말", "스틱포", "20g 단백질"],
 			"ingredients": ["분리유청단백", "BCAA", "식이섬유", "마그네슘"],
 			"note": "운동 끝나고 쉐이커 흔들기도 귀찮은 날. 생수병에 바로 털어 넣어도 안 뭉치게 입자를 잡았어요.",
-			"howto": "물 300ml에 1포를 넣고 10초만 흔들어 드세요. 운동 후 30분 이내 권장.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "운동 후 1포" }, { "ic": "powder", "k": "제형", "v": "분말 스틱" }, { "ic": "box", "k": "구성", "v": "10포" }]
+			"howto": "물 300ml에 1포를 넣고 10초만 흔들어 드세요. 운동 후 30분 이내 권장."
 		},
 		{
-			"code": "haru-goodnight-gummy", "creator": "@haru.well", "category": "mental", "name": "하루 굿나잇 구미", "sub": "테아닌 · 마그네슘", "price": 26000, "unit": "30구미 / 1개월", "stock": 200,
+			"code": "haru-goodnight-gummy", "creator": "@haru.well", "category": "mental", "name": "하루 굿나잇 구미", "price": 26000, "unit": "30구미 / 1개월", "stock": 200,
 			"tile": "linear-gradient(145deg,#a05ac8,#3f1f57)", "icon": "gummy", "form": "캔디", "pack": "보틀", "flavor": "포도", "tag": "", "chips": ["구미", "보틀", "포도맛"],
 			"ingredients": ["L-테아닌", "마그네슘", "감태추출물", "락티움"],
 			"note": "자기 전 핸드폰 대신 구미 하나. 달지 않게, 그렇지만 간식처럼 기다려지게 만들었어요.",
-			"howto": "취침 30분 전 1~2개를 씹어 드세요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "취침 전 1~2개" }, { "ic": "gummy", "k": "제형", "v": "구미" }, { "ic": "bottle", "k": "구성", "v": "30개 보틀" }]
+			"howto": "취침 30분 전 1~2개를 씹어 드세요."
 		},
 		{
-			"code": "soy-ceramide-ampoule", "creator": "@soy.clean", "category": "derma", "name": "소이 세라마이드 앰플", "sub": "장벽 케어 · 저자극", "price": 34000, "unit": "30ml", "stock": 200,
+			"code": "soy-ceramide-ampoule", "creator": "@soy.clean", "category": "derma", "name": "소이 세라마이드 앰플", "price": 34000, "unit": "30ml", "stock": 200,
 			"tile": "linear-gradient(145deg,#3fb8aa,#145048)", "icon": "liquid", "form": "액상", "pack": "보틀", "flavor": "", "tag": "BEST", "chips": ["앰플", "30ml", "민감성"],
 			"ingredients": ["세라마이드 NP", "판테놀", "병풀추출물", "나이아신아마이드"],
 			"note": "성분표에 모르는 이름이 없게. 제가 매일 바르는 것 중 꼭 필요한 다섯 가지만 남겼어요.",
-			"howto": "세안 후 토너 다음 단계에서 2~3방울을 얼굴 전체에 펴 바르세요.",
-			"specs": [{ "ic": "clock", "k": "사용", "v": "아침 · 저녁" }, { "ic": "liquid", "k": "제형", "v": "앰플" }, { "ic": "bottle", "k": "구성", "v": "30ml" }]
+			"howto": "세안 후 토너 다음 단계에서 2~3방울을 얼굴 전체에 펴 바르세요."
 		},
 		{
-			"code": "soy-biotin-capsule", "creator": "@soy.clean", "category": "hair", "name": "소이 비오틴 캡슐", "sub": "헤어 · 손톱 · 하루 1캡슐", "price": 24000, "unit": "60캡슐 / 2개월", "stock": 200,
+			"code": "soy-biotin-capsule", "creator": "@soy.clean", "category": "hair", "name": "소이 비오틴 캡슐", "price": 24000, "unit": "60캡슐 / 2개월", "stock": 200,
 			"tile": "linear-gradient(145deg,#e6c33a,#6b5a12)", "icon": "pill", "form": "알약", "pack": "PTP", "flavor": "", "tag": "", "chips": ["캡슐", "PTP", "2개월분"],
 			"ingredients": ["비오틴 5000㎍", "맥주효모", "케라틴", "아연"],
 			"note": "한 알로 끝내고 싶은 사람을 위한 가장 심플한 구성. 대신 함량은 타협 안 했어요.",
-			"howto": "하루 1캡슐을 물과 함께 드세요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "하루 1캡슐" }, { "ic": "pill", "k": "제형", "v": "하드캡슐" }, { "ic": "ptp", "k": "구성", "v": "60캡슐" }]
+			"howto": "하루 1캡슐을 물과 함께 드세요."
 		},
 		{
-			"code": "minji-glutathione-lemon", "creator": "@minji.routine", "category": "inner", "name": "민지 글루타치온 스틱 — 레몬", "sub": "이너 글로우 · 짜먹는", "price": 36000, "unit": "14포 / 2주분", "stock": 200,
+			"code": "minji-glutathione-lemon", "creator": "@minji.routine", "category": "inner", "name": "민지 글루타치온 스틱 — 레몬", "price": 36000, "unit": "14포 / 2주분", "stock": 200,
 			"tile": "linear-gradient(145deg,#e6c33a,#6b5a12)", "icon": "lemon", "form": "액상", "pack": "스틱포", "flavor": "레몬", "tag": "NEW", "chips": ["짜먹는", "스틱포", "레몬맛"],
 			"ingredients": ["글루타치온", "비타민C", "엘더베리", "히알루론산"],
 			"note": "아침 공복에 상큼하게. 쓴맛 때문에 못 먹던 글루타치온을 레몬청 느낌으로 바꿨어요.",
-			"howto": "아침 공복에 1포를 그대로 짜서 드세요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "아침 1포" }, { "ic": "stick", "k": "제형", "v": "액상 스틱" }, { "ic": "box", "k": "구성", "v": "14포" }]
+			"howto": "아침 공복에 1포를 그대로 짜서 드세요."
 		},
 		{
-			"code": "jun-daily-multi-mens", "creator": "@jun.fit", "category": "mens", "name": "준 데일리 멀티 — 맨즈", "sub": "아르기닌 · 아연 · 마카", "price": 29000, "unit": "30정 / 1개월", "stock": 200,
+			"code": "jun-daily-multi-mens", "creator": "@jun.fit", "category": "mens", "name": "준 데일리 멀티 — 맨즈", "price": 29000, "unit": "30정 / 1개월", "stock": 200,
 			"tile": "linear-gradient(145deg,#4f7fe8,#1c2f6b)", "icon": "pill", "form": "알약", "pack": "보틀", "flavor": "", "tag": "", "chips": ["정제", "보틀", "1개월분"],
 			"ingredients": ["L-아르기닌", "아연", "마카", "비타민D"],
 			"note": "매일 챙겨야 할 걸 한 통으로. 출근길 가방에 넣고 다니기 좋게 작은 보틀로 만들었어요.",
-			"howto": "하루 1정을 아침 식사 후 드세요.",
-			"specs": [{ "ic": "clock", "k": "섭취", "v": "하루 1정" }, { "ic": "pill", "k": "제형", "v": "타정" }, { "ic": "bottle", "k": "구성", "v": "30정 보틀" }]
+			"howto": "하루 1정을 아침 식사 후 드세요."
 		}
 	]
 }

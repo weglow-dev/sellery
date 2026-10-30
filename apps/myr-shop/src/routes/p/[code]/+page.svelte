@@ -36,7 +36,7 @@
 
 <svelte:head>
 	<title>{p.name} · {creator.name} — MYR Shop</title>
-	<meta name="description" content={p.sub} />
+	<meta name="description" content="{creator.name}의 {p.name} — {p.form}{p.unit ? ` · ${p.unit}` : ''}" />
 </svelte:head>
 
 <!-- 모바일: 화면 높이(앱 셸 <main>) 를 꽉 채우는 세로 flex — 내용만 스크롤, 담기 바는 바닥에 보통 흐름으로 (+layout.svelte 주석) -->
@@ -59,9 +59,9 @@
 				</button>
 				<CartButton glass />
 			</div>
-			<div class="absolute bottom-3.5 left-4 flex gap-1.5 lg:bottom-[18px] lg:left-5">
+			<div class="absolute bottom-3.5 left-4 flex gap-1.5 lg:hidden">
 				{#each p.chips as ch (ch)}
-					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md lg:px-3 lg:py-[7px] lg:text-[13px]">{ch}</span>
+					<span class="rounded-full bg-bg/55 px-2.5 py-1.5 text-[12px] font-bold backdrop-blur-md">{ch}</span>
 				{/each}
 			</div>
 		</div>
@@ -75,7 +75,6 @@
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
 				</a>
 				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
-				<p class="mt-1.5 text-[14px] text-fg-soft">{p.sub}</p>
 				<div class="mt-3.5 flex items-baseline gap-2">
 					<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
 					<span class="text-[13px] text-white/45">{p.unit}</span>
@@ -107,16 +106,6 @@
 				<h2 class={h2}>{p.storyTitle}</h2>
 				<p class="mt-3 text-[14px] leading-[1.75] text-white/72 text-pretty lg:mt-4 lg:text-[16px] lg:leading-[1.8]">{p.story}</p>
 			</section>
-			<div class="mt-4 grid grid-cols-3 gap-2 lg:mt-6 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] lg:gap-3">
-				{#each p.points as pt (pt.t)}
-					<div class="{card} px-3 py-3.5 lg:p-[22px]">
-						<span class="block text-[20px] font-extrabold tracking-[-.04em] text-accent lg:text-[26px]">{pt.big}</span>
-						<span class="mt-1 block text-[13px] font-bold lg:mt-1.5 lg:text-[14px]">{pt.t}</span>
-						<span class="mt-0.5 block text-[11px] leading-[1.45] text-fg-faint lg:mt-1 lg:text-[13px] lg:leading-[1.5]">{pt.d}</span>
-					</div>
-				{/each}
-			</div>
-
 			<!-- 02 성분 -->
 			<section id="ingredients" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>02 · 무엇이 들어있나요</p>
@@ -135,7 +124,6 @@
 			<!-- 03 섭취법 -->
 			<section id="howto" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>03 · 이렇게 드세요</p>
-				<h2 class={h2}>{p.howtoTitle}</h2>
 				<div class="mt-4 flex flex-col gap-2 lg:mt-5 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] lg:gap-3">
 					{#each p.howtoSteps as s, i (s.t)}
 						<div class="{card} flex gap-3.5 p-4 lg:flex-col lg:gap-3 lg:p-[22px]">
@@ -152,16 +140,7 @@
 			<!-- 04 제품 정보 -->
 			<section id="info" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>04 · 제품 정보</p>
-				<div class="mt-4 grid grid-cols-3 gap-2 lg:grid-cols-[repeat(auto-fit,minmax(160px,1fr))] lg:gap-2.5">
-					{#each p.specs as sp (sp.k)}
-						<div class="{card} flex flex-col items-start gap-1.5 px-3 py-3.5 lg:gap-2 lg:rounded-[18px] lg:p-[18px]">
-							<span class="text-white/90"><Icon id={sp.ic} size={22} /></span>
-							<span class="text-[11px] text-fg-faint lg:text-[12px]">{sp.k}</span>
-							<span class="text-[13px] font-bold lg:text-[15px]">{sp.v}</span>
-						</div>
-					{/each}
-				</div>
-				<div class="mt-2.5 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-3">
+				<div class="mt-4 flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:mt-5">
 					{#each infoRows as r, i (r.k)}
 						<div class="grid grid-cols-[88px_minmax(0,1fr)] gap-3 bg-white/2 px-4 py-3 text-[13px] lg:grid-cols-[160px_minmax(0,1fr)] lg:gap-4 lg:px-5 lg:py-3.5 lg:text-[14px] {i ? 'border-t border-white/7' : ''}">
 							<span class="text-fg-faint">{r.k}</span><span class="text-white/85">{r.v}</span>
@@ -210,7 +189,6 @@
 		</a>
 		<div>
 			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
-			<p class="mt-2 text-[15px] text-fg-soft">{p.sub}</p>
 			<div class="mt-4 flex items-baseline gap-2.5">
 				<span class="text-[30px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
 				<span class="text-[14px] text-white/45">{p.unit}</span>

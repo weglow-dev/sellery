@@ -23,7 +23,6 @@ export function fromRow(r: Row): Product {
 		cat: str(r.category),
 		creator: creatorOfRow(r.creator),
 		name: str(r.name),
-		sub: str(r.sub),
 		price: typeof r.price === 'number' ? r.price : 0,
 		unit: str(r.unit),
 		tile: str(r.tile, 'linear-gradient(145deg,#6b7280,#262a33)'),
@@ -37,13 +36,10 @@ export function fromRow(r: Row): Product {
 		ingredients,
 		note: str(r.note),
 		howto,
-		specs: arr(r.specs),
 		soldOut: r.sold_out === true,
 		storyTitle: str(r.story_title) || fallback.storyTitle,
 		story: str(r.story) || fallback.story,
-		points: arr(r.points).length ? arr(r.points) : fallback.points,
 		ingredientRows: arr(r.ingredient_rows).length ? arr(r.ingredient_rows) : fallback.ingredientRows,
-		howtoTitle: str(r.howto_title) || fallback.howtoTitle,
 		howtoSteps: arr(r.howto_steps).length ? arr(r.howto_steps) : fallback.howtoSteps,
 		faq: arr(r.faq).length ? arr(r.faq) : fallback.faq
 	};

@@ -101,9 +101,9 @@ select is(public.myr_like_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-car
 select is(public.myr_like_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', true) ->> 'ok', 'true', '두 번 켜도 멱등');
 select is(public.myr_likes_merge('00000000-0000-4000-8000-0000000000c1', '["pgtap-cart-b", 7, "nope", "pgtap-cart-pending"]'::jsonb), '{"ok": true, "merged": 2, "skipped": 2}'::jsonb, '찜 합치기 — 문자열 아닌 값 · 없는 code 는 건너뜀 (pending 은 찜은 된다)');
 select is(
-  (select jsonb_agg(e->>'code') from jsonb_array_elements(public.myr_likes_get('00000000-0000-4000-8000-0000000000c1')) e),
-  '["pgtap-cart-b", "pgtap-cart-a"]'::jsonb,
-  '찜 목록 — 최근 순 · 살 수 없는 상품(pending) 은 뺀다'
+  (select jsonb_agg(e->>'code' order by e->>'code') from jsonb_array_elements(public.myr_likes_get('00000000-0000-4000-8000-0000000000c1')) e),
+  '["pgtap-cart-a", "pgtap-cart-b"]'::jsonb,
+  '찜 목록 — 살 수 없는 상품(pending) 은 뺀다 (한 트랜잭션 안에선 created_at 이 같아 순서는 보지 않는다)'
 );
 select is(public.myr_like_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', false) ->> 'liked', 'false', '찜 끄기');
 select is((select count(*) from public.myr_likes where user_id = '00000000-0000-4000-8000-0000000000c1'), 2::bigint, '끈 뒤 찜 2개(b · pending)');

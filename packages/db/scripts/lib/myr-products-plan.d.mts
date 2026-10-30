@@ -8,9 +8,7 @@ export type SeedProduct = Record<string, unknown>;
 export type Detail = {
   story_title: string;
   story: string;
-  points: { big: string; t: string; d: string }[];
   ingredient_rows: { name: string; why: string; amount: string }[];
-  howto_title: string;
   howto_steps: { t: string; d: string }[];
   faq: { q: string; a: string }[];
 };
@@ -19,7 +17,6 @@ export type ProductRow = Detail & {
   seller_id: string;
   category: string;
   name: string;
-  sub: string;
   unit: string;
   price: number;
   options: unknown[];
@@ -34,7 +31,6 @@ export type ProductRow = Detail & {
   ingredients: string[];
   note: string;
   howto: string;
-  specs: unknown[];
   stock: number;
   status: string;
   seller_margin_rate: number | null;
