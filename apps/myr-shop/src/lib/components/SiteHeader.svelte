@@ -47,7 +47,7 @@
 				<span>장바구니</span>
 				{#if shop.cartCount}
 					<!-- 뱃지: 테두리 대신 ring(상자 크기에 안 들어감) · leading-none · 두 자리면 알약으로 늘어난다 -->
-					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-bg ring-2 ring-bg">
+					<span class="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] leading-none font-bold tabular-nums text-white ring-2 ring-bg">
 						<span class="mt-0.5">{shop.cartBadge}</span>
 					</span>
 				{/if}
