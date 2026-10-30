@@ -9,7 +9,6 @@ export type Detail = {
   story_title: string;
   story: string;
   ingredient_rows: { name: string; why: string; amount: string }[];
-  howto_title: string;
   howto_steps: { t: string; d: string }[];
   faq: { q: string; a: string }[];
 };

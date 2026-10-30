@@ -124,7 +124,6 @@
 			<!-- 03 섭취법 -->
 			<section id="howto" class="mt-10 scroll-mt-24 lg:mt-14">
 				<p class={label}>03 · 이렇게 드세요</p>
-				<h2 class={h2}>{p.howtoTitle}</h2>
 				<div class="mt-4 flex flex-col gap-2 lg:mt-5 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))] lg:gap-3">
 					{#each p.howtoSteps as s, i (s.t)}
 						<div class="{card} flex gap-3.5 p-4 lg:flex-col lg:gap-3 lg:p-[22px]">

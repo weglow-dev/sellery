@@ -46,8 +46,8 @@ describe("withDetail · toRow", () => {
     expect(d.faq[0].a).toBe("하루 1포");
   });
   it("상세가 있으면 그대로", () => {
-    const d = withDetail({ story_title: "X", story: "Y", ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
-    expect(d).toEqual({ story_title: "X", story: "Y", ingredient_rows: [], howto_title: "H", howto_steps: [], faq: [] });
+    const d = withDetail({ story_title: "X", story: "Y", ingredient_rows: [], howto_steps: [], faq: [] });
+    expect(d).toEqual({ story_title: "X", story: "Y", ingredient_rows: [], howto_steps: [], faq: [] });
   });
   it("toRow — code 소문자 · 기본값 · status · 잘못된 status 는 throw", () => {
     const row = toRow({ code: " ABC-1 ", name: " 이름 ", category: "diet", price: 100, ingredients: ["x"], howto: "h" }, "seller-uuid", "pending");

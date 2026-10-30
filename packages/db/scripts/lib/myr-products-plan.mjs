@@ -18,7 +18,6 @@ export function withDetail(p) {
     story_title: p.story_title ?? "매일 챙기기 쉬운 것만 남겼어요",
     story: p.story ?? '제가 직접 매일 먹고 바르는 것 중에서 꼭 필요한 것만 골랐어요. 성분은 단순하게, 함량은 타협 없이. 팔로워분들이 "이건 뭐예요?" 물어보던 질문에 제품으로 답한 거예요.',
     ingredient_rows: p.ingredient_rows ?? ingredients.map((n, i) => ({ name: n, why: WHY[i % 4], amount: ROLE[i % 4] })),
-    howto_title: p.howto_title ?? "이렇게 드세요",
     howto_steps: p.howto_steps ?? [
       { t: "하루 한 번", d: p.howto ?? "" },
       { t: "꾸준히", d: "최소 4주 이상 루틴으로 이어가 주세요." },

@@ -41,7 +41,6 @@ export function fromRow(r: Row): Product {
 		storyTitle: str(r.story_title) || fallback.storyTitle,
 		story: str(r.story) || fallback.story,
 		ingredientRows: arr(r.ingredient_rows).length ? arr(r.ingredient_rows) : fallback.ingredientRows,
-		howtoTitle: str(r.howto_title) || fallback.howtoTitle,
 		howtoSteps: arr(r.howto_steps).length ? arr(r.howto_steps) : fallback.howtoSteps,
 		faq: arr(r.faq).length ? arr(r.faq) : fallback.faq
 	};

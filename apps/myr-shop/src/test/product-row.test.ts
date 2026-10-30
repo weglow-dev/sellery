@@ -24,7 +24,6 @@ const row = {
 	story_title: '제목',
 	story: '본문',
 	ingredient_rows: [{ name: '가르시니아 HCA', why: '…', amount: '750mg' }],
-	howto_title: '점심 후',
 	howto_steps: [{ t: '식사 후', d: '30분' }],
 	faq: [{ q: 'q', a: 'a' }],
 	sold_out: false,
@@ -41,14 +40,14 @@ describe('fromRow', () => {
 			ic: 'grape',
 			tag: 'BEST',
 			soldOut: false,
-			storyTitle: '제목',
-			howtoTitle: '점심 후'
+			storyTitle: '제목'
 		});
+		expect(p).not.toHaveProperty('howtoTitle'); // 섭취법 제목은 0059 에서 삭제
 		expect(p.creator).toEqual({ id: 's-1', name: '민지 루틴', handle: '@minji.routine', avatarUrl: null });
 		expect(p.faq[0]).toEqual({ q: 'q', a: 'a' });
 	});
 	it('상세가 비어 있으면 기본 템플릿 — 성분 수로 포인트를 만들고 섭취법을 재사용', () => {
-		const p = fromRow({ ...row, story_title: '', story: null, ingredient_rows: undefined, howto_title: '', howto_steps: [], faq: null });
+		const p = fromRow({ ...row, story_title: '', story: null, ingredient_rows: undefined, howto_steps: [], faq: null });
 		expect(p.storyTitle).toBe('매일 챙기기 쉬운 것만 남겼어요');
 		expect(p).not.toHaveProperty('points'); // 숫자 포인트 3칸은 0059 에서 삭제
 		expect(p.ingredientRows.map((r) => r.name)).toEqual(['가르시니아 HCA', '녹차추출물']);
