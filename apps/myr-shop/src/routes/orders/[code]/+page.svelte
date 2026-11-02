@@ -15,6 +15,6 @@
 	<BackHeader title="주문 상세" />
 	<h1 class="hidden text-[32px] font-extrabold tracking-[-.03em] lg:block">주문 상세</h1>
 	<div class="px-5 pt-1.5 pb-8 lg:mt-6 lg:px-0 lg:pt-0 lg:pb-0">
-		<OrderDetail order={data.order} />
+		<OrderDetail order={data.order} inquiries={data.inquiries} />
 	</div>
 </div>

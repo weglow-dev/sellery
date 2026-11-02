@@ -3,11 +3,12 @@
  *   notifyOrderPaid(orderId)        checkout-sync `confirmDone` — 새 주문(already 제외). PAID 면 고객 주문 확인 + 줄의 셀러별 새 주문 · WAITING_DEPOSIT 이면 고객 입금 안내만
  *   notifyDepositDone(orderId)      checkout-sync `depositDone` — 입금 확인 → 고객 주문 확인 + 셀러 새 주문
  *   notifyOrderRefunded(orderId, r) refund.ts `refundItems` — record 가 새로 기록했을 때(already 제외) · 고객 + 환불된 줄의 셀러
+ *   notifyCsOpened(csId, msg)       cs.ts `openCs`(접수) · `customerReplyCs`(추가 문의) — 셀러에게 · notifyCsReplied(csId, reply) — 콘솔 답변 → 고객(S7 · 0063)
  * 받는 사람: 고객 = buyer_email → customers.email → 회원 auth 계정 이메일(없으면 조용히 건너뜀 · 카카오 계정은 이메일이 없을 수 있다) · 셀러 = sellers.email(없으면 건너뜀 — 시드 크리에이터는 비어 있다).
  * 멱등: 템플릿 idempotencyKey(Resend Idempotency-Key + 프로세스 24시간 가드).
  */
 import { isEmailAddress } from '$lib/mail/resend';
-import { depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailItem, type MailOrder, type MailRefund, type MailTemplate } from '$lib/mail/templates';
+import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate } from '$lib/mail/templates';
 import { admin } from './admin';
 import { mailCtx, sendMail, type MailSendResult } from './mail';
 
@@ -151,5 +152,61 @@ export async function notifyOrderRefunded(orderId: string, r: MailRefund): Promi
 	} catch (e) {
 		console.error('[mail] notifyOrderRefunded failed:', e instanceof Error ? e.message : e);
 		return { customer: null, sellers: {} };
+	}
+}
+
+/* ---------------- 고객 문의 (S7 · 0063) ---------------- */
+type RawCs = { id: string; code: string; type: string; buyer_name: string; order_code: string | null; order_id: string | null; customer_id: string | null; user_id: string | null; myr_products: { code: string; name: string } | { code: string; name: string }[] | null; sellers: { name: string; email: string | null } | { name: string; email: string | null }[] | null };
+type LoadedCs = { cs: MailCs; customerEmail: string | null; sellerEmail: string | null };
+
+async function loadCs(conversationId: string): Promise<LoadedCs | null> {
+	const db = admin();
+	const { data, error } = await db
+		.from('myr_cs_conversations')
+		.select('id, code, type, buyer_name, order_code, order_id, customer_id, user_id, myr_products(code, name), sellers(name, email)')
+		.eq('id', conversationId)
+		.maybeSingle();
+	if (error) {
+		console.error('[mail] cs read failed:', error.message);
+		return null;
+	}
+	const c = data as RawCs | null;
+	if (!c) return null;
+	const p = one(c.myr_products);
+	const s = one(c.sellers);
+	let buyerEmail: string | null = null;
+	if (c.order_id) {
+		const { data: o } = await db.from('myr_orders').select('buyer_email').eq('id', c.order_id).maybeSingle();
+		buyerEmail = (o as { buyer_email: string | null } | null)?.buyer_email ?? null;
+	}
+	const customerEmail = await resolveCustomerEmail({ buyerEmail, customerId: c.customer_id, userId: c.user_id });
+	return {
+		cs: { conversationId: c.id, code: c.code, type: c.type, buyerName: c.buyer_name || '고객', orderCode: c.order_code, productName: p?.name ?? '상품', productCode: p?.code ?? '', sellerName: s?.name ?? '크리에이터', isMember: !!c.user_id },
+		customerEmail,
+		sellerEmail: s && isEmailAddress(s.email) ? s.email!.trim() : null
+	};
+}
+
+/** 새 문의(접수) · 추가 문의 → 셀러. cs.ts `openCs` · `customerReplyCs` 가 부른다 */
+export async function notifyCsOpened(conversationId: string, message: { messageId: string; body: string; followUp: boolean }): Promise<MailSendResult | null> {
+	try {
+		const loaded = await loadCs(conversationId);
+		if (!loaded) return null;
+		return await deliver(loaded.sellerEmail, csOpenedSellerMail(loaded.cs, message, mailCtx()));
+	} catch (e) {
+		console.error('[mail] notifyCsOpened failed:', e instanceof Error ? e.message : e);
+		return null;
+	}
+}
+
+/** 셀러·관리자 답변 → 고객. 콘솔의 reply 경로가 부른다(이 앱에는 호출처가 없다 — 콘솔 PR 에서 같은 함수를 복사·호출) */
+export async function notifyCsReplied(conversationId: string, reply: { messageId: string; body: string }): Promise<MailSendResult | null> {
+	try {
+		const loaded = await loadCs(conversationId);
+		if (!loaded) return null;
+		return await deliver(loaded.customerEmail, csRepliedMail(loaded.cs, reply, mailCtx()));
+	} catch (e) {
+		console.error('[mail] notifyCsReplied failed:', e instanceof Error ? e.message : e);
+		return null;
 	}
 }
