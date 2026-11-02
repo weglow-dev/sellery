@@ -1,11 +1,13 @@
 <script lang="ts">
-	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용. 줄 · 금액 · 배송 상태 · 입금 안내(가상계좌) · 배송지. 환불·문의 버튼은 다음 단계. */
+	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용. 줄(줄마다 그 상품 크리에이터에게 문의하기) · 금액 · 배송 상태 · 입금 안내(가상계좌) · 배송지 · 환불 패널 · 이 주문의 문의 목록(S7). */
 	import { won } from '$lib/data';
+	import { csNewHref, csStatusChip, type CsForOrder } from '$lib/cs-rules';
 	import { displayCode, shortDate, statusLabel, type OrderView } from '$lib/order-view';
 	import RefundPanel from '$lib/components/RefundPanel.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order }: { order: OrderView } = $props();
+	let { order, inquiries = [] }: { order: OrderView; inquiries?: CsForOrder[] } = $props();
+	const chipTone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const label = $derived(statusLabel(order));
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', muted: 'bg-white/8 text-white/55', danger: 'bg-[#ff6b6b]/12 text-[#ff6b6b]', ok: 'bg-[#4ade80]/12 text-[#4ade80]' };
 	const dueText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
@@ -43,7 +45,7 @@
 					<div class="min-w-0 flex-1">
 						{#if it.creator}<p class="text-[11px] font-bold text-accent">{it.creator}</p>{/if}
 						<p class="truncate text-[14px] font-bold">{it.name}{#if it.option} · {it.option}{/if}</p>
-						<p class="mt-0.5 text-[12px] text-fg-faint">{won(it.unitPrice)} × {it.qty}{#if ls} · <span class="text-white/55">{ls}</span>{/if}</p>
+						<p class="mt-0.5 text-[12px] text-fg-faint">{won(it.unitPrice)} × {it.qty}{#if ls} · <span class="text-white/55">{ls}</span>{/if} · <a href={csNewHref(it.code, order.code)} class="font-bold text-accent">문의하기</a></p>
 					</div>
 					<span class="text-[14px] font-extrabold">{won(it.amount)}</span>
 				</div>
@@ -71,6 +73,20 @@
 			<div class="flex items-baseline justify-between border-t border-white/8 pt-2"><span class="font-bold">{order.status === 'WAITING_DEPOSIT' ? '입금할 금액' : '총 결제 금액'}</span><span class="text-[20px] font-extrabold text-accent">{won(order.amount)}</span></div>
 		</div>
 		<RefundPanel {order} />
-		<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">문의는 곧 열려요. 급한 문의는 마이페이지의 고객센터로.</p>
+		{#if inquiries.length}
+			<div class="mt-4 border-t border-white/8 pt-4">
+				<p class="text-[13px] font-bold text-fg-faint">이 주문의 문의</p>
+				<div class="mt-2 flex flex-col gap-1.5">
+					{#each inquiries as q (q.code)}
+						{@const chip = csStatusChip(q.status)}
+						<a href="/cs/{q.code}" class="flex items-center justify-between gap-2 rounded-[12px] bg-white/4 px-3 py-2.5 text-fg transition-colors hover:bg-white/7">
+							<span class="min-w-0"><span class="block truncate text-[13px] font-bold">{q.productName}</span><span class="block text-[11.5px] text-fg-faint"><span class="font-mono">{q.code.toUpperCase()}</span> · {q.type} · {shortDate(q.lastMessageAt)}</span></span>
+							<span class="shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold {chipTone[chip.tone]}">{chip.label}</span>
+						</a>
+					{/each}
+				</div>
+			</div>
+		{/if}
+		<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">배송·교환·반품은 상품 줄의 [문의하기]로 크리에이터에게 바로 물어보세요.</p>
 	</aside>
 </div>

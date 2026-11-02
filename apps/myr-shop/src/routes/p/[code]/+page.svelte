@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DETAIL_ANCHORS, catName, handleSlug, infoRowsOf, won } from '$lib/data';
+	import { csNewHref } from '$lib/cs-rules';
 	import { goBack } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
@@ -160,6 +161,10 @@
 						</div>
 					{/each}
 				</div>
+				<a href={csNewHref(p.code)} class="mt-3 flex items-center justify-between rounded-[18px] border border-dashed border-white/14 px-4 py-3.5 text-[14px] text-fg transition-colors lg:px-[22px] lg:hover:border-white/30">
+					<span>궁금한 점이 더 있나요? <b>{creator.name}</b>님에게 문의하기</span>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="text-fg-faint"><path d="M9 5l7 7-7 7" /></svg>
+				</a>
 			</section>
 
 			<!-- 함께 보면 좋은 레시피 -->

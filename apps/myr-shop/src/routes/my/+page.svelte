@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { won } from '$lib/data';
+	import { csStatusChip } from '$lib/cs-rules';
 	import { displayCode, shortDate, statusLabel } from '$lib/order-view';
 	import { shop } from '$lib/state.svelte';
 	import Tile from '$lib/components/Tile.svelte';
@@ -12,6 +13,7 @@
 	const orders = $derived(data.orders);
 	const name = $derived(user?.name ?? shop.buyer.name.trim());
 	const LANDING = 'https://sellery.life/influencer/oem';
+	const csTone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const menu = [
 		{ name: '비회원 주문 조회', href: '/orders/lookup' },
 		{ name: '배송지 관리', href: '/checkout' },
@@ -107,6 +109,22 @@
 				</a>
 			{/each}
 		</div>
+
+		{#if user && data.inquiries.length}
+			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">내 문의</h3>
+			<div class="flex flex-col gap-2">
+				{#each data.inquiries as q (q.id)}
+					{@const chip = csStatusChip(q.status)}
+					<a href="/cs/{q.code}" class="flex items-center justify-between gap-3 rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-fg transition-colors lg:rounded-[20px] lg:px-5 lg:hover:border-white/25">
+						<span class="min-w-0">
+							<span class="block truncate text-[14px] font-bold">{q.product?.name ?? '문의'}</span>
+							<span class="block truncate text-[12px] text-fg-faint"><span class="font-mono">{q.code.toUpperCase()}</span> · {q.type} · {shortDate(q.lastMessageAt)}{#if q.lastPreview} · {q.lastPreview}{/if}</span>
+						</span>
+						<span class="shrink-0 rounded-full px-2.5 py-[5px] text-[12px] font-bold {csTone[chip.tone]}">{chip.label}</span>
+					</a>
+				{/each}
+			</div>
+		{/if}
 
 		<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">찜한 레시피</h3>
 		{#if shop.ready && shop.likes.length === 0}
