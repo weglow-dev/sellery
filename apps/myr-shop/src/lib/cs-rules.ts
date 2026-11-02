@@ -246,8 +246,6 @@ export const csTokenCookieName = (conversationCode: string): string => `${CS_TOK
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const parseClientToken = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null);
 
-/** 접수 화면 링크 — 상품 페이지 · 주문 상세(주문번호 프리필) */
-export const csNewHref = (productCode: string, orderCode?: string | null): string => `/cs/new?product=${encodeURIComponent(productCode)}${orderCode ? `&order=${encodeURIComponent(orderCode)}` : ''}`;
 
 /** 상대 시각 — "방금" · "N분 전" · "N시간 전" · "어제" · "N일 전" · "N주 전" · 그 뒤는 "M월 D일"(KST). now 주입 가능(테스트) */
 export function relTime(iso: string | null | undefined, now: number = Date.now()): string {
@@ -265,4 +263,31 @@ export function relTime(iso: string | null | undefined, now: number = Date.now()
 	if (days < 28) return `${Math.floor(days / 7)}주 전`;
 	const k = new Date(t + 9 * 3_600_000);
 	return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일`;
+}
+
+/* ---------------- 상품 페이지 문의 시트 (대표 시안 2026-11-02) ---------------- */
+/** 주문번호 선택이 나오는 유형 — 배송 문의 · 교환·반품 만 */
+export const CS_ORDER_TYPES: readonly CsType[] = ['배송 문의', '교환·반품'];
+export const csNeedsOrder = (type: string): boolean => (CS_ORDER_TYPES as readonly string[]).includes(type);
+export const CS_PLACEHOLDERS: Record<CsType, string> = {
+	'배송 문의': '배송 상태, 도착 예정일 등 궁금한 점을 적어주세요',
+	'교환·반품': '교환·반품하려는 이유와 받은 상품의 상태를 적어주세요',
+	'상품 문의': '성분, 함량, 효과 등 궁금한 점을 적어주세요',
+	기타: '궁금한 점을 자유롭게 적어주세요'
+};
+
+/** 주문 드롭다운 옵션 — 내 주문 중 **이 상품 줄이 있는** 것만(최신순 그대로) · 라벨 "MYR1001 · 11월 2일 · 상품 × 2" */
+export type CsOrderOption = { code: string; label: string };
+export function csOrderOptions(
+	orders: readonly { code: string; createdAt: string; items: readonly { code: string; name: string; qty: number }[] }[],
+	productCode: string,
+	fmtDate: (iso: string) => string
+): CsOrderOption[] {
+	const out: CsOrderOption[] = [];
+	for (const o of orders) {
+		const line = o.items.find((i) => i.code === productCode);
+		if (!line) continue;
+		out.push({ code: o.code, label: `${o.code.toUpperCase()} · ${fmtDate(o.createdAt)} · ${line.name} × ${line.qty}` });
+	}
+	return out;
 }

@@ -16,6 +16,8 @@ export type OrderItem = {
 	ic: string;
 	thumbUrl: string | null;
 	creator: string;
+	/** '@minji.routine' — 0065 · 문의 시트 머리 */
+	creatorHandle: string;
 };
 export type OrderShipping = { recipient: string; phone: string; address1: string; address2: string; postcode: string; memo: string };
 export type OrderDeposit = { bank: string; account: string; holder: string; due: string | null };
@@ -41,6 +43,8 @@ export type OrderView = {
 	buyerName: string;
 	/** 상세(본인 확인 뒤)에만 실린다 */
 	shipping: OrderShipping | null;
+	/** 주문 때 받은 이메일 — 상세에만(0065) */
+	buyerEmail: string | null;
 	items: OrderItem[];
 };
 
@@ -65,7 +69,8 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		tile: str(o, 'tile', 'linear-gradient(145deg,#6b7280,#262a33)'),
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
-		creator: str(o, 'creator')
+		creator: str(o, 'creator'),
+		creatorHandle: str(o, 'creator_handle')
 	};
 }
 
@@ -104,6 +109,7 @@ export function orderFromJson(v: unknown): OrderView | null {
 					memo: str(ship, 'memo')
 				}
 			: null,
+		buyerEmail: strOrNull(o, 'buyer_email'),
 		items: (Array.isArray(o.items) ? o.items : []).map(itemFromJson).filter((i): i is OrderItem => i !== null)
 	};
 }

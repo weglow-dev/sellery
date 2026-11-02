@@ -99,3 +99,14 @@ describe('parseLookupInput · parseLookupResult', () => {
 		expect(parseLookupResult({ ok: true, order_id: 'o', order_code: 'myr1001', token: 'short' })).toEqual({ ok: false, code: 'BAD_RESULT' });
 	});
 });
+
+describe('0065 — 상세 이메일 · 줄 크리에이터 핸들', () => {
+	it('buyer_email · creator_handle 을 읽는다(없으면 null · 빈 문자열)', () => {
+		const o = orderFromJson({ id: 'o', code: 'myr1', buyer_email: 'a@b.co', items: [{ id: 'i', product_code: 'a', creator: '민지', creator_handle: '@minji' }] })!;
+		expect(o.buyerEmail).toBe('a@b.co');
+		expect(o.items[0].creatorHandle).toBe('@minji');
+		const n = orderFromJson({ id: 'o', code: 'myr1', items: [{ id: 'i' }] })!;
+		expect(n.buyerEmail).toBeNull();
+		expect(n.items[0].creatorHandle).toBe('');
+	});
+});

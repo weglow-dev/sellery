@@ -4,7 +4,9 @@ import {
 	CS_BODY_MAX,
 	CS_CODE_RE,
 	csFailMessage,
-	csNewHref,
+	csNeedsOrder,
+	csOrderOptions,
+	CS_PLACEHOLDERS,
 	csSenderLabel,
 	csStatusChip,
 	csTokenCookieName,
@@ -127,14 +129,12 @@ describe('문구 · 칩 · 쿠키', () => {
 		expect(csSenderLabel('seller', '민지 루틴')).toBe('민지 루틴');
 		expect(csSenderLabel('admin')).toBe('MYR 운영팀');
 	});
-	it('쿠키 이름 · 토큰 · 코드 형식 · 접수 링크', () => {
+	it('쿠키 이름 · 토큰 · 코드 형식', () => {
 		expect(csTokenCookieName('CS1001')).toBe('myr_cs_cs1001');
 		expect(parseClientToken('8A6A1B53-321E-406F-8D4F-1C52911878CC')).toBe('8a6a1b53-321e-406f-8d4f-1c52911878cc');
 		expect(parseClientToken('nope')).toBeNull();
 		expect(CS_CODE_RE.test('cs1001')).toBe(true);
 		expect(CS_CODE_RE.test('myr1001')).toBe(false);
-		expect(csNewHref('minji-grape-jelly', 'myr1001')).toBe('/cs/new?product=minji-grape-jelly&order=myr1001');
-		expect(csNewHref('minji-grape-jelly')).toBe('/cs/new?product=minji-grape-jelly');
 	});
 });
 
@@ -154,5 +154,29 @@ describe('relTime · firstBody (마이 "내 문의")', () => {
 	it('parseCsConversation 은 first_body 를 읽는다', () => {
 		expect(parseCsConversation({ ...convJson, first_body: '저녁에 먹어도 되나요?' })!.firstBody).toBe('저녁에 먹어도 되나요?');
 		expect(parseCsConversation(convJson)!.firstBody).toBeNull();
+	});
+});
+
+describe('문의 시트 — 주문 드롭다운은 배송 문의 · 교환·반품만', () => {
+	it('csNeedsOrder', () => {
+		expect(csNeedsOrder('배송 문의')).toBe(true);
+		expect(csNeedsOrder('교환·반품')).toBe(true);
+		expect(csNeedsOrder('상품 문의')).toBe(false);
+		expect(csNeedsOrder('기타')).toBe(false);
+	});
+	it('유형마다 안내 문구가 있다', () => {
+		for (const t of ['배송 문의', '교환·반품', '상품 문의', '기타'] as const) expect(CS_PLACEHOLDERS[t].length).toBeGreaterThan(5);
+	});
+	it('csOrderOptions — 이 상품 줄이 있는 주문만 · 순서 유지 · 라벨', () => {
+		const orders = [
+			{ code: 'myr1003', createdAt: '2026-11-02T00:00:00Z', items: [{ code: 'b', name: '상품 B', qty: 1 }] },
+			{ code: 'myr1002', createdAt: '2026-11-01T00:00:00Z', items: [{ code: 'a', name: '상품 A', qty: 2 }, { code: 'b', name: '상품 B', qty: 1 }] },
+			{ code: 'myr1001', createdAt: '2026-10-30T00:00:00Z', items: [{ code: 'a', name: '상품 A', qty: 1 }] }
+		];
+		expect(csOrderOptions(orders, 'a', () => 'D')).toEqual([
+			{ code: 'myr1002', label: 'MYR1002 · D · 상품 A × 2' },
+			{ code: 'myr1001', label: 'MYR1001 · D · 상품 A × 1' }
+		]);
+		expect(csOrderOptions(orders, 'zzz', () => 'D')).toEqual([]);
 	});
 });
