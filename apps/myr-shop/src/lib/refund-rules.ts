@@ -10,13 +10,6 @@ const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === '
 export const REFUND_REASONS = ['단순 변심', '주문 실수', '배송 지연', '상품 불량·파손', '기타'] as const;
 export const REASON_MAX = 200;
 
-/** 화면의 사유(드롭다운) + 상세(선택) → 서버로 보내는 한 줄 `사유 — 상세` (REASON_MAX 안 · 상세가 비면 사유만) */
-export function composeReason(reason: string, detail: string): string {
-	const r = cleanText(reason);
-	const d = cleanText(detail);
-	return (d ? `${r} — ${d}` : r).slice(0, REASON_MAX);
-}
-
 /** POST /api/payments/cancel 본문 `{ orderCode, items?: [{ itemId, qty }], reason? }` — items 비우면 전체. 형식 틀리면 null */
 export function parseCancelBody(v: unknown): { orderCode: string; items: RefundLine[]; reason: string } | null {
 	const b = obj(v);

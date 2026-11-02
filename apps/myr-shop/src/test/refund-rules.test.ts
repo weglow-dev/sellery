@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OrderItem, OrderView } from '../lib/order-view';
 import {
-	composeReason,
 	customerCanRefund,
 	estimateRefund,
 	parseCancelBody,
@@ -161,15 +160,5 @@ describe('RPC 파서 · 문구', () => {
 		});
 		expect(refundMessage('SHIPPED')).toContain('발송');
 		expect(refundMessage('ZZZ', '토스 메시지')).toBe('토스 메시지');
-	});
-});
-
-describe('composeReason — 드롭다운 사유 + 상세', () => {
-	it('상세가 비면 사유만, 있으면 "사유 — 상세"', () => {
-		expect(composeReason('단순 변심', '')).toBe('단순 변심');
-		expect(composeReason('상품 불량·파손', '  뚜껑이 깨져서 왔어요 ')).toBe('상품 불량·파손 — 뚜껑이 깨져서 왔어요');
-	});
-	it('200자를 넘지 않는다', () => {
-		expect(composeReason('기타', 'x'.repeat(300)).length).toBe(200);
 	});
 });

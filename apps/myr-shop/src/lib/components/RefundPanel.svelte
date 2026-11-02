@@ -1,13 +1,13 @@
 <script lang="ts">
-	/** 환불 신청 — 줄마다 체크박스 카드(수량 2개 이상이면 체크 뒤 수량 선택) · 사유 드롭다운(빈 값으로 시작 · 필수) + 상세(선택) → 확인 단계(인라인) → POST /api/payments/cancel → 주문 다시 읽기.
+	/** 환불 신청 — 줄마다 체크박스 카드(수량 2개 이상이면 체크 뒤 수량 선택) · 사유 커스텀 드롭다운(빈 값으로 시작 · 필수 · REFUND_REASONS 만) → 확인 단계(인라인) → POST /api/payments/cancel → 주문 다시 읽기.
 	 *  브라우저 confirm() 은 쓰지 않는다. 금액은 화면 추정(estimateRefund)이고 서버 precheck 가 다시 계산한다. 입금 대기 주문은 "주문 취소"(토스 호출 없음).
-	 *  서버로 가는 reason 은 `사유 — 상세`(REASON_MAX 안) 한 줄 — 서버·DB 는 그대로(composeReason · refund-rules.ts). */
+	 *  상세 사유 입력은 두지 않는다 — 상품별 고객 문의로 받아 인플루언서 콘솔에 넘기는 흐름(S6-4)이 따로 간다. */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
 	import type { OrderView } from '$lib/order-view';
 	import Tile from '$lib/components/Tile.svelte';
-	import { composeReason, customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
+	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
 
 	let { order }: { order: OrderView } = $props();
 	const can = $derived(customerCanRefund(order));
@@ -18,7 +18,7 @@
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let reason = $state<string>('');
-	let detail = $state('');
+	let reasonOpen = $state(false);
 	let qtyById = $state<Record<string, number>>({});
 
 	const chosen = $derived<RefundLine[]>(Object.entries(qtyById).filter(([, q]) => q > 0).map(([item_id, qty]) => ({ item_id, qty })));
@@ -29,7 +29,7 @@
 	function start() {
 		qtyById = Object.fromEntries(lines.map((l) => [l.id, remainingQty(l)]));
 		reason = '';
-		detail = '';
+		reasonOpen = false;
 		open = true;
 		confirming = false;
 		error = null;
@@ -40,6 +40,20 @@
 	function setQty(id: string, max: number, v: number) {
 		qtyById = { ...qtyById, [id]: Math.max(1, Math.min(max, v)) };
 	}
+	function pickReason(r: string) {
+		reason = r;
+		reasonOpen = false;
+	}
+	function reasonKey(e: KeyboardEvent) {
+		if (e.key === 'Escape') reasonOpen = false;
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			const i = REFUND_REASONS.indexOf(reason as (typeof REFUND_REASONS)[number]);
+			const n = e.key === 'ArrowDown' ? Math.min(REFUND_REASONS.length - 1, i + 1) : Math.max(0, i - 1);
+			reason = REFUND_REASONS[n];
+			reasonOpen = true;
+		}
+	}
 	async function submit() {
 		if (submitting) return;
 		submitting = true;
@@ -48,7 +62,7 @@
 			const res = await fetch('/api/payments/cancel', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ orderCode: order.code, items: deposit ? [] : chosen.map((c) => ({ itemId: c.item_id, qty: c.qty })), reason: deposit ? composeReason(reason || '고객 요청', detail) : composeReason(reason, detail) })
+				body: JSON.stringify({ orderCode: order.code, items: deposit ? [] : chosen.map((c) => ({ itemId: c.item_id, qty: c.qty })), reason: deposit ? reason || '고객 요청' : reason })
 			});
 			const r = (await res.json().catch(() => null)) as { ok: boolean; code?: string; message?: string; status?: string; refunded?: number } | null;
 			if (!res.ok || !r?.ok) {
@@ -67,7 +81,6 @@
 	const btn = 'flex h-12 flex-1 items-center justify-center rounded-[14px] text-[14px] font-bold transition-colors';
 	const checkCls =
 		'h-[22px] w-[22px] shrink-0 cursor-pointer appearance-none rounded-[7px] border-[1.5px] border-white/25 bg-transparent transition-colors checked:border-accent checked:bg-accent checked:bg-[url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%230a0b0e%27%20stroke-width=%273%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M5%2012.5l4.5%204.5L19%207.5%27/%3E%3C/svg%3E")] checked:bg-[length:16px_16px] checked:bg-center checked:bg-no-repeat disabled:cursor-not-allowed disabled:opacity-30';
-	const fieldCls = 'mt-2 w-full rounded-[14px] border border-white/10 bg-white/4 px-4 text-[14px] text-fg placeholder:text-fg-faint focus:border-accent focus:outline-none disabled:opacity-50';
 </script>
 
 {#if can.ok}
@@ -108,11 +121,34 @@
 					{/each}
 				</div>
 				<p class="mt-5 text-[13px] font-bold text-fg-soft">환불 사유</p>
-				<select bind:value={reason} disabled={submitting} aria-label="환불 사유" class="{fieldCls} h-12 {reason === '' ? 'text-fg-faint' : ''}">
-					<option value="" disabled>사유를 선택하세요</option>
-					{#each REFUND_REASONS as r (r)}<option value={r}>{r}</option>{/each}
-				</select>
-				<textarea bind:value={detail} disabled={submitting} rows="2" maxlength="150" placeholder="상태나 상황을 적어주시면 더 빠르게 처리돼요 (선택)" aria-label="상세 사유" class="{fieldCls} resize-none py-3 leading-[1.5]"></textarea>
+				<div class="relative mt-2">
+					<button
+						type="button"
+						onclick={() => (reasonOpen = !reasonOpen)}
+						onkeydown={reasonKey}
+						disabled={submitting}
+						aria-haspopup="listbox"
+						aria-expanded={reasonOpen}
+						aria-label="환불 사유"
+						class="flex h-12 w-full items-center justify-between rounded-[14px] border bg-white/4 px-4 text-left text-[14px] transition-colors focus:outline-none disabled:opacity-50 {reasonOpen ? 'border-accent' : 'border-white/10'} {reason === '' ? 'text-fg-faint' : 'text-fg'}"
+					>
+						<span class="truncate">{reason === '' ? '사유를 선택하세요' : reason}</span>
+						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-fg-faint transition-transform {reasonOpen ? 'rotate-180' : ''}" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+					</button>
+					{#if reasonOpen}
+						<button type="button" class="fixed inset-0 z-10 cursor-default" aria-label="사유 목록 닫기" onclick={() => (reasonOpen = false)}></button>
+						<ul role="listbox" aria-label="환불 사유" class="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-[14px] border border-white/10 bg-[#15161a] shadow-[0_12px_32px_rgba(0,0,0,.45)]">
+							{#each REFUND_REASONS as r (r)}
+								<li role="option" aria-selected={reason === r}>
+									<button type="button" onclick={() => pickReason(r)} class="flex h-12 w-full items-center justify-between border-b border-white/6 px-4 text-left text-[14px] transition-colors last:border-b-0 hover:bg-white/5 {reason === r ? 'font-bold text-accent' : 'text-fg'}">
+										<span>{r}</span>
+										{#if reason === r}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>{/if}
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</div>
 				<div class="mt-4 flex items-baseline justify-between text-[14px]">
 					<span class="text-fg-soft">예상 환불 금액{#if est.full && order.shippingFee} <span class="text-[12px] text-fg-faint">(배송비 포함)</span>{/if}</span>
 					<span class="text-[18px] font-extrabold text-accent">{won(est.amount)}</span>
