@@ -7,7 +7,7 @@
 	import { shop } from '$lib/state.svelte';
 	import { depositInfoOf, failText, guestOrderHref, parseSuccessParams, type DepositInfo, type FailText, type RejectedItem } from '$lib/checkout-rules';
 
-	type Card = { orderCode: string; orderName: string; itemsAmount: number; shippingFee: number; amount: number; buyerName: string; address: string; items: { name: string; option: string; qty: number; amount: number }[] };
+	type Card = { orderCode: string; orderName: string; itemsAmount: number; shippingFee: number; amount: number; buyerName: string; address: string; items: { code: string; name: string; option: string; qty: number; amount: number }[] };
 	type ConfirmOk = { ok: true; orderCode: string; status: string; already?: boolean; card: Card | null; deposit?: DepositInfo | null; guest?: boolean };
 	type ConfirmFail = { ok: false; code: string; message?: string; items?: RejectedItem[] };
 	type View = { kind: 'loading' } | { kind: 'ok'; r: ConfirmOk; amount: number } | { kind: 'fail'; code: string; fail: FailText };
@@ -37,7 +37,7 @@
 			}
 			if (r.status >= 200 && r.status < 300 && r.data?.ok === true) {
 				view = { kind: 'ok', r: r.data, amount: parsed.amount };
-				if (!r.data.already) shop.afterOrder();
+				if (!r.data.already) shop.afterOrder(r.data.card?.items.map((i) => i.code).filter(Boolean));
 				return;
 			}
 			const d = r.data;

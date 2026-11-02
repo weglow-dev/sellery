@@ -46,6 +46,25 @@ export function cartTotals(lines: CartLine[]): CartTotals {
 	};
 }
 
+// ---- 선택 주문 (2026-11-02 대표 요청) — "선택 해제한 code 목록" 을 기억한다: 새로 담은 줄은 기본 선택이고, 장바구니에서 빠진 code 는 자동으로 정리된다 ----
+
+/** 주문에 들어갈 줄 = 살 수 있고 선택 해제되지 않은 줄 */
+export const selectedLines = (lines: CartLine[], unselected: readonly string[]): CartLine[] =>
+	lines.filter((l) => canBuy(l) && !unselected.includes(l.product.code));
+
+/** 선택 토글 — on 이면 해제 목록에서 빼고, 아니면 넣는다 */
+export function setUnselected(unselected: readonly string[], code: string, selected: boolean): string[] {
+	if (selected) return unselected.filter((c) => c !== code);
+	return unselected.includes(code) ? [...unselected] : [...unselected, code];
+}
+
+/** 전체 선택/해제 — 해제는 지금 있는 줄 전부를 해제 목록에 */
+export const setAllSelected = (lines: CartLine[], selected: boolean): string[] => (selected ? [] : lines.map((l) => l.product.code));
+
+/** 장바구니에서 사라진 code 는 해제 목록에서도 정리 */
+export const pruneUnselected = (unselected: readonly string[], lines: CartLine[]): string[] =>
+	unselected.filter((c) => lines.some((l) => l.product.code === c));
+
 /** localStorage 에서 읽은 값 검증 — 스냅샷 꼴이 아니면 버린다 */
 export const isProduct = (p: unknown): p is Product =>
 	!!p && typeof p === 'object' && typeof (p as Product).code === 'string' && typeof (p as Product).price === 'number';

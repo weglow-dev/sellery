@@ -31,6 +31,11 @@ export const mergeCart = async (userId: string, lines: MergeLine[]): Promise<Rpc
 
 export const clearCart = async (userId: string): Promise<RpcResult> => asResult(await rpc('myr_cart_clear', { p_user_id: userId }));
 
+/** 주문된 상품만 장바구니에서 뺀다(선택 주문 — 선택 안 한 줄은 남긴다). 줄마다 qty 0 = 삭제. 하나가 실패해도 나머지는 계속 */
+export async function removeCartCodes(userId: string, codes: string[]): Promise<void> {
+	await Promise.allSettled(codes.map((code) => setCart(userId, { code, qty: 0 })));
+}
+
 export const getLikes = async (userId: string): Promise<Product[]> => asRows(await rpc('myr_likes_get', { p_user_id: userId })).map(fromRow);
 
 export const setLike = async (userId: string, code: string, liked: boolean): Promise<RpcResult> =>

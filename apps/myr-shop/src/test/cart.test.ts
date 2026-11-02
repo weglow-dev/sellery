@@ -1,6 +1,17 @@
 // 장바구니 계산 — apps/myr-shop/src/lib/cart.ts (숫자는 data.ts FREE_SHIPPING 50,000 · SHIPPING_FEE 3,000 · MAX_QTY 9)
 import { describe, expect, it } from 'vitest';
-import { cartTotals, clampQty, mergeLine, removeLine, sanitizeLines, setLineQty } from '../lib/cart';
+import {
+	cartTotals,
+	clampQty,
+	mergeLine,
+	pruneUnselected,
+	removeLine,
+	sanitizeLines,
+	selectedLines,
+	setAllSelected,
+	setLineQty,
+	setUnselected
+} from '../lib/cart';
 import { FREE_SHIPPING, MAX_QTY, MOCK_PRODUCTS, SHIPPING_FEE } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS; // 32,000 · 28,000
@@ -61,5 +72,32 @@ describe('sanitizeLines — localStorage 복원', () => {
 			{ product: b, qty: MAX_QTY }
 		]);
 		expect(sanitizeLines(undefined)).toEqual([]);
+	});
+});
+
+describe('선택 주문 — selectedLines · setUnselected · setAllSelected · pruneUnselected', () => {
+	const lines = [
+		{ product: a, qty: 1 },
+		{ product: b, qty: 2 },
+		{ product: { ...a, code: 'c-paused' }, qty: 1, available: false }
+	];
+	it('기본은 전부 선택 · 살 수 없는 줄은 빠진다', () => {
+		expect(selectedLines(lines, []).map((l) => l.product.code)).toEqual([a.code, b.code]);
+	});
+	it('해제 목록에 있으면 빠지고 · 토글은 멱등', () => {
+		let un = setUnselected([], a.code, false);
+		expect(un).toEqual([a.code]);
+		expect(setUnselected(un, a.code, false)).toEqual([a.code]);
+		expect(selectedLines(lines, un).map((l) => l.product.code)).toEqual([b.code]);
+		un = setUnselected(un, a.code, true);
+		expect(un).toEqual([]);
+	});
+	it('전체 해제는 지금 줄 전부 · 전체 선택은 빈 목록 · 사라진 code 는 정리', () => {
+		expect(setAllSelected(lines, false)).toEqual([a.code, b.code, 'c-paused']);
+		expect(setAllSelected(lines, true)).toEqual([]);
+		expect(pruneUnselected([a.code, 'gone'], lines)).toEqual([a.code]);
+	});
+	it('합계는 선택한 줄만', () => {
+		expect(cartTotals(selectedLines(lines, [b.code])).subtotal).toBe(a.price);
 	});
 });

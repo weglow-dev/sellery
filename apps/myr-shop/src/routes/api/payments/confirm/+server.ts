@@ -14,7 +14,7 @@ import {
 	type DepositInfo
 } from '$lib/checkout-rules';
 import { admin, hasAdmin } from '$lib/server/admin';
-import { clearCart } from '$lib/server/cart';
+import { clearCart, removeCartCodes } from '$lib/server/cart';
 import { apiError, cancelAndFail, confirmDone, failCheckout, logPaymentEvent, moneyHeld, rejectCrossSite, type Admin } from '$lib/server/checkout-sync';
 import { issueGuestToken } from '$lib/server/customers';
 import { isTossError, isUncertain, tossConfirm, tossGetPayment, type TossError, type TossPayment, type TossResult } from '$lib/server/toss';
@@ -38,14 +38,14 @@ export type SuccessCard = {
 	amount: number;
 	buyerName: string;
 	address: string;
-	items: { name: string; option: string; qty: number; amount: number }[];
+	items: { code: string; name: string; option: string; qty: number; amount: number }[];
 };
 
 async function buildCard(db: Admin, orderId: string): Promise<SuccessCard | null> {
 	try {
 		const [{ data: o }, { data: items }] = await Promise.all([
 			db.from('myr_orders').select('code, order_name, items_amount, shipping_fee, amount, buyer_name, shipping').eq('id', orderId).maybeSingle(),
-			db.from('myr_order_items').select('product_name, option_name, qty, amount').eq('order_id', orderId).order('created_at')
+			db.from('myr_order_items').select('product_name, option_name, qty, amount, myr_products(code)').eq('order_id', orderId).order('created_at')
 		]);
 		if (!o) return null;
 		const ord = o as {
@@ -67,7 +67,11 @@ async function buildCard(db: Admin, orderId: string): Promise<SuccessCard | null
 			amount: ord.amount,
 			buyerName: ord.buyer_name,
 			address,
-			items: ((items as { product_name: string; option_name: string; qty: number; amount: number }[] | null) ?? []).map((i) => ({
+			items: (
+				(items as
+					{ product_name: string; option_name: string; qty: number; amount: number; myr_products: { code: string } | { code: string }[] | null }[] | null) ?? []
+			).map((i) => ({
+				code: (Array.isArray(i.myr_products) ? i.myr_products[0]?.code : i.myr_products?.code) ?? '',
 				name: i.product_name,
 				option: i.option_name,
 				qty: i.qty,
@@ -178,7 +182,13 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 			const { data: o } = await db.from('myr_orders').select('raw_payment').eq('id', r.orderId).maybeSingle();
 			deposit = depositInfoOf((o as { raw_payment: unknown } | null)?.raw_payment);
 		}
-		if (user && !r.already) await clearCart(user.id).catch((e) => console.error('[confirm] cart clear failed:', e instanceof Error ? e.message : e));
+		// 선택 주문 — 주문된 상품만 계정 장바구니에서 뺀다(선택 안 한 줄은 남긴다). 주문 줄을 못 읽었으면(card null) 전부 비운다
+		if (user && !r.already) {
+			const codes = card?.items.map((i) => i.code).filter(Boolean) ?? [];
+			await (codes.length ? removeCartCodes(user.id, codes) : clearCart(user.id)).catch((e) =>
+				console.error('[confirm] cart clear failed:', e instanceof Error ? e.message : e)
+			);
+		}
 		const guestOk = user ? false : await finishGuest(cookies, r.orderCode);
 		return json({
 			ok: true,

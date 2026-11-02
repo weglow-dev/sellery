@@ -5,7 +5,21 @@
  *  계산은 전부 lib/cart.ts(순수 · 테스트됨). 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
  *  상태 변경은 전부 이 모듈의 메서드로만. */
 import { browser } from '$app/environment';
-import { canBuy, cartTotals, isProduct, mergeLine, mergePayload, removeLine, sanitizeLines, setLineQty, type CartLine } from './cart';
+import {
+	canBuy,
+	cartTotals,
+	isProduct,
+	mergeLine,
+	mergePayload,
+	pruneUnselected,
+	removeLine,
+	sanitizeLines,
+	selectedLines,
+	setAllSelected,
+	setLineQty,
+	setUnselected,
+	type CartLine
+} from './cart';
 import type { Product } from './data';
 
 const LS_KEY = 'myr-shop-v2';
@@ -15,10 +29,10 @@ export type OrderLine = { code: string; name: string; qty: number; amount: numbe
 export type Order = { no: string; lines: OrderLine[]; subtotal: number; shipping: number; total: number; address: string; pay: string; at: string };
 export type Buyer = { name: string; phone: string; address: string };
 
-type Persisted = { cart: CartLine[]; likes: Product[]; buyer: Buyer; orders: Order[] };
+type Persisted = { cart: CartLine[]; likes: Product[]; buyer: Buyer; orders: Order[]; unselected: string[] };
 
 function load(): Persisted {
-	const empty: Persisted = { cart: [], likes: [], buyer: { name: '', phone: '', address: '' }, orders: [] };
+	const empty: Persisted = { cart: [], likes: [], buyer: { name: '', phone: '', address: '' }, orders: [], unselected: [] };
 	if (!browser) return empty;
 	try {
 		const raw = localStorage.getItem(LS_KEY);
@@ -28,7 +42,8 @@ function load(): Persisted {
 			cart: sanitizeLines(v.cart),
 			likes: (v.likes ?? []).filter(isProduct),
 			buyer: { ...empty.buyer, ...(v.buyer ?? {}) },
-			orders: v.orders ?? []
+			orders: v.orders ?? [],
+			unselected: Array.isArray(v.unselected) ? v.unselected.filter((c): c is string => typeof c === 'string') : []
 		};
 	} catch {
 		return empty;
@@ -52,6 +67,8 @@ class ShopState {
 	ready = $state(false);
 	/** 장바구니·찜이 계정(서버)과 동기화 중인가 — true 면 브라우저에는 저장하지 않는다. 로그인했어도 서버를 못 읽으면 false(브라우저 보관으로 계속) */
 	synced = $state(false);
+	/** 주문에서 뺀 줄(code) — 체크박스 선택. 기본은 전부 선택. 브라우저에만 저장(로그인 여부 무관 · 기기별) */
+	unselected = $state<string[]>([]);
 	private toastTimer: ReturnType<typeof setTimeout> | undefined;
 	private cartSeq = 0;
 	private likesSeq = 0;
@@ -63,6 +80,7 @@ class ShopState {
 		this.orders = v.orders;
 		this.cart = v.cart;
 		this.likes = v.likes;
+		this.unselected = v.unselected;
 		if (signedIn) {
 			try {
 				const [cart, likes] = await Promise.all([
@@ -86,7 +104,13 @@ class ShopState {
 	persist() {
 		if (!browser || !this.ready) return;
 		try {
-			const v: Persisted = { cart: this.synced ? [] : this.cart, likes: this.synced ? [] : this.likes, buyer: this.buyer, orders: this.orders };
+			const v: Persisted = {
+				cart: this.synced ? [] : this.cart,
+				likes: this.synced ? [] : this.likes,
+				buyer: this.buyer,
+				orders: this.orders,
+				unselected: pruneUnselected(this.unselected, this.cart)
+			};
 			localStorage.setItem(LS_KEY, JSON.stringify(v));
 		} catch {
 			/* 사생활 모드 등 — 저장 실패는 조용히 */
@@ -94,8 +118,20 @@ class ShopState {
 	}
 
 	// ---- 장바구니 (계산은 전부 lib/cart.ts — 테스트 src/test/cart.test.ts) ----
-	cartItems = $derived(this.cart.map((l) => ({ ...l.product, qty: l.qty, available: canBuy(l), lineAmount: l.product.price * l.qty })));
-	totals = $derived(cartTotals(this.cart));
+	cartItems = $derived(
+		this.cart.map((l) => ({
+			...l.product,
+			qty: l.qty,
+			available: canBuy(l),
+			selected: canBuy(l) && !this.unselected.includes(l.product.code),
+			lineAmount: l.product.price * l.qty
+		}))
+	);
+	/** 주문에 들어갈 줄(선택 + 살 수 있음) — 합계·배송비·체크아웃은 전부 이 줄 기준 */
+	orderLines = $derived(selectedLines(this.cart, this.unselected));
+	selectedItems = $derived(this.cartItems.filter((it) => it.selected));
+	allSelected = $derived(this.cartItems.filter((it) => it.available).every((it) => it.selected));
+	totals = $derived(cartTotals(this.orderLines));
 	/** 뱃지·"N개" 는 **상품 종류 수**(줄 수) — 같은 상품 수량을 올려도 늘지 않는다(2026-10-30 대표 결정). 수량 합은 totals.count */
 	cartCount = $derived(this.cart.length);
 	/** 뱃지 글자 — 9 를 넘으면 '9+' (두 자리가 들어가면 아이콘 버튼 위에서 알약이 아이콘을 가린다) */
@@ -136,6 +172,17 @@ class ShopState {
 		this.cart = removeLine(this.cart, code);
 		this.syncCart({ code, qty: 0 });
 	}
+	/** 선택 토글 — 브라우저에만 기억(서버 장바구니에는 선택 개념이 없다) */
+	select(code: string, on: boolean) {
+		this.unselected = setUnselected(this.unselected, code, on);
+	}
+	selectAll(on: boolean) {
+		this.unselected = setAllSelected(this.cart, on);
+	}
+	/** 선택한 줄 삭제 */
+	removeSelected() {
+		for (const l of this.orderLines) this.remove(l.product.code);
+	}
 
 	// ---- 찜 ----
 	liked(code: string) {
@@ -154,11 +201,11 @@ class ShopState {
 	}
 
 	// ---- 주문 ----
-	/** 결제 확정(/checkout/success) 뒤 — 브라우저 장바구니를 비운다. 계정 장바구니는 /api/payments/confirm 이 서버에서 비웠다(0057 myr_cart_clear).
-	 *  주문 목록은 서버(myr_orders)가 진실이다 — `orders` 는 옛 목 데이터 자리(마이 화면 · 다음 단계에서 서버 주문으로 교체). */
-	afterOrder() {
+	/** 결제 확정(/checkout/success) 뒤 — 주문된 상품(codes)만 장바구니에서 뺀다(선택 안 한 줄은 남는다). 계정 장바구니는 /api/payments/confirm 이 같은 code 들을 서버에서 뺐다.
+	 *  codes 가 없으면(옛 응답) 전부 비운다. 주문 목록은 서버(myr_orders)가 진실 — `orders` 는 옛 목 데이터 자리. */
+	afterOrder(codes?: string[]) {
 		++this.cartSeq;
-		this.cart = [];
+		this.cart = codes ? this.cart.filter((l) => !codes.includes(l.product.code)) : [];
 	}
 
 	// ---- 토스트 ----

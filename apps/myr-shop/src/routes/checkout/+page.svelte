@@ -46,7 +46,8 @@
 		if (!draft.address1 && shop.buyer.address) draft = { ...draft, address1: shop.buyer.address };
 	});
 
-	const items = $derived(shop.cartItems.filter((it) => it.available));
+	/** 주문 상품 = 장바구니에서 체크한 줄(살 수 있는 것만) — 합계·배송비도 같은 기준(state.orderLines) */
+	const items = $derived(shop.selectedItems);
 	const canPay = $derived(ready && !widgetError && !blocked && agreedRequired && !submitting && items.length > 0 && (data.guest ? gdraft.consent : true));
 
 	function nameOf(code: string): string {
@@ -134,9 +135,9 @@
 
 		{#if shop.ready && items.length === 0}
 			<div class="flex flex-col items-center gap-4 px-5 pt-20 text-center lg:pt-[100px]">
-				<p class="text-[17px] font-bold lg:text-[20px]">담긴 상품이 없어요</p>
-				<p class="text-[14px] text-fg-faint lg:text-[15px]">장바구니에 레시피를 담은 뒤 결제할 수 있어요</p>
-				<a href="/category" class="mt-2 flex h-12 items-center rounded-[14px] border border-white/14 px-[22px] text-[14px] font-bold text-fg">둘러보기</a>
+				<p class="text-[17px] font-bold lg:text-[20px]">{shop.cartItems.length ? '선택한 상품이 없어요' : '담긴 상품이 없어요'}</p>
+				<p class="text-[14px] text-fg-faint lg:text-[15px]">{shop.cartItems.length ? '장바구니에서 주문할 상품을 체크해주세요' : '장바구니에 레시피를 담은 뒤 결제할 수 있어요'}</p>
+				<a href={shop.cartItems.length ? '/cart' : '/category'} class="mt-2 flex h-12 items-center rounded-[14px] border border-white/14 px-[22px] text-[14px] font-bold text-fg">{shop.cartItems.length ? '장바구니로' : '둘러보기'}</a>
 			</div>
 		{/if}
 		<!-- 비어 있으면 폼을 그리지 않는다 (class 토글은 lg:grid 가 hidden 을 이겨 PC 에서 폼이 같이 보였다) -->
