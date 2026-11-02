@@ -3,7 +3,7 @@
 	 *  크리에이터가 답변하면 notifyCsReplied(이메일)도 가지만, 이메일이 없는 고객(비회원 미입력 · 카카오)은 이 화면이 정본. */
 	import { enhance } from '$app/forms';
 	import { won } from '$lib/data';
-	import { CS_BODY_MAX, csNewHref, csSenderLabel } from '$lib/cs-rules';
+	import { CS_BODY_MAX, csSenderLabel } from '$lib/cs-rules';
 	import { shortDate } from '$lib/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
@@ -12,6 +12,8 @@
 	let submitting = $state(false);
 	const c = $derived(data.conversation);
 	const closed = $derived(c.status === 'CLOSED');
+	// 새 문의는 같은 문의 시트(CsSheet)로 — 주문이 연결돼 있으면 그 주문 상세(회원/비회원), 아니면 상품 페이지
+	const newAskHref = $derived(c.order ? (c.isMember ? `/orders/${c.order.code}` : `/orders/g/${c.order.code}`) : c.product ? `/p/${c.product.code}` : null);
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const fmtTime = (iso: string) => `${shortDate(iso)} ${new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })}`;
 	function onKeydown(e: KeyboardEvent) {
@@ -68,7 +70,7 @@
 				{#if closed}<p class="text-center text-[12px] text-fg-faint">처리 종료{c.closedAt ? ` · ${fmtTime(c.closedAt)}` : ''}</p>{/if}
 			</div>
 			{#if closed}
-				<p class="mt-4 border-t border-white/8 pt-4 text-[13px] leading-[1.55] text-white/70">처리 종료된 문의예요. 더 궁금한 점은 {#if c.product}<a href={csNewHref(c.product.code, c.orderCode)} class="font-bold text-accent">새 문의</a>{:else}새 문의{/if}로 남겨주세요.</p>
+				<p class="mt-4 border-t border-white/8 pt-4 text-[13px] leading-[1.55] text-white/70">처리 종료된 문의예요. 더 궁금한 점은 {#if newAskHref}<a href={newAskHref} class="font-bold text-accent">{c.order ? '주문 상세' : '상품 페이지'}</a>의 [문의]{:else}주문 상세나 상품 페이지의 [문의]{/if}로 새로 남겨주세요.</p>
 			{:else}
 				<form method="post" action="?/reply" class="mt-4 border-t border-white/8 pt-4" use:enhance={() => { submitting = true; return async ({ update, result, formElement }) => { await update(); if (result.type === 'redirect') formElement.reset(); submitting = false; }; }}>
 					<label for="cs-reply" class="mb-1.5 block text-[13px] font-bold text-fg-soft">추가 문의</label>

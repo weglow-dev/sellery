@@ -4,7 +4,6 @@ import {
 	CS_BODY_MAX,
 	CS_CODE_RE,
 	csFailMessage,
-	csNewHref,
 	csNeedsOrder,
 	csOrderOptions,
 	CS_PLACEHOLDERS,
@@ -130,14 +129,12 @@ describe('문구 · 칩 · 쿠키', () => {
 		expect(csSenderLabel('seller', '민지 루틴')).toBe('민지 루틴');
 		expect(csSenderLabel('admin')).toBe('MYR 운영팀');
 	});
-	it('쿠키 이름 · 토큰 · 코드 형식 · 접수 링크', () => {
+	it('쿠키 이름 · 토큰 · 코드 형식', () => {
 		expect(csTokenCookieName('CS1001')).toBe('myr_cs_cs1001');
 		expect(parseClientToken('8A6A1B53-321E-406F-8D4F-1C52911878CC')).toBe('8a6a1b53-321e-406f-8d4f-1c52911878cc');
 		expect(parseClientToken('nope')).toBeNull();
 		expect(CS_CODE_RE.test('cs1001')).toBe(true);
 		expect(CS_CODE_RE.test('myr1001')).toBe(false);
-		expect(csNewHref('minji-grape-jelly', 'myr1001')).toBe('/cs/new?product=minji-grape-jelly&order=myr1001');
-		expect(csNewHref('minji-grape-jelly')).toBe('/cs/new?product=minji-grape-jelly');
 	});
 });
 

@@ -246,8 +246,6 @@ export const csTokenCookieName = (conversationCode: string): string => `${CS_TOK
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const parseClientToken = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null);
 
-/** 접수 화면 링크 — 상품 페이지 · 주문 상세(주문번호 프리필) */
-export const csNewHref = (productCode: string, orderCode?: string | null): string => `/cs/new?product=${encodeURIComponent(productCode)}${orderCode ? `&order=${encodeURIComponent(orderCode)}` : ''}`;
 
 /** 상대 시각 — "방금" · "N분 전" · "N시간 전" · "어제" · "N일 전" · "N주 전" · 그 뒤는 "M월 D일"(KST). now 주입 가능(테스트) */
 export function relTime(iso: string | null | undefined, now: number = Date.now()): string {
