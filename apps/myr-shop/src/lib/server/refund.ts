@@ -23,10 +23,17 @@ export async function refundItems(input: {
 	reason: string;
 }): Promise<RefundOutcome> {
 	const db = admin();
-	// 로그(payment_events)를 주문번호로도 찾을 수 있게 토스 orderId 를 같이 적는다 — 결제 세션(myr_checkouts)에 있다
-	const { data: ord } = await db.from('myr_orders').select('checkout_id, myr_checkouts(toss_order_id)').eq('id', input.orderId).maybeSingle();
-	const co = (ord as { myr_checkouts?: { toss_order_id: string } | { toss_order_id: string }[] | null } | null)?.myr_checkouts;
+	// 로그(payment_events)를 주문번호(order_code · 0062)와 토스 orderId 로 찾을 수 있게 둘 다 적는다 — 토스 orderId 는 결제 세션(myr_checkouts)에 있다
+	const { data: ord, error: ordError } = await db
+		.from('myr_orders')
+		.select('code, checkout_id, myr_checkouts(toss_order_id)')
+		.eq('id', input.orderId)
+		.maybeSingle();
+	if (ordError) console.error('[refund] order lookup failed:', ordError.message);
+	const row = ord as { code?: string; myr_checkouts?: { toss_order_id: string } | { toss_order_id: string }[] | null } | null;
+	const co = row?.myr_checkouts;
 	const tossOrderId = (Array.isArray(co) ? co[0]?.toss_order_id : co?.toss_order_id) ?? null;
+	const orderCode = row?.code ?? null;
 	const { data: preJson, error: preError } = await db.rpc('myr_app_refund_precheck', {
 		p_order_id: input.orderId,
 		p_items: input.items,
@@ -50,6 +57,7 @@ export async function refundItems(input: {
 				await logPaymentEvent(db, {
 					source: 'cancel',
 					toss_order_id: tossOrderId,
+					order_code: orderCode,
 					event_type: 'refund',
 					payment_key: pre.paymentKey,
 					payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, cancel: cancel.body, status: cancel.status },
@@ -62,6 +70,7 @@ export async function refundItems(input: {
 			await logPaymentEvent(db, {
 				source: 'cancel',
 				toss_order_id: tossOrderId,
+				order_code: orderCode,
 				event_type: 'refund',
 				payment_key: pre.paymentKey,
 				payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, cancel: cancel.body, status: cancel.status },
@@ -87,6 +96,7 @@ export async function refundItems(input: {
 		await logPaymentEvent(db, {
 			source: 'cancel',
 			toss_order_id: tossOrderId,
+			order_code: orderCode,
 			event_type: 'refund',
 			payment_key: pre.paymentKey,
 			payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, error: recError.message },
@@ -100,6 +110,7 @@ export async function refundItems(input: {
 	await logPaymentEvent(db, {
 		source: 'cancel',
 		toss_order_id: tossOrderId,
+		order_code: orderCode,
 		event_type: pre.deposit ? 'deposit_cancel' : 'refund',
 		payment_key: pre.paymentKey,
 		payload: { orderId: input.orderId, actor: input.actor, items: pre.items, amount: pre.amount, full: pre.full, raw },

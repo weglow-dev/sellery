@@ -1,11 +1,14 @@
 -- pgTAP — 0061 환불: 권한 · precheck 가드(actor 표) · 금액(부분/전액+배송비) · record(줄·주문 상태 파생 · sold_qty 반환 · 멱등) · 입금 대기 취소 (docs/myr.md §6.3)
 begin;
-select plan(38);
+select plan(40);
 
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 precheck 실행 불가');
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 precheck 실행 불가');
 select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 record 실행 불가');
 select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 record 실행 가능');
+
+select has_column('public', 'payment_events', 'order_code', 'payment_events.order_code (0062) 가 있다');
+select col_type_is('public', 'payment_events', 'order_code', 'text', 'order_code 는 text');
 
 -- 픽스처: 회원 주문(줄 2개 · 셀러 2명 · 배송비 3,000) · 비회원 주문 · 입금 대기 주문
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)

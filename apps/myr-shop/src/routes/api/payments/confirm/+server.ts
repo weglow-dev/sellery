@@ -302,6 +302,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 		source: 'confirm',
 		event_type: 'confirm',
 		toss_order_id: orderId,
+		order_code: r.orderCode,
 		payment_key: paymentKey,
 		payload: payment,
 		handled: true,

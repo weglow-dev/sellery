@@ -85,6 +85,7 @@ async function reconcileDeposit(db: Admin, due: { id: string; code: string; paym
 	await logPaymentEvent(db, {
 		source: 'deposit_callback',
 		event_type: 'reconcile',
+		order_code: order.code,
 		payment_key: due.payment_key,
 		payload: { order: { id: order.id, code: order.code }, lookup: look.body },
 		handled: !result.startsWith('error'),

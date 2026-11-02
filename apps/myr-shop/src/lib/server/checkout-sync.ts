@@ -46,6 +46,8 @@ export async function logPaymentEvent(
 		source: EventSource;
 		event_type?: string | null;
 		toss_order_id?: string | null;
+		/** 샵 주문번호(myr_orders.code · 0062) — 주문이 생긴 뒤의 로그(승인 성공 · 환불 · 입금)에 적는다 */
+		order_code?: string | null;
 		payment_key?: string | null;
 		payload: unknown;
 		handled?: boolean;
@@ -59,6 +61,7 @@ export async function logPaymentEvent(
 				source: ev.source,
 				event_type: ev.event_type ?? null,
 				toss_order_id: ev.toss_order_id ?? null,
+				order_code: ev.order_code ?? null,
 				payment_key: ev.payment_key ?? null,
 				payload: ev.payload ?? {},
 				handled: ev.handled ?? false,
