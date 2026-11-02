@@ -11,7 +11,7 @@ import { rateLimit } from '$lib/server/rate-limit';
 
 /**
  * `/cs/new?product=<code>&order=<주문번호?>` — 크리에이터(셀러)에게 문의 접수 (docs/myr.md §4 · §6.6 · S7 · apps/shop cs/new 복사 · 캠페인 → 상품).
- * load: `myr_product_card(code)` 로 상품·크리에이터(없으면 404). 회원이면 이름 프리필 · `?order=` 는 주문번호 프리필(주문 상세 "문의하기").
+ * load: `myr_product_card(code)` 로 상품·크리에이터(없으면 404). 비회원은 `?order=` 가 있을 때만(주문 상세 상품 줄에서 진입) — 없으면 로그인으로 · 제출도 주문번호 필수. 회원이면 이름 프리필 · `?order=` 는 주문번호 프리필(주문 상세 "문의하기").
  * `?/open`: 레이트리밋(IP 30분 5건 · 회원은 user 도) → parseCsOpenInput → openCs(code, input, { userId, guestToken }) → client_token 은 **HttpOnly 쿠키**로만 → 303 /cs/<code>?opened=1.
  * 주문 연결은 소유 증명될 때만(0063 · §6.6) — 회원 본인 주문 · 비회원 조회 토큰(그 주문번호의 `myr_guest_*` 쿠키 · 로그인 상태에서도 읽는다).
  */
@@ -25,6 +25,8 @@ export const load: PageServerLoad = async (event) => {
 	if (!hasAdmin()) error(503, { message: '문의 접수가 아직 설정되지 않았어요' });
 	const { user } = await event.locals.safeGetSession();
 	const orderRaw = (event.url.searchParams.get('order') ?? '').trim();
+	// 비회원은 주문 상세(비회원 주문 조회)의 상품 줄에서만 문의한다 — 주문번호 없이 들어오면 로그인으로
+	if (!user && !orderRaw) redirect(303, `/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
 	return {
 		product: { code: card.product.code, name: card.product.name, tile: card.product.tile, icon: card.product.ic, thumbUrl: card.product.thumbUrl },
 		creator: { name: card.product.creator.name, handle: card.product.creator.handle },
@@ -44,6 +46,7 @@ export const actions: Actions = {
 		if (!PRODUCT_CODE_RE.test(code)) error(404, { message: '문의할 제품을 찾을 수 없습니다' });
 		if (!hasAdmin()) return fail(503, { message: '문의 접수가 아직 설정되지 않았어요', field: null, values });
 		const { user } = await event.locals.safeGetSession();
+		if (!user && !(values.order_code ?? '').trim()) return fail(400, { message: '비회원은 주문 상세에서 주문번호와 함께 문의할 수 있어요', field: 'order_code', values });
 		const ip = event.getClientAddress();
 		if (!rateLimit(`cs-open:${ip}`, 5) || (user && !rateLimit(`cs-open:u:${user.id}`, 5))) return fail(429, { message: RATE_LIMIT_MESSAGE, field: null, values });
 		const parsed = parseCsOpenInput(fd);
