@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { DETAIL_ANCHORS, catName, handleSlug, infoRowsOf, won } from '$lib/data';
-	import { csNewHref } from '$lib/cs-rules';
 	import { goBack } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
+	import CsSheet from '$lib/components/CsSheet.svelte';
 	import CartButton from '$lib/components/CartButton.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import QtyStepper from '$lib/components/QtyStepper.svelte';
@@ -13,6 +13,7 @@
 	 *  PC(lg): 왼쪽 상세 스크롤 + 오른쪽 고정 구매 패널(280~360px) (디자인 "MYR Shop PC" 상세).
 	 *  상세 섹션 01~05 는 인플루언서가 상품 등록 때 채우는 템플릿 — 각 섹션이 입력 필드가 된다(docs/myr.md §4.2). */
 	let { data } = $props();
+	let csOpen = $state(false);
 	const p = $derived(data.product);
 	const creator = $derived(p.creator);
 	const infoRows = $derived(infoRowsOf(p));
@@ -76,7 +77,7 @@
 						<span class="min-w-0"><span class="block truncate text-[14px] font-bold">{creator.name}</span><span class="block truncate text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
 					</a>
 					{#if data.user}
-					<a href={csNewHref(p.code)} class="flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] border border-white/16 px-3.5 text-[13px] font-bold text-fg transition-colors active:bg-white/5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</a>
+					<button type="button" onclick={() => (csOpen = true)} class="flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] border border-white/16 px-3.5 text-[13px] font-bold text-fg transition-colors active:bg-white/5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</button>
 					{/if}
 				</div>
 				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
@@ -193,7 +194,7 @@
 			<span><span class="block text-[15px] font-bold">{creator.name}</span><span class="block text-[13px] text-fg-faint">{creator.handle} · 레시피 더 보기</span></span>
 		</a>
 		{#if data.user}
-		<a href={csNewHref(p.code)} class="-mt-1 flex h-[46px] items-center justify-center gap-2 rounded-[14px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</a>
+		<button type="button" onclick={() => (csOpen = true)} class="-mt-1 flex h-[46px] items-center justify-center gap-2 rounded-[14px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</button>
 		{/if}
 		<div>
 			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
@@ -256,3 +257,5 @@
 		</button>
 	</div>
 </div>
+
+{#if data.user}<CsSheet bind:open={csOpen} product={{ code: p.code, name: p.name, tile: p.tile, ic: p.ic, thumbUrl: p.thumbUrl }} creator={{ name: creator.name, handle: creator.handle }} />{/if}

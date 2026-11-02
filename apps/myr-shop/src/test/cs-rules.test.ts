@@ -5,6 +5,9 @@ import {
 	CS_CODE_RE,
 	csFailMessage,
 	csNewHref,
+	csNeedsOrder,
+	csOrderOptions,
+	CS_PLACEHOLDERS,
 	csSenderLabel,
 	csStatusChip,
 	csTokenCookieName,
@@ -154,5 +157,29 @@ describe('relTime · firstBody (마이 "내 문의")', () => {
 	it('parseCsConversation 은 first_body 를 읽는다', () => {
 		expect(parseCsConversation({ ...convJson, first_body: '저녁에 먹어도 되나요?' })!.firstBody).toBe('저녁에 먹어도 되나요?');
 		expect(parseCsConversation(convJson)!.firstBody).toBeNull();
+	});
+});
+
+describe('문의 시트 — 주문 드롭다운은 배송 문의 · 교환·반품만', () => {
+	it('csNeedsOrder', () => {
+		expect(csNeedsOrder('배송 문의')).toBe(true);
+		expect(csNeedsOrder('교환·반품')).toBe(true);
+		expect(csNeedsOrder('상품 문의')).toBe(false);
+		expect(csNeedsOrder('기타')).toBe(false);
+	});
+	it('유형마다 안내 문구가 있다', () => {
+		for (const t of ['배송 문의', '교환·반품', '상품 문의', '기타'] as const) expect(CS_PLACEHOLDERS[t].length).toBeGreaterThan(5);
+	});
+	it('csOrderOptions — 이 상품 줄이 있는 주문만 · 순서 유지 · 라벨', () => {
+		const orders = [
+			{ code: 'myr1003', createdAt: '2026-11-02T00:00:00Z', items: [{ code: 'b', name: '상품 B', qty: 1 }] },
+			{ code: 'myr1002', createdAt: '2026-11-01T00:00:00Z', items: [{ code: 'a', name: '상품 A', qty: 2 }, { code: 'b', name: '상품 B', qty: 1 }] },
+			{ code: 'myr1001', createdAt: '2026-10-30T00:00:00Z', items: [{ code: 'a', name: '상품 A', qty: 1 }] }
+		];
+		expect(csOrderOptions(orders, 'a', () => 'D')).toEqual([
+			{ code: 'myr1002', label: 'MYR1002 · D · 상품 A × 2' },
+			{ code: 'myr1001', label: 'MYR1001 · D · 상품 A × 1' }
+		]);
+		expect(csOrderOptions(orders, 'zzz', () => 'D')).toEqual([]);
 	});
 });

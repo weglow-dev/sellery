@@ -266,3 +266,30 @@ export function relTime(iso: string | null | undefined, now: number = Date.now()
 	const k = new Date(t + 9 * 3_600_000);
 	return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일`;
 }
+
+/* ---------------- 상품 페이지 문의 시트 (대표 시안 2026-11-02) ---------------- */
+/** 주문번호 선택이 나오는 유형 — 배송 문의 · 교환·반품 만 */
+export const CS_ORDER_TYPES: readonly CsType[] = ['배송 문의', '교환·반품'];
+export const csNeedsOrder = (type: string): boolean => (CS_ORDER_TYPES as readonly string[]).includes(type);
+export const CS_PLACEHOLDERS: Record<CsType, string> = {
+	'배송 문의': '배송 상태, 도착 예정일 등 궁금한 점을 적어주세요',
+	'교환·반품': '교환·반품하려는 이유와 받은 상품의 상태를 적어주세요',
+	'상품 문의': '성분, 함량, 효과 등 궁금한 점을 적어주세요',
+	기타: '궁금한 점을 자유롭게 적어주세요'
+};
+
+/** 주문 드롭다운 옵션 — 내 주문 중 **이 상품 줄이 있는** 것만(최신순 그대로) · 라벨 "MYR1001 · 11월 2일 · 상품 × 2" */
+export type CsOrderOption = { code: string; label: string };
+export function csOrderOptions(
+	orders: readonly { code: string; createdAt: string; items: readonly { code: string; name: string; qty: number }[] }[],
+	productCode: string,
+	fmtDate: (iso: string) => string
+): CsOrderOption[] {
+	const out: CsOrderOption[] = [];
+	for (const o of orders) {
+		const line = o.items.find((i) => i.code === productCode);
+		if (!line) continue;
+		out.push({ code: o.code, label: `${o.code.toUpperCase()} · ${fmtDate(o.createdAt)} · ${line.name} × ${line.qty}` });
+	}
+	return out;
+}
