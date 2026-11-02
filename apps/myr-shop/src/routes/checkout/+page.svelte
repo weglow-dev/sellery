@@ -7,6 +7,8 @@
 	import {
 		EMPTY_GUEST_DRAFT,
 		GUEST_CONSENT_TEXT,
+		ORDER_EMAIL_PLACEHOLDER,
+		parseOptionalEmail,
 		rejectedItemsText,
 		validateGuestBuyer,
 		validateShipping,
@@ -39,6 +41,9 @@
 	// svelte-ignore state_referenced_locally
 	let draft = $state<ShippingDraft>({ ...data.defaults });
 	let gdraft = $state<GuestBuyerDraft>({ ...EMPTY_GUEST_DRAFT });
+	// 계정 이메일이 없는 회원(카카오 이메일 미동의) — 주문 안내 메일(선택) · 저장된 값으로 시작
+	// svelte-ignore state_referenced_locally
+	let memberEmail = $state(data.savedEmail ?? '');
 	let invalid = $state<Record<string, boolean>>({});
 	onMount(() => {
 		if (!draft.recipient && shop.buyer.name) draft = { ...draft, recipient: shop.buyer.name };
@@ -73,6 +78,17 @@
 			}
 			guest = { ...g.buyer, consent: true };
 		}
+		let email: string | null = null;
+		if (!data.guest && data.needsEmail) {
+			const e = parseOptionalEmail(memberEmail);
+			if (e === false) {
+				invalid = { 'm-email': true };
+				shop.showToast('이메일 형식을 확인해주세요');
+				document.getElementById('ck-m-email')?.focus();
+				return;
+			}
+			email = e;
+		}
 		// 주문자 정보는 다음 결제의 프리필로 브라우저에 남긴다
 		shop.buyer = { name: v.shipping.recipient, phone: v.shipping.phone, address: v.shipping.address1 };
 
@@ -85,7 +101,8 @@
 					lines: items.map((it) => ({ code: it.code, qty: it.qty, optionIndex: 0 })),
 					shipping: v.shipping,
 					guest,
-					saveAddress: data.guest ? false : saveAddress
+					saveAddress: data.guest ? false : saveAddress,
+					email
 				})
 			});
 			const r = (await res.json().catch(() => null)) as ApiOk | ApiFail | null;
@@ -180,13 +197,16 @@
 					</div>
 					{#if data.guest}
 						<div class="mt-2.5 flex flex-col gap-2.5">
-							<input id="ck-g-email" bind:value={gdraft.email} type="email" placeholder="이메일 (선택 · 주문 안내 메일)" autocomplete="email" aria-label="이메일" disabled={submitting} class="{inputCls} {border('g-email')}" />
+							<input id="ck-g-email" bind:value={gdraft.email} type="email" placeholder={ORDER_EMAIL_PLACEHOLDER} autocomplete="email" aria-label="이메일" disabled={submitting} class="{inputCls} {border('g-email')}" />
 							<label class="flex cursor-pointer items-start gap-3 rounded-[14px] bg-white/3 px-4 py-3.5">
 								<input type="checkbox" bind:checked={gdraft.consent} disabled={submitting} class="m-0 mt-0.5 h-5 w-5 shrink-0 accent-accent" />
 								<span class="text-[12.5px] leading-[1.55] text-white/70"><b class="font-bold text-fg">(필수)</b> {GUEST_CONSENT_TEXT}</span>
 							</label>
 						</div>
 					{:else}
+						{#if data.needsEmail}
+							<input id="ck-m-email" bind:value={memberEmail} oninput={() => (invalid = {})} type="email" placeholder={ORDER_EMAIL_PLACEHOLDER} autocomplete="email" aria-label="이메일" maxlength="200" disabled={submitting} class="mt-2.5 {inputCls} {border('m-email')}" />
+						{/if}
 						<label class="mt-2.5 flex cursor-pointer items-center gap-2.5 px-1 text-[13px] text-white/70">
 							<input type="checkbox" bind:checked={saveAddress} disabled={submitting} class="m-0 h-[18px] w-[18px] accent-accent" />기본 배송지로 저장
 						</label>

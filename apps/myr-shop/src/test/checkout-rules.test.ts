@@ -9,6 +9,8 @@ import {
 	isMyrOrderId,
 	ownsCheckout,
 	parseCheckoutBody,
+	parseOptionalEmail,
+	ORDER_EMAIL_PLACEHOLDER,
 	parseClaimResult,
 	parseConfirmResult,
 	parseCreateResult,
@@ -101,7 +103,7 @@ describe('parseCheckoutBody', () => {
 	const shipping = { recipient: '홍길동', phone: '01012345678', address1: '서울시 어딘가 1-2' };
 	it('lines + shipping (+ guest · saveAddress)', () => {
 		const r = parseCheckoutBody({ lines: [{ code: 'a', qty: 1 }], shipping, saveAddress: true });
-		expect(r.ok && r.body).toEqual({ lines: [{ code: 'a', qty: 1, option_index: 0 }], shipping, guest: null, saveAddress: true });
+		expect(r.ok && r.body).toEqual({ lines: [{ code: 'a', qty: 1, option_index: 0 }], shipping, guest: null, saveAddress: true, email: null });
 		const g = parseCheckoutBody({ lines: [{ code: 'a', qty: 1 }], shipping, guest: { name: '김', phone: '01011112222', consent: true } });
 		expect(g.ok && g.body.guest).toEqual({ name: '김', phone: '01011112222', email: null });
 	});
@@ -206,5 +208,27 @@ describe('RPC 파서', () => {
 			due: '2026-10-31T23:59:59+09:00'
 		});
 		expect(depositInfoOf({ virtualAccount: null })).toBeNull();
+	});
+});
+
+describe('회원 주문 안내 메일(카카오 이메일 미동의)', () => {
+	const shipping = { recipient: '홍길동', phone: '01012345678', address1: '서울시 어딘가 1-2' };
+	it('parseOptionalEmail — 비면 null · 형식 밖 false · 앞뒤 공백 제거', () => {
+		expect(parseOptionalEmail('')).toBeNull();
+		expect(parseOptionalEmail(undefined)).toBeNull();
+		expect(parseOptionalEmail('  a@b.co ')).toBe('a@b.co');
+		expect(parseOptionalEmail('nope')).toBe(false);
+		expect(parseOptionalEmail('a@b.c')).toBe(false);
+		expect(parseOptionalEmail(`${'a'.repeat(200)}@b.co`)).toBe(false);
+	});
+	it('parseCheckoutBody 가 email 을 싣는다 · 틀리면 400 문구', () => {
+		const ok = parseCheckoutBody({ lines: [{ code: 'a', qty: 1 }], shipping, email: 'me@kakao.com' });
+		expect(ok.ok && ok.body.email).toBe('me@kakao.com');
+		const none = parseCheckoutBody({ lines: [{ code: 'a', qty: 1 }], shipping });
+		expect(none.ok && none.body.email).toBeNull();
+		expect(parseCheckoutBody({ lines: [{ code: 'a', qty: 1 }], shipping, email: 'x@' })).toEqual({ ok: false, message: '이메일 형식을 확인해주세요' });
+	});
+	it('입력칸 문구', () => {
+		expect(ORDER_EMAIL_PLACEHOLDER).toBe('이메일(주문 안내 메일)');
 	});
 });
