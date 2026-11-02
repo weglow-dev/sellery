@@ -599,7 +599,7 @@ node --env-file=.env.local packages/db/scripts/dev-admin.mjs --email admin@local
 
 - **대시보드에서 SvelteKit 프로젝트의 환경변수 저장이 "Failed to verify the project's public environment variable prefix" 로 실패**할 때가 있다 → REST API(`POST /v10/projects/<project>/env?upsert=true&teamId=<team>` · 비밀은 `type: "sensitive"`) 또는 Vercel CLI(`vercel env add`)로 넣는다. 값은 셸 히스토리·문서에 남기지 않는다.
 - **환경변수만 바꾼 뒤 `vercel redeploy`(또는 대시보드 Redeploy)가 CANCELED** 된다 — Ignored Build Step 의 `git diff`(`VERCEL_GIT_PREVIOUS_SHA`) 가 비어 "변경 없음" 으로 스킵하기 때문. `PUBLIC_*` 는 빌드 시 인라인이라 재빌드가 필요하므로: `PATCH /v9/projects/<project>` 로 `commandForIgnoringBuildStep` 을 잠시 비움 → redeploy → 원래 명령(§1.1 표)으로 복구. `sellery-app` 의 `exit 0` 은 복구하지 않는다(동결).
-- 비밀(`SUPABASE_SERVICE_ROLE_KEY` 등)은 `$env/dynamic/private` 라 재배포 없이도 다음 요청부터 반영된다 — 재배포가 필요한 건 `PUBLIC_*` 뿐.
+- 환경변수는 **추가·변경 뒤 재배포해야 반영된다** — `$env/dynamic/private` 도 마찬가지(Vercel 이 배포 시점의 값을 함수에 고정한다). 2026-11-02 MYR 샵에 `TOSS_SECRET_KEY` 를 넣은 뒤 재배포 없이 결제해 `CONFIG_ERROR` 가 났고, `vercel redeploy <현재 Production URL>` 로 해결했다. 대시보드에서는 Deployments → 최신 배포 ⋯ → Redeploy.
 
 ---
 

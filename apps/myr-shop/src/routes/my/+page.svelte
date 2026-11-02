@@ -1,24 +1,24 @@
 <script lang="ts">
 	import { won } from '$lib/data';
+	import { displayCode, shortDate, statusLabel } from '$lib/order-view';
 	import { shop } from '$lib/state.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문 · 찜한 레시피 · 메뉴.
-	 *  로그인은 레이아웃 data.user(카카오 · S3). 비로그인이면 로그인 CTA. 포인트는 1차 범위 밖(docs/myr.md §9-12)이라 칸을 두지 않는다.
+	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문(서버 myr_orders · 0060) · 찜한 레시피 · 메뉴.
+	 *  로그인은 레이아웃 data.user(카카오 · S3). 비로그인이면 로그인 CTA + 비회원 주문 조회 링크. 포인트는 1차 범위 밖(docs/myr.md §9-12)이라 칸을 두지 않는다.
 	 *  PC(lg): 왼쪽 sticky 프로필+메뉴 · 오른쪽 주문/찜 */
 	let { data } = $props();
 	const user = $derived(data.user);
+	const orders = $derived(data.orders);
 	const name = $derived(user?.name ?? shop.buyer.name.trim());
 	const LANDING = 'https://sellery.life/influencer/oem';
 	const menu = [
+		{ name: '비회원 주문 조회', href: '/orders/lookup' },
 		{ name: '배송지 관리', href: '/checkout' },
 		{ name: '고객센터', href: '/' },
 		{ name: '내 제품 만들기 (MYR 제조의뢰)', href: LANDING, external: true }
 	];
-	const when = (iso: string) => {
-		const d = new Date(iso);
-		return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-	};
+	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', muted: 'bg-white/8 text-white/55', danger: 'bg-[#ff6b6b]/12 text-[#ff6b6b]', ok: 'bg-[#4ade80]/12 text-[#4ade80]' };
 </script>
 
 <svelte:head><title>마이페이지 — MYR Shop</title></svelte:head>
@@ -53,12 +53,12 @@
 				</form>
 			{/if}
 			<div class="hidden w-full grid-cols-2 gap-2 border-t border-white/7 pt-1.5 lg:grid">
-				<div><p class="mt-2 text-[20px] font-extrabold text-accent">{shop.orders.length}</p><p class="mt-0.5 text-[12px] text-fg-faint">주문</p></div>
+				<div><p class="mt-2 text-[20px] font-extrabold text-accent">{orders.length}</p><p class="mt-0.5 text-[12px] text-fg-faint">주문</p></div>
 				<div><p class="mt-2 text-[20px] font-extrabold">{shop.likes.length}</p><p class="mt-0.5 text-[12px] text-fg-faint">찜</p></div>
 			</div>
 		</div>
 		<div class="mt-2.5 grid grid-cols-2 gap-2 lg:hidden">
-			<div class="rounded-2xl border border-white/8 bg-white/4 px-3 py-3.5"><p class="text-[22px] font-extrabold tracking-[-.03em] text-accent">{shop.orders.length}</p><p class="mt-1 text-[12px] text-fg-soft">주문</p></div>
+			<div class="rounded-2xl border border-white/8 bg-white/4 px-3 py-3.5"><p class="text-[22px] font-extrabold tracking-[-.03em] text-accent">{orders.length}</p><p class="mt-1 text-[12px] text-fg-soft">주문</p></div>
 			<div class="rounded-2xl border border-white/8 bg-white/4 px-3 py-3.5"><p class="text-[22px] font-extrabold tracking-[-.03em]">{shop.likes.length}</p><p class="mt-1 text-[12px] text-fg-soft">찜</p></div>
 		</div>
 		<div class="order-last mt-[26px] flex flex-col overflow-hidden rounded-[18px] border border-white/8 lg:order-none lg:mt-0 lg:rounded-[20px]">
@@ -80,24 +80,31 @@
 		<h1 class="hidden text-[32px] font-extrabold tracking-[-.03em] lg:block">마이페이지</h1>
 
 		<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-7 lg:mb-3 lg:text-[17px]">최근 주문</h3>
-		{#if shop.ready && shop.orders.length === 0}
+		{#if !user}
+			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] leading-[1.6] text-fg-faint lg:rounded-[20px] lg:py-10">
+				로그인하면 주문을 여기서 볼 수 있어요<br />비회원으로 주문했다면 <a href="/orders/lookup" class="font-bold text-accent">주문 조회</a>에서 주문번호와 연락처로 확인해요
+			</div>
+		{:else if data.ordersError}
+			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-fg-faint lg:rounded-[20px] lg:py-10">주문을 불러오지 못했어요 — 잠시 후 다시 열어주세요</div>
+		{:else if orders.length === 0}
 			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-fg-faint lg:rounded-[20px] lg:py-10">아직 주문이 없어요</div>
 		{/if}
 		<div class="flex flex-col gap-2.5">
-			{#each shop.orders as o (o.no)}
-				<div class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 lg:flex lg:items-center lg:gap-4 lg:rounded-[20px] lg:px-5 lg:py-4">
-					<div class="flex items-center justify-between lg:hidden"><span class="text-[12px] text-fg-faint">{o.no}</span><span class="rounded-full bg-accent/12 px-2 py-1 text-[11px] font-bold text-accent">배송 준비중</span></div>
+			{#each orders as o (o.id)}
+				{@const label = statusLabel(o)}
+				<a href="/orders/{o.code}" class="block rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-fg transition-colors lg:flex lg:items-center lg:gap-4 lg:rounded-[20px] lg:px-5 lg:py-4 lg:hover:border-white/25">
+					<div class="flex items-center justify-between lg:hidden"><span class="font-mono text-[12px] text-fg-faint">{displayCode(o.code)}</span><span class="rounded-full px-2 py-1 text-[11px] font-bold {tone[label.tone]}">{label.text}</span></div>
 					<div class="mt-2.5 flex items-center gap-2.5 lg:contents">
 						<div class="flex gap-1.5">
-							{#each o.lines.slice(0, 2) as l (l.code)}
-								<Tile tile={l.tile} ic={l.ic} icon={22} class="h-10 w-10 rounded-xl lg:h-12 lg:w-12 lg:rounded-[14px]" />
+							{#each o.items.slice(0, 2) as l (l.id)}
+								<Tile tile={l.tile} ic={l.ic} thumbUrl={l.thumbUrl} icon={22} class="h-10 w-10 rounded-xl lg:h-12 lg:w-12 lg:rounded-[14px]" />
 							{/each}
 						</div>
-						<div class="min-w-0 flex-1"><p class="truncate text-[14px] font-bold lg:text-[15px]">{o.lines[0].name}{o.lines.length > 1 ? ` 외 ${o.lines.length - 1}건` : ''}</p><p class="mt-0.5 text-[12px] text-fg-faint"><span class="hidden lg:inline">{o.no} · </span>{when(o.at)}</p></div>
-						<span class="hidden rounded-full bg-accent/12 px-2.5 py-[5px] text-[12px] font-bold text-accent lg:inline">배송 준비중</span>
-						<span class="text-[14px] font-extrabold lg:min-w-[90px] lg:text-right lg:text-[16px]">{won(o.total)}</span>
+						<div class="min-w-0 flex-1"><p class="truncate text-[14px] font-bold lg:text-[15px]">{o.orderName}</p><p class="mt-0.5 text-[12px] text-fg-faint"><span class="hidden font-mono lg:inline">{displayCode(o.code)} · </span>{shortDate(o.createdAt)}</p></div>
+						<span class="hidden rounded-full px-2.5 py-[5px] text-[12px] font-bold lg:inline {tone[label.tone]}">{label.text}</span>
+						<span class="text-[14px] font-extrabold lg:min-w-[90px] lg:text-right lg:text-[16px]">{won(o.amount)}</span>
 					</div>
-				</div>
+				</a>
 			{/each}
 		</div>
 
