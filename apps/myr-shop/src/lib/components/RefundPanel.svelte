@@ -9,11 +9,11 @@
 	import Tile from '$lib/components/Tile.svelte';
 	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
 
-	let { order }: { order: OrderView } = $props();
+	/** open 은 바깥(OrderDetail 의 [교환 · 환불 신청])이 켤 수 있다 · showTrigger=false 면 자체 버튼을 그리지 않는다 */
+	let { order, open = $bindable(false), showTrigger = true }: { order: OrderView; open?: boolean; showTrigger?: boolean } = $props();
 	const can = $derived(customerCanRefund(order));
 	const lines = $derived(refundableItems(order.items));
 
-	let open = $state(false);
 	let confirming = $state(false);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
@@ -26,13 +26,23 @@
 	const deposit = $derived(can.ok && can.deposit);
 	const canProceed = $derived(deposit || (chosen.length > 0 && reason !== ''));
 
-	function start() {
+	function init() {
 		qtyById = Object.fromEntries(lines.map((l) => [l.id, remainingQty(l)]));
 		reason = '';
 		reasonOpen = false;
-		open = true;
 		confirming = false;
 		error = null;
+	}
+	// 열릴 때마다 처음 상태로(바깥에서 열어도 같다)
+	let inited = false;
+	$effect(() => {
+		if (open && !inited) {
+			inited = true;
+			init();
+		} else if (!open) inited = false;
+	});
+	function start() {
+		open = true;
 	}
 	function toggle(id: string, max: number, on: boolean) {
 		qtyById = { ...qtyById, [id]: on ? max : 0 };
@@ -85,7 +95,7 @@
 
 {#if can.ok}
 	{#if !open}
-		<button type="button" onclick={start} class="mt-3 h-12 w-full rounded-[14px] border border-white/14 text-[14px] font-bold text-fg hover:bg-white/5">{deposit ? '주문 취소' : '환불 신청'}</button>
+		{#if showTrigger}<button type="button" onclick={start} class="mt-3 h-12 w-full rounded-[14px] border border-white/14 text-[14px] font-bold text-fg hover:bg-white/5">{deposit ? '주문 취소' : '환불 신청'}</button>{/if}
 	{:else}
 		<div class="mt-3 rounded-[18px] border border-white/10 bg-white/3 p-4">
 			<p class="text-[14px] font-extrabold">{deposit ? '입금 전 주문 취소' : '환불 신청'}</p>
@@ -153,7 +163,7 @@
 					<span class="text-fg-soft">예상 환불 금액{#if est.full && order.shippingFee} <span class="text-[12px] text-fg-faint">(배송비 포함)</span>{/if}</span>
 					<span class="text-[18px] font-extrabold text-accent">{won(est.amount)}</span>
 				</div>
-				<p class="mt-1 text-[12px] text-fg-faint">발송 전 주문만 환불할 수 있어요.</p>
+				<p class="mt-1 text-[12px] leading-[1.5] text-fg-faint">발송 전 주문만 환불할 수 있어요. 교환은 상품 옆 [문의] → 교환·반품으로 요청해주세요.</p>
 			{/if}
 			{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
 			{#if !confirming}

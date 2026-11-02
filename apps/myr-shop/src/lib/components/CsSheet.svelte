@@ -1,14 +1,16 @@
 <script lang="ts">
 	/** 크리에이터에게 문의하기 — 상품 페이지에서 여는 시트(대표 시안 2026-11-02). PC = 가운데 모달 · 모바일 = 아래에서 올라오는 시트.
 	 *  상품 카드 · 문의 유형 칩 · (배송 문의 · 교환·반품 일 때만) 주문번호 콤보박스(내 주문 중 이 상품이 있는 것 · 직접 입력 가능) · 내용 · 안내 · [문의 보내기].
-	 *  POST /api/cs(회원 전용 · 이름은 세션) → 닫고 토스트. 주문 목록은 처음 열 때 GET /api/cs/orders 로 한 번. */
+	 *  POST /api/cs → 닫고 토스트. 상품 페이지(회원): 주문 목록은 열 때 GET /api/cs/orders 로(상품이 바뀌면 다시).
+	 *  주문 상세(회원·비회원): preset 으로 그 주문을 고정해 넘긴다 — 목록 = 그 주문 하나 · 유형과 무관하게 그 주문에 연결 · 비회원은 서버가 주문 조회 토큰으로 확인. */
 	import { tick } from 'svelte';
 	import { shop } from '$lib/state.svelte';
 	import { CS_BODY_MAX, CS_PLACEHOLDERS, CS_TYPES, csNeedsOrder, type CsOrderOption, type CsType } from '$lib/cs-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
 	type P = { code: string; name: string; tile: string; ic: string; thumbUrl: string | null };
-	let { open = $bindable(false), product, creator }: { open?: boolean; product: P; creator: { name: string; handle: string } } = $props();
+	let { open = $bindable(false), product, creator, preset = null, onSent }: { open?: boolean; product: P; creator: { name: string; handle: string }; preset?: CsOrderOption | null; onSent?: () => void } = $props();
+	let loadedFor = '';
 
 	let type = $state<CsType>('배송 문의');
 	let orderCode = $state('');
@@ -29,11 +31,25 @@
 		const prev = document.body.style.overflow;
 		document.body.style.overflow = 'hidden';
 		tick().then(() => panel?.focus());
-		if (orders === null) {
-			fetch(`/api/cs/orders?product=${encodeURIComponent(product.code)}`)
-				.then((r) => r.json())
-				.then((j: { orders?: CsOrderOption[] }) => (orders = Array.isArray(j?.orders) ? j.orders : []))
-				.catch(() => (orders = []));
+		const key = preset ? `preset:${preset.code}:${product.code}` : product.code;
+		if (loadedFor !== key) {
+			loadedFor = key;
+			body = '';
+			type = '배송 문의';
+			if (preset) {
+				orders = [preset];
+				orderCode = preset.code.toUpperCase();
+			} else {
+				orders = null;
+				orderCode = '';
+				const code = product.code;
+				fetch(`/api/cs/orders?product=${encodeURIComponent(code)}`)
+					.then((r) => r.json())
+					.then((j: { orders?: CsOrderOption[] }) => {
+						if (loadedFor === code) orders = Array.isArray(j?.orders) ? j.orders : [];
+					})
+					.catch(() => (orders = []));
+			}
 		}
 		return () => {
 			document.body.style.overflow = prev;
@@ -62,7 +78,7 @@
 			const res = await fetch('/api/cs', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ productCode: product.code, type, body, order_code: needsOrder ? orderCode.trim() : '' })
+				body: JSON.stringify({ productCode: product.code, type, body, order_code: preset ? preset.code : needsOrder ? orderCode.trim() : '' })
 			});
 			const r = (await res.json().catch(() => null)) as { ok: boolean; message?: string } | null;
 			if (!res.ok || !r?.ok) {
@@ -73,7 +89,9 @@
 			submitting = false;
 			open = false;
 			body = '';
-			orderCode = '';
+			if (!preset) orderCode = '';
+			loadedFor = '';
+			if (onSent) onSent();
 			shop.showToast('문의를 보냈어요 · 답변은 마이페이지에서 확인할 수 있어요');
 		} catch {
 			error = '잠시 후 다시 시도해주세요';
@@ -132,6 +150,7 @@
 						autocomplete="off"
 						maxlength="32"
 						disabled={submitting}
+						readonly={!!preset}
 						role="combobox"
 						aria-expanded={listOpen}
 						aria-controls="cs-order-list"
