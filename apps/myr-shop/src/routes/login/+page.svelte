@@ -65,7 +65,7 @@
 			<p class="mt-4 text-center text-[12px] leading-[1.55] text-fg-faint">
 				로그인하면 <a href="/terms" class="underline underline-offset-2">이용약관</a>과 <a href="/privacy" class="underline underline-offset-2">개인정보처리방침</a>에 동의한 것으로 봅니다
 			</p>
-			<p class="mt-3 border-t border-dashed border-white/10 pt-3 text-center text-[12.5px] leading-[1.55] text-fg-faint">로그인 없이도 살 수 있어요 — 결제 때 비회원으로 구매를 고르면 돼요</p>
+			<p class="mt-3 border-t border-dashed border-white/10 pt-3 text-center text-[12.5px] leading-[1.55] text-fg-faint">비회원으로 주문했다면 <a href="/orders/lookup" class="font-bold text-accent underline underline-offset-2">주문 조회</a>에서 주문번호와 연락처로 확인할 수 있어요</p>
 		</div>
 
 		{#if data.devLogin}

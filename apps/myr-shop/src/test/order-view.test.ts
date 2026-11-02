@@ -1,0 +1,101 @@
+// 주문 조회 순수 규칙 — apps/myr-shop/src/lib/order-view.ts
+import { describe, expect, it } from 'vitest';
+import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, shortDate, statusLabel } from '../lib/order-view';
+
+const json = {
+	id: 'o1',
+	code: 'myr1001',
+	status: 'PAID',
+	amount: 106000,
+	items_amount: 106000,
+	shipping_fee: 0,
+	refund_amount: 0,
+	order_name: '글루타치온 외 1건',
+	payment_method: '간편결제',
+	paid_at: '2026-11-02T02:21:26+00:00',
+	created_at: '2026-11-02T02:21:00+00:00',
+	deposit_due_at: null,
+	deposit: null,
+	courier: null,
+	tracking_no: null,
+	shipped_at: null,
+	delivered_at: null,
+	guest: false,
+	buyer_name: '홍길동',
+	shipping: { recipient: '홍길동', phone: '01012345678', address1: '서울 어딘가', address2: '', postcode: '', memo: '' },
+	items: [
+		{
+			id: 'i1',
+			product_code: 'a',
+			name: 'A',
+			option: '',
+			qty: 2,
+			unit_price: 20000,
+			amount: 40000,
+			status: 'PAID',
+			refunded_qty: 0,
+			tile: 't',
+			icon: 'pill',
+			thumb_url: null,
+			creator: '민지'
+		},
+		{ bad: true }
+	]
+};
+
+describe('orderFromJson', () => {
+	it('필드 매핑 · 이상한 줄은 버림 · 배송지 중첩', () => {
+		const o = orderFromJson(json)!;
+		expect(o).toMatchObject({ code: 'myr1001', status: 'PAID', amount: 106000, paymentMethod: '간편결제', guest: false, deposit: null });
+		expect(o.items).toHaveLength(1);
+		expect(o.items[0]).toMatchObject({ code: 'a', qty: 2, unitPrice: 20000, creator: '민지' });
+		expect(o.shipping?.recipient).toBe('홍길동');
+		expect(orderFromJson({ id: 'x' })).toBeNull();
+		expect(ordersFromJson([json, null, 'x'])).toHaveLength(1);
+	});
+	it('입금 대기 — deposit 객체', () => {
+		const o = orderFromJson({ ...json, status: 'WAITING_DEPOSIT', deposit: { bank: '20', account: '123', holder: '홍', due: '2026-11-03T14:59:59+00:00' } })!;
+		expect(o.deposit).toEqual({ bank: '20', account: '123', holder: '홍', due: '2026-11-03T14:59:59+00:00' });
+	});
+});
+
+describe('statusLabel', () => {
+	const base = { status: 'PAID', trackingNo: null, shippedAt: null, deliveredAt: null };
+	it('상태·배송 컬럼으로 한 단어', () => {
+		expect(statusLabel(base).text).toBe('배송 준비중');
+		expect(statusLabel({ ...base, trackingNo: '123' }).text).toBe('배송 중');
+		expect(statusLabel({ ...base, shippedAt: 'x', deliveredAt: 'y' }).text).toBe('배송 완료');
+		expect(statusLabel({ ...base, status: 'WAITING_DEPOSIT' }).text).toBe('입금 대기');
+		expect(statusLabel({ ...base, status: 'CANCELED' })).toEqual({ text: '취소됨', tone: 'muted' });
+		expect(statusLabel({ ...base, status: 'PARTIAL_REFUNDED' }).tone).toBe('danger');
+		expect(statusLabel({ ...base, status: 'REFUNDED' }).text).toBe('환불 완료');
+	});
+});
+
+describe('shortDate · displayCode', () => {
+	it('KST 기준 월·일 · 잘못된 값은 빈 문자열', () => {
+		expect(shortDate('2026-11-02T16:30:00+00:00')).toBe('11월 3일'); // UTC 16:30 = KST 다음 날 01:30
+		expect(shortDate(null)).toBe('');
+		expect(shortDate('nope')).toBe('');
+		expect(displayCode('myr1001')).toBe('MYR1001');
+	});
+});
+
+describe('parseLookupInput · parseLookupResult', () => {
+	it('주문번호는 #·공백·대소문자 무시 · 연락처 정규화', () => {
+		expect(parseLookupInput(' #MYR 1001 ', '010-9999-8888')).toEqual({ ok: true, code: 'myr1001', phone: '01099998888' });
+		expect(parseLookupInput('', '01099998888')).toMatchObject({ ok: false, field: 'code' });
+		expect(parseLookupInput('myr/1001', '01099998888')).toMatchObject({ ok: false, field: 'code' });
+		expect(parseLookupInput('myr1001', '12')).toMatchObject({ ok: false, field: 'phone' });
+	});
+	it('RPC 결과 — 토큰 형식이 틀리면 BAD_RESULT', () => {
+		expect(parseLookupResult({ ok: true, order_id: 'o', order_code: 'myr1001', token: 'a'.repeat(64) })).toEqual({
+			ok: true,
+			orderId: 'o',
+			orderCode: 'myr1001',
+			token: 'a'.repeat(64)
+		});
+		expect(parseLookupResult({ ok: false, code: 'NOT_FOUND' })).toEqual({ ok: false, code: 'NOT_FOUND' });
+		expect(parseLookupResult({ ok: true, order_id: 'o', order_code: 'myr1001', token: 'short' })).toEqual({ ok: false, code: 'BAD_RESULT' });
+	});
+});

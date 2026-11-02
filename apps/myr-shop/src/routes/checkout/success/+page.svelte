@@ -122,7 +122,7 @@
 	</div>
 	<div class="flex shrink-0 gap-2.5 px-5 pt-3 pb-7 lg:justify-center lg:px-0 lg:pt-7 lg:pb-0">
 		{#if view.kind === 'ok'}
-			<a href={view.r.guest ? guestOrderHref(view.r.orderCode) : '/my'} class="flex h-14 flex-1 items-center justify-center rounded-2xl border-[1.5px] border-white/14 text-[15px] font-bold text-fg lg:h-[54px] lg:flex-none lg:px-7">주문 내역</a>
+			<a href={view.r.guest ? guestOrderHref(view.r.orderCode) : `/orders/${view.r.orderCode}`} class="flex h-14 flex-1 items-center justify-center rounded-2xl border-[1.5px] border-white/14 text-[15px] font-bold text-fg lg:h-[54px] lg:flex-none lg:px-7">주문 상세</a>
 			<a href="/" class="flex h-14 flex-1 items-center justify-center rounded-2xl bg-accent text-[15px] font-extrabold text-bg lg:h-[54px] lg:flex-none lg:px-7">계속 쇼핑하기</a>
 		{:else if view.kind === 'fail'}
 			{#if view.fail.kind === 'pending'}

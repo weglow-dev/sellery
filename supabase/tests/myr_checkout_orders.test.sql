@@ -147,7 +147,9 @@ select is(public.myr_app_claim_checkout('myr_t_000006', 'pk_c5') ->> 'ok', 'true
 insert into t select 'o3', public.myr_app_confirm_checkout((((select v from t where k = 'c5')::jsonb) -> 'checkout' ->> 'id')::uuid, 'pk_c5',
   '{"status":"WAITING_FOR_DEPOSIT","orderId":"myr_t_000006","totalAmount":23000,"paymentKey":"pk_c5","method":"가상계좌","virtualAccount":{"dueDate":"2026-10-31T23:59:59+09:00"}}'::jsonb)::text;
 select is((select sold_qty from public.myr_products where code = 'pgtap-co-b'), 1, 'B 예약 1');
-select is((select count(*) from public.myr_app_deposit_due(10)), 0::bigint, '기한 전이면 due 목록에 없음');
+-- 픽스처 dueDate 는 고정 문자열이라 날짜가 지나면 "기한 전" 이 아니다 — 상대값으로 맞춘다
+update public.myr_orders set deposit_due_at = now() + interval '1 day' where id = (((select v from t where k = 'o3')::jsonb) ->> 'order_id')::uuid;
+select is((select count(*) from public.myr_app_deposit_due(100) d where (d ->> 'id')::uuid = (((select v from t where k = 'o3')::jsonb) ->> 'order_id')::uuid), 0::bigint, '기한 전이면 due 목록에 없음');
 update public.myr_orders set deposit_due_at = now() - interval '1 hour' where id = (((select v from t where k = 'o3')::jsonb) ->> 'order_id')::uuid;
 select is((select count(*) from public.myr_app_deposit_due(10) d where (d ->> 'id')::uuid = (((select v from t where k = 'o3')::jsonb) ->> 'order_id')::uuid), 1::bigint, '기한 지나면 due 목록에');
 select is(public.myr_app_deposit_expire((((select v from t where k = 'o3')::jsonb) ->> 'order_id')::uuid, '{"status":"CANCELED"}'::jsonb) ->> 'status', 'CANCELED', '만료 → CANCELED');
@@ -161,7 +163,8 @@ update public.myr_checkouts set expires_at = now() - interval '2 hours' where to
 select is(public.myr_app_claim_checkout('myr_t_000007', 'pk_c6') ->> 'code', 'EXPIRED', '만료된 PENDING 은 claim 때 EXPIRED 로');
 insert into t select 'c7', public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c4', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-b","qty":1}]', 'myr_t_000008')::text;
 update public.myr_checkouts set expires_at = now() - interval '2 hours' where toss_order_id = 'myr_t_000008';
-select is(public.myr_expire_checkouts(interval '1 hour'), 1, 'myr_expire_checkouts — 유예 지난 PENDING 1건');
+-- 로컬 DB 에 다른 PENDING 세션이 남아 있을 수 있으니 반환 수는 "1 이상" 만 본다
+select ok(public.myr_expire_checkouts(interval '1 hour') >= 1, 'myr_expire_checkouts — 유예 지난 PENDING 을 만료');
 select is((select status from public.myr_checkouts where toss_order_id = 'myr_t_000008'), 'EXPIRED', '→ EXPIRED');
 insert into t select 'c8', public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c4', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-b","qty":1}]', 'myr_t_000009')::text;
 select is(public.myr_app_claim_checkout('myr_t_000009', 'pk_c8') ->> 'ok', 'true', '선점');
