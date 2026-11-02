@@ -90,6 +90,8 @@ export type CsConversation = {
 	closedAt: string | null;
 	createdAt: string;
 	messageCount: number;
+	/** 첫 질문(0064 · 200자) — 마이 "내 문의" 제목 */
+	firstBody: string | null;
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null; status: string } | null;
 	seller: { id: string; name: string; handle: string } | null;
 };
@@ -134,6 +136,7 @@ export function parseCsConversation(json: unknown): CsConversation | null {
 		closedAt: strOrNull(o.closed_at),
 		createdAt: str(o.created_at),
 		messageCount: intOr(o.message_count),
+		firstBody: strOrNull(o.first_body),
 		product: p && strOrNull(p.id) ? { id: str(p.id), code: str(p.code), name: str(p.name), tile: strOrNull(p.tile), icon: str(p.icon, 'pill'), thumbUrl: strOrNull(p.thumb_url), status: str(p.status) } : null,
 		seller: s && strOrNull(s.id) ? { id: str(s.id), name: str(s.name), handle: str(s.handle) } : null
 	};
@@ -245,3 +248,21 @@ export const parseClientToken = (v: unknown): string | null => (typeof v === 'st
 
 /** 접수 화면 링크 — 상품 페이지 · 주문 상세(주문번호 프리필) */
 export const csNewHref = (productCode: string, orderCode?: string | null): string => `/cs/new?product=${encodeURIComponent(productCode)}${orderCode ? `&order=${encodeURIComponent(orderCode)}` : ''}`;
+
+/** 상대 시각 — "방금" · "N분 전" · "N시간 전" · "어제" · "N일 전" · "N주 전" · 그 뒤는 "M월 D일"(KST). now 주입 가능(테스트) */
+export function relTime(iso: string | null | undefined, now: number = Date.now()): string {
+	if (!iso) return '';
+	const t = new Date(iso).getTime();
+	if (Number.isNaN(t)) return '';
+	const min = Math.floor((now - t) / 60_000);
+	if (min < 1) return '방금';
+	if (min < 60) return `${min}분 전`;
+	const kstDay = (ms: number) => Math.floor((ms + 9 * 3_600_000) / 86_400_000);
+	const days = kstDay(now) - kstDay(t);
+	if (days <= 0) return `${Math.floor(min / 60)}시간 전`;
+	if (days === 1) return '어제';
+	if (days < 7) return `${days}일 전`;
+	if (days < 28) return `${Math.floor(days / 7)}주 전`;
+	const k = new Date(t + 9 * 3_600_000);
+	return `${k.getUTCMonth() + 1}월 ${k.getUTCDate()}일`;
+}

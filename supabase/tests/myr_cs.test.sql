@@ -1,6 +1,6 @@
 -- pgTAP — 0063 MYR 고객 문의: 권한 · 접수(검증 · 주문 소유 증명 · 이 상품 줄만) · actor 별 스레드/목록 · 답변 상태 전이 · 종료 (docs/myr.md §7 S7 · §6.6)
 begin;
-select plan(75);
+select plan(78);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_cs_open', '{uuid,uuid,uuid,text,text,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 cs_open 실행 불가');
@@ -13,6 +13,7 @@ select function_privs_are('public', 'myr_app_cs_for_order', '{uuid}'::text[], 'a
 select function_privs_are('public', 'myr_app_cs_reply', '{text,text,uuid,uuid,uuid,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 cs_reply 실행 가능');
 select table_privs_are('public', 'myr_cs_conversations', 'anon', '{}'::text[], 'anon 은 myr_cs_conversations 직접 접근 불가');
 select table_privs_are('public', 'myr_cs_messages', 'authenticated', '{}'::text[], 'authenticated 는 myr_cs_messages 직접 접근 불가');
+select col_default_is('public', 'myr_cs_messages', 'created_at', 'clock_timestamp()', '0064 메시지 시각 = clock_timestamp (한 트랜잭션 안에서도 순서 보장)');
 
 -- ---------- 픽스처 ----------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -97,6 +98,7 @@ select is(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_m), 
 select is(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_o), 'admin') -> 'conversation' -> 'order', 'null'::jsonb, '연결 안 된 주문은 null');
 select is(jsonb_array_length(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_m), 'admin') -> 'messages'), 1, '메시지 1개');
 select is(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_m), 'admin') -> 'conversation' ->> 'is_member', 'true', '회원 문의 is_member');
+select is(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_m), 'admin') -> 'conversation' ->> 'first_body', '언제 오나요', '0064 first_body = 첫 질문');
 
 -- ---------- 답변 · 상태 전이 ----------
 select is(public.myr_app_cs_reply((select r ->> 'conversation_code' from t_m), 'hacker', null, null, null, 'x') ->> 'code', 'BAD_ACTOR', 'reply BAD_ACTOR');
@@ -113,6 +115,7 @@ select is((select r -> 'message' ->> 'sender' from t_a), 'seller', '관리자 �
 select is((select r -> 'message' ->> 'actor_role' from t_a), 'admin', '실제 역할은 admin');
 select is((select r ->> 'status' from t_a), 'ANSWERED', '대행 답변 → ANSWERED');
 select is(jsonb_array_length(public.myr_app_cs_thread((select r ->> 'conversation_code' from t_m), 'admin') -> 'messages'), 4, '메시지 4개 시간순');
+select is((select e ->> 'first_body' from jsonb_array_elements(public.myr_app_cs_list('customer', '00000000-0000-4000-8000-0000000000c8')) e where e ->> 'code' = (select r ->> 'conversation_code' from t_m)), '언제 오나요', '답변이 쌓여도 first_body 는 첫 질문 그대로');
 
 -- ---------- 목록 ----------
 select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a51')), 6, '셀러 A 의 문의 6건(상품 A)');

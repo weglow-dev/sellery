@@ -70,11 +70,15 @@
 		<div class="px-5 pt-5 lg:px-0 lg:pt-0">
 			<!-- 모바일 구매 정보 (PC 는 오른쪽 패널) -->
 			<div class="lg:hidden">
-				<a href="/category?creator={handleSlug(creator.handle)}" class="flex items-center gap-2.5 text-left text-fg">
-					<Avatar {creator} size={34} />
-					<span><span class="block text-[14px] font-bold">{creator.name}</span><span class="block text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-				</a>
+				<div class="flex items-center justify-between gap-3">
+					<a href="/category?creator={handleSlug(creator.handle)}" class="flex min-w-0 items-center gap-2.5 text-left text-fg">
+						<Avatar {creator} size={34} />
+						<span class="min-w-0"><span class="block truncate text-[14px] font-bold">{creator.name}</span><span class="block truncate text-[12px] text-fg-faint">{creator.handle} · 레시피 보기</span></span>
+					</a>
+					{#if data.user}
+					<a href={csNewHref(p.code)} class="flex h-10 shrink-0 items-center gap-1.5 rounded-[12px] border border-white/16 px-3.5 text-[13px] font-bold text-fg transition-colors active:bg-white/5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</a>
+					{/if}
+				</div>
 				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
 				<div class="mt-3.5 flex items-baseline gap-2">
 					<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
@@ -161,10 +165,6 @@
 						</div>
 					{/each}
 				</div>
-				<a href={csNewHref(p.code)} class="mt-3 flex items-center justify-between rounded-[18px] border border-dashed border-white/14 px-4 py-3.5 text-[14px] text-fg transition-colors lg:px-[22px] lg:hover:border-white/30">
-					<span>궁금한 점이 더 있나요? <b>{creator.name}</b>님에게 문의하기</span>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="text-fg-faint"><path d="M9 5l7 7-7 7" /></svg>
-				</a>
 			</section>
 
 			<!-- 함께 보면 좋은 레시피 -->
@@ -192,6 +192,9 @@
 			<Avatar {creator} size={40} />
 			<span><span class="block text-[15px] font-bold">{creator.name}</span><span class="block text-[13px] text-fg-faint">{creator.handle} · 레시피 더 보기</span></span>
 		</a>
+		{#if data.user}
+		<a href={csNewHref(p.code)} class="-mt-1 flex h-[46px] items-center justify-center gap-2 rounded-[14px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z" /></svg>{creator.name}에게 문의하기</a>
+		{/if}
 		<div>
 			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
 			<div class="mt-4 flex items-baseline gap-2.5">

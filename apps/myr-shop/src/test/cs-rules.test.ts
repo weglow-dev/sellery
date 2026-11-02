@@ -10,6 +10,7 @@ import {
 	csTokenCookieName,
 	normalizeCsBody,
 	parseClientToken,
+	relTime,
 	parseCsActionResult,
 	parseCsConversation,
 	parseCsForOrder,
@@ -134,5 +135,24 @@ describe('문구 · 칩 · 쿠키', () => {
 		expect(CS_CODE_RE.test('myr1001')).toBe(false);
 		expect(csNewHref('minji-grape-jelly', 'myr1001')).toBe('/cs/new?product=minji-grape-jelly&order=myr1001');
 		expect(csNewHref('minji-grape-jelly')).toBe('/cs/new?product=minji-grape-jelly');
+	});
+});
+
+describe('relTime · firstBody (마이 "내 문의")', () => {
+	const now = Date.parse('2026-11-05T03:00:00Z'); // KST 11/5 12:00
+	it('분·시간·어제·일·주·날짜', () => {
+		expect(relTime('2026-11-05T02:59:40Z', now)).toBe('방금');
+		expect(relTime('2026-11-05T02:30:00Z', now)).toBe('30분 전');
+		expect(relTime('2026-11-04T16:00:00Z', now)).toBe('11시간 전'); // KST 11/5 01:00 — 같은 날
+		expect(relTime('2026-11-04T10:00:00Z', now)).toBe('어제'); // KST 11/4 19:00
+		expect(relTime('2026-11-02T03:00:00Z', now)).toBe('3일 전');
+		expect(relTime('2026-10-20T03:00:00Z', now)).toBe('2주 전');
+		expect(relTime('2026-09-01T03:00:00Z', now)).toBe('9월 1일');
+		expect(relTime(null, now)).toBe('');
+		expect(relTime('nope', now)).toBe('');
+	});
+	it('parseCsConversation 은 first_body 를 읽는다', () => {
+		expect(parseCsConversation({ ...convJson, first_body: '저녁에 먹어도 되나요?' })!.firstBody).toBe('저녁에 먹어도 되나요?');
+		expect(parseCsConversation(convJson)!.firstBody).toBeNull();
 	});
 });
