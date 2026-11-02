@@ -8,6 +8,7 @@
 import { parsePrecheckResult, parseRecordResult, refundIdempotencyKey, type RefundLine } from '$lib/refund-rules';
 import { admin } from './admin';
 import { logPaymentEvent } from './checkout-sync';
+import { notifyOrderRefunded } from './mail-events';
 import { isTossError, isUncertain, tossCancel } from './toss';
 
 export type RefundActor = 'customer' | 'seller' | 'admin' | 'system';
@@ -117,5 +118,15 @@ export async function refundItems(input: {
 		handled: true,
 		result: rec.already ? 'noop' : pre.deposit ? 'deposit_canceled' : pre.full ? 'refunded' : 'refunded_partial'
 	});
+	// 거래 메일 — 새로 기록했을 때만 · 고객 + 환불된 줄의 셀러 · 절대 throw 하지 않는다 (mail-events.ts)
+	if (!rec.already) {
+		await notifyOrderRefunded(input.orderId, {
+			items: pre.items.map((i) => ({ itemId: i.item_id, qty: i.qty, amount: i.amount })),
+			amount: pre.amount,
+			full: pre.full,
+			reason,
+			deposit: pre.deposit
+		});
+	}
 	return { ok: true, already: rec.already, orderCode: rec.orderCode, status: rec.status, amount: rec.amount, refunded: pre.deposit ? 0 : pre.amount };
 }

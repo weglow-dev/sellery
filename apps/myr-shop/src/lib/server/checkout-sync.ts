@@ -19,6 +19,7 @@ import {
 	type ConfirmFnResult,
 	type RejectedItem
 } from '$lib/checkout-rules';
+import { notifyDepositDone, notifyOrderPaid } from './mail-events';
 import { isTossError, tossCancel, tossCanceledTotal, type TossPayment, type TossResult } from './toss';
 
 export type Admin = SupabaseClient;
@@ -236,7 +237,11 @@ export async function confirmDone(
 		});
 		return { ok: false, code: 'CONFIRMING', message: failMessage('CONFIRMING'), items: [], canceled: false, dbError: true };
 	}
-	if (parsed.ok) return { ok: true, already: parsed.already, recovered, orderId: parsed.order_id, orderCode: parsed.order_code, status: parsed.status };
+	if (parsed.ok) {
+		// 거래 메일 — 새 주문일 때만(already 는 이미 보냈다) · 절대 throw 하지 않는다 (mail-events.ts)
+		if (!parsed.already) await notifyOrderPaid(parsed.order_id);
+		return { ok: true, already: parsed.already, recovered, orderId: parsed.order_id, orderCode: parsed.order_code, status: parsed.status };
+	}
 	if (parsed.code === 'BAD_RESULT') return { ok: false, code: 'CONFIRMING', message: failMessage('CONFIRMING'), items: [], canceled: false, dbError: true };
 
 	if (CANCEL_ON_CODES.has(parsed.code)) {
@@ -296,6 +301,7 @@ export async function depositDone(admin: Admin, order: OrderLite, payment: TossP
 	if (error) return { result: `error: deposit_done ${error.message}`.slice(0, 200), handled: false };
 	const r = parseDepositResult(data);
 	if (!r.ok) return { result: `error: deposit_done ${r.code}`, handled: false };
+	if (!r.already) await notifyDepositDone(order.id); // 입금 확인 → 고객 주문 확인 + 셀러 새 주문 (mail-events.ts)
 	return { result: r.already ? 'noop' : 'deposit_done', handled: true };
 }
 export async function depositExpire(admin: Admin, order: OrderLite, payment: TossPayment | null): Promise<{ result: string; handled: boolean }> {

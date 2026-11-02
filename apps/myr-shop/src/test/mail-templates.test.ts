@@ -1,0 +1,165 @@
+// 거래 메일 템플릿·레이아웃 — apps/myr-shop/src/lib/mail/{templates,layout}.ts · 셀러는 자기 줄만 · 비회원 링크 · 이스케이프 · 멱등 키
+import { describe, expect, it } from 'vitest';
+import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../lib/mail/layout';
+import { depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, type MailOrder, type MailRefund } from '../lib/mail/templates';
+
+const ctx = { siteUrl: 'https://myr-shop.vercel.app/' };
+const order = (over: Partial<MailOrder> = {}): MailOrder => ({
+	id: '11111111-2222-3333-4444-555555555555',
+	code: 'myr1007',
+	status: 'PAID',
+	buyerName: '김고객',
+	isMember: true,
+	shipping: { recipient: '김고객', phone: '010-0000-0000', address1: '부산시 해운대구 센텀중앙로 55', address2: '1203호', postcode: '48059' },
+	items: [
+		{ id: 'i-a', name: '지유 레시피 그래놀라', option: '2봉', qty: 2, unitPrice: 16000, amount: 32000, sellerId: 's-jiyu', sellerName: '지유', status: 'PAID', refundedQty: 0 },
+		{ id: 'i-b', name: '혜린 단백질 쉐이크', option: '', qty: 1, unitPrice: 29000, amount: 29000, sellerId: 's-hyerin', sellerName: '혜린', status: 'PAID', refundedQty: 0 }
+	],
+	itemsAmount: 61000,
+	shippingFee: 0,
+	amount: 61000,
+	refundAmount: 0,
+	paymentMethod: '카드',
+	deposit: null,
+	...over
+});
+
+describe('레이아웃', () => {
+	it('HTML 은 입력을 이스케이프하고 text 대체본은 같은 내용', () => {
+		const doc = { title: '제목 <b>', intro: '소개 & 설명', rows: [{ label: '주문번호', value: 'MYR1001' }], button: { label: '열기', url: 'https://x.test/a?b=1&c=2' }, notes: ['메모'] };
+		const html = renderMailHtml(doc);
+		expect(html).toContain('제목 &lt;b&gt;');
+		expect(html).toContain('소개 &amp; 설명');
+		expect(html).toContain('href="https://x.test/a?b=1&amp;c=2"');
+		expect(html).toContain('MYR'); // 워드마크
+		expect(html).toContain('(주)위글로우');
+		const text = renderMailText(doc);
+		expect(text).toContain('주문번호: MYR1001');
+		expect(text).toContain('열기: https://x.test/a?b=1&c=2');
+		expect(text).toContain('official@weglow.biz');
+	});
+	it('escapeHtml · mailIdempotencyKey', () => {
+		expect(escapeHtml(`<a href="x">'&'</a>`)).toBe('&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;');
+		expect(mailIdempotencyKey('myr_order_paid', 'customer', 'o 1', null)).toBe('myr_order_paid:customer:o_1');
+		expect(mailIdempotencyKey('e', '가')).toBe('e:_ac00_');
+	});
+});
+
+describe('주문 확인(고객)', () => {
+	it('회원은 /orders/<code> · 상품 전부 · 금액 · 배송지', () => {
+		const m = orderPaidCustomerMail(order(), ctx);
+		expect(m.subject).toBe('[MYR] 주문이 접수되었어요 · MYR1007');
+		expect(m.html).toContain('https://myr-shop.vercel.app/orders/myr1007');
+		expect(m.text).toContain('지유 레시피 그래놀라 · 2봉 × 2');
+		expect(m.text).toContain('혜린 단백질 쉐이크 × 1');
+		expect(m.text).toContain('결제 금액: ₩61,000');
+		expect(m.text).toContain('부산시 해운대구 센텀중앙로 55 1203호');
+		expect(m.text).not.toContain('비회원');
+		expect(m.idempotencyKey).toBe('myr_order_paid:customer:11111111-2222-3333-4444-555555555555');
+		expect(m.tag).toBe('myr_order_paid');
+	});
+	it('비회원은 /orders/g/<code> + 조회 안내 · 배송비는 금액 옆에', () => {
+		const m = orderPaidCustomerMail(order({ isMember: false, shippingFee: 3000, amount: 64000 }), ctx);
+		expect(m.html).toContain('https://myr-shop.vercel.app/orders/g/myr1007');
+		expect(m.text).toContain('비회원 주문은');
+		expect(m.text).toContain('₩64,000 (배송비 ₩3,000 포함)');
+		expect(orderPageUrl({ code: 'myr1', isMember: false }, ctx)).toBe('https://myr-shop.vercel.app/orders/g/myr1');
+	});
+	it('사용자 입력(이름·주소)은 이스케이프', () => {
+		const m = orderPaidCustomerMail(order({ buyerName: '<script>x</script>' }), ctx);
+		expect(m.html).not.toContain('<script>');
+		expect(m.html).toContain('&lt;script&gt;');
+	});
+});
+
+describe('입금 안내(가상계좌)', () => {
+	it('계좌·예금주·기한 · 멱등 키는 주문당 하나', () => {
+		const m = depositPendingMail(order({ status: 'WAITING_DEPOSIT', deposit: { bank: '신한은행', account: '110-123-456789', holder: '(주)위글로우', due: '2026-11-05T23:59:59+09:00' } }), ctx);
+		expect(m.subject).toBe('[MYR] 입금 안내 · MYR1007');
+		expect(m.text).toContain('입금 계좌: 신한은행 110-123-456789 ((주)위글로우)');
+		expect(m.text).toContain('입금 기한: 11월 5일');
+		expect(m.text).toContain('입금 금액: ₩61,000');
+		expect(m.idempotencyKey).toBe('myr_deposit_pending:11111111-2222-3333-4444-555555555555');
+	});
+	it('계좌 정보가 없어도(raw 미도착) 금액·주문번호는 나간다', () => {
+		const m = depositPendingMail(order({ status: 'WAITING_DEPOSIT' }), ctx);
+		expect(m.text).not.toContain('입금 계좌');
+		expect(m.text).toContain('주문번호: MYR1007');
+	});
+});
+
+describe('새 주문(셀러) — 자기 줄만', () => {
+	it('지유에게는 지유 줄만 · 배송지·연락처 없음 · 셀러별 멱등 키', () => {
+		const m = orderPaidSellerMail(order(), 's-jiyu', ctx)!;
+		expect(m.subject).toBe('[MYR] 새 주문 · MYR1007 · 지유 레시피 그래놀라');
+		expect(m.text).toContain('지유님');
+		expect(m.text).toContain('지유 레시피 그래놀라 · 2봉 × 2');
+		expect(m.text).not.toContain('혜린 단백질 쉐이크');
+		expect(m.text).toContain('내 상품 금액: ₩32,000');
+		expect(m.text).not.toContain('센텀중앙로');
+		expect(m.text).not.toContain('010-');
+		expect(m.idempotencyKey).toBe('myr_order_paid:seller:11111111-2222-3333-4444-555555555555:s-jiyu');
+		const h = orderPaidSellerMail(order(), 's-hyerin', ctx)!;
+		expect(h.text).toContain('혜린 단백질 쉐이크 × 1');
+		expect(h.text).not.toContain('그래놀라');
+		expect(h.idempotencyKey).not.toBe(m.idempotencyKey);
+	});
+	it('줄이 없는 셀러는 null', () => {
+		expect(orderPaidSellerMail(order(), 's-nobody', ctx)).toBeNull();
+	});
+});
+
+describe('환불(고객)', () => {
+	const partial: MailRefund = { items: [{ itemId: 'i-a', qty: 1, amount: 16000 }], amount: 16000, full: false, reason: '고객 요청', deposit: false };
+	it('부분 환불 — 환불된 줄×수량 · 금액 · 나머지 발송 안내', () => {
+		const m = orderRefundedMail(order({ status: 'PARTIAL_REFUNDED', refundAmount: 16000 }), partial, ctx);
+		expect(m.subject).toBe('[MYR] 환불이 완료되었어요 · MYR1007');
+		expect(m.text).toContain('일부 환불이 완료되었어요');
+		expect(m.text).toContain('환불 상품: 지유 레시피 그래놀라 · 2봉 × 1');
+		expect(m.text).not.toContain('혜린');
+		expect(m.text).toContain('환불 금액: ₩16,000');
+		expect(m.text).toContain('나머지 상품은 그대로 발송돼요');
+		expect(m.text).toContain('사유: 고객 요청');
+		expect(m.html).toContain('/orders/myr1007');
+	});
+	it('전액 환불 — 배송비 포함 표기 · 다른 줄 조합은 다른 멱등 키', () => {
+		const full: MailRefund = { items: [{ itemId: 'i-a', qty: 2, amount: 32000 }, { itemId: 'i-b', qty: 1, amount: 29000 }], amount: 64000, full: true, reason: '', deposit: false };
+		const m = orderRefundedMail(order({ status: 'REFUNDED', shippingFee: 3000, amount: 64000 }), full, ctx);
+		expect(m.text).toContain('환불이 완료되었어요');
+		expect(m.text).toContain('환불 금액: ₩64,000 (배송비 포함)');
+		expect(m.text).not.toContain('나머지 상품');
+		expect(m.text).not.toContain('사유:');
+		const p = orderRefundedMail(order(), partial, ctx);
+		expect(m.idempotencyKey).not.toBe(p.idempotencyKey);
+		expect(m.idempotencyKey.startsWith('myr_order_refunded:11111111-2222-3333-4444-555555555555:')).toBe(true);
+	});
+	it('입금 대기 취소 — 결제 없이 취소 문구 · 환불 금액 없음', () => {
+		const dep: MailRefund = { items: [{ itemId: 'i-a', qty: 2, amount: 32000 }, { itemId: 'i-b', qty: 1, amount: 29000 }], amount: 61000, full: true, reason: '고객 요청', deposit: true };
+		const m = orderRefundedMail(order({ status: 'CANCELED' }), dep, ctx);
+		expect(m.subject).toBe('[MYR] 주문이 취소되었어요 · MYR1007');
+		expect(m.text).toContain('입금 전이라 결제 없이 취소');
+		expect(m.text).not.toContain('환불 금액');
+		expect(m.text).toContain('취소된 상품: 지유 레시피 그래놀라 · 2봉 × 2');
+	});
+});
+
+describe('환불(셀러) — 자기 줄만', () => {
+	it('환불된 줄의 셀러만 받고, 금액은 단가×수량', () => {
+		const r: MailRefund = { items: [{ itemId: 'i-a', qty: 1, amount: 16000 }], amount: 16000, full: false, reason: '고객 요청', deposit: false };
+		const m = orderRefundedSellerMail(order(), r, 's-jiyu', ctx)!;
+		expect(m.subject).toBe('[MYR] 환불 · MYR1007 · 지유 레시피 그래놀라');
+		expect(m.text).toContain('환불된 내 상품: 지유 레시피 그래놀라 · 2봉 × 1');
+		expect(m.text).toContain('내 상품 환불 금액: ₩16,000');
+		expect(orderRefundedSellerMail(order(), r, 's-hyerin', ctx)).toBeNull();
+	});
+	it('입금 대기 취소는 모든 셀러에게 자기 줄 · 멱등 키가 셀러별로 다르다', () => {
+		const dep: MailRefund = { items: [{ itemId: 'i-a', qty: 2, amount: 32000 }, { itemId: 'i-b', qty: 1, amount: 29000 }], amount: 61000, full: true, reason: '', deposit: true };
+		const j = orderRefundedSellerMail(order({ status: 'CANCELED' }), dep, 's-jiyu', ctx)!;
+		const h = orderRefundedSellerMail(order({ status: 'CANCELED' }), dep, 's-hyerin', ctx)!;
+		expect(j.text).toContain('취소된 내 상품: 지유 레시피 그래놀라 · 2봉 × 2');
+		expect(j.text).not.toContain('혜린');
+		expect(h.text).toContain('혜린 단백질 쉐이크 × 1');
+		expect(j.idempotencyKey).not.toBe(h.idempotencyKey);
+		expect(orderRefundedSellerMail(order(), dep, 's-nobody', ctx)).toBeNull();
+	});
+});
