@@ -19,7 +19,7 @@ import {
 	type ConfirmFnResult,
 	type RejectedItem
 } from '$lib/checkout-rules';
-import { isTossError, tossCancel, type TossPayment, type TossResult } from './toss';
+import { isTossError, tossCancel, tossCanceledTotal, type TossPayment, type TossResult } from './toss';
 
 export type Admin = SupabaseClient;
 export type EventSource = 'webhook' | 'deposit_callback' | 'confirm' | 'cancel';
@@ -276,8 +276,8 @@ export async function confirmDone(
 }
 
 // ---- 주문 측 (가상계좌 입금·만료 · 콘솔 취소) ----
-export type OrderLite = { id: string; code: string; status: string; payment_key: string | null; checkout_id: string | null };
-export const ORDER_LITE_COLS = 'id, code, status, payment_key, checkout_id';
+export type OrderLite = { id: string; code: string; status: string; payment_key: string | null; checkout_id: string | null; refund_amount: number };
+export const ORDER_LITE_COLS = 'id, code, status, payment_key, checkout_id, refund_amount';
 
 export async function findOrderByCheckout(admin: Admin, checkoutId: string): Promise<OrderLite | null> {
 	const { data, error } = await admin.from('myr_orders').select(ORDER_LITE_COLS).eq('checkout_id', checkoutId).maybeSingle();
@@ -391,9 +391,12 @@ async function syncOrder(admin: Admin, order: OrderLite, payment: TossPayment): 
 		await refreshOrderPayment(admin, order, payment);
 		return { result: 'noop', handled: true };
 	}
-	if ((st === 'CANCELED' || st === 'PARTIAL_CANCELED') && (order.status === 'PAID' || order.status === 'PARTIAL_REFUNDED')) {
-		// 줄 단위 환불 기록(myr_app_refund_record)은 다음 마이그레이션 — 그때까지 운영 큐에 남긴다
-		return { result: st === 'CANCELED' ? 'needs_manual_adjust' : 'partial_cancel_manual', handled: false };
+	if (st === 'CANCELED' || st === 'PARTIAL_CANCELED') {
+		// 우리 환불(/api/payments/cancel · 0061 record)은 refund_amount 에 이미 적혀 있다 — 토스 cancels[] 합과 같으면 그 웹훅은 noop.
+		// 토스 콘솔에서만 취소해 합이 더 크면(어느 줄인지 모른다) 운영 큐 — 사람이 줄을 지정해 record 한다(docs/myr.md §6.3).
+		const tossTotal = tossCanceledTotal(payment);
+		if (tossTotal <= (order.refund_amount ?? 0)) return { result: 'noop', handled: true };
+		return { result: `needs_manual_adjust: toss ${tossTotal} > recorded ${order.refund_amount ?? 0}`, handled: false };
 	}
 	return { result: 'noop', handled: true };
 }

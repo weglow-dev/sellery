@@ -29,6 +29,13 @@ export type TossResult = { ok: boolean; status: number; body: TossPayment | Toss
 export const isTossError = (body: TossPayment | TossError): body is TossError =>
 	typeof (body as TossError).code === 'string' && typeof (body as TossPayment).paymentKey !== 'string';
 export const isUncertain = (res: TossResult): boolean => res.status === 0 || res.status >= 500;
+/** cancels[].cancelAmount 합 (없으면 totalAmount − balanceAmount · 그것도 없으면 0) — 토스 콘솔 취소와 우리 기록(refund_amount) 대조용 */
+export function tossCanceledTotal(p: TossPayment): number {
+	const cancels = Array.isArray(p.cancels) ? p.cancels : [];
+	if (cancels.length > 0) return cancels.reduce((sum, c) => sum + (Number.isFinite(c.cancelAmount) ? c.cancelAmount : 0), 0);
+	if (typeof p.balanceAmount === 'number' && Number.isFinite(p.balanceAmount)) return Math.max(0, p.totalAmount - p.balanceAmount);
+	return 0;
+}
 export const hasToss = (): boolean => typeof env.TOSS_SECRET_KEY === 'string' && env.TOSS_SECRET_KEY.trim() !== '';
 
 const looksLikePayment = (v: unknown): v is TossPayment =>

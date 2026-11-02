@@ -1,0 +1,164 @@
+// 환불 순수 규칙 — apps/myr-shop/src/lib/refund-rules.ts
+import { describe, expect, it } from 'vitest';
+import type { OrderItem, OrderView } from '../lib/order-view';
+import {
+	customerCanRefund,
+	estimateRefund,
+	parseCancelBody,
+	parsePrecheckResult,
+	parseRecordResult,
+	refundableItems,
+	refundIdempotencyKey,
+	refundMessage
+} from '../lib/refund-rules';
+
+const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID'): OrderItem => ({
+	id,
+	code: id,
+	name: id,
+	option: '',
+	qty,
+	unitPrice,
+	amount: qty * unitPrice,
+	status,
+	refundedQty,
+	tile: '',
+	ic: 'pill',
+	thumbUrl: null,
+	creator: ''
+});
+const A = '11111111-1111-4111-8111-111111111111';
+const B = '22222222-2222-4222-8222-222222222222';
+const order = (over: Partial<OrderView> = {}): OrderView =>
+	({
+		id: 'o',
+		code: 'myr1001',
+		status: 'PAID',
+		amount: 43000,
+		itemsAmount: 40000,
+		shippingFee: 3000,
+		refundAmount: 0,
+		orderName: '',
+		paymentMethod: '카드',
+		paidAt: 'x',
+		createdAt: 'x',
+		depositDueAt: null,
+		deposit: null,
+		courier: null,
+		trackingNo: null,
+		shippedAt: null,
+		deliveredAt: null,
+		guest: false,
+		buyerName: '',
+		shipping: null,
+		items: [item(A, 2, 10000), item(B, 1, 20000)],
+		...over
+	}) as OrderView;
+
+describe('parseCancelBody', () => {
+	it('orderCode 소문자 · items 선택 · reason 정리', () => {
+		expect(parseCancelBody({ orderCode: 'MYR1001', items: [{ itemId: A, qty: 1 }], reason: ' 단순 변심 \u{1F49A}' })).toEqual({
+			orderCode: 'myr1001',
+			items: [{ item_id: A, qty: 1 }],
+			reason: '단순 변심'
+		});
+		expect(parseCancelBody({ orderCode: 'myr1001' })).toEqual({ orderCode: 'myr1001', items: [], reason: '' });
+	});
+	it('형식 오류는 null', () => {
+		expect(parseCancelBody({ orderCode: 'bad code' })).toBeNull();
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: 'x', qty: 1 }] })).toBeNull();
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 0 }] })).toBeNull();
+		expect(parseCancelBody(null)).toBeNull();
+	});
+});
+
+describe('customerCanRefund · refundableItems', () => {
+	it('발송 전 PAID → ok · 입금 대기 → deposit · 발송 뒤·환불·취소 → 불가', () => {
+		expect(customerCanRefund(order())).toEqual({ ok: true, deposit: false });
+		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT' }))).toEqual({ ok: true, deposit: true });
+		expect(customerCanRefund(order({ trackingNo: 'T' })).ok).toBe(false);
+		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);
+		expect(customerCanRefund(order({ status: 'CANCELED' })).ok).toBe(false);
+		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED')] })).ok).toBe(false);
+	});
+	it('남은 수량이 있는 줄만', () => {
+		expect(
+			refundableItems([item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000, 1, 'REFUNDED'), item('c', 1, 1, 0, 'CANCELED')]).map((i) => i.id)
+		).toEqual([A]);
+	});
+});
+
+describe('estimateRefund', () => {
+	it('부분은 단가 × qty · 전부면 배송비 포함 · 남은 수량 넘는 요청은 잘린다', () => {
+		expect(estimateRefund(order(), [{ item_id: A, qty: 1 }])).toEqual({ amount: 10000, full: false });
+		expect(
+			estimateRefund(order(), [
+				{ item_id: A, qty: 2 },
+				{ item_id: B, qty: 1 }
+			])
+		).toEqual({ amount: 43000, full: true });
+		expect(
+			estimateRefund(order(), [
+				{ item_id: A, qty: 9 },
+				{ item_id: B, qty: 9 }
+			])
+		).toEqual({ amount: 43000, full: true });
+		expect(estimateRefund(order({ refundAmount: 10000, items: [item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000)] }), []).amount).toBe(0);
+		expect(
+			estimateRefund(order({ refundAmount: 10000, items: [item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000)] }), [
+				{ item_id: A, qty: 1 },
+				{ item_id: B, qty: 1 }
+			])
+		).toEqual({ amount: 33000, full: true });
+	});
+});
+
+describe('refundIdempotencyKey', () => {
+	it('같은 줄 묶음은 순서가 달라도 같은 키 · 다른 수량은 다른 키 · 전체는 all', () => {
+		const k1 = refundIdempotencyKey('o', [
+			{ item_id: A, qty: 1 },
+			{ item_id: B, qty: 2 }
+		]);
+		const k2 = refundIdempotencyKey('o', [
+			{ item_id: B, qty: 2 },
+			{ item_id: A, qty: 1 }
+		]);
+		expect(k1).toBe(k2);
+		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 2 }])).not.toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));
+		expect(refundIdempotencyKey('o', [])).toBe('o:all');
+		expect(k1.length).toBeLessThanOrEqual(300);
+	});
+});
+
+describe('RPC 파서 · 문구', () => {
+	it('precheck ok · BAD_ITEMS · record', () => {
+		expect(
+			parsePrecheckResult({
+				ok: true,
+				order_code: 'myr1001',
+				order_status: 'PAID',
+				payment_key: 'pk',
+				amount: 10000,
+				deposit: false,
+				full: false,
+				items: [{ item_id: A, qty: 1, amount: 10000, seller_id: 's' }]
+			})
+		).toMatchObject({ ok: true, amount: 10000, items: [{ item_id: A, qty: 1 }] });
+		expect(parsePrecheckResult({ ok: false, code: 'BAD_ITEMS', items: [{ item_id: A, reason: 'TOO_MANY', left: 2 }] })).toEqual({
+			ok: false,
+			code: 'BAD_ITEMS',
+			status: undefined,
+			items: [{ item_id: A, reason: 'TOO_MANY', left: 2 }]
+		});
+		expect(parsePrecheckResult('x')).toEqual({ ok: false, code: 'BAD_RESULT' });
+		expect(parseRecordResult({ ok: true, already: false, order_code: 'myr1001', status: 'PARTIAL_REFUNDED', amount: 10000 })).toEqual({
+			ok: true,
+			already: false,
+			orderCode: 'myr1001',
+			status: 'PARTIAL_REFUNDED',
+			amount: 10000
+		});
+		expect(refundMessage('SHIPPED')).toContain('발송');
+		expect(refundMessage('ZZZ', '토스 메시지')).toBe('토스 메시지');
+	});
+});
