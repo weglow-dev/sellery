@@ -2,6 +2,7 @@
 	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용. 줄 · 금액 · 배송 상태 · 입금 안내(가상계좌) · 배송지. 환불·문의 버튼은 다음 단계. */
 	import { won } from '$lib/data';
 	import { displayCode, shortDate, statusLabel, type OrderView } from '$lib/order-view';
+	import RefundPanel from '$lib/components/RefundPanel.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	let { order }: { order: OrderView } = $props();
@@ -69,6 +70,7 @@
 			{/if}
 			<div class="flex items-baseline justify-between border-t border-white/8 pt-2"><span class="font-bold">{order.status === 'WAITING_DEPOSIT' ? '입금할 금액' : '총 결제 금액'}</span><span class="text-[20px] font-extrabold text-accent">{won(order.amount)}</span></div>
 		</div>
-		<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">환불·문의는 곧 열려요. 급한 문의는 마이페이지의 고객센터로.</p>
+		<RefundPanel {order} />
+		<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">문의는 곧 열려요. 급한 문의는 마이페이지의 고객센터로.</p>
 	</aside>
 </div>
