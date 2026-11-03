@@ -1,0 +1,16 @@
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { goBack } from '$lib/nav';
+	import Icon from './Icon.svelte';
+
+	/** 60px 헤더 — [뒤로] · 제목 · 오른쪽 보조. onback 이 없으면 브라우저 뒤로(앱 밖이면 fallback) */
+	let { title, fallback = '/', onback, right }: { title: string; fallback?: string; onback?: () => void; right?: Snippet } = $props();
+</script>
+
+<div class="flex h-[60px] shrink-0 items-center gap-2 pr-5 pl-1.5">
+	<button type="button" onclick={() => (onback ? onback() : goBack(fallback))} aria-label="뒤로" class="flex h-11 w-11 items-center justify-center text-fg">
+		<Icon id="back" size={22} sw={2.2} />
+	</button>
+	<span class="flex-1 truncate text-[16px] font-bold">{title}</span>
+	{#if right}{@render right()}{/if}
+</div>

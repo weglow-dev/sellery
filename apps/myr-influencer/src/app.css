@@ -1,0 +1,91 @@
+@import 'tailwindcss';
+
+/* MYR 인플루언서 콘솔 테마 — 샵(apps/myr-shop/src/app.css)·랜딩과 같은 다크 베이스 + 웜 앰버 포인트.
+   디자인(Claude Design "MYR Influencer Admin")의 인라인 값을 토큰으로 옮겼다. 레이아웃·색은 컴포넌트 안에서 Tailwind 유틸리티로. */
+@theme {
+	--font-sans: 'Pretendard Variable', Pretendard, 'Apple SD Gothic Neo', sans-serif;
+
+	--color-bg: #0a0b0e;
+	--color-panel: #15161a;
+	--color-panel-2: #1d1f25;
+	--color-fg: #ffffff;
+	--color-accent: #ff7a3d;
+	--color-accent-deep: #ff5a1f;
+	/* 상태 색 — 판매 중·진행 중(민트) · 교환 요청(라일락). 환불·심사 중·긴급은 accent */
+	--color-mint: #a8dcc8;
+	--color-lilac: #b8c4f5;
+
+	/* 화면 등장 — 홈·목록은 아래에서(up-in), 상세·에디터·완료는 오른쪽에서(slide-in). 토스트는 up-in 짧게 */
+	--animate-up-in: up-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-slide-in: slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-toast: up-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes up-in {
+	0% {
+		opacity: 0;
+		transform: translateY(18px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes slide-in {
+	0% {
+		opacity: 0;
+		transform: translateX(28px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes pop {
+	0% {
+		opacity: 0;
+		transform: scale(0.3);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@layer base {
+	html,
+	body {
+		margin: 0;
+		background: var(--color-bg);
+		color: var(--color-fg);
+		font-family: var(--font-sans);
+		word-break: keep-all;
+	}
+	input,
+	textarea,
+	button {
+		font-family: inherit;
+	}
+	input::placeholder,
+	textarea::placeholder {
+		color: rgba(255, 255, 255, 0.34);
+	}
+	/* 가로·세로 스크롤 영역은 스크롤바를 감춘다 */
+	.no-bar {
+		scrollbar-width: none;
+	}
+	.no-bar::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
