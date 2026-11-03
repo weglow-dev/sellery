@@ -9,6 +9,8 @@ export default {
 	compilerOptions: { runes: true },
 	kit: {
 		adapter: adapter({ runtime: 'nodejs22.x' }),
+		// ssr=false 라 페이지 셸이 하나 — 상대 경로 자산(./favicon.png)이 /products/new 같은 하위 경로에서 깨지므로 절대 경로로
+		paths: { relative: false },
 		env: { dir: '../..' } // 루트 .env.local 을 다른 앱과 공유 (인증을 붙일 때 PUBLIC_SUPABASE_* 가 같은 프로젝트)
 	}
 };

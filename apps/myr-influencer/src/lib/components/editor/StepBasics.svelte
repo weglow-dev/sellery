@@ -43,13 +43,13 @@
 
 <StepHead n={1} name="기본 정보" title={'어떤 제품을\n올릴까요?'} desc="제품명, 가격, 카테고리 — 샵 오른쪽 구매 패널에 보이는 정보예요." where="구매 패널" />
 
-<div class="mt-4 flex flex-col gap-3.5">
+<div class="mt-4 flex flex-col gap-3.5 lg:mt-5 lg:gap-4">
 	<div class="flex flex-col gap-2">
 		<label class={LABEL} for="{uid}-name">판매 제품명</label>
 		<input id="{uid}-name" class={INPUT_LG} bind:value={ed.name} placeholder="예: 민지 글루타치온 스틱 — 레몬" maxlength="60" />
 	</div>
 
-	<div class="grid grid-cols-2 gap-2.5">
+	<div class="grid grid-cols-2 gap-2.5 lg:gap-3">
 		<div class="flex flex-col gap-2">
 			<label class={LABEL} for="{uid}-price">판매가</label>
 			<div class="relative">
@@ -79,15 +79,15 @@
 					type="button"
 					aria-pressed={on}
 					onclick={() => (ed.cat = c.id)}
-					class="rounded-full border px-3 py-[9px] text-[13px] font-bold transition-all {on ? 'border-accent bg-accent/12 text-accent' : 'border-white/12 text-white/80'}">{c.name}</button
+					class="rounded-full border px-3 py-[9px] text-[13px] font-bold transition-all lg:px-3.5 {on ? 'border-accent bg-accent/12 text-accent' : 'border-white/12 text-white/80'}">{c.name}</button
 				>
 			{/each}
 			{#if !catAdding}
-				<button type="button" onclick={() => (catAdding = true)} class="rounded-full border-[1.5px] border-dashed border-white/25 px-3 py-[9px] text-[13px] font-bold text-white/75">+ 추가</button>
+				<button type="button" onclick={() => (catAdding = true)} class="rounded-full border-[1.5px] border-dashed border-white/25 px-3 py-[9px] text-[13px] font-bold text-white/75 lg:px-3.5">+ 추가</button>
 			{/if}
 		</div>
 		{#if catAdding}
-			<div class="mt-0.5 flex items-center gap-2">
+			<div class="mt-0.5 flex items-center gap-2 lg:max-w-[480px]">
 				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					class="h-[46px] min-w-0 flex-1 rounded-xl border-[1.5px] border-accent bg-accent/6 px-3.5 text-[15px] text-fg outline-none"
@@ -105,9 +105,9 @@
 
 	<div class="flex flex-col gap-2">
 		<span class={LABEL}>제품 이미지 <span class="font-medium text-white/45">({ed.images.length}/{MAX_IMAGES})</span></span>
-		<div class="no-bar flex gap-2 overflow-x-auto pt-0.5 pb-1">
+		<div class="no-bar flex gap-2 overflow-x-auto pt-0.5 pb-1 lg:flex-wrap lg:gap-2.5 lg:overflow-visible">
 			{#each ed.images as src, i (src)}
-				<div class="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[18px] border-2 {i === 0 ? 'border-accent' : 'border-white/12'}">
+				<div class="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[18px] border-2 lg:h-[104px] lg:w-[104px] {i === 0 ? 'border-accent' : 'border-white/12'}">
 					<button type="button" onclick={() => makeCover(i)} class="block h-full w-full" aria-label={i === 0 ? '대표 이미지' : `${i + 1}번째 사진을 대표로`}>
 						<img {src} alt="" class="h-full w-full object-cover" />
 					</button>
@@ -118,7 +118,7 @@
 				</div>
 			{/each}
 			{#if ed.images.length < MAX_IMAGES}
-				<label class="relative flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[18px] border-[1.5px] border-dashed border-white/28 bg-white/3 text-white/80">
+				<label class="relative flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[18px] border-[1.5px] border-dashed border-white/28 bg-white/3 text-white/80 transition-colors lg:h-[104px] lg:w-[104px] lg:hover:border-accent">
 					<input type="file" accept="image/*" multiple onchange={pickImages} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="제품 사진 추가" />
 					<Icon id="plus" size={20} sw={2.2} />
 					<span class="text-[11px] font-bold">사진 추가</span>
@@ -145,7 +145,7 @@
 
 	<div class="flex flex-col gap-2">
 		<span class={LABEL}>태그 3개</span>
-		<div class="grid grid-cols-3 gap-2">
+		<div class="grid grid-cols-3 gap-2 lg:max-w-[480px]">
 			{#each ed.chips as _, i (i)}
 				<input class="{INPUT_SM} text-center font-semibold" bind:value={ed.chips[i]} placeholder={TAG_PH[i]} aria-label="태그 {i + 1}" maxlength="10" />
 			{/each}
@@ -153,7 +153,7 @@
 	</div>
 </div>
 
-<div class="mt-4 flex items-center gap-3 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5">
+<div class="mt-4 flex items-center gap-3 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 lg:mt-[18px]">
 	<span class="shrink-0 text-[12px] text-white/50">예상 정산</span>
 	<span class="flex-1 text-[13px] text-white/75">판매가 − 플랫폼 수수료 10%</span>
 	<span class="text-[15px] font-extrabold whitespace-nowrap text-accent">{marginText(parsePrice(ed.price))}</span>

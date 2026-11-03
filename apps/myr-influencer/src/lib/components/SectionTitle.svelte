@@ -5,4 +5,4 @@
 	let { children }: { children: Snippet } = $props();
 </script>
 
-<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70">{@render children()}</h3>
+<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70 lg:text-[15px]">{@render children()}</h3>
