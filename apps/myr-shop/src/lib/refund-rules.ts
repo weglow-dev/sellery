@@ -3,16 +3,39 @@ import { ORDER_CODE_RE } from './checkout-rules';
 import { cleanText } from './text';
 import type { OrderItem, OrderView } from './order-view';
 
-/** note = 제품별 상세 내용(선택 · 크리에이터에게 전달 · 0067 줄 refund_reason 에 "사유 — 상세") — 금액·Idempotency-Key 에는 쓰지 않는다 */
-export type RefundLine = { item_id: string; qty: number; note?: string };
-const UUID_RE = /^[0-9a-f-]{36}$/;
+/** note = 제품별 상세 내용(선택 · 크리에이터에게 전달 · 0067 줄 refund_reason 에 "사유 — 상세") · photos = 올린 사진 경로(0068 · 줄당 3장) — 금액·Idempotency-Key 에는 쓰지 않는다 */
+export type RefundLine = { item_id: string; qty: number; note?: string; photos?: string[] };
+export const UUID_RE = /^[0-9a-f-]{36}$/;
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
 export const REFUND_REASONS = ['단순 변심', '주문 실수', '배송 지연', '상품 불량·파손', '기타'] as const;
 export const REASON_MAX = 200;
 export const REFUND_NOTE_MAX = 300;
 
-/** POST /api/payments/cancel 본문 `{ orderCode, items?: [{ itemId, qty, note? }], reason? }` — items 비우면 전체 · note 는 정리해 300자(비면 뺀다). 형식 틀리면 null */
+/* ---- 사진(0068) — 버킷 myr-refunds · 경로 <order id>/<item id>/<uuid>.<ext> ---- */
+export const REFUND_PHOTO_MAX = 3;
+/** 버킷 한도 5MB · Vercel 서버리스 본문 4.5MB 가 먼저 막는다 → 4MB */
+export const REFUND_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+export const REFUND_PHOTO_TYPES: Readonly<Record<string, string>> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+export const REFUND_PHOTO_ACCEPT = Object.keys(REFUND_PHOTO_TYPES).join(',');
+const PHOTO_PATH_RE = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const refundPhotoPath = (orderId: string, itemId: string, ext: string, rand: string = crypto.randomUUID()): string => `${orderId}/${itemId}/${rand}.${ext}`;
+/** 형식 + (주면) 그 주문(·줄) 아래인지 */
+export function isRefundPhotoPath(path: string, orderId?: string, itemId?: string): boolean {
+	if (!PHOTO_PATH_RE.test(path)) return false;
+	if (orderId && !path.startsWith(`${orderId}/`)) return false;
+	if (itemId && !path.startsWith(`${orderId}/${itemId}/`)) return false;
+	return true;
+}
+/** 매직 바이트로 jpeg/png/webp 판별 — 브라우저가 준 MIME 은 믿지 않는다 */
+export function sniffImageType(b: Uint8Array): { type: string; ext: string } | null {
+	if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { type: 'image/jpeg', ext: 'jpg' };
+	if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return { type: 'image/png', ext: 'png' };
+	if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { type: 'image/webp', ext: 'webp' };
+	return null;
+}
+
+/** POST /api/payments/cancel 본문 `{ orderCode, items?: [{ itemId, qty, note?, photos? }], reason? }` — items 비우면 전체 · note 는 정리해 300자(비면 뺀다) · photos 는 경로 형식 3장까지(비면 뺀다). 형식 틀리면 null */
 export function parseCancelBody(v: unknown): { orderCode: string; items: RefundLine[]; reason: string } | null {
 	const b = obj(v);
 	if (!b) return null;
@@ -27,7 +50,13 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 				return null;
 			if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
 			const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
-			items.push(note ? { item_id: l.itemId, qty: l.qty as number, note } : { item_id: l.itemId, qty: l.qty as number });
+			const line: RefundLine = { item_id: l.itemId, qty: l.qty as number };
+			if (note) line.note = note;
+			if (l.photos !== undefined && l.photos !== null) {
+				if (!Array.isArray(l.photos) || l.photos.length > REFUND_PHOTO_MAX || !l.photos.every((p) => typeof p === 'string' && isRefundPhotoPath(p))) return null;
+				if (l.photos.length) line.photos = [...new Set(l.photos as string[])];
+			}
+			items.push(line);
 		}
 	}
 	const reason = cleanText(typeof b.reason === 'string' ? b.reason : '').slice(0, REASON_MAX);

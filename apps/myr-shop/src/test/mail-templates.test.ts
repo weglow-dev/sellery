@@ -171,6 +171,16 @@ describe('환불(셀러) — 자기 줄만', () => {
 		expect(m.text).toContain('포장이 찢어졌어요');
 		expect(orderRefundedMail(o, r, ctx).text).not.toContain('포장이 찢어졌어요');
 	});
+	it('셀러 환불 메일 — 사진 서명 URL 행 + 7일 안내 · 고객 메일엔 없음 (0068)', () => {
+		const o = order();
+		const mine = o.items[0];
+		const r = { items: [{ itemId: mine.id, qty: 1, amount: mine.unitPrice, photoUrls: ['https://x.test/a.jpg?token=1', 'https://x.test/b.jpg?token=2'] }], amount: mine.unitPrice, full: false, reason: '상품 불량·파손', deposit: false };
+		const m = orderRefundedSellerMail(o, r, mine.sellerId, ctx)!;
+		expect(m.text).toContain(`사진 · ${mine.name}`);
+		expect(m.text).toContain('2) https://x.test/b.jpg?token=2');
+		expect(m.text).toContain('7일 동안');
+		expect(orderRefundedMail(o, r, ctx).text).not.toContain('x.test');
+	});
 });
 
 describe('고객 문의 메일 (S7)', () => {

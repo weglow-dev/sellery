@@ -28,13 +28,14 @@ export type EventSource = 'webhook' | 'deposit_callback' | 'confirm' | 'cancel';
 export const apiError = (status: number, code: string, message?: string | null, extra?: Record<string, unknown>): Response =>
 	Response.json({ ok: false, code, message: failMessage(code, message), ...(extra ?? {}) }, { status });
 
-/** 상태 변경 API 의 CSRF 가드 — Sec-Fetch-Site same-origin/none + JSON 본문만 */
-export function rejectCrossSite(request: Request): Response | null {
+/** 상태 변경 API 의 CSRF 가드 — Sec-Fetch-Site same-origin/none + JSON 본문만(multipart: true 면 파일 업로드 폼도 — 0068 환불 사진) */
+export function rejectCrossSite(request: Request, opts: { multipart?: boolean } = {}): Response | null {
 	const site = (request.headers.get('sec-fetch-site') ?? '').toLowerCase();
 	if (site && site !== 'same-origin' && site !== 'none') return apiError(403, 'BAD_ORIGIN');
 	const contentType = (request.headers.get('content-type') ?? '').toLowerCase();
-	if (!contentType.startsWith('application/json')) return apiError(403, 'BAD_ORIGIN');
-	return null;
+	if (contentType.startsWith('application/json')) return null;
+	if (opts.multipart && contentType.startsWith('multipart/form-data')) return null;
+	return apiError(403, 'BAD_ORIGIN');
 }
 
 export { CHECKOUT_LITE_COLS, parseCheckoutLite };

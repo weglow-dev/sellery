@@ -36,8 +36,8 @@ export type MailOrder = {
 	deposit: MailDeposit;
 };
 /** 환불 1건 — record 가 돌려준 것 */
-/** items[].note = 고객이 제품별로 남긴 상세(0067 · 셀러 메일에만) */
-export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string }[]; amount: number; full: boolean; reason: string; deposit: boolean };
+/** items[].note = 고객이 제품별로 남긴 상세(0067) · photoUrls = 사진 서명 URL(0068 · 7일) — 둘 다 셀러 메일에만 */
+export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string; photoUrls?: string[] }[]; amount: number; full: boolean; reason: string; deposit: boolean };
 
 const url = (ctx: MailCtx, path: string): string => `${ctx.siteUrl.replace(/\/+$/, '')}${path}`;
 const upper = (code: string): string => code.toUpperCase();
@@ -170,8 +170,10 @@ export function orderRefundedSellerMail(o: MailOrder, r: MailRefund, sellerId: s
 			{ label: r.deposit ? '취소된 내 상품' : '환불된 내 상품', value: itemsText(lines) },
 			...(r.deposit ? [] : [{ label: '내 상품 환불 금액', value: won(amount) }]),
 			...(r.reason ? [{ label: '사유', value: r.reason }] : []),
-			...mine.filter((p) => p.x.note).map((p) => ({ label: `상세 · ${p.i.name}`, value: previewOf(p.x.note as string, 300) }))
-		]
+			...mine.filter((p) => p.x.note).map((p) => ({ label: `상세 · ${p.i.name}`, value: previewOf(p.x.note as string, 300) })),
+			...mine.filter((p) => p.x.photoUrls?.length).map((p) => ({ label: `사진 · ${p.i.name}`, value: (p.x.photoUrls as string[]).map((u, i) => `${i + 1}) ${u}`).join('\n') }))
+		],
+		notes: mine.some((p) => p.x.photoUrls?.length) ? ['사진 링크는 7일 동안 열려요. 그 뒤에는 콘솔의 환불 내역에서 보세요.'] : undefined
 	};
 	const key = mailIdempotencyKey('myr_order_refunded', 'seller', o.id, sellerId, ...r.items.map((x) => `${x.itemId.slice(0, 8)}.${x.qty}`).sort());
 	return finish(doc, `[MYR] ${r.deposit ? '주문 취소' : '환불'} · ${code} · ${lines[0].name}`, key, 'myr_order_refunded_seller');

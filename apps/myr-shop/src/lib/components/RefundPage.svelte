@@ -3,7 +3,8 @@
 	 *  PC: 제목 + 주문번호 / 왼쪽 제품 체크 카드(수량 2개 이상이면 수량 · 접히는 "상세 내용 (선택)" = 크리에이터에게 전달 · 0067 줄 refund_reason) + 환불 사유 드롭다운(REFUND_REASONS 만)
 	 *      / 오른쪽 환불 요약(선택 수 · 사유 · 예상 금액 · [환불 신청] → 인라인 확인) + 안내.
 	 *  모바일: 뒤로 헤더(주문번호) · 같은 순서로 쌓고 하단 바 버튼(앱 셸 바닥 — fixed 아님). 입금 대기 주문은 "주문 취소"(토스 호출 없음 · 확인만).
-	 *  금액은 화면 추정(estimateRefund) · 서버 precheck 가 다시 계산. 브라우저 confirm() 은 쓰지 않는다. 사진 첨부는 다음 PR(저장소). 보낸 뒤 주문 상세로. */
+	 *  사진(0068): 고르는 즉시 POST /api/refunds/photos 로 올리고(줄당 3장 · 4MB · jpeg/png/webp) 경로만 들고 있다가 신청 본문 items[].photos 로 보낸다 · × 는 DELETE. 미리보기는 브라우저 object URL.
+	 *  금액은 화면 추정(estimateRefund) · 서버 precheck 가 다시 계산. 브라우저 confirm() 은 쓰지 않는다. 보낸 뒤 주문 상세로. */
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { won } from '$lib/data';
@@ -11,7 +12,7 @@
 	import { displayCode, type OrderView } from '$lib/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
+	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
 
 	let { order, backHref }: { order: OrderView; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
@@ -22,6 +23,9 @@
 	let qtyById = $state<Record<string, number>>(untrack(() => Object.fromEntries(lines.length === 1 ? lines.map((l) => [l.id, remainingQty(l)]) : [])));
 	let noteById = $state<Record<string, string>>({});
 	let noteOpen = $state<Record<string, boolean>>({});
+	type Photo = { path: string; url: string };
+	let photosById = $state<Record<string, Photo[]>>({});
+	let uploading = $state<Record<string, number>>({});
 	let reason = $state('');
 	let reasonOpen = $state(false);
 	let confirming = $state(false);
@@ -33,7 +37,11 @@
 			.filter(([, q]) => q > 0)
 			.map(([item_id, qty]) => {
 				const note = (noteById[item_id] ?? '').trim();
-				return note ? { item_id, qty, note } : { item_id, qty };
+				const photos = (photosById[item_id] ?? []).map((p) => p.path);
+				const line: RefundLine = { item_id, qty };
+				if (note) line.note = note;
+				if (photos.length) line.photos = photos;
+				return line;
 			})
 	);
 	const count = $derived(chosen.reduce((n, c) => n + c.qty, 0));
@@ -62,6 +70,41 @@
 			const n = e.key === 'ArrowDown' ? Math.min(REFUND_REASONS.length - 1, i + 1) : Math.max(0, i - 1);
 			reason = REFUND_REASONS[n];
 			reasonOpen = true;
+		}
+	}
+	async function addPhotos(itemId: string, files: FileList | null) {
+		if (!files?.length) return;
+		const room = REFUND_PHOTO_MAX - (photosById[itemId]?.length ?? 0) - (uploading[itemId] ?? 0);
+		const picked = [...files].slice(0, Math.max(0, room));
+		if (files.length > picked.length) shop.showToast(`사진은 제품당 ${REFUND_PHOTO_MAX}장까지 올릴 수 있어요`);
+		for (const f of picked) {
+			if (!REFUND_PHOTO_TYPES[f.type] || f.size > REFUND_PHOTO_MAX_BYTES) {
+				shop.showToast('사진은 4MB 이하 jpg·png·webp 만 올릴 수 있어요');
+				continue;
+			}
+			uploading = { ...uploading, [itemId]: (uploading[itemId] ?? 0) + 1 };
+			try {
+				const fd = new FormData();
+				fd.set('orderCode', order.code);
+				fd.set('itemId', itemId);
+				fd.set('file', f);
+				const res = await fetch('/api/refunds/photos', { method: 'POST', body: fd });
+				const r = (await res.json().catch(() => null)) as { ok: boolean; path?: string; message?: string } | null;
+				if (!res.ok || !r?.ok || !r.path) shop.showToast(r?.message ?? '사진을 올리지 못했어요');
+				else photosById = { ...photosById, [itemId]: [...(photosById[itemId] ?? []), { path: r.path, url: URL.createObjectURL(f) }] };
+			} catch {
+				shop.showToast('사진을 올리지 못했어요');
+			}
+			uploading = { ...uploading, [itemId]: Math.max(0, (uploading[itemId] ?? 1) - 1) };
+		}
+	}
+	async function removePhoto(itemId: string, photo: Photo) {
+		photosById = { ...photosById, [itemId]: (photosById[itemId] ?? []).filter((p) => p.path !== photo.path) };
+		URL.revokeObjectURL(photo.url);
+		try {
+			await fetch('/api/refunds/photos', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderCode: order.code, path: photo.path }) });
+		} catch {
+			/* 화면에서는 이미 뺐다 — 남은 파일은 비공개 버킷의 고아(운영 정리) */
 		}
 	}
 	async function submit() {
@@ -162,10 +205,12 @@
 									{/if}
 									<!-- 상세 내용(선택) — 크리에이터에게 전달 · 접힘 -->
 									<button type="button" onclick={() => (noteOpen = { ...noteOpen, [it.id]: !noteOpen[it.id] })} aria-expanded={!!noteOpen[it.id]} aria-controls={noteId} class="mt-3 flex h-11 w-full items-center justify-between rounded-[12px] border border-white/10 bg-white/4 px-4 text-left text-[13px] font-bold text-fg transition-colors hover:border-white/20">
-										<span>상세 내용 (선택){#if (noteById[it.id] ?? '').trim()}<span class="ml-1.5 text-accent">·</span>{/if}</span>
+										<span>상세 내용 · 사진 추가 (선택){#if (noteById[it.id] ?? '').trim() || photosById[it.id]?.length}<span class="ml-1.5 text-accent">·</span>{/if}</span>
 										<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="shrink-0 text-fg-faint transition-transform {noteOpen[it.id] ? 'rotate-180' : ''}"><path d="M6 9l6 6 6-6" /></svg>
 									</button>
 									{#if noteOpen[it.id]}
+										{@const photos = photosById[it.id] ?? []}
+										{@const busy = uploading[it.id] ?? 0}
 										<div id={noteId} class="mt-2">
 											<textarea
 												value={noteById[it.id] ?? ''}
@@ -177,7 +222,23 @@
 												aria-label="{it.name} 상세 내용"
 												class="w-full resize-none rounded-[12px] border-[1.5px] border-white/10 bg-white/4 px-4 py-3 text-[13.5px] leading-[1.55] text-fg outline-none placeholder:text-fg-faint focus:border-accent disabled:opacity-50"
 											></textarea>
-											<p class="mt-1.5 text-[12px] text-fg-faint">이 제품의 CS는 {it.creator || '크리에이터'}이(가) 직접 확인해요</p>
+											<div class="mt-2.5 flex items-center gap-2.5">
+												{#each photos as ph (ph.path)}
+													<div class="relative h-14 w-14 shrink-0">
+														<img src={ph.url} alt="" class="h-14 w-14 rounded-[12px] object-cover" />
+														<button type="button" onclick={() => removePhoto(it.id, ph)} disabled={submitting} aria-label="사진 삭제" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-fg ring-1 ring-white/25"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+													</div>
+												{/each}
+												{#if photos.length + busy < REFUND_PHOTO_MAX}
+													<label class="flex h-14 w-14 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[12px] border border-dashed border-white/20 text-[11px] text-fg-faint transition-colors hover:border-white/40 hover:text-fg {submitting || busy ? 'pointer-events-none opacity-50' : ''}">
+														<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></svg>
+														{busy ? '올리는 중' : '사진'}
+														<input type="file" accept={REFUND_PHOTO_ACCEPT} multiple class="sr-only" disabled={submitting || !!busy} onchange={(e) => { addPhotos(it.id, e.currentTarget.files); e.currentTarget.value = ''; }} />
+													</label>
+												{/if}
+												<span class="text-[12px] text-fg-faint">{photos.length}/{REFUND_PHOTO_MAX}</span>
+											</div>
+											<p class="mt-2 text-[12px] text-fg-faint">이 제품의 CS는 {it.creator || '크리에이터'}이(가) 직접 확인해요</p>
 										</div>
 									{/if}
 								{/if}
@@ -256,7 +317,7 @@
 							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>같은 상품을 다시 주문하면 새 가상계좌가 발급돼요</li>
 						{:else}
 							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>발송 전 주문은 바로 환불돼요 · 카드는 카드사에 따라 영업일 3일 안에 반영돼요</li>
-							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>상세 내용은 판매 크리에이터가 직접 확인해요</li>
+							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>상세 내용과 사진은 판매 크리에이터가 직접 확인해요</li>
 							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>교환은 주문 상세의 [문의] → 교환·반품으로 요청해주세요</li>
 						{/if}
 					</ul>

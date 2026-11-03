@@ -9,6 +9,7 @@ import { parsePrecheckResult, parseRecordResult, refundIdempotencyKey, type Refu
 import { admin } from './admin';
 import { logPaymentEvent } from './checkout-sync';
 import { notifyOrderRefunded } from './mail-events';
+import { signRefundPhotos } from './refund-photos';
 import { isTossError, isUncertain, tossCancel } from './toss';
 
 export type RefundActor = 'customer' | 'seller' | 'admin' | 'system';
@@ -48,6 +49,7 @@ export async function refundItems(input: {
 	const reason = (input.reason || (input.actor === 'customer' ? '고객 요청' : `${input.actor} 환불`)).slice(0, 200);
 	// 제품별 상세(0067) — record 가 줄 refund_reason 에 남기고, 셀러 메일에도 싣는다
 	const noteById = new Map(input.items.filter((l) => l.note).map((l) => [l.item_id, l.note as string]));
+	const photosById = new Map(input.items.filter((l) => l.photos?.length).map((l) => [l.item_id, l.photos as string[]]));
 	let raw: unknown = null;
 
 	if (!pre.deposit) {
@@ -122,8 +124,16 @@ export async function refundItems(input: {
 	});
 	// 거래 메일 — 새로 기록했을 때만 · 고객 + 환불된 줄의 셀러 · 절대 throw 하지 않는다 (mail-events.ts)
 	if (!rec.already) {
+		// 사진(0068)은 서명 URL(7일)로 셀러 메일에 — 서명 실패는 메일을 막지 않는다
+		const signed = await signRefundPhotos([...photosById.values()].flat());
 		await notifyOrderRefunded(input.orderId, {
-			items: pre.items.map((i) => ({ itemId: i.item_id, qty: i.qty, amount: i.amount, note: noteById.get(i.item_id) })),
+			items: pre.items.map((i) => ({
+				itemId: i.item_id,
+				qty: i.qty,
+				amount: i.amount,
+				note: noteById.get(i.item_id),
+				photoUrls: (photosById.get(i.item_id) ?? []).map((p) => signed.get(p)).filter((u): u is string => !!u)
+			})),
 			amount: pre.amount,
 			full: pre.full,
 			reason,
