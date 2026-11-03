@@ -3,12 +3,14 @@
  *   notifyOrderPaid(orderId)        checkout-sync `confirmDone` — 새 주문(already 제외). PAID 면 고객 주문 확인 + 줄의 셀러별 새 주문 · WAITING_DEPOSIT 이면 고객 입금 안내만
  *   notifyDepositDone(orderId)      checkout-sync `depositDone` — 입금 확인 → 고객 주문 확인 + 셀러 새 주문
  *   notifyOrderRefunded(orderId, r) refund.ts `refundItems` — record 가 새로 기록했을 때(already 제외) · 고객 + 환불된 줄의 셀러
+ *   notifyOrderShipped(orderId, s)  ship.ts `shipOrder` — 새 운송장 기록 → 고객 배송 시작(0069)
  *   notifyCsOpened(csId, msg)       cs.ts `openCs`(접수) — 셀러에게 · notifyCsReplied(csId, reply) — 콘솔 답변 → 고객(S7 · 0063)
  * 받는 사람: 고객 = buyer_email → customers.email → 회원 auth 계정 이메일(없으면 조용히 건너뜀 · 카카오 계정은 이메일이 없을 수 있다) · 셀러 = sellers.email(없으면 건너뜀 — 시드 크리에이터는 비어 있다).
  * 멱등: 템플릿 idempotencyKey(Resend Idempotency-Key + 프로세스 24시간 가드).
  */
 import { isEmailAddress } from '$lib/mail/resend';
-import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate } from '$lib/mail/templates';
+import { trackingUrl } from '$lib/ship-rules';
+import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '$lib/mail/templates';
 import { admin } from './admin';
 import { mailCtx, sendMail, type MailSendResult } from './mail';
 
@@ -152,6 +154,18 @@ export async function notifyOrderRefunded(orderId: string, r: MailRefund): Promi
 	} catch (e) {
 		console.error('[mail] notifyOrderRefunded failed:', e instanceof Error ? e.message : e);
 		return { customer: null, sellers: {} };
+	}
+}
+
+/** 발송(운송장 기록) → 고객만. ship.ts `shipOrder` 가 새 기록일 때 부른다 */
+export async function notifyOrderShipped(orderId: string, s: { courier: string; trackingNo: string }): Promise<MailSendResult | null> {
+	try {
+		const loaded = await loadOrder(orderId);
+		if (!loaded) return null;
+		return await deliver(loaded.customerEmail, orderShippedMail(loaded.order, { ...s, trackingUrl: trackingUrl(s.courier, s.trackingNo) }, mailCtx()));
+	} catch (e) {
+		console.error('[mail] notifyOrderShipped failed:', e instanceof Error ? e.message : e);
+		return null;
 	}
 }
 

@@ -1,7 +1,7 @@
 // 거래 메일 템플릿·레이아웃 — apps/myr-shop/src/lib/mail/{templates,layout}.ts · 셀러는 자기 줄만 · 비회원 링크 · 이스케이프 · 멱등 키
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../lib/mail/layout';
-import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, type MailOrder, type MailRefund } from '../lib/mail/templates';
+import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../lib/mail/templates';
 
 const ctx = { siteUrl: 'https://myr-shop.vercel.app/' };
 const order = (over: Partial<MailOrder> = {}): MailOrder => ({
@@ -204,5 +204,24 @@ describe('고객 문의 메일 (S7)', () => {
 		expect(m.text).toContain('가'.repeat(199) + '…');
 		expect(m.idempotencyKey).toBe('myr_cs_replied:m3');
 		expect(csRepliedMail({ ...cs, isMember: true }, { messageId: 'm3', body: 'x' }, ctx).text).not.toContain('비회원 문의는');
+	});
+});
+
+describe('배송 시작 메일 (0069)', () => {
+	it('택배사·운송장·남은 상품·받는 분 · 조회 버튼 · 멱등 키 = 주문 + 운송장 · 비회원 안내', () => {
+		const o = order({ items: [order().items[0], { ...order().items[1], status: 'REFUNDED', refundedQty: 1 }] });
+		const m = orderShippedMail(o, { courier: 'CJ대한통운', trackingNo: '1234567890', trackingUrl: 'https://trace.cjlogistics.com/next/tracking.html?wblNo=1234567890' }, ctx);
+		expect(m.subject).toBe('[MYR] 상품이 출발했어요 · MYR1007');
+		expect(m.text).toContain('CJ대한통운');
+		expect(m.text).toContain('1234567890');
+		expect(m.text).toContain('지유 레시피 그래놀라 · 2봉 × 2');
+		expect(m.text).not.toContain('혜린 단백질 쉐이크');
+		expect(m.text).toContain('김고객 · 부산시 해운대구 센텀중앙로 55 1203호');
+		expect(m.html).toContain('trace.cjlogistics.com');
+		expect(m.idempotencyKey).toBe('myr_order_shipped:11111111-2222-3333-4444-555555555555:1234567890');
+		expect(m.text).not.toContain('비회원 주문은');
+		const g = orderShippedMail(order({ isMember: false }), { courier: '한진택배', trackingNo: '1', trackingUrl: null }, ctx);
+		expect(g.text).toContain('비회원 주문은');
+		expect(g.html).toContain('/orders/g/myr1007');
 	});
 });
