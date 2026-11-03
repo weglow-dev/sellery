@@ -1,6 +1,6 @@
 -- pgTAP — 0061 환불: 권한 · precheck 가드(actor 표) · 금액(부분/전액+배송비) · record(줄·주문 상태 파생 · sold_qty 반환 · 멱등) · 입금 대기 취소 (docs/myr.md §6.3)
 begin;
-select plan(40);
+select plan(42);
 
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 precheck 실행 불가');
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 precheck 실행 불가');
@@ -57,8 +57,10 @@ select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41',
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d42', '[]', 'customer', '00000000-0000-4000-8000-0000000000e1') ->> 'amount', '13000', '비회원은 customer_id 로 본인 확인 · 전액 13,000');
 
 -- ---------- record — 부분 → 나머지 ----------
-select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'customer', '00000000-0000-4000-8000-0000000000c7', '단순 변심', 10000),
+select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"note":"  포장이 찢어졌어요  "}]', 'customer', '00000000-0000-4000-8000-0000000000c7', '단순 변심', 10000),
   '{"ok": true, "already": false, "order_code": "pgtap-rf-m", "status": "PARTIAL_REFUNDED", "amount": 10000}'::jsonb, '부분 환불 기록 → 주문 PARTIAL_REFUNDED');
+select is((select refund_reason from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), '단순 변심 — 포장이 찢어졌어요', '0067 줄 refund_reason = 사유 — 상세(공백 정리)');
+select is((select refund_reason from public.myr_orders where id = '00000000-0000-4000-8000-000000000d41'), '단순 변심', '0067 주문 refund_reason 은 사유만');
 select is((select status || '/' || refunded_qty || '/' || refund_amount || '/' || refund_actor from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), 'PARTIAL_REFUNDED/1/10000/customer', '줄 — 1개 환불 · PARTIAL_REFUNDED');
 select is((select sold_qty from public.myr_products where code = 'pgtap-rf-a'), 2, 'sold_qty 반환 (3 → 2)');
 select is((select refund_amount || '/' || status from public.myr_orders where id = '00000000-0000-4000-8000-000000000d41'), '10000/PARTIAL_REFUNDED', '주문 refund_amount 누적');

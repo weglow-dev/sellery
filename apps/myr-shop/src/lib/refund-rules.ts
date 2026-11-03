@@ -3,14 +3,16 @@ import { ORDER_CODE_RE } from './checkout-rules';
 import { cleanText } from './text';
 import type { OrderItem, OrderView } from './order-view';
 
-export type RefundLine = { item_id: string; qty: number };
+/** note = 제품별 상세 내용(선택 · 크리에이터에게 전달 · 0067 줄 refund_reason 에 "사유 — 상세") — 금액·Idempotency-Key 에는 쓰지 않는다 */
+export type RefundLine = { item_id: string; qty: number; note?: string };
 const UUID_RE = /^[0-9a-f-]{36}$/;
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
 export const REFUND_REASONS = ['단순 변심', '주문 실수', '배송 지연', '상품 불량·파손', '기타'] as const;
 export const REASON_MAX = 200;
+export const REFUND_NOTE_MAX = 300;
 
-/** POST /api/payments/cancel 본문 `{ orderCode, items?: [{ itemId, qty }], reason? }` — items 비우면 전체. 형식 틀리면 null */
+/** POST /api/payments/cancel 본문 `{ orderCode, items?: [{ itemId, qty, note? }], reason? }` — items 비우면 전체 · note 는 정리해 300자(비면 뺀다). 형식 틀리면 null */
 export function parseCancelBody(v: unknown): { orderCode: string; items: RefundLine[]; reason: string } | null {
 	const b = obj(v);
 	if (!b) return null;
@@ -23,7 +25,9 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 			const l = obj(raw);
 			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > 99)
 				return null;
-			items.push({ item_id: l.itemId, qty: l.qty as number });
+			if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
+			const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
+			items.push(note ? { item_id: l.itemId, qty: l.qty as number, note } : { item_id: l.itemId, qty: l.qty as number });
 		}
 	}
 	const reason = cleanText(typeof b.reason === 'string' ? b.reason : '').slice(0, REASON_MAX);
@@ -66,7 +70,7 @@ export function estimateRefund(
 }
 
 /** 토스 Idempotency-Key — 같은 주문·같은 줄 묶음의 재시도는 같은 키(토스가 같은 응답) · 다른 묶음은 다른 키. ≤ 300자 */
-export function refundIdempotencyKey(orderId: string, items: { item_id: string; qty: number }[]): string {
+export function refundIdempotencyKey(orderId: string, items: RefundLine[]): string {
 	const part = [...items]
 		.map((i) => `${i.item_id.slice(0, 8)}.${i.qty}`)
 		.sort()

@@ -65,6 +65,13 @@ describe('parseCancelBody', () => {
 		});
 		expect(parseCancelBody({ orderCode: 'myr1001' })).toEqual({ orderCode: 'myr1001', items: [], reason: '' });
 	});
+	it('items.note — 정리 · 300자 · 비면 키 없음 · 문자열 아니면 null (0067)', () => {
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '  포장이  찢어졌어요 \u{1F49A} ' }] })?.items).toEqual([{ item_id: A, qty: 1, note: '포장이 찢어졌어요' }]);
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 'x'.repeat(400) }] })?.items[0].note).toHaveLength(300);
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '   ' }] })?.items).toEqual([{ item_id: A, qty: 1 }]);
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 5 }] })).toBeNull();
+		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1, note: '메모' }])).toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));
+	});
 	it('형식 오류는 null', () => {
 		expect(parseCancelBody({ orderCode: 'bad code' })).toBeNull();
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: 'x', qty: 1 }] })).toBeNull();

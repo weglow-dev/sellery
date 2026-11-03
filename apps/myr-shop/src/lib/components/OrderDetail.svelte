@@ -2,8 +2,7 @@
 	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용 · 화면 전체(머리 포함)를 그린다(대표 시안 2026-11-02).
 	 *  PC: 제목 + 오른쪽 상태 칩·주문번호·시각·결제수단 / 왼쪽 상품 카드(크리에이터 · 이름 · 수량·금액 · [문의]) / 오른쪽 결제 정보 + [교환 · 환불 신청] · 배송지(+이메일).
 	 *  모바일: 뒤로 헤더(주문번호) · 칩 줄 · 상품 카드 · 결제 · 배송지 · 하단 바 [교환 · 환불 신청](앱 셸 바닥 — fixed 를 쓰지 않는다, +layout.svelte 주석).
-	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = RefundPanel 을 결제 카드 안에서 연다. */
-	import { tick } from 'svelte';
+	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로. */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '$lib/cs-rules';
@@ -11,7 +10,6 @@
 	import { customerCanRefund } from '$lib/refund-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
-	import RefundPanel from '$lib/components/RefundPanel.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	let { order, inquiries = [], guestNote = false }: { order: OrderView; inquiries?: CsForOrder[]; guestNote?: boolean } = $props();
@@ -33,14 +31,8 @@
 		csOpen = true;
 	}
 
-	// 환불 패널 — 결제 카드 안 · 모바일 하단 바에서 열면 그 자리로 스크롤
-	let refundOpen = $state(false);
-	let payCard = $state<HTMLElement | null>(null);
-	async function openRefund() {
-		refundOpen = true;
-		await tick();
-		payCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-	}
+	// 환불 신청은 별도 페이지(대표 시안 2026-11-03) — 비회원은 조회 토큰 경로
+	const refundHref = $derived(guestNote ? `/orders/g/${order.code}/refund` : `/orders/${order.code}/refund`);
 	const actionLabel = $derived(deposit ? '주문 취소' : '교환 · 환불 신청');
 	const chipTone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const askIcon = 'M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z';
@@ -124,7 +116,7 @@
 
 			<!-- 오른쪽: 결제 정보 · 배송지 · 이 주문의 문의 -->
 			<div class="flex flex-col gap-3 lg:sticky lg:top-[104px]">
-				<section bind:this={payCard} class="scroll-mt-4 rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
+				<section class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
 					<h2 class="mb-3.5 hidden text-[16px] font-extrabold lg:block">결제 정보</h2>
 					<div class="flex flex-col gap-2 text-[14px]">
 						{#if order.refundAmount}
@@ -140,10 +132,11 @@
 						<span class="text-[14px] font-bold">{order.status === 'WAITING_DEPOSIT' ? '입금할 금액' : '최종 결제'}</span>
 						<span class="text-[22px] font-extrabold tracking-[-.02em] lg:text-[24px]">{won(Math.max(0, order.amount - order.refundAmount))}</span>
 					</div>
-					{#if can.ok && !refundOpen}
-						<button type="button" onclick={openRefund} class="mt-5 hidden h-14 w-full rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:block">{actionLabel}</button>
+					{#if can.ok}
+						<a href={refundHref} class="mt-5 hidden h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:flex">{actionLabel}</a>
+					{:else if order.status !== 'REFUNDED' && order.status !== 'CANCELED'}
+						<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">{can.reason}</p>
 					{/if}
-					<RefundPanel {order} bind:open={refundOpen} showTrigger={false} />
 				</section>
 
 				{#if order.shipping}
@@ -178,9 +171,9 @@
 	</div>
 
 	<!-- 모바일 하단 바 -->
-	{#if can.ok && !refundOpen}
+	{#if can.ok}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
-			<button type="button" onclick={openRefund} class="h-14 w-full rounded-[16px] border border-white/16 text-[15px] font-bold text-fg">{actionLabel}</button>
+			<a href={refundHref} class="flex h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg">{actionLabel}</a>
 		</div>
 	{/if}
 </div>

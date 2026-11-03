@@ -46,6 +46,8 @@ export async function refundItems(input: {
 	if (!pre.ok) return { ok: false, code: pre.code, items: pre.items };
 
 	const reason = (input.reason || (input.actor === 'customer' ? '고객 요청' : `${input.actor} 환불`)).slice(0, 200);
+	// 제품별 상세(0067) — record 가 줄 refund_reason 에 남기고, 셀러 메일에도 싣는다
+	const noteById = new Map(input.items.filter((l) => l.note).map((l) => [l.item_id, l.note as string]));
 	let raw: unknown = null;
 
 	if (!pre.deposit) {
@@ -121,7 +123,7 @@ export async function refundItems(input: {
 	// 거래 메일 — 새로 기록했을 때만 · 고객 + 환불된 줄의 셀러 · 절대 throw 하지 않는다 (mail-events.ts)
 	if (!rec.already) {
 		await notifyOrderRefunded(input.orderId, {
-			items: pre.items.map((i) => ({ itemId: i.item_id, qty: i.qty, amount: i.amount })),
+			items: pre.items.map((i) => ({ itemId: i.item_id, qty: i.qty, amount: i.amount, note: noteById.get(i.item_id) })),
 			amount: pre.amount,
 			full: pre.full,
 			reason,

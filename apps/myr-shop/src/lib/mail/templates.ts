@@ -36,7 +36,8 @@ export type MailOrder = {
 	deposit: MailDeposit;
 };
 /** 환불 1건 — record 가 돌려준 것 */
-export type MailRefund = { items: { itemId: string; qty: number; amount: number }[]; amount: number; full: boolean; reason: string; deposit: boolean };
+/** items[].note = 고객이 제품별로 남긴 상세(0067 · 셀러 메일에만) */
+export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string }[]; amount: number; full: boolean; reason: string; deposit: boolean };
 
 const url = (ctx: MailCtx, path: string): string => `${ctx.siteUrl.replace(/\/+$/, '')}${path}`;
 const upper = (code: string): string => code.toUpperCase();
@@ -168,7 +169,8 @@ export function orderRefundedSellerMail(o: MailOrder, r: MailRefund, sellerId: s
 			{ label: '주문번호', value: code },
 			{ label: r.deposit ? '취소된 내 상품' : '환불된 내 상품', value: itemsText(lines) },
 			...(r.deposit ? [] : [{ label: '내 상품 환불 금액', value: won(amount) }]),
-			...(r.reason ? [{ label: '사유', value: r.reason }] : [])
+			...(r.reason ? [{ label: '사유', value: r.reason }] : []),
+			...mine.filter((p) => p.x.note).map((p) => ({ label: `상세 · ${p.i.name}`, value: previewOf(p.x.note as string, 300) }))
 		]
 	};
 	const key = mailIdempotencyKey('myr_order_refunded', 'seller', o.id, sellerId, ...r.items.map((x) => `${x.itemId.slice(0, 8)}.${x.qty}`).sort());
