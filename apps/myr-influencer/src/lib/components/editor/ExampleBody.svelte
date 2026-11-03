@@ -3,7 +3,8 @@
 	import Icon from '../Icon.svelte';
 
 	/** 완성된 상세페이지 예시(소이 비오틴 캡슐) 본문 — 지금 쓰는 단계 섹션을 강조하고 그 자리로 스크롤한다.
-	 *  모바일 바텀시트(ExampleSheet)와 PC 오른쪽 고정 패널(상품 등록 화면)이 같이 쓴다. 이 컴포넌트가 스크롤 영역 자체다.
+	 *  모바일 바텀시트(ExampleSheet · lg 미만에서만 보임)와 PC 오른쪽 패널(상품 등록 화면 · lg 이상에서만 보임)이 같이 쓴다. 이 컴포넌트가 스크롤 영역 자체다.
+	 *  lg: 클래스 = PC 패널 크기(디자인 "MYR Influencer Admin PC" 2026-11-03 개정 — 글자·여백 한 단계씩 큼). 시트는 lg 에서 숨으므로 영향이 없다.
 	 *  예시 내용은 디자인 고정 문구다(실제 상품이 아니다). 8단계(미리보기)는 섹션이 없어 7단계 위치에 머문다. */
 	let { step, class: cls = '' }: { step: number; class?: string } = $props();
 
@@ -41,58 +42,62 @@
 		['다른 영양제와 같이 먹어도 되나요?', '네, 일반적인 영양제와 함께 드셔도 괜찮아요. 복용 중인 약이 있다면 전문가와 상의하세요.'],
 		['하루 두 알 먹어도 되나요?', '1일 1정을 권장해요. 그 이상은 효과가 커지지 않아요.']
 	];
+	/** 섹션 안 작은 머리말("01 · 왜 만들었나요") */
+	const EYEBROW = 'text-[10px] font-bold tracking-[0.08em] text-accent lg:text-[11px]';
+	/** 섹션 안 제목("매일 챙기기 쉬운 것만 남겼어요") */
+	const HEADING = 'text-[17px] font-extrabold tracking-[-0.02em] lg:text-[18px]';
 </script>
 
 {#snippet section(n: number, tag: string, body: Snippet)}
 	{@const on = Math.min(step, 7) === n}
-	<div data-ex={n} class="relative mt-3.5 rounded-[18px] border-[1.5px] p-3.5 transition-colors duration-300 {on ? 'border-accent bg-accent/7' : 'border-white/6 bg-transparent'}">
-		<span class="absolute -top-[9px] left-3 rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-[0.02em] {on ? 'bg-accent text-bg' : 'bg-white/8 text-white/55'}">{tag}</span>
+	<div data-ex={n} class="relative mt-3.5 rounded-[18px] border-[1.5px] p-3.5 transition-colors duration-300 lg:mt-4 lg:p-4 {on ? 'border-accent bg-accent/7' : 'border-white/6 bg-transparent'}">
+		<span class="absolute -top-[9px] left-3 rounded-full px-2 py-0.5 text-[10px] font-extrabold tracking-[0.02em] lg:text-[11px] {on ? 'bg-accent text-bg' : 'bg-white/8 text-white/55'}">{tag}</span>
 		{@render body()}
 	</div>
 {/snippet}
 
-<div bind:this={scroller} class="no-bar relative min-h-0 flex-1 overflow-y-auto px-5 pt-1.5 {cls}">
-	<p class="mb-2.5 text-[11px] text-white/45">홈 / 헤어 &amp; 바디 / 소이 비오틴 캡슐</p>
+<div bind:this={scroller} class="no-bar relative min-h-0 flex-1 overflow-y-auto px-5 pt-1.5 lg:px-6 lg:pt-2 {cls}">
+	<p class="mb-2.5 text-[11px] text-white/45 lg:text-[12px]">홈 / 헤어 &amp; 바디 / 소이 비오틴 캡슐</p>
 
 	{#snippet s1()}
 		<div class="relative flex aspect-[16/10] items-center justify-center rounded-2xl text-white/95" style="background:linear-gradient(145deg,#FFF0A8,#E6C04A)">
 			<Icon id="pill" set="tile" size={84} />
 			<div class="absolute bottom-2.5 left-2.5 flex gap-[5px]">
-				{#each ['캡슐', 'PTP', '2개월분'] as c (c)}<span class="rounded-full bg-bg/55 px-[9px] py-1 text-[10px] font-bold">{c}</span>{/each}
+				{#each ['캡슐', 'PTP', '2개월분'] as c (c)}<span class="rounded-full bg-bg/55 px-[9px] py-1 text-[10px] font-bold lg:text-[11px]">{c}</span>{/each}
 			</div>
 		</div>
 		<div class="mt-3 flex items-center gap-2">
-			<span class="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#F5D58E] text-[10px] font-extrabold text-bg">소</span>
-			<span class="text-[12px] font-bold">소이 클린 <span class="font-medium text-white/45">@soy.clean</span></span>
+			<span class="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-[#F5D58E] text-[10px] font-extrabold text-bg lg:text-[11px]">소</span>
+			<span class="text-[12px] font-bold lg:text-[13px]">소이 클린 <span class="font-medium text-white/45">@soy.clean</span></span>
 		</div>
-		<p class="mt-2 text-[20px] font-extrabold tracking-[-0.03em]">소이 비오틴 캡슐</p>
-		<p class="mt-1.5 text-[18px] font-extrabold">₩24,000 <span class="text-[11px] font-medium text-white/45">60캡슐 / 2개월</span></p>
+		<p class="mt-2 text-[20px] font-extrabold tracking-[-0.03em] lg:text-[22px]">소이 비오틴 캡슐</p>
+		<p class="mt-1.5 text-[18px] font-extrabold lg:text-[20px]">₩24,000 <span class="text-[11px] font-medium text-white/45">60캡슐 / 2개월</span></p>
 	{/snippet}
 	{@render section(1, '01 기본 정보 · 구매 패널', s1)}
 
 	{#snippet s2()}
 		<div class="rounded-3xl border border-accent/18 bg-accent/7 px-5 pt-[22px] pb-6">
-			<p class="text-[12px] font-bold tracking-[0.01em] text-accent">소이 클린의 레시피 노트</p>
-			<p class="mt-3.5 text-[15px] leading-[1.7] font-medium text-pretty">"한 알로 끝내고 싶은 사람을 위한 가장 심플한 구성. 대신 함량은 타협 안 했어요."</p>
+			<p class="text-[12px] font-bold tracking-[0.01em] text-accent lg:text-[13px]">소이 클린의 레시피 노트</p>
+			<p class="mt-3.5 text-[15px] leading-[1.7] font-medium text-pretty lg:text-[16px]">"한 알로 끝내고 싶은 사람을 위한 가장 심플한 구성. 대신 함량은 타협 안 했어요."</p>
 		</div>
 	{/snippet}
 	{@render section(2, '02 레시피 노트', s2)}
 
 	{#snippet s3()}
-		<p class="text-[10px] font-bold tracking-[0.08em] text-accent">01 · 왜 만들었나요</p>
-		<p class="mt-1.5 text-[17px] font-extrabold tracking-[-0.02em]">매일 챙기기 쉬운 것만 남겼어요</p>
-		<p class="mt-2 text-[12px] leading-[1.7] text-white/68">제가 직접 매일 먹고 바르는 것 중에서 꼭 필요한 것만 골랐어요. 성분은 단순하게, 함량은 타협 없이. 팔로워분들이 "이건 뭐예요?" 물어보던 질문에 제품으로 답한 거예요.</p>
+		<p class={EYEBROW}>01 · 왜 만들었나요</p>
+		<p class="mt-1.5 {HEADING}">매일 챙기기 쉬운 것만 남겼어요</p>
+		<p class="mt-2 text-[12px] leading-[1.7] text-white/68 lg:text-[13px]">제가 직접 매일 먹고 바르는 것 중에서 꼭 필요한 것만 골랐어요. 성분은 단순하게, 함량은 타협 없이. 팔로워분들이 "이건 뭐예요?" 물어보던 질문에 제품으로 답한 거예요.</p>
 	{/snippet}
 	{@render section(3, '03 왜 만들었나요', s3)}
 
 	{#snippet s4()}
-		<p class="text-[10px] font-bold tracking-[0.08em] text-accent">02 · 무엇이 들어있나요</p>
-		<p class="mt-1.5 mb-2.5 text-[17px] font-extrabold tracking-[-0.02em]">성분표에 모르는 이름이 없게</p>
+		<p class={EYEBROW}>02 · 무엇이 들어있나요</p>
+		<p class="mt-1.5 mb-2.5 {HEADING}">성분표에 모르는 이름이 없게</p>
 		<div class="overflow-hidden rounded-[14px] border border-white/8">
 			{#each INGREDIENTS as [name, why, tag], i (name)}
 				<div class="grid grid-cols-[1.1fr_1.6fr_auto] items-center gap-2.5 bg-white/2 px-3 py-2.5 {i ? 'border-t border-white/7' : ''}">
-					<span class="text-[12px] font-bold">{name}</span>
-					<span class="text-[11px] text-white/55">{why}</span>
+					<span class="text-[12px] font-bold lg:text-[13px]">{name}</span>
+					<span class="text-[11px] text-white/55 lg:text-[12px]">{why}</span>
 					<span class="text-[11px] font-bold whitespace-nowrap text-accent">{tag}</span>
 				</div>
 			{/each}
@@ -101,13 +106,13 @@
 	{@render section(4, '04 성분', s4)}
 
 	{#snippet s5()}
-		<p class="mb-2.5 text-[10px] font-bold tracking-[0.08em] text-accent">03 · 이렇게 드세요</p>
+		<p class="mb-2.5 {EYEBROW}">03 · 이렇게 드세요</p>
 		<div class="grid grid-cols-3 gap-1.5">
 			{#each STEPS as [n, t, d] (n)}
 				<div class="flex flex-col gap-1.5 rounded-xl border border-white/8 bg-white/4 p-2.5">
-					<span class="flex h-5 w-5 items-center justify-center rounded-[7px] bg-accent/14 text-[10px] font-extrabold text-accent">{n}</span>
-					<span class="text-[12px] font-bold">{t}</span>
-					<span class="text-[10px] leading-normal text-white/55">{d}</span>
+					<span class="flex h-5 w-5 items-center justify-center rounded-[7px] bg-accent/14 text-[10px] font-extrabold text-accent lg:text-[11px]">{n}</span>
+					<span class="text-[12px] font-bold lg:text-[13px]">{t}</span>
+					<span class="text-[10px] leading-normal text-white/55 lg:text-[12px]">{d}</span>
 				</div>
 			{/each}
 		</div>
@@ -115,10 +120,10 @@
 	{@render section(5, '05 섭취법', s5)}
 
 	{#snippet s6()}
-		<p class="mb-2.5 text-[10px] font-bold tracking-[0.08em] text-accent">04 · 제품 정보</p>
+		<p class="mb-2.5 {EYEBROW}">04 · 제품 정보</p>
 		<div class="overflow-hidden rounded-xl border border-white/8">
 			{#each INFO as [k, v], i (k)}
-				<div class="grid grid-cols-[72px_minmax(0,1fr)] gap-2 bg-white/2 px-3 py-2 text-[11px] {i ? 'border-t border-white/7' : ''}">
+				<div class="grid grid-cols-[72px_minmax(0,1fr)] gap-2 bg-white/2 px-3 py-2 text-[11px] lg:grid-cols-[84px_minmax(0,1fr)] lg:text-[12px] {i ? 'border-t border-white/7' : ''}">
 					<span class="text-white/50">{k}</span><span class="text-white/85">{v}</span>
 				</div>
 			{/each}
@@ -127,12 +132,12 @@
 	{@render section(6, '06 제품 정보', s6)}
 
 	{#snippet s7()}
-		<p class="mb-2.5 text-[10px] font-bold tracking-[0.08em] text-accent">05 · 자주 묻는 질문</p>
+		<p class="mb-2.5 {EYEBROW}">05 · 자주 묻는 질문</p>
 		<div class="flex flex-col gap-1.5">
 			{#each FAQ as [q, a] (q)}
 				<div class="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
-					<p class="text-[12px] font-bold"><span class="mr-1.5 text-accent">Q</span>{q}</p>
-					<p class="mt-[5px] ml-4 text-[11px] leading-[1.55] text-white/62">{a}</p>
+					<p class="text-[12px] font-bold lg:text-[13px]"><span class="mr-1.5 text-accent">Q</span>{q}</p>
+					<p class="mt-[5px] ml-4 text-[11px] leading-[1.55] text-white/62 lg:text-[12px]">{a}</p>
 				</div>
 			{/each}
 		</div>
