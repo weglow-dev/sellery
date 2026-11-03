@@ -4,12 +4,15 @@ import type { OrderItem, OrderView } from '../lib/order-view';
 import {
 	customerCanRefund,
 	estimateRefund,
+	isRefundPhotoPath,
 	parseCancelBody,
 	parsePrecheckResult,
 	parseRecordResult,
 	refundableItems,
 	refundIdempotencyKey,
-	refundMessage
+	refundMessage,
+	refundPhotoPath,
+	sniffImageType
 } from '../lib/refund-rules';
 
 const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID'): OrderItem => ({
@@ -71,6 +74,29 @@ describe('parseCancelBody', () => {
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '   ' }] })?.items).toEqual([{ item_id: A, qty: 1 }]);
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 5 }] })).toBeNull();
 		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1, note: '메모' }])).toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));
+	});
+	it('items.photos — 경로 형식 3장까지 · 중복 제거 · 비면 키 없음 · 형식 밖이면 null (0068)', () => {
+		const O = '11111111-1111-4111-8111-111111111111';
+		const p1 = refundPhotoPath(O, A, 'jpg', '22222222-2222-4222-8222-222222222222');
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, photos: [p1, p1] }] })?.items).toEqual([{ item_id: A, qty: 1, photos: [p1] }]);
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, photos: [] }] })?.items).toEqual([{ item_id: A, qty: 1 }]);
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, photos: ['../etc/passwd'] }] })).toBeNull();
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, photos: [p1, p1.replace('2222', '3333'), p1.replace('2222', '4444'), p1.replace('2222', '5555')] }] })).toBeNull();
+		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1, photos: [p1] }])).toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));
+	});
+	it('isRefundPhotoPath · sniffImageType', () => {
+		const O = '11111111-1111-4111-8111-111111111111';
+		const p = refundPhotoPath(O, A, 'png', '22222222-2222-4222-8222-222222222222');
+		expect(isRefundPhotoPath(p)).toBe(true);
+		expect(isRefundPhotoPath(p, O)).toBe(true);
+		expect(isRefundPhotoPath(p, O, A)).toBe(true);
+		expect(isRefundPhotoPath(p, O.replace('1111', '9999'))).toBe(false);
+		expect(isRefundPhotoPath(p, O, A.replace(/.$/, '0'))).toBe(false);
+		expect(isRefundPhotoPath(`${O}/${A}/x.gif`)).toBe(false);
+		expect(sniffImageType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toEqual({ type: 'image/jpeg', ext: 'jpg' });
+		expect(sniffImageType(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]))).toEqual({ type: 'image/png', ext: 'png' });
+		expect(sniffImageType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toEqual({ type: 'image/webp', ext: 'webp' });
+		expect(sniffImageType(new Uint8Array([0x47, 0x49, 0x46, 0x38]))).toBeNull();
 	});
 	it('형식 오류는 null', () => {
 		expect(parseCancelBody({ orderCode: 'bad code' })).toBeNull();

@@ -1,6 +1,6 @@
 -- pgTAP — 0061 환불: 권한 · precheck 가드(actor 표) · 금액(부분/전액+배송비) · record(줄·주문 상태 파생 · sold_qty 반환 · 멱등) · 입금 대기 취소 (docs/myr.md §6.3)
 begin;
-select plan(42);
+select plan(46);
 
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 precheck 실행 불가');
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 precheck 실행 불가');
@@ -57,10 +57,15 @@ select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41',
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d42', '[]', 'customer', '00000000-0000-4000-8000-0000000000e1') ->> 'amount', '13000', '비회원은 customer_id 로 본인 확인 · 전액 13,000');
 
 -- ---------- record — 부분 → 나머지 ----------
-select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"note":"  포장이 찢어졌어요  "}]', 'customer', '00000000-0000-4000-8000-0000000000c7', '단순 변심', 10000),
+-- 0068 — 사진: 버킷 · 다른 주문/줄 경로는 BAD_PHOTOS · 이 줄 경로는 줄에 남는다
+select is((select public || '/' || file_size_limit from storage.buckets where id = 'myr-refunds'), 'false/5242880', '0068 버킷 myr-refunds 비공개 · 5MB');
+select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"photos":["00000000-0000-4000-8000-000000000d42/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000aa.jpg"]}]', 'customer', '00000000-0000-4000-8000-0000000000c7', 'x', 10000) -> 'items' -> 0 ->> 'reason', 'BAD_PHOTOS', '0068 다른 주문 아래 사진 경로는 BAD_PHOTOS(기록 없음)');
+select is((select refunded_qty from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), 0, '0068 BAD_PHOTOS 면 줄이 그대로');
+select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"note":"  포장이 찢어졌어요  ","photos":["00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000aa.jpg","00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ab.png"]}]', 'customer', '00000000-0000-4000-8000-0000000000c7', '단순 변심', 10000),
   '{"ok": true, "already": false, "order_code": "pgtap-rf-m", "status": "PARTIAL_REFUNDED", "amount": 10000}'::jsonb, '부분 환불 기록 → 주문 PARTIAL_REFUNDED');
 select is((select refund_reason from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), '단순 변심 — 포장이 찢어졌어요', '0067 줄 refund_reason = 사유 — 상세(공백 정리)');
 select is((select refund_reason from public.myr_orders where id = '00000000-0000-4000-8000-000000000d41'), '단순 변심', '0067 주문 refund_reason 은 사유만');
+select is((select array_length(refund_photos, 1) || '/' || refund_photos[2] from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), '2/00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ab.png', '0068 줄 refund_photos 에 경로 2개');
 select is((select status || '/' || refunded_qty || '/' || refund_amount || '/' || refund_actor from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), 'PARTIAL_REFUNDED/1/10000/customer', '줄 — 1개 환불 · PARTIAL_REFUNDED');
 select is((select sold_qty from public.myr_products where code = 'pgtap-rf-a'), 2, 'sold_qty 반환 (3 → 2)');
 select is((select refund_amount || '/' || status from public.myr_orders where id = '00000000-0000-4000-8000-000000000d41'), '10000/PARTIAL_REFUNDED', '주문 refund_amount 누적');
