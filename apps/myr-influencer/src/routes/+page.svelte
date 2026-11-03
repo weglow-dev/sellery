@@ -22,7 +22,8 @@
 	}
 </script>
 
-<div class="no-bar min-h-0 flex-1 animate-up-in overflow-y-auto px-5 pb-6 lg:mx-auto lg:max-w-[1240px] lg:overflow-visible lg:px-10 lg:pt-7 lg:pb-10">
+<!-- PC: 최소 높이 = <main>(화면 − 상단 내비) — 아래 2단이 남은 높이를 채운다. 내용이 더 길면 그대로 스크롤 -->
+<div class="no-bar min-h-0 flex-1 animate-up-in overflow-y-auto px-5 pb-6 lg:mx-auto lg:flex lg:min-h-full lg:w-full lg:max-w-[1240px] lg:flex-col lg:overflow-visible lg:px-10 lg:pt-7 lg:pb-10">
 	<!-- 모바일 상단(로고 · 알림) — PC 는 상단 내비가 대신 -->
 	<div class="flex h-[60px] items-center justify-between lg:hidden">
 		<div class="flex items-center gap-2.5">
@@ -93,7 +94,7 @@
 		</a>
 	</div>
 
-	<div class="lg:mt-7 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8">
+	<div class="lg:mt-7 lg:grid lg:flex-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8">
 		<section class="flex flex-col">
 			<div class="mt-7 flex items-baseline justify-between lg:mt-0">
 				<h2 class="text-[17px] font-extrabold tracking-[-0.02em] lg:text-[20px]">오늘 처리할 일</h2>
@@ -102,7 +103,7 @@
 			<div class="mt-3 flex flex-col gap-2 lg:mt-3.5 lg:flex-1 lg:gap-2.5">
 				{#each today as c (c.id)}
 					{@const tm = CS_TYPE_META[c.type]}
-					<a href="/cs/{c.id}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
+					<a href="/cs/{c.id}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
 						<Tile tile={c.tile} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
 						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
 							<span class="flex items-center gap-1.5"><Badge cls={tm.cls}>{tm.label}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]"><span class="hidden lg:inline">{c.no} · </span>{c.ago}</span></span>
