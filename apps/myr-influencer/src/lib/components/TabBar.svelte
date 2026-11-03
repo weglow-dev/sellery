@@ -13,7 +13,7 @@
 </script>
 
 <!-- 앱 셸(+layout.svelte) 바닥에 보통 흐름으로 놓인다 — fixed/sticky 는 모바일 브라우저에서 잘려서 쓰지 않는다(myr-shop 과 같은 이유) -->
-<nav class="w-full shrink-0 bg-bg px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))]" aria-label="주요 메뉴">
+<nav class="w-full shrink-0 bg-bg px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden" aria-label="주요 메뉴">
 	<div class="grid h-16 grid-cols-3 items-center rounded-[22px] border border-white/8 bg-panel px-1.5 shadow-[0_10px_30px_rgba(0,0,0,.4)]">
 		{#each tabs as t (t.href)}
 			{@const on = active(t.href)}

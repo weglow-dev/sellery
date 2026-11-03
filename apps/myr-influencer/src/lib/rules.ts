@@ -75,6 +75,17 @@ export function resolutionOptions(c: CsRequest): ResolutionOption[] {
 	];
 }
 
+/** 처리된 요청의 "처리 방법" 표시 이름 — PC 상세의 처리 결과 패널 (디자인 PC resolutionNames).
+ *  선택지 이름(resolutionOptions 의 "교환으로 전환" 등)과 달리 결과는 한 가지 이름으로 보여 준다 */
+export const RESOLUTION_NAMES: Record<Resolution, string> = {
+	refund: '전액 환불',
+	partial: '부분 환불 (배송비 차감)',
+	reship: '새 제품 재발송',
+	reship_collect: '회수 후 재발송',
+	reject: '반려'
+};
+export const resolutionName = (c: CsRequest) => (c.resolution ? RESOLUTION_NAMES[c.resolution] : '—');
+
 /** 고객에게 보낼 메시지 템플릿 (상세 화면 칩) */
 export const REPLY_TEMPLATES: Record<Exclude<Resolution, 'reject'>, string> = {
 	refund: '불편을 드려 죄송해요. 환불 승인되었고, 3영업일 안에 결제수단으로 돌려드릴게요.',

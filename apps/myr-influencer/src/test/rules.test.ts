@@ -17,6 +17,7 @@ import {
 	parsePrice,
 	previewSections,
 	productTabCounts,
+	resolutionName,
 	resolutionOptions,
 	resolveCs,
 	stepValid,
@@ -76,6 +77,12 @@ describe('처리 결과 반영 · 타임라인', () => {
 		const r = resolveCs(byId('cs2'), 'rejected', 'reject');
 		expect(r.timeline?.map((t) => t.title)).toEqual(['요청 접수', '반려']);
 		expect(timelineRows(r).every((t) => t.done)).toBe(true);
+	});
+	it('처리 결과 이름 — 요청 종류와 무관하게 한 이름 · 처리 전은 "—"', () => {
+		expect(resolutionName(byId('cs4'))).toBe('새 제품 재발송');
+		expect(resolutionName(byId('cs6'))).toBe('반려');
+		expect(resolutionName(resolveCs(byId('cs1'), 'progress', 'reship'))).toBe('새 제품 재발송');
+		expect(resolutionName(byId('cs1'))).toBe('—');
 	});
 	it('원본 요청은 바꾸지 않는다', () => {
 		const before = byId('cs3');
