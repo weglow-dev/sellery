@@ -7,7 +7,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '$lib/cs-rules';
-	import { displayCode, shortDate, statusLabel, type OrderItem, type OrderView } from '$lib/order-view';
+	import { displayCode, refundSteps, shortDate, statusLabel, type OrderItem, type OrderView } from '$lib/order-view';
 	import { customerCanRefund } from '$lib/refund-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
@@ -21,6 +21,7 @@
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', muted: 'bg-white/8 text-white/55', danger: 'bg-[#ff6b6b]/12 text-[#ff6b6b]', ok: 'bg-[#4ade80]/12 text-[#4ade80]' };
 	const dueText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 	const lineStatus = (s: string, refunded: number, qty: number) => (s === 'REFUNDED' ? '환불 완료' : s === 'PARTIAL_REFUNDED' ? `${refunded}/${qty} 환불` : s === 'CANCELED' ? '취소' : '');
+	const steps = $derived(refundSteps(order));
 	const meta = $derived([relTime(order.paidAt ?? order.createdAt), order.paymentMethod].filter(Boolean).join(' · '));
 
 	// 문의 시트 — 누른 줄의 상품 + 이 주문 고정
@@ -90,13 +91,35 @@
 						<div class="min-w-0 flex-1">
 							{#if it.creator}<p class="hidden text-[12px] font-bold text-accent lg:block">{it.creator}</p>{/if}
 							<p class="truncate text-[14.5px] font-bold lg:mt-0.5 lg:text-[16px]">{it.name}{#if it.option} · {it.option}{/if}</p>
-							<p class="mt-0.5 text-[12.5px] text-fg-faint lg:mt-1 lg:text-[13px]">{it.qty}개 · {won(it.amount)}{#if ls} · <span class="text-white/55">{ls}</span>{/if}</p>
+							<p class="mt-0.5 text-[12.5px] text-fg-faint lg:mt-1 lg:text-[13px]">{it.qty}개 · {won(it.amount)}{#if ls}<span class="text-white/55 lg:hidden"> · {ls}</span>{/if}</p>
 						</div>
+						{#if ls}<span class="hidden shrink-0 rounded-[8px] bg-[#6b7bd6]/18 px-2.5 py-[5px] text-[12.5px] font-bold text-[#aab4f5] lg:inline-block">{ls}</span>{/if}
 						<button type="button" onclick={() => ask(it)} class="flex h-9 shrink-0 items-center gap-1.5 rounded-[12px] border border-white/16 px-3 text-[13px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4">
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={askIcon} /></svg>문의
 						</button>
 					</div>
 				{/each}
+
+				<!-- 환불 진행 상태 — 실제 기록만(신청 사유 · 완료 시각). 환불은 신청 즉시 토스 취소까지 끝나서 "판매자 확인" 대기 단계는 없다 -->
+				{#if steps}
+					<section aria-label="환불 진행 상태" class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
+						<h2 class="text-[15px] font-extrabold lg:text-[16px]">환불 진행 상태</h2>
+						<ol class="mt-4 flex flex-col">
+							{#each steps as st, i (st.title)}
+								<li class="relative flex gap-3 {i < steps.length - 1 ? 'pb-5' : ''}">
+									{#if i < steps.length - 1}<span aria-hidden="true" class="absolute top-6 bottom-0 left-[11px] w-px bg-white/14"></span>{/if}
+									<span class="z-[1] flex h-6 w-6 shrink-0 items-center justify-center rounded-full {st.done ? 'bg-accent text-bg' : 'border border-white/20'}">
+										{#if st.done}<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>{/if}
+									</span>
+									<div class="min-w-0">
+										<p class="text-[14.5px] font-bold">{st.title}{#if st.at}<span class="ml-2 text-[12px] font-normal text-fg-faint">{relTime(st.at)}</span>{/if}</p>
+										<p class="mt-0.5 text-[12.5px] leading-[1.5] text-fg-faint">{st.detail}</p>
+									</div>
+								</li>
+							{/each}
+						</ol>
+					</section>
+				{/if}
 			</div>
 
 			<!-- 오른쪽: 결제 정보 · 배송지 · 이 주문의 문의 -->
@@ -104,16 +127,19 @@
 				<section bind:this={payCard} class="scroll-mt-4 rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
 					<h2 class="mb-3.5 hidden text-[16px] font-extrabold lg:block">결제 정보</h2>
 					<div class="flex flex-col gap-2 text-[14px]">
-						<div class="flex justify-between text-fg-soft"><span>{order.shippingFee ? '상품 금액' : '결제 금액'}</span><span class="text-fg">{won(order.itemsAmount)}</span></div>
-						{#if order.shippingFee}<div class="flex justify-between text-fg-soft"><span>배송비</span><span class="text-fg">{won(order.shippingFee)}</span></div>{/if}
+						{#if order.refundAmount}
+							<!-- 환불이 있으면: 결제 금액 · 환불 금액 → 최종 결제(= 결제 − 환불) -->
+							<div class="flex justify-between text-fg-soft"><span>결제 금액</span><span class="text-fg">{won(order.amount)}</span></div>
+							<div class="flex justify-between text-fg-soft"><span>환불 금액</span><span class="font-bold text-accent">−{won(order.refundAmount)}</span></div>
+						{:else}
+							<div class="flex justify-between text-fg-soft"><span>{order.shippingFee ? '상품 금액' : '결제 금액'}</span><span class="text-fg">{won(order.itemsAmount)}</span></div>
+							{#if order.shippingFee}<div class="flex justify-between text-fg-soft"><span>배송비</span><span class="text-fg">{won(order.shippingFee)}</span></div>{/if}
+						{/if}
 					</div>
 					<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
 						<span class="text-[14px] font-bold">{order.status === 'WAITING_DEPOSIT' ? '입금할 금액' : '최종 결제'}</span>
-						<span class="text-[22px] font-extrabold tracking-[-.02em] lg:text-[24px]">{won(order.amount)}</span>
+						<span class="text-[22px] font-extrabold tracking-[-.02em] lg:text-[24px]">{won(Math.max(0, order.amount - order.refundAmount))}</span>
 					</div>
-					{#if order.refundAmount}
-						<div class="mt-1.5 flex justify-between text-[13.5px]"><span class="text-fg-soft">환불</span><span class="font-bold text-[#ff6b6b]">−{won(order.refundAmount)}</span></div>
-					{/if}
 					{#if can.ok && !refundOpen}
 						<button type="button" onclick={openRefund} class="mt-5 hidden h-14 w-full rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:block">{actionLabel}</button>
 					{/if}

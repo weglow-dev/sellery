@@ -1,6 +1,6 @@
 // 주문 조회 순수 규칙 — apps/myr-shop/src/lib/order-view.ts
 import { describe, expect, it } from 'vitest';
-import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, shortDate, statusLabel } from '../lib/order-view';
+import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, refundSteps, shortDate, statusLabel } from '../lib/order-view';
 
 const json = {
 	id: 'o1',
@@ -108,5 +108,24 @@ describe('0065 — 상세 이메일 · 줄 크리에이터 핸들', () => {
 		const n = orderFromJson({ id: 'o', code: 'myr1', items: [{ id: 'i' }] })!;
 		expect(n.buyerEmail).toBeNull();
 		expect(n.items[0].creatorHandle).toBe('');
+	});
+});
+
+describe('0066 — 환불 진행 상태', () => {
+	it('refund_reason · refunded_at 을 읽는다(없으면 null)', () => {
+		const o = orderFromJson({ id: 'o', code: 'myr1', refund_amount: 26000, refund_reason: '상품 불량·파손', refunded_at: '2026-11-03T01:02:03Z', items: [] })!;
+		expect(o.refundReason).toBe('상품 불량·파손');
+		expect(o.refundedAt).toBe('2026-11-03T01:02:03Z');
+		const n = orderFromJson({ id: 'o', code: 'myr1', items: [] })!;
+		expect(n.refundReason).toBeNull();
+		expect(n.refundedAt).toBeNull();
+	});
+	it('refundSteps — 환불이 없으면 null · 있으면 신청(사유) → 완료, 둘 다 done(대기 단계 없음)', () => {
+		expect(refundSteps({ refundAmount: 0, refundReason: null, refundedAt: null })).toBeNull();
+		const s = refundSteps({ refundAmount: 26000, refundReason: '상품 불량·파손', refundedAt: '2026-11-03T01:02:03Z' })!;
+		expect(s.map((x) => x.title)).toEqual(['환불 신청', '환불 완료']);
+		expect(s[0].detail).toBe('상품 불량·파손');
+		expect(s.every((x) => x.done && x.at === '2026-11-03T01:02:03Z')).toBe(true);
+		expect(refundSteps({ refundAmount: 1, refundReason: '', refundedAt: null })![0].detail).toBe('사유 없음');
 	});
 });

@@ -45,6 +45,9 @@ export type OrderView = {
 	shipping: OrderShipping | null;
 	/** 주문 때 받은 이메일 — 상세에만(0065) */
 	buyerEmail: string | null;
+	/** 가장 최근 환불의 사유·시각 — 상세에만, 환불이 있을 때만(0066) */
+	refundReason: string | null;
+	refundedAt: string | null;
 	items: OrderItem[];
 };
 
@@ -110,6 +113,8 @@ export function orderFromJson(v: unknown): OrderView | null {
 				}
 			: null,
 		buyerEmail: strOrNull(o, 'buyer_email'),
+		refundReason: strOrNull(o, 'refund_reason'),
+		refundedAt: strOrNull(o, 'refunded_at'),
 		items: (Array.isArray(o.items) ? o.items : []).map(itemFromJson).filter((i): i is OrderItem => i !== null)
 	};
 }
@@ -133,6 +138,17 @@ export function statusLabel(o: Pick<OrderView, 'status' | 'trackingNo' | 'shippe
 			if (o.shippedAt || o.trackingNo) return { text: '배송 중', tone: 'accent' };
 			return { text: '배송 준비중', tone: 'accent' };
 	}
+}
+
+/** 주문 상세 "환불 진행 상태" — 실제 기록만(신청 사유 · 환불 시각 · 금액). 환불은 신청 즉시 토스 취소까지 끝나므로 "판매자 확인" 대기 단계는 없다 → 환불이 없으면 null.
+ *  단계는 모두 done(진행 중인 환불이 없다) — 화면이 체크 표시로 그린다. */
+export type RefundStep = { title: string; detail: string; at: string | null; done: boolean };
+export function refundSteps(o: Pick<OrderView, 'refundAmount' | 'refundReason' | 'refundedAt'>): RefundStep[] | null {
+	if (o.refundAmount <= 0) return null;
+	return [
+		{ title: '환불 신청', detail: o.refundReason || '사유 없음', at: o.refundedAt, done: true },
+		{ title: '환불 완료', detail: '결제수단으로 환불됐어요 · 카드는 카드사에 따라 영업일 3일 안에 반영돼요', at: o.refundedAt, done: true }
+	];
 }
 
 /** 날짜 짧게 ("11월 2일") — 서버·브라우저 같은 결과(UTC 가 아닌 KST 로 고정) */
