@@ -62,14 +62,6 @@ export function parseCsOpenInput(raw: unknown): ParsedCsOpenInput {
 	return { ok: true, type, body, buyerName: buyerName || null, orderCode: orderCode ? orderCode.toLowerCase() : null };
 }
 
-export type ParsedCsReplyInput = { ok: true; body: string } | { ok: false; field: 'body'; message: string };
-export function parseCsReplyInput(raw: unknown): ParsedCsReplyInput {
-	const src = formToObj(raw);
-	const body = normalizeCsBody(str(src?.body));
-	if (!body || body.length > CS_BODY_MAX) return { ok: false, field: 'body', message: CS_OPEN_FIELD_MESSAGES.body };
-	return { ok: true, body };
-}
-
 /* ---------------- 행 · 스레드 (myr_cs_conversation_json · myr_cs_thread_json) ---------------- */
 export type CsOrderItem = { id: string; name: string; option: string; qty: number; amount: number; status: string; refundedQty: number };
 export type CsOrderSummary = { code: string; status: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null; paidAt: string | null; item: CsOrderItem | null };
@@ -194,19 +186,6 @@ export function parseCsOpenResult(json: unknown): CsOpenResult {
 	return { ok: false, code: isCsFailCode(o.code) ? o.code : 'DB_ERROR' };
 }
 
-export type CsActionResult = { ok: true; already: boolean; conversationId: string; conversationCode: string; status: CsStatus; message: CsMessage | null } | { ok: false; code: CsFailCode };
-export function parseCsActionResult(json: unknown): CsActionResult {
-	const o = obj(json);
-	if (!o) return { ok: false, code: 'DB_ERROR' };
-	if (o.ok === true) {
-		const conversationId = strOrNull(o.conversation_id);
-		const conversationCode = strOrNull(o.conversation_code);
-		if (!conversationId || !conversationCode || !isCsStatus(o.status)) return { ok: false, code: 'DB_ERROR' };
-		return { ok: true, already: o.already === true, conversationId, conversationCode, status: o.status, message: parseCsMessage(o.message) };
-	}
-	return { ok: false, code: isCsFailCode(o.code) ? o.code : 'DB_ERROR' };
-}
-
 /* ---------------- 문구 · 칩 ---------------- */
 export const CS_FAIL_MESSAGES: Record<CsFailCode, string> = {
 	NOT_FOUND: '문의를 찾을 수 없어요',
@@ -220,8 +199,7 @@ export const CS_FAIL_MESSAGES: Record<CsFailCode, string> = {
 export const csFailMessage = (code: string): string => (isCsFailCode(code) ? CS_FAIL_MESSAGES[code] : CS_FAIL_MESSAGES.DB_ERROR);
 
 export const CS_DONE_MESSAGES = {
-	opened: (sellerName: string | null) => `문의가 ${sellerName ?? '크리에이터'}에게 전달되었어요 — 답변이 달리면 이 화면과 이메일로 알려드려요`,
-	customerReplied: '추가 문의를 보냈어요 — 크리에이터가 확인하면 답변이 달려요'
+	opened: (sellerName: string | null) => `문의가 ${sellerName ?? '크리에이터'}에게 전달되었어요 — 답변이 달리면 이 화면과 이메일로 알려드려요`
 } as const;
 
 export type CsChipTone = 'accent' | 'ok' | 'muted';

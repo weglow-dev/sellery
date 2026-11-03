@@ -185,8 +185,8 @@ export function previewOf(body: string | null | undefined, max = PREVIEW_MAX): s
 }
 const csGuestNote = '비회원 문의는 접수한 기기(브라우저)에서 90일간 열려요. 다른 기기에서는 주문 조회 뒤 주문 상세의 문의 목록에서 여세요.';
 
-/** 새 문의 · 추가 문의 → 셀러(크리에이터). 고객 연락처·배송지는 싣지 않는다. 답변 화면은 인플루언서 콘솔(준비 중) — 링크 없음 */
-export function csOpenedSellerMail(cs: MailCs, message: { messageId: string; body: string; followUp: boolean }, _ctx: MailCtx): MailTemplate {
+/** 새 문의 → 셀러(크리에이터). 고객 연락처·배송지는 싣지 않는다. 답변 화면은 인플루언서 콘솔(준비 중) — 링크 없음 */
+export function csOpenedSellerMail(cs: MailCs, message: { messageId: string; body: string }, _ctx: MailCtx): MailTemplate {
 	const code = upper(cs.code);
 	const rows: MailRow[] = [
 		{ label: '문의번호', value: code },
@@ -196,20 +196,20 @@ export function csOpenedSellerMail(cs: MailCs, message: { messageId: string; bod
 	];
 	if (cs.orderCode) rows.push({ label: '주문번호', value: upper(cs.orderCode) });
 	const doc: MailDoc = {
-		title: message.followUp ? '고객이 추가 문의를 남겼어요' : '새 고객 문의가 접수되었어요',
+		title: '새 고객 문의가 접수되었어요',
 		preheader: previewOf(message.body, 80),
-		intro: message.followUp ? `${cs.sellerName}님, 문의 ${code}에 고객이 메시지를 더 남겼어요.` : `${cs.sellerName}님, 내 상품에 고객 문의가 접수되었어요. MYR 은 고객 문의를 크리에이터에게 바로 전달해요.`,
+		intro: `${cs.sellerName}님, 내 상품에 고객 문의가 접수되었어요. MYR 은 고객 문의를 크리에이터에게 바로 전달해요.`,
 		rows,
 		quote: previewOf(message.body),
 		notes: ['답변은 인플루언서 콘솔에서 남길 수 있어요(준비 중). 그때까지 급한 문의는 MYR 운영팀(official@weglow.biz)이 함께 봅니다.', '고객의 연락처·배송지는 메일에 싣지 않아요.']
 	};
-	return finish(doc, `[MYR] ${message.followUp ? '추가 문의' : '새 고객 문의'} · ${code} · ${cs.type}`, mailIdempotencyKey(message.followUp ? 'myr_cs_followup' : 'myr_cs_opened', message.messageId), message.followUp ? 'myr_cs_followup' : 'myr_cs_opened');
+	return finish(doc, `[MYR] 새 고객 문의 · ${code} · ${cs.type}`, mailIdempotencyKey('myr_cs_opened', message.messageId), 'myr_cs_opened');
 }
 
 /** 답변 → 고객 */
 export function csRepliedMail(cs: MailCs, reply: { messageId: string; body: string }, ctx: MailCtx): MailTemplate {
 	const code = upper(cs.code);
-	const notes = ['이어서 질문하려면 문의 화면에서 추가 문의를 남겨주세요.'];
+	const notes: string[] = [];
 	if (!cs.isMember) notes.push(csGuestNote);
 	const doc: MailDoc = {
 		title: '문의에 답변이 달렸어요',
