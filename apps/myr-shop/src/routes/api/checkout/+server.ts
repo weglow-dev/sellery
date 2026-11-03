@@ -10,7 +10,8 @@ import { rateLimit } from '$lib/server/rate-limit';
 
 /**
  * POST /api/checkout — 결제 세션 생성 (apps/shop api/checkout 의 MYR 판 · docs/myr.md §6.2 · 0058 myr_app_create_checkout).
- * 입력 { lines:[{ code, qty, optionIndex? }], shipping:{ recipient, phone, address1, address2?, postcode?, memo? }, guest?:{ name, phone, email?, consent:true }, saveAddress? }
+ * 입력 { lines:[{ code, qty, optionIndex? }], shipping:{ recipient, phone, address1, address2?, postcode?, memo? }, guest?:{ name, phone, email?, consent:true }, saveAddress?, email? }
+ *   email = 계정 이메일이 없는 회원(카카오 이메일 미동의)이 적은 주문 안내 메일 — 회원 이메일은 계정 이메일 → 이번 입력 → customers.email 순. 입력이 있으면 customers.email 에 저장(다음 결제 프리필 · 메일 대체 주소)
  *   ① 같은 오리진·JSON 만(403) · 본문 형식(400)
  *   ② 로그인 또는 비회원(미로그인이면 guest 필수 — 없으면 401 · IP 레이트리밋 30분 20건)
  *   ③ customers 행 — 회원 ensureCustomer · 비회원 app_guest_customer_upsert(체크아웃 1건 = 행 1개)
@@ -27,7 +28,7 @@ export const POST: RequestHandler = async (event) => {
 	if (cross) return cross;
 	const parsed = parseCheckoutBody(await request.json().catch(() => null));
 	if (!parsed.ok) return apiError(400, 'BAD_REQUEST', parsed.message);
-	const { lines, shipping, guest, saveAddress } = parsed.body;
+	const { lines, shipping, guest, saveAddress, email: typedEmail } = parsed.body;
 
 	const { user } = await locals.safeGetSession();
 	if (!user && !guest) return apiError(401, 'UNAUTHORIZED');
@@ -45,15 +46,25 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	let customerId: string;
+	let savedEmail: string | null = null;
 	try {
-		customerId = user ? (await ensureCustomer(user)).id : await createGuestCustomer(guest!);
+		if (user) {
+			const c = await ensureCustomer(user);
+			customerId = c.id;
+			savedEmail = c.email;
+		} else customerId = await createGuestCustomer(guest!);
 	} catch (e) {
 		console.error('[checkout] customer failed:', e instanceof Error ? e.message : e);
 		return apiError(500, 'DB_ERROR', '고객 정보를 확인하지 못했어요 — 잠시 후 다시 시도해주세요');
 	}
 
 	const prevGuest = user ? null : (cookies.get(GUEST_CHECKOUT_COOKIE) ?? null);
-	const buyer = user ? { name: displayName(user), phone: shipping.phone, email: user.email ?? null } : guest!;
+	const memberEmail = user ? (user.email || typedEmail || savedEmail || null) : null;
+	if (user && !user.email && typedEmail && typedEmail !== savedEmail) {
+		const { error: e } = await db.from('customers').update({ email: typedEmail }).eq('id', customerId);
+		if (e) console.error('[checkout] customers.email update failed:', e.message);
+	}
+	const buyer = user ? { name: displayName(user), phone: shipping.phone, email: memberEmail } : guest!;
 	const tossOrderId = generateOrderId();
 	const { data, error } = await db.rpc('myr_app_create_checkout', {
 		p_user_id: user?.id ?? null,

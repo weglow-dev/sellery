@@ -4,7 +4,7 @@ import { displayName } from '$lib/auth';
 import { ORDER_CODE_RE, parseGuestToken, type GuestBuyer, type Shipping } from '$lib/checkout-rules';
 import { admin } from './admin';
 
-export type CustomerRef = { id: string; address: Shipping | null; phone: string | null };
+export type CustomerRef = { id: string; address: Shipping | null; phone: string | null; email: string | null };
 
 function parseShipping(json: unknown): Shipping | null {
 	if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
@@ -29,11 +29,11 @@ export async function ensureCustomer(user: User): Promise<CustomerRef> {
 		.from('customers')
 		.upsert({ user_id: user.id, name: displayName(user), email: user.email ?? null }, { onConflict: 'user_id', ignoreDuplicates: true });
 	if (upsertError) throw new Error(`customers upsert failed: ${upsertError.message}`);
-	const { data, error } = await db.from('customers').select('id, address, phone').eq('user_id', user.id).maybeSingle();
+	const { data, error } = await db.from('customers').select('id, address, phone, email').eq('user_id', user.id).maybeSingle();
 	if (error) throw new Error(`customers select failed: ${error.message}`);
 	if (!data) throw new Error('customers row missing after upsert');
-	const row = data as { id: string; address: unknown; phone: string | null };
-	return { id: row.id, address: parseShipping(row.address), phone: row.phone ?? null };
+	const row = data as { id: string; address: unknown; phone: string | null; email: string | null };
+	return { id: row.id, address: parseShipping(row.address), phone: row.phone ?? null, email: row.email ?? null };
 }
 
 /** 비회원 customers 행 — 체크아웃 1건 = 행 1개 (0021) */

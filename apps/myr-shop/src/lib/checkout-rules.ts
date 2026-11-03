@@ -107,6 +107,16 @@ export const EMPTY_GUEST_DRAFT: GuestBuyerDraft = { name: '', phone: '', email: 
 export const GUEST_CONSENT_TEXT =
 	'비회원 주문을 위해 이름·연락처·이메일(선택)·배송지를 수집·이용하는 데 동의합니다 — 주문 조회·배송·환불·문의 응대에 쓰고, 거래기록 보존 기간(5년) 뒤 파기합니다';
 
+/** 주문 안내 메일 입력칸 문구 — 비회원 · 계정 이메일이 없는 회원(카카오 이메일 미동의) 공용 */
+export const ORDER_EMAIL_PLACEHOLDER = '이메일(주문 안내 메일)';
+
+/** 선택 이메일 — 비면 null · 형식이 틀리면 false */
+export function parseOptionalEmail(raw: unknown): string | null | false {
+	const s = typeof raw === 'string' ? raw.trim() : '';
+	if (!s) return null;
+	return s.length <= GUEST_EMAIL_MAX && EMAIL_RE.test(s) ? s : false;
+}
+
 export function validateGuestBuyer(d: GuestBuyerDraft): { ok: true; buyer: GuestBuyer } | { ok: false; field: GuestBuyerField; message: string } {
 	const name = cleanText(d.name).slice(0, GUEST_NAME_MAX);
 	if (!name) return { ok: false, field: 'name', message: '주문자 이름을 입력해주세요' };
@@ -136,7 +146,8 @@ export function parseGuestBody(v: unknown): GuestBuyer | null {
 }
 
 /** POST /api/checkout 본문 전체 */
-export type CheckoutBody = { lines: CheckoutLine[]; shipping: Shipping; guest: GuestBuyer | null; saveAddress: boolean };
+/** email = 회원 중 계정 이메일이 없는 사람이 적은 주문 안내 메일(선택) — 서버는 계정 이메일이 있으면 그걸 쓰고 이 값은 무시한다 */
+export type CheckoutBody = { lines: CheckoutLine[]; shipping: Shipping; guest: GuestBuyer | null; saveAddress: boolean; email: string | null };
 export function parseCheckoutBody(v: unknown): { ok: true; body: CheckoutBody } | { ok: false; message: string } {
 	const o = obj(v);
 	if (!o) return { ok: false, message: '요청 본문이 올바르지 않습니다' };
@@ -149,7 +160,9 @@ export function parseCheckoutBody(v: unknown): { ok: true; body: CheckoutBody } 
 		guest = parseGuestBody(o.guest);
 		if (!guest) return { ok: false, message: '주문자 이름·연락처와 개인정보 동의를 확인해주세요' };
 	}
-	return { ok: true, body: { lines, shipping, guest, saveAddress: o.saveAddress === true } };
+	const email = parseOptionalEmail(o.email);
+	if (email === false) return { ok: false, message: '이메일 형식을 확인해주세요' };
+	return { ok: true, body: { lines, shipping, guest, saveAddress: o.saveAddress === true, email } };
 }
 
 /* ---------------- 비회원 쿠키 ---------------- */

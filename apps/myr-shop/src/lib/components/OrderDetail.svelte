@@ -126,11 +126,10 @@
 						<p class="mt-2 text-[15px] font-bold">{order.shipping.recipient} <span class="ml-1.5 font-normal text-white/75">{order.shipping.phone}</span></p>
 						<p class="mt-1 text-[14px] text-white/80">{#if order.shipping.postcode}({order.shipping.postcode}) {/if}{order.shipping.address1} {order.shipping.address2}</p>
 						{#if order.shipping.memo}<p class="mt-1 text-[13px] text-fg-faint">메모: {order.shipping.memo}</p>{/if}
-						{#if order.buyerEmail}
-							<p class="mt-3.5 flex items-center gap-2.5 border-t border-white/8 pt-3.5 text-[13.5px] text-white/80">
-								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>{order.buyerEmail}
-							</p>
-						{/if}
+						<!-- 이메일 줄은 항상 — 주문 때 이메일을 안 받았으면(카카오 계정 · 비회원 미입력) '-' -->
+						<p class="mt-3.5 flex items-center gap-2.5 border-t border-white/8 pt-3.5 text-[13.5px] {order.buyerEmail ? 'text-white/80' : 'text-fg-faint'}">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg><span aria-label={order.buyerEmail ? undefined : '이메일 없음'}>{order.buyerEmail || '-'}</span>
+						</p>
 					</section>
 				{/if}
 
