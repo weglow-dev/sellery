@@ -1,0 +1,13 @@
+<script lang="ts">
+	import { displayCode } from '$lib/order-view';
+	import RefundPage from '$lib/components/RefundPage.svelte';
+
+	let { data } = $props();
+</script>
+
+<svelte:head>
+	<title>환불 신청 {displayCode(data.order.code)} — MYR Shop</title>
+	<meta name="robots" content="noindex, nofollow" />
+</svelte:head>
+
+<RefundPage order={data.order} backHref={data.backHref} />

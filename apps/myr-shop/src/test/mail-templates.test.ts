@@ -162,6 +162,15 @@ describe('환불(셀러) — 자기 줄만', () => {
 		expect(j.idempotencyKey).not.toBe(h.idempotencyKey);
 		expect(orderRefundedSellerMail(order(), dep, 's-nobody', ctx)).toBeNull();
 	});
+	it('셀러 환불 메일 — 내 줄의 상세(note)만 "상세 · 상품명" 행으로 (0067)', () => {
+		const o = order();
+		const mine = o.items[0];
+		const r = { items: [{ itemId: mine.id, qty: 1, amount: mine.unitPrice, note: '포장이 찢어졌어요' }], amount: mine.unitPrice, full: false, reason: '상품 불량·파손', deposit: false };
+		const m = orderRefundedSellerMail(o, r, mine.sellerId, ctx)!;
+		expect(m.text).toContain(`상세 · ${mine.name}`);
+		expect(m.text).toContain('포장이 찢어졌어요');
+		expect(orderRefundedMail(o, r, ctx).text).not.toContain('포장이 찢어졌어요');
+	});
 });
 
 describe('고객 문의 메일 (S7)', () => {
