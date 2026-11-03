@@ -122,6 +122,31 @@ export function orderPaidSellerMail(o: MailOrder, sellerId: string, _ctx: MailCt
 	return finish(doc, `[MYR] 새 주문 · ${code} · ${mine[0].name}`, mailIdempotencyKey('myr_order_paid', 'seller', o.id, sellerId), 'myr_order_paid_seller');
 }
 
+/* ---------------- 배송 시작 (고객 · 0069) ---------------- */
+export type MailShipment = { courier: string; trackingNo: string; trackingUrl: string | null };
+export function orderShippedMail(o: MailOrder, s: MailShipment, ctx: MailCtx): MailTemplate {
+	const code = upper(o.code);
+	const live = o.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0).map((i) => ({ ...i, qty: i.qty - i.refundedQty }));
+	const rows: MailRow[] = [
+		{ label: '주문번호', value: code },
+		{ label: '택배사', value: s.courier },
+		{ label: '운송장', value: s.trackingNo },
+		{ label: '상품', value: itemsText(live.length ? live : o.items) }
+	];
+	if (o.shipping) rows.push({ label: '받는 분', value: `${o.shipping.recipient} · ${o.shipping.address1}${o.shipping.address2 ? ` ${o.shipping.address2}` : ''}` });
+	const notes = ['배송 조회는 운송장 등록 뒤 몇 시간 지나야 보일 수 있어요.'];
+	if (!o.isMember) notes.push(guestNote);
+	const doc: MailDoc = {
+		title: '상품이 출발했어요',
+		preheader: `${code} · ${s.courier} ${s.trackingNo}`,
+		intro: `${o.buyerName}님, 주문 ${code}의 상품을 보냈어요.`,
+		rows,
+		button: s.trackingUrl ? { label: '배송 조회', url: s.trackingUrl } : { label: '주문 상세 보기', url: orderPageUrl(o, ctx) },
+		notes
+	};
+	return finish(doc, `[MYR] 상품이 출발했어요 · ${code}`, mailIdempotencyKey('myr_order_shipped', o.id, s.trackingNo), 'myr_order_shipped');
+}
+
 /* ---------------- 환불 완료 (고객) ---------------- */
 export function orderRefundedMail(o: MailOrder, r: MailRefund, ctx: MailCtx): MailTemplate {
 	const code = upper(o.code);
