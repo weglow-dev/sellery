@@ -1,6 +1,6 @@
 -- pgTAP — 0060 주문 조회: 권한 · 목록(줄 포함 · 배송지 없음) · 상세(회원/비회원 소유 판정 · 배송지 · 입금 정보) (docs/myr.md §7 S6)
 begin;
-select plan(25);
+select plan(28);
 
 select function_privs_are('public', 'myr_app_my_orders', '{uuid,integer}'::text[], 'anon', '{}'::text[], 'anon 은 my_orders 실행 불가');
 select function_privs_are('public', 'myr_app_my_orders', '{uuid,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 my_orders 실행 불가');
@@ -54,6 +54,12 @@ update public.myr_orders set buyer_email = 'pgtap-ov@myr.test' where code = 'pgt
 select is(public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') ->> 'buyer_email', 'pgtap-ov@myr.test', '0065 상세에는 buyer_email');
 select ok(public.myr_app_my_orders('00000000-0000-4000-8000-0000000000c5') -> 1 -> 'buyer_email' = 'null'::jsonb, '0065 목록에는 buyer_email 없음(null)');
 select is(public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') -> 'items' -> 0 ->> 'creator_handle', '@pgtap.ov', '0065 줄 JSON 에 creator_handle');
+
+-- 0066 — 환불 사유·시각(상세에만 · 환불이 있을 때만)
+select ok(public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') -> 'refund_reason' = 'null'::jsonb and public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') -> 'refunded_at' = 'null'::jsonb, '0066 환불이 없으면 refund_reason·refunded_at 은 null');
+update public.myr_orders set refund_amount = 20000, refund_reason = '상품 불량·파손', refunded_at = '2026-11-03T01:02:03Z' where code = 'pgtap-ov-m1';
+select is(public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') ->> 'refund_reason', '상품 불량·파손', '0066 상세에 환불 사유');
+select ok((public.myr_app_order_view('pgtap-ov-m1', '00000000-0000-4000-8000-0000000000c5') ->> 'refunded_at')::timestamptz = '2026-11-03T01:02:03Z'::timestamptz and public.myr_app_my_orders('00000000-0000-4000-8000-0000000000c5') -> 1 -> 'refund_reason' = 'null'::jsonb, '0066 상세에 환불 시각 · 목록에는 없음(null)');
 
 select * from finish();
 rollback;
