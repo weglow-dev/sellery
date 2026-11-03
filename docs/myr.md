@@ -5,6 +5,8 @@
 > 근거(저장소 안): `apps/shop/src/routes/{api,checkout,cs,orders,account}/**` · `packages/payments/src/server/*` · `packages/db/src/server/{brand,partner,admin}/*.server.ts` · `supabase/migrations/{0004,0005,0008,0015,0018,0020,0021,0041}` · `docs/branding-plan.md`(랜딩 `apps/myr`) · `docs/brand-console-plan.md` · `docs/admin-console-plan.md`(콘솔 골격) · `docs/deploy.md`(외부 서비스 등록).
 >
 > 이 문서가 정하지 않는 것: 디자인(MYR 랜딩의 다크·앰버 테마를 따를지), 도메인 이름, 정산 요율 숫자. §9 열린 결정.
+>
+> **2026-11-03 물류 방향 반영**: 발송은 물류사 **이벗(Ebut)** API 로 자동화한다 — 바인허브(`weglow-biz/vyneherb` 저장소)와 같은 방식(평일 11시 자동 발주 · 18시 송장 자동 수집 · 반품 회수 API). 그래서 송장은 **주문 줄 단위**가 되고(결정 8 · 13), 배송준비중 이후의 환불·교환은 **인플루언서 승인 + 회수**를 거친다(결정 7). 연동 설계는 §6.8, 콘솔 작업 순서는 §4.2.1 · §4.3, 단계는 §7 E1~E4.
 
 ---
 
@@ -19,12 +21,13 @@
 | 4 | **상품 등록은 인플루언서가 한다**(가격 · 소개글 · 이미지 · 옵션 · 판매/일시중지). 등록 직후 상태는 `pending` 이고 **운영팀 검수(`listed`) 를 통과해야 샵에 보인다.** 반려는 사유 필수 | 셀러리 `products.status` 게이트(0002 · `app_admin_review_product` 0015) 와 같은 패턴. 표시광고·건기식 문구는 사람이 봐야 한다. |
 | 5 | **같은 Supabase 프로젝트(`sellery`), 새 테이블**(`myr_` 접두사 · 함수 `myr_app_*`) · 공유하는 것 = `auth` · `profiles` · `sellers` · `customers` · `payment_events` · 비회원 토큰 RPC(0021) · `platform_settings` | 로그인·고객·토스 키·지급대행을 둘로 나누지 않는다. 셀러리 전용 테이블(`campaigns` `orders` `cs_conversations` …)은 건드리지 않는다. |
 | 6 | **결제·주문 코드는 그대로, SQL 함수만 다시.** `/api/checkout` `/api/payments/{confirm,webhook}` `/api/cron/reconcile` · `toss.server.ts` · `checkout-sync` 흐름 · `checkout_sessions` 상태 기계는 복사. `app_confirm_checkout` · `app_checkout_reserved` · `app_refund_precheck` 를 상품 축으로 재작성, `campaign_card` → `myr_product_card` | 결합은 "무엇을 검사하느냐"(캠페인 LIVE·기간·배정 재고 → 상품 listed·stock) 뿐이고 전부 DB 함수 안에 있다. |
-| 7 | **CS·환불은 인플루언서가 한다.** 문의함 · 스레드 · 답변 · 종료 · 환불을 `seller_id` 게이트로. 환불은 **내 줄(order_items) 단위의 토스 부분 취소**(§6.3). 교환은 1차에서 **CS 스레드로 처리 + 재발송 운송장 1칸**(§6.4) | 브랜드 콘솔 `cs.server.ts` · `brand-refund.server.ts` 를 `brand_id → seller_id` 로 복사하되, 결제 1건에 셀러가 여럿이라 전액 취소가 아니라 `cancelAmount` 부분 취소가 된다. 셀러리에도 교환 상태 기계는 없다. |
-| 8 | **발송은 MYR 물류센터가 주문 단위로 한 번에 한다**(2026-10-29 전제 — 고객에게 주문 1건 · 배송 1건). 운송장 입력 · 발주서는 `myr-admin`, 배송비는 **결제당 1건**(무료배송 기준도 장바구니 합계 기준). 인플루언서 콘솔 "주문" 탭은 내 줄의 **열람 · 환불 · CS** 만 | 랜딩이 "재고·물류는 MYR 이 맡는다" 를 약속하고, 셀러별 배송 N건을 고객에게 보여주지 않기로 했다. 셀러가 각자 보내는 방식으로 바꾸면 배송비 · 무료배송 · 운송장이 전부 셀러별(= 줄 묶음별) 로 갈라진다(§9-9 에 되돌릴 조건을 적어 둔다). |
-| 9 | **운영 콘솔 `myr-admin` 1차 = 상품 검수 + 주문/문의 열람 + 환불 대행.** 게이트는 `profiles.role='admin'`(`requireAdmin()` 복사) | 셀러리 관리자 계정을 그대로 쓴다(같은 Supabase). 정산 실행·지급은 2차. |
+| 7 | **CS·환불은 인플루언서가 한다.** 문의함 · 스레드 · 답변 · 종료 · 교환/환불 처리를 `seller_id` 게이트로. 환불은 **내 줄(order_items) 단위의 토스 부분 취소**(§6.3). **2026-11-03 개정 — 교환·환불은 승인형**: 고객 요청 → 인플루언서 승인(처리 방법 선택)/반려 → 발주 전이면 즉시 환불, 발주(배송준비중) 뒤면 회수 → 환불 · 교환은 재발송(§6.4 · §6.8). 회수·재발송 **실행**은 운영(admin) · 서버 몫 | 브랜드 콘솔 `cs.server.ts` · `brand-refund.server.ts` 를 `brand_id → seller_id` 로 복사하되, 결제 1건에 셀러가 여럿이라 전액 취소가 아니라 `cancelAmount` 부분 취소가 된다. 이벗으로 발주된 주문은 창고에서 이미 작업 중이라 즉시 취소할 수 없다 — 바인허브도 교환·반품을 신청 → 진행중 → 완료/거부 상태로 관리한다. |
+| 8 | **발송은 MYR 물류(이벗)가 주문 단위로 한 번에 한다**(2026-10-29 전제 — 고객에게 주문 1건 · 배송 1건). 배송비는 **결제당 1건**(무료배송 기준도 장바구니 합계 기준). **2026-11-03 개정 — 발주·송장은 이벗 API 자동**(결정 13): 송장은 이벗이 **주문 줄마다** 돌려주므로 줄 단위로 저장한다(한 박스면 줄들의 송장이 같다). 수동 송장 입력은 이벗 장애·연동 전 대비로 `myr-admin` 에만. 인플루언서 콘솔 "주문" 탭은 내 줄의 **열람**만(환불은 결정 7 승인 흐름) | 랜딩이 "재고·물류는 MYR 이 맡는다" 를 약속하고, 셀러별 배송 N건을 고객에게 보여주지 않기로 했다. 셀러가 각자 보내는 방식으로 바꾸면 배송비 · 무료배송 · 운송장이 전부 셀러별(= 줄 묶음별) 로 갈라진다(§9-9 에 되돌릴 조건을 적어 둔다). |
+| 9 | **운영 콘솔 `myr-admin` 1차 = 상품 검수 + 주문/문의 열람 + 예외 환불(§4.3 우선 2 — 인플루언서 흐름이 막혔을 때만 · 사유 필수).** 게이트는 `profiles.role='admin'`(`requireAdmin()` 복사) | 셀러리 관리자 계정을 그대로 쓴다(같은 Supabase). 정산 실행·지급은 2차. |
 | 10 | **정산은 1차 범위 밖.** 주문에 `seller_margin_rate` 스냅샷만 남기고, 실적 화면은 매출·환불·순매출·예상 정산액을 보여준다 | 요율·주기·지급 방식이 미정. 셀러리 0053 수식(3%+3%+5%) 을 가져오지 않는다. 지급대행(`payouts.server.ts` · 0042) 은 나중에 재사용 가능. |
 | 11 | **셀러리 코드와의 경계** — 서버 모듈은 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 에 복사본. 셀러리 모듈(`brand/*` `partner/*` `campaign*`) 을 import 하지 않는다(`scripts/check-boundaries.mjs` 에 규칙 추가). 순수 모듈(`text` `dates` `carriers` `guest-order` `money` `auth`) 과 `mail/{resend,layout}` 은 공유 | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 서버 폴더만 지우면 되게. |
 | 12 | **단일 함수 원칙** — 같은 동작(환불 · 운송장 · 문의 답변 · 상품 상태 변경)은 **패키지 함수 하나 + SQL 함수 하나**로 두고 `actor`('customer' · 'seller' · 'admin') 매개변수로 권한만 가른다. 앱 라우트는 세션에서 actor 를 정해 그 함수를 부르는 얇은 껍데기. 외부가 부르는 HTTP 엔드포인트(토스 웹훅 · 크론) 는 `myr-shop` 에만 둔다(§3.1) | 셀러리는 고객 `/api/payments/cancel` · 브랜드 `refundOrderAsBrand` · 관리자 `admin-refund` 로 같은 토스 취소가 세 벌이다. MYR 은 앱이 넷이라 그대로 가면 네 벌이 된다. 앱끼리 HTTP 로 부르지 않는다 — 같은 Supabase 를 service role 로 직접 쓰므로 CORS·인증 전달이 필요 없다. |
+| 13 | **물류 = 이벗 API 자동화(2026-11-03 · 바인허브와 같은 방식)** — ① 평일 11시: 11시 전 결제(가상계좌는 입금) 된 줄을 이벗 주문 등록(`ordercreatem` · 주문번호 = 줄 id · 상품 = 이벗 상품코드) → 줄 상태 "배송준비중" · 실패 3회 재시도 ② 매일 18시: 이벗 상태 조회(`orderstatus`) → 줄마다 송장 → "배송중" · 택배사 배송완료(또는 10일 경과) → "배송완료" · 배송 시작 메일 ③ 반품 회수(`exprtakeback` · 취소 · 상태 조회) ④ 이벗 상품코드는 **운영팀이 상품 검수 때 입력**(인플루언서는 입력·열람하지 않음) ⑤ 재고는 창고(이벗) 기준 — 인플루언서 재고 입력 없음. 크론·이벗 클라이언트는 `myr-shop`(외부 호출 한 곳 · 결정 12) | 물류사가 바인허브와 같은 이벗을 쓰기로 함(2026-11-03). 바인허브 구현(`backend/shop/app/Services/EbutOrderService.php` · `Jobs/OrderStatusToPreparing.php` · `Jobs/OrderStatusToDeliveringOrDelivered.php` · `routes/console.php`) 을 기준으로 삼는다. 이벗 계정 · 상품 등록 절차 · 박스 발송인은 미정(§9-14). |
 
 ---
 
@@ -40,10 +43,13 @@
   ├ 가격·소개글 수정 ─ 가격 변경은 pending 재검수 (§9)
   │                                                                     장바구니(여러 셀러) → 토스 결제 1건
   │                                                                       → myr_orders 1건 + myr_order_items(줄마다 seller_id)
-  │                                    주문 → 운송장 등록(단건/CSV) ──▶ 배송 시작 메일 (주문 단위 · 물류센터)
-  ├ 주문 탭: 내 줄 열람 · 줄 환불(부분 취소) · 문의 연결
-  ├ 문의 탭: 고객 문의(seller_id) 답변·종료 ◀──────────────────────── /cs/new?product=<code>(&order=)
-  ├ 환불: 내 줄 → 토스 cancelAmount 부분 취소        열람·환불 대행     고객 셀프 환불(발송 전 · 줄 또는 전체) /api/payments/cancel
+  │                     [서버 크론 · 이벗]  평일 11시 자동 발주(줄 → 배송준비중) · 18시 송장 수집(줄 → 배송중/완료) ──▶ 배송 시작 메일
+  │                                    실패·지연 목록 · 수동 송장(장애 대비)
+  ├ 주문 탭: 내 줄 열람(배송 상태 · 송장 · 수취인 가림)
+  ├ 문의 탭: 고객 문의(seller_id) 답변·종료 ◀──────────────────────── 문의 시트(CsSheet)
+  ├ 교환·환불 탭: 요청 승인/반려 ◀──────────────────────────────────── 환불 신청 페이지(배송준비중 이후 = "요청")
+  │    승인 → 발주 전: 즉시 부분 취소     회수 접수·확인 → 환불       고객 셀프 환불(발주 전 · 줄 또는 전체) /api/payments/cancel
+  │                                       교환 재발송
   └ 실적 탭: 내 줄 기준 매출·환불·순매출·상품별 집계
 ```
 
@@ -113,6 +119,22 @@ myr_cs_messages         ← 0005 cs_messages, sender('customer'|'seller'|'admin'
 
 주문 상태는 줄에서 파생한다 — 모든 줄 REFUNDED 면 `REFUNDED`, 일부면 `PARTIAL_REFUNDED`(토스 `PARTIAL_CANCELED` 와 1:1). `sold_qty` 트리거는 `myr_order_items`(PAID) 에서 상품별로 재계산.
 
+**이벗 연동으로 추가할 것(2026-11-03 · §6.8 · 아직 마이그레이션 없음)**
+
+```
+E1-a  myr_products            + ebut_goods_code text (옵션이 있으면 options[i].ebut_code 또는 별도 표 — 이벗 등록 방식 확인 뒤)
+                              운영팀이 검수 때 입력 · 공개 RPC 에는 싣지 않는다
+E1-b  myr_order_items         + ship_status('PAID'|'PREPARING'|'SHIPPING'|'DELIVERED') · courier · tracking_no
+                                · ebut_registered_at · shipped_at · delivered_at · is_delayed
+                              → 송장·배송 상태의 단위가 줄이 된다(이벗이 줄마다 송장을 준다 · 결정 8)
+      myr_orders              courier · tracking_no · shipped_at 는 남겨 두고(옛 코드 호환 · §3.1 "같이 배포되지 않는 창")
+                              화면은 줄 값을 읽는다. 주문 배송 라벨 = 줄 상태의 최솟값
+E4    myr_refund_requests     교환/환불 요청(줄 · 수량 · 사유 · 사진 · 처리 방법 · 상태 · 회수 번호 · 타임라인) — 인플루언서 7번
+      myr_ebut_runs(선택)      크론 실행 기록(발주 · 송장 수집 · 건수 · 실패) — 어드민 발주·배송 화면
+```
+
+0069 처리: 파일은 그대로 두고, E1-b 마이그레이션에서 `myr_app_admin_ship` 을 **같은 이름·인자로 다시 정의**해 주문의 남은 줄 전부에 같은 송장을 쓰게 한다(한 박스 발송 · 호출하는 쪽 변경 없음). 이벗 크론과 정정 화면용으로 **줄 단위 송장 함수**를 새로 둔다. `myr_app_admin_ship_pending` 도 기준을 줄 상태로 다시 정의한다.
+
 RLS: 전부 `revoke all from anon, authenticated` · service role 만. 고객 공개 읽기는 `myr_product_card(code)` · `myr_home_products()` RPC(security definer · anon 실행 허용) 로만 — `products` 의 공개 grant 열 목록(0002) 과 같은 원칙으로 재고·마진·반려 사유는 내지 않는다. 주문 본인 조회는 `myr_orders_select_own`(`auth.uid() = user_id`) 요약 컬럼만(0004 와 동일).
 
 RPC(전부 `{ok, code}` 반환 · 서버 전용):
@@ -154,8 +176,9 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 
    | 동작 | customer | seller | admin |
    |---|---|---|---|
-   | 환불(줄 단위 부분 취소) | 본인 주문의 줄(전체 = 모든 줄) · PAID · 발송 전 | `seller_id = 내 id` 인 줄만 · PAID · 발송 뒤 허용(`after_ship` 기록) | 전부 |
-   | 운송장 · 교환 발송 · 발주서 | — | — (열람만 · 수취인 원문 없음) | 전부(물류센터) |
+   | 환불(줄 단위 부분 취소) | 본인 주문의 줄(전체 = 모든 줄) · PAID · 발송 전(**이벗 연동 뒤 = 발주 전**) | `seller_id = 내 id` 인 줄만 · PAID · 발송 뒤 허용(`after_ship` 기록) — **이벗 연동 뒤에는 승인 흐름(결정 7)에서만 호출** | 전부 |
+   | 교환·환불 요청 처리(E4 · 인플루언서 7번) | 요청 생성(배송준비중 이후) | 내 줄 요청 승인(처리 방법) · 반려 | 전부 · 회수 접수/취소/완료 · 재발송 |
+   | 운송장 · 교환 발송 · 발주 | — | — (열람만 · 수취인 원문 없음) | 전부(수동 입력 · 재발주) · 자동은 서버 크론(이벗) |
    | 문의 열람·답글 | 본인(토큰·user) · 추가 문의 | 내 상품 문의 · 답변·종료 | 전부 · 대행 답변(`sender='seller'` `actor_role='admin'`) |
    | 상품 상태 | — | 내 상품 · listed ↔ paused · rejected → pending | 전부 · pending → listed/rejected · 강제 전환 |
 
@@ -187,9 +210,10 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 |---|---|---|---|
 | 가입·로그인 | `/signup` `/verify-sent` `/login` `/password/*` `/auth/confirm` | 이메일+비밀번호 · token_hash · `sellers` 행 생성(`createSellerFromSignup`) | `apps/influencer` 그대로 |
 | 홈 | `/home` | 검수 상태 · 미발송 · 미답변 문의 · 오늘 매출 카드 | `partner/home.server.ts` 축소 |
-| 상품 | `/products` `/products/new` `/products/[code]` | 목록(상태 칩) · 등록 · 수정 · 판매중/일시중지 · 반려 사유 · 재제출 | `apps/brand/(console)/products/*` |
-| 주문 | `/orders` `/orders/[code]` | 내 줄이 있는 주문 목록(줄 · 수량 · 금액 · 배송 상태 읽기) · 내 줄 환불(부분 취소) · 문의 연결. **운송장 입력 없음**(물류센터 · 결정 8) | `apps/brand/(console)/orders` 에서 발송 기능 제거 |
-| 문의 | `/cs` `/cs/[code]` | 문의함(OPEN → ANSWERED → CLOSED) · 답변 · 종료 | `apps/brand/(console)/cs/*` |
+| 상품 | `/products` `/products/new` `/products/[code]` | 목록(상태 칩) · 등록 · 수정 · 판매중/일시중지 · 반려 사유 · 재제출. **재고 입력 없음 · 이벗 상품코드 없음**(결정 13) | `apps/brand/(console)/products/*` |
+| 주문 | `/orders` `/orders/[code]` | 내 줄이 있는 주문 목록(줄 · 수량 · 금액 · **줄별 배송 상태 · 송장** 읽기) · 문의 연결. **운송장 입력 · 환불 버튼 없음**(결정 7 · 8) | `apps/brand/(console)/orders` 에서 발송·환불 제거 |
+| 문의 | `/cs` `/cs/[code]` | 상품·배송 문의함(OPEN → ANSWERED → CLOSED) · 답변 · 종료 | `apps/brand/(console)/cs/*` |
+| 교환·환불 | `/returns` `/returns/[id]`(UI 시안의 "교환 · 환불 관리" — 지금 경로 `/cs`) | 요청 목록(대기 · 진행 중 · 완료/반려) · 승인(처리 방법 선택 + 고객 메시지) · 반려 · 타임라인 · 사진 | 새로(시안 "MYR Influencer Admin") |
 | 실적 | `/sales` | 기간별 매출·환불·순매출 · 상품별 · 예상 정산액 | `apps/influencer/(console)/sales` 축소 |
 | 내 정보 | `/my` | 프로필(핸들 · 아바타 · 소개) · 정산 계좌 · 알림 이메일 | `apps/influencer/(console)/my` |
 
@@ -197,19 +221,93 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 
 PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 **수취인 실명·연락처·주소 원문을 넣지 않는다**(셀러리 0004 "인플루언서 응답에서 제거" 규칙 유지 · 구매자 표시명은 `김*은` 마스킹). CS 에서 주소가 필요하면 문의 스레드 안에서 고객이 적거나 운영팀이 대행한다. 수취인 원문은 admin 응답에만, 열람 로그는 `sensitive_access_log`(0013) 재사용.
 
+#### 4.2.1 작업 순서 (2026-11-03 · UI 단계 이후)
+
+지금 상태: Claude Design "MYR Influencer Admin" 시안을 목 데이터로 옮긴 화면만 있다(`ssr=false` · `lib/state.svelte.ts` · 인증·DB 없음). 이벗 연동(E1~E4 · §6.8)을 기다리지 않고 0~5 를 먼저 하고, E1-b 는 6번 바로 앞에 샵 수정과 함께 한다.
+
+- **0. Vercel 배포(미리)**
+    - ① CLI 로 프로젝트 생성: `vercel project add myr-influencer --scope weglow-team` → `vercel link --project myr-influencer` → `vercel project update myr-influencer --root-directory apps/myr-influencer --framework sveltekit-1 --node-version 22.x --yes`
+    - ② 대시보드 Settings → Git 에서 `weglow-dev/sellery` 연결 · Production Branch main · "Include source files outside of the Root Directory" ON
+    - ③ `apps/myr-influencer/vercel.json`(지금은 비워도 됨) + `static/robots.txt` disallow 와 `<meta name="robots" content="noindex">`
+    - ④ 첫 배포 확인 `https://myr-influencer.vercel.app` ⑤ `docs/deploy.md` MYR 표에 열 추가
+    - 주의 — main 에 앱이 없는 상태에서 Git 을 연결하면 푸시한 브랜치가 Production 으로 한 번 배포됨(myr-shop 때 그랬음 · main 병합 뒤 덮임). 고유 URL(`-weglow-team.vercel.app`)은 SSO 보호로 302 라 확인은 프로젝트 별칭으로
+- **1. 공용 코드 추출**
+    - `packages/myr` — toss · checkout-sync(로그) · refund · mail/* · mail-events · cs · ship + 순수 cs-rules · refund-rules. 나중에 이벗 클라이언트도 여기
+    - 샵을 import 로 바꾸고 기존 vitest 통과 확인
+    - 복사 방식으로 가면 건너뜀. 다만 어드민까지 세 앱이 같은 환불·메일 코드를 쓰므로 추출을 권장(결정 12)
+- **2. 인증 골격**
+    - `ssr=false` 제거 · `hooks.server.ts`(샵 복사) · `lib/server/{admin,seller}.ts` — `requireSeller` 게이트 복사 · 🥬 잔액 제거 · 상태 anon/guest/suspended/ok
+    - `(console)` 그룹 + `+layout.server.ts` 가 me(sellers 행) 전달 → `ME` 상수 치환
+    - `/login`(이메일+비번) · `/auth/confirm` `/auth/signout` · `/suspended`
+    - 가입은 10번으로 미루고, 테스트는 시드 셀러 행(`@minji.routine` 등)에 `partner-admin.mjs invite --link` 로 계정 연결
+    - Vercel 환경변수 `PUBLIC_SUPABASE_*`(없으면 빌드 실패) · `SUPABASE_SERVICE_ROLE_KEY` · Preview `PUBLIC_DEV_LOGIN=1` · Supabase Redirect URLs `localhost:5179` · `myr-influencer.vercel.app`(Owner 권한) · 값은 `vercel env pull --cwd apps/shop` 에서(루트 `.env.local` 은 로컬 DB)
+- **3. 내 제품 읽기**
+    - 새 마이그레이션 `myr_app_seller_products(seller)` + `draft` 상태 추가
+    - `/products` 서버 load → 목 products 를 서버 값으로 · 상태 매핑 순수 함수(임시저장 · 심사 중 · 판매 중 · 일시중지 · 반려)
+    - 재고는 **읽기 전용**(창고 기준 · 이벗 재고 연동 전에는 운영팀 입력값)
+- **4. 상품 등록 쓰기**
+    - `myr_app_seller_save_product(seller, code?, payload, submit)` — 임시저장 = draft · 제출 = pending · rejected → pending 재제출 · `myr_app_seller_set_status`(listed ↔ paused)
+    - ProductDraft → `myr_products` 매핑 순수 모듈(+vitest: info 표 5줄 ↔ form/pack/unit · ingredient_rows → ingredients)
+    - 이미지 업로드 `POST /api/products/photos` — Storage 버킷 · `image_urls` 컬럼 · 샵 환불 사진 API 와 같은 틀
+    - **재고 칸 제거 · 이벗 상품코드 칸 없음** · 카테고리 자유 추가 제거(DB 6개 고정) · 제출 완료 화면 연결
+    - 검수는 어드민 상품 검수 전까지 `myr-products.mjs review` · pgTAP(거부 코드 전부) · 가격·옵션 수정 시 재검수 여부 결정 필요(§9-3)
+- **5. 문의 답변(스레드형)**
+    - `/cs` = `myr_app_cs_list(actor='seller')` · `/cs/[code]` = `myr_app_cs_thread` + `myr_app_cs_reply` + `myr_app_cs_close` + `notifyCsReplied` 메일
+    - 대상은 상품 문의 · 배송 문의. 교환·환불은 7번 화면 · 마이그레이션 없음
+- **E1-b. 줄 단위 배송 상태(6번 직전 · 샵 수정 포함 · §3 · §6.8)**
+    - 줄마다 배송 상태 · 택배사 · 송장 · 이벗 등록 시각 · 0069 함수 재정의 + 줄 단위 송장 함수
+    - 샵 주문 상세·환불 화면 수정 · 고객 셀프 환불 기준 "송장 전" → "발주(배송준비중) 전"
+    - 이벗 연동(E2·E3) 전에도 동작 — 그때까지 상태 전환·송장 입력은 운영 스크립트 / 어드민 주문 화면
+- **6. 주문 열람(읽기 전용)**
+    - 새 RPC `myr_app_seller_orders(seller)` — 내 줄만 · 수취인 원문 없음 · `김*은` 마스킹 · 줄마다 배송 상태 · 송장
+    - `/orders` 화면(시안 없음) · **셀러 환불 버튼 없음**(7번 승인 흐름으로)
+- **7. 교환·환불 승인형 CS(필수 · E4 의 DB 부분)**
+    - 새 마이그레이션 `myr_refund_requests` — 교환/환불 · 줄·수량 · 사유 · 사진 · 처리 방법 · 상태(대기 · 진행 중 · 완료 · 반려) · 타임라인
+    - 샵 환불 신청 페이지 수정 — 발주 전은 지금처럼 즉시 취소, 배송준비중 이후는 "요청" 생성
+    - 콘솔 처리 — 승인(처리 방법 선택) 또는 반려 + 고객 메시지 · 반려 메일
+    - 승인 뒤: 발주 전 = 즉시 `refundItems` · 발주 후 환불 = 회수 접수 → 회수 확인 → `refundItems` · 교환 = 회수(필요 시) → 재발송
+    - 회수·재발송 실행은 어드민 몫 — 이벗 회수 API(E4) 전에는 운영자가 "회수 완료 · 재발송 송장" 을 수동 처리
+    - 환불 사진 서명 URL · 단순 변심 왕복 배송비(UI 의 ₩6,000)는 정책 결정 필요
+- **8. 홈 지표 · 실적** — `myr_app_seller_sales(seller)`(이번 달 매출·주문·수량 · CS 비율 · 7일 막대) → `MOCK_STATS` `mockMonthRevenue` 치환 · 정산율은 `platform_settings`(§9-6 전까지 UI 의 10% 는 자리값) · `/sales`(시안 없음)
+- **9. 프로필** — 사진 업로드(Storage) → `sellers.avatar_url` · `/my` 알림 이메일 · 정산 계좌(시안 없음)
+- **10. 가입** — `/signup` `/verify-sent` · `create_seller_from_signup`(0010) 재사용 또는 MYR 축소판 · Supabase 이메일 템플릿이 셀러리와 공유되는 제약(§2.1)
+- **11. 마무리** — `check-boundaries` 규칙(셀러리 모듈 import 금지) · 이 문서 §7 · `docs/deploy.md` MYR 표 · pgTAP/vitest 결과를 PR 본문에
+
 ### 4.3 `apps/myr-admin` (운영)
 
-| 경로 | 내용 | 원본 |
-|---|---|---|
-| `/login` | 이메일 로그인 · `requireAdmin()`(`profiles.role='admin'`) | `apps/admin` |
-| `/home` | 검수 대기 수 · 오늘 주문 · 미답변 문의 | |
-| `/products` `/products/[code]` | 검수 대기 목록(pending 우선) · 상세(이미지 · 문구 · 옵션 · 셀러) · 승인/반려(사유) · listed/paused 강제 전환 | `apps/admin` 상품 검수(파트너 관리) 패턴 |
-| `/orders` `/orders/[code]` | 주문표(수취인 원문) · **운송장 단건/CSV · 발주서 · 교환 재발송**(물류센터 · 결정 8) · 환불 대행(`actor='admin'`) | `apps/brand/(console)/orders`(발송) + `apps/admin/(console)/(money)/orders`(열람·환불) |
-| `/cs` `/cs/[code]` | 열람 · 대행 답변(`sender='seller'`, `actor_role='admin'`) | `(money)/cs` |
-| `/sellers` | 인플루언서 목록 · 정지/복구 | `partner-admin.mjs` 기능의 화면판 |
-| (2차) `/settle` | 정산 실행 · 지급 | 0020 패턴 |
+2026-11-03 개정 — 이벗 연동을 반영해 화면을 다시 나눴다. 우선순위는 짝이 되는 작업과 함께 간다: **우선 1** ↔ 인플루언서 4번(상품 등록) · **우선 2** ↔ E1-b · 인플루언서 6번 · **우선 3** ↔ 이벗 확정 뒤 E2~E4 · 인플루언서 7번 · **우선 4** ↔ 이벗 재고 API · 박스 발송인 결정 뒤.
 
-`noindex` · `/robots.txt` disallow · 운영자 외 세션은 404 가 아니라 `/login` 으로.
+- **우선 1 · 로그인** `/login`
+    - 관리자 계정 로그인(셀러리와 같은 `profiles.role='admin'` · `requireAdmin()` 복사) · 관리자가 아니면 거부
+    - noindex · `/robots.txt` disallow · 운영자 외 세션은 404 가 아니라 `/login` 으로
+- **우선 1 · 홈** `/`
+    - 검수 대기 수 · 발송 대기 수(이벗 연동 뒤 = 오늘 발주 결과 성공·실패) · 배송 지연 수 · 처리 안 된 교환·환불 수 · 재고 부족 수(이벗 재고 연동 뒤)
+    - 숫자를 누르면 해당 화면으로
+- **우선 1 · 상품 검수** `/products` · `/products/[code]`
+    - 상태별 목록(심사 중 · 판매 중 · 일시중지 · 반려) · 인플루언서 필터
+    - 샵과 같은 모양의 상세 미리보기
+    - 승인 · 반려(사유 필수) · 판매중지 · 재개(`myr_app_admin_review_product` 0056)
+    - **이벗 상품코드 입력·수정**(옵션이 있으면 옵션별 · E1-a) — 이벗 확정 전에는 선택, 확정 뒤 승인 필수
+    - 재고 입력(이벗 재고 연동 전까지 운영팀 값)
+    - 이 화면이 생기면 `myr-products.mjs review` 삭제
+- **우선 2 · 주문** `/orders` · `/orders/[code]`
+    - 전체 주문 · 상태·기간·인플루언서 필터 · 수취인 정보 전체(열람 기록 `sensitive_access_log`)
+    - 줄별 배송 상태 · 송장 · 이벗 등록 이력
+    - **송장 수동 입력·정정**(주문 단위 = 0069 재정의 · 줄 단위 = 새 함수) · 송장 CSV 일괄
+    - **예외 환불**(`refundItems` actor='admin' · 0061 이 관리자에게 모든 줄을 허용) — 평소 환불은 인플루언서 승인 흐름 · 교환·반품 화면에서 끝나고, 이건 그 흐름이 막혔을 때만: 인플루언서 미응답 · 정지·탈퇴 · 토스 콘솔에서 금액만 취소된 건 정리(§6.3 운영 큐) · 오배송·분실 같은 물류 사고. 기본 버튼으로 두지 않고 **사유 필수** · 관리자 처리 기록 · 해당 인플루언서에게 알림 메일 · 그 줄에 진행 중인 교환·환불 요청이 있으면 경고하고 같이 닫는다(이중 환불은 DB 가 막지만 요청 상태가 어긋날 수 있다)
+    - 이 화면이 생기면 `/api/ops/ship` · `myr-ops.mjs`(+ `lib/myr-ops-plan.mjs` · 테스트) · `.env.example` 의 `MYR_SHOP_URL` 삭제 — `ship.ts` 는 콘솔로 복사(정식)
+- **우선 2 · 문의** `/cs` · `/cs/[code]`
+    - 전체 문의 열람 · 상태 필터 · 대행 답변(`sender='seller'` `actor_role='admin'`) · 종료
+- **우선 3 · 발주·배송** `/shipping`(E2 · E3 와 함께)
+    - 오늘 11시 발주 대상 미리보기 · 이벗 등록 실패 목록과 [다시 보내기] · 배송준비중에서 멈춘 지연 목록 · 크론 실행 기록(발주 · 송장 수집)
+- **우선 3 · 교환·반품** `/returns`(인플루언서 7번 · E4 와 함께)
+    - 인플루언서가 승인한 요청 중 회수가 필요한 건
+    - 회수 접수 · 취소 · 상태 확인(이벗 `exprtakeback` 등) — E4 전에는 "회수 완료" 수동 처리
+    - 회수 확인 뒤 환불 실행 · 교환 재발송 등록(E4 전에는 재발송 송장 수동 입력)
+- **우선 4 · 재고** `/stock` — 이벗 재고와 판매 가능 수량 비교 · 재고 부족 기준 · 알림(바인허브 `EbutStockService` · `SendWarehouseLowStockNotification` 참고)
+- **우선 4 · 인플루언서** `/sellers` — 목록 · 상품 수 · 계정 연결 여부 · 정지·복구 · 초대(운영팀이 만든 셀러 행에 계정 연결) · 박스에 인플루언서 이름을 찍기로 하면 인플루언서별 이벗 쇼핑몰 코드·보내는 사람(바인허브는 한의원별 `ebut_shop_code`)
+- **우선 4 · 설정** `/settings` — 이벗 공통 설정(쇼핑몰 코드 · 보내는 사람) · 발주 마감 시각 · 배송비 · 무료배송 기준 · 공휴일(선택 · 바인허브에도 없음)
+- **나중 · 정산** `/settle` — 정산 정책(마진율 · 지급 주기)이 정해진 뒤 · 0020 패턴
 
 ---
 
@@ -250,8 +348,12 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 - 배송비: 줄 환불 때 배송비는 **돌려주지 않는다**(기본) · 모든 줄이 환불되면 배송비까지 전액. 남은 줄 합계가 무료배송 기준 아래로 떨어져도 배송비를 사후 청구하지 않는다(§9-11 에 대안).
 - 가상계좌 `WAITING_DEPOSIT` 은 토스 호출 없이 상태만 취소(§6.7).
 
+- **이벗 연동 뒤(2026-11-03 · §6.8)**: 고객 셀프 환불 기준이 "발송 전" → "**발주 전**"(줄 상태 PAID · 평일 11시 전) 으로 당겨진다. 배송준비중 이후는 환불 신청 페이지가 즉시 취소 대신 **요청**(`myr_refund_requests`)을 만들고, 인플루언서 승인 → (회수) → `refundItems` 로 간다. `refundItems` · precheck · record 자체는 그대로 — 부르는 시점과 주체만 바뀐다.
+
 ### 6.4 교환(1차 최소안)
 문의 유형 '교환·반품' 스레드에서 인플루언서가 판단하고, **재발송은 물류센터(admin)** 가 주문 단위로 `exchange_courier` · `exchange_tracking_no` 입력 → 고객 주문 상세에 "교환 발송" 줄 + 메일. 주문 · 줄 `status` 는 바꾸지 않는다(PAID 유지). 상태 기계(`EXCHANGE_REQUESTED → EXCHANGED`) 는 운영해 보고 필요하면 2차.
+
+- **2026-11-03 개정 — 승인형으로**: 이벗으로 발주되면 교환은 "회수(필요 시) → 이벗에 교환 주문 재등록(바인허브 `ordGbn=2`) → 새 송장" 이라 스레드만으로는 처리할 수 없다. 교환·환불 요청을 `myr_refund_requests` 로 따로 두고(인플루언서 7번), 상태는 대기 → 진행 중 → 완료/반려(바인허브 ER/EP/EC/EJ · RR/RP/RC/RJ 와 같은 구조). 처리 방법: 환불 요청 = 전액 환불 · 부분 환불(배송비 차감) · 교환으로 전환 / 교환 요청 = 바로 재발송 · 회수 후 재발송 · 환불로 전환(UI 시안 `resolutionOptions`). 교환 재발송 송장은 E4 전까지 어드민 수동 입력.
 
 ### 6.5 메일(Resend · 기존 템플릿)
 주문 확인(고객 1통 + **줄의 셀러마다 1통** — 내 줄만 담아 `sellers.email`) · 배송 시작(고객) · 환불 완료(고객 + 해당 줄 셀러) · 교환 발송(고객) · 입금 안내(가상계좌) · 문의 접수(셀러) · 문의 답변(고객). `mail-events.server.ts` 복사본에서 `brands.email → sellers.email`. 발신은 MYR 도메인 인증 전까지 `noreply@sellery.life`.
@@ -273,6 +375,37 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
   - 환불 가드: `WAITING_DEPOSIT` 은 "취소"(토스 취소 호출 없이 상태만) · `PAID` 이후는 §6.3. 셀러 주문표·실적은 `WAITING_DEPOSIT` 을 매출에 넣지 않는다.
 - **2026-10-30 적용(0058)**: 위 그대로 — `myr_app_confirm_checkout` 이 `WAITING_FOR_DEPOSIT` 을 받으면 `WAITING_DEPOSIT` 주문 + 재고 예약, `DEPOSIT_CALLBACK`/reconcile 이 `myr_app_deposit_done`(→ PAID) · `myr_app_deposit_expire`(→ CANCELED · 줄 CANCELED · 재고 반환) 로 종결. 성공 페이지가 은행·계좌·기한을 보여준다. 입금 안내 메일은 아직 없음. 위젯에 가상계좌를 켤지는 토스 설정(§9-10).
 - 1차에 가상계좌를 미루더라도 **상태값과 컬럼은 M4 스키마에 넣어 둔다** — 나중에 열 때 마이그레이션 없이 위젯 설정 + 함수 분기만 추가하면 된다.
+
+### 6.8 물류 — 이벗(Ebut) 자동 발주 · 송장 (2026-11-03 · 결정 13)
+
+물류사가 바인허브와 같은 이벗을 쓰기로 했다. MYR 상품이 만들어진 뒤 이벗 쪽 등록 절차(창고 입고 · 상품코드 발급)는 아직 정해지지 않았으므로, **우선 바인허브와 같은 방식으로 "운영팀이 상품 검수 때 이벗 상품코드를 연결" 하는 것까지 만들고**, API 연동(E2~E4)은 계정·절차가 확정된 뒤 붙인다.
+
+**바인허브 방식(참고 · `weglow-biz/vyneherb` `backend/shop`)**
+
+| 시각(KST) | 하는 일 | 이벗 API · 바인허브 코드 |
+|---|---|---|
+| 평일 11:00 | 11시 전 첫 결제가 된 주문의 "결제완료" 줄을 이벗에 등록 → 성공한 줄만 "배송준비중" · 실패 주문은 3회 재시도 뒤 critical 로그 | `ordercreatem`(Bearer API 키 · 줄마다 `orderNo` = 주문 줄 id · `goodsCode` = 상품코드 · 수취인 · 보내는 사람 · `ordShop` 쇼핑몰 코드 · `ordGbn` 1 일반/2 교환) · `Jobs/OrderStatusToPreparing.php` |
+| 매일 18:00 | 배송준비중·배송중 줄을 조회해 `invcExprNo`(송장) 저장 → "배송중" · 택배사 `exprStatus=91` 또는 배송 시작 10일 경과 → "배송완료" · 그 뒤 남은 배송준비중 줄은 `is_delayed` | `orderstatus`(codeType 2 · 줄 id 목록) · `Jobs/OrderStatusToDeliveringOrDelivered.php` |
+| 반품 시 | 회수 접수 · 취소 · 상태 조회 | `exprtakeback` · `exprtbcancel` · `exprtbstatus` · `Jobs/AssignPickupReturnNumber.php` |
+| 수시 | 창고 재고 조회 · 부족 알림 | `EbutStockService` · `SendWarehouseLowStockNotification` |
+
+환경값: `EBUT_ID` · `EBUT_CUST_CODE` · `EBUT_API_KEY` · `EBUT_ORD_SHOP` + 보내는 사람(이름 · 연락처 · 우편번호 · 주소). 공휴일은 처리하지 않는다(평일만).
+
+**MYR 에 옮길 때의 작업(E1~E4)**
+
+| 번호 | 내용 | 짝이 되는 콘솔 작업 | 시점 |
+|---|---|---|---|
+| E1-a | `myr_products` 이벗 상품코드(옵션별) · 공개 RPC 제외 | 어드민 상품 검수(우선 1) | 지금 — 확정 전에는 선택 입력 |
+| E1-b | 줄 단위 배송 상태 · 송장 · 이벗 등록 시각 · 지연 표시(§3) · 0069 재정의 + 줄 단위 송장 함수 · 샵 주문 상세·환불 화면 · 고객 셀프 환불 기준 "발주 전" | 인플루언서 6 · 어드민 주문(우선 2) | 인플루언서 6번 직전 · 이벗 확정 불필요 |
+| E2 | 평일 11시 발주 크론(Vercel `0 2 * * 1-5` UTC) — 11시 전 결제(가상계좌는 입금 시각) 줄 → `ordercreatem` → 배송준비중 · 3회 재시도 · 실행 기록 | 어드민 발주·배송(우선 3) | 이벗 계정 확정 뒤 |
+| E3 | 매일 18시 송장 수집 크론(`0 9 * * *` UTC) — `orderstatus` → 줄 송장 · 배송중/배송완료 · 배송 시작 메일(줄 단위 · 같은 송장 묶음 1통) · 지연 표시 | 어드민 발주·배송(우선 3) | E2 와 함께 |
+| E4 | 반품 회수 접수·취소·상태 · 교환 재등록(`ordGbn=2`) · `myr_refund_requests`(DB 는 인플루언서 7번에서 먼저) | 인플루언서 7 · 어드민 교환·반품(우선 3) | 요청·승인은 먼저, 회수 API 는 이벗 확정 뒤 |
+
+규칙:
+- 이벗 호출은 `myr-shop` 의 크론에서만(결정 12 — 외부 호출 한 곳). 콘솔의 [다시 보내기] · 회수 접수는 같은 패키지 함수를 서버 action 에서 부른다.
+- 발주는 멱등이어야 한다 — 이벗 등록에 성공한 줄만 상태를 바꾸고(바인허브와 같음), 같은 줄을 두 번 보내지 않도록 `ebut_registered_at` 이 있는 줄은 제외.
+- 수취인 이름·연락처·주소가 물류사로 넘어가므로 **개인정보처리방침에 수탁자(물류사) 명시**.
+- 이벗 장애 대비로 어드민의 수동 송장 입력(0069 계열)은 연동 뒤에도 남긴다.
 
 ---
 
@@ -303,8 +436,10 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 | **S4/S5 결제·주문 · 완료(2026-10-30)** | **0058** `myr_checkouts` · `myr_checkout_items` · `myr_orders` · `myr_order_items`(가상계좌 `WAITING_DEPOSIT` · `deposit_due_at` 포함) · `myr_shipping_fee`(platform_settings `myr_shipping` 50,000/3,000) · `myr_app_create_checkout`(줄 합치기 · listed/옵션/단가/잔여 검증 · 한 줄이라도 미달이면 `LINES_REJECTED items[]` · supersede) · `myr_app_claim_checkout` · `myr_app_confirm_checkout`(상품 행 id 순 `for update` · DONE → PAID · WAITING_FOR_DEPOSIT → WAITING_DEPOSIT + 재고 예약) · `myr_app_deposit_done/expire/due` · `myr_expire/stale/purge_*` · `myr_app_guest_token_issue/verify/lookup` · 0021 `purge_checkout_pii` 가 `myr_orders` 도 보게 재정의 · sold_qty 트리거(줄 + 주문 상태). **샵**: `lib/checkout-rules.ts`(순수 · 검증·파서·문구) · `lib/server/{toss,checkout-sync,customers,cron,rate-limit}.ts`(셀러리 복사) · `/api/checkout` · `/api/payments/confirm`(회원 user_id · 비회원 `myr_gck` 쿠키 · 성공 시 계정 장바구니 비움 · 비회원 토큰 쿠키 `myr_guest_<code>`) · `/api/payments/webhook` · `/api/cron/reconcile`(`vercel.json` 10분) · `/checkout`(토스 결제위젯 `PaymentWidget.svelte` · 비회원 이메일·동의) · `/checkout/success`(confirm 1회 · 입금 안내) · `/checkout/fail`(본인 PENDING 종결). 확인: pgTAP 101 · vitest · 로컬 브라우저로 비회원 담기 → 체크아웃 → 세션 생성(35,000 = 32,000 + 배송비) → 위젯 렌더 → confirm/webhook/cron/fail 랜딩을 API 로 검증(토스 시크릿이 로컬에 없어 승인은 `CONFIG_ERROR` 로 FAILED 되는 것까지). **남은 것**: 토스 테스트 키 리허설(카드 · 간편결제 · 두 셀러 담아 결제 · 가상계좌 입금 콜백) — Vercel `myr-shop` 에 `TOSS_SECRET_KEY` `PUBLIC_TOSS_CLIENT_KEY` `CRON_SECRET` + 토스 웹훅 URL 등록 뒤(docs/deploy.md MYR 표) · PAID 뒤 토스 콘솔 취소는 줄 환불 RPC(다음 마이그레이션) 전까지 payment_events 운영 큐(`needs_manual_adjust`) · 주문 확인 메일 없음 | 마이그레이션 1개 · pgTAP 101 · 라우트 4 · 화면 3 |
 | M4 샵 | `apps/myr-shop` 생성(홈 · `/p/[code]` · 장바구니 · 로그인 · 체크아웃 · 결제 API · 웹훅 · reconcile · 주문 조회) + 0057 `myr_checkouts` `myr_checkout_items` `myr_orders` `myr_order_items`(가상계좌 상태·컬럼 포함) · 다중 줄 결제 RPC · 줄 단위 환불 RPC(actor 한 벌 · 부분 취소) · `refund.server.ts` `checkout.server.ts` | 앱 1 · 마이그레이션 1개 · 토스 테스트 키 리허설(카드 · 간편결제 · 가상계좌 입금 콜백 · **두 셀러 담아 한 줄만 환불**) |
 | M4-UI(선행) · **2026-10-29 완료** | 디자인(Claude Design "MYR Shop" 프로젝트 파일 `MYR Shop.dc.html` 2026-10-28 판) 을 **목 데이터로 화면만** — `apps/myr-shop`: `/` 홈 · `/category?cat=&creator=` · `/p/[code]` · `/cart` · `/checkout` · `/checkout/done` · `/my` · 탭바 · 토스트. 장바구니·찜·주문자·목 주문은 `localStorage`(`myr-shop-v1` · `lib/state.svelte.ts`), 데이터는 `lib/data.ts`. 결제 수단 칸은 디자인 그림(§6.7 위젯 자리) · 포인트 칸은 뺌(§9-12) · 뒤로가기는 `lib/nav.ts`(앱 안에서 온 길이 없으면 홈). **2차(같은 날 · "MYR Shop PC" 2026-10-29 판)**: 상세페이지 섹션 — 레시피 노트 → 01 왜 만들었나(스토리 + 숫자 포인트 3) → 02 성분표(성분·이유·함량) → 03 섭취법(3스텝) → 04 제품 정보(스펙 + 표) → 05 FAQ → 함께 보면 좋은 레시피 — 모바일·PC 공통(인플루언서 상품 등록 템플릿 = `Detail` 타입 · 민지 젤리·하루 콜라겐만 실제 문구, 나머지는 `genericDetail`) + **PC(lg≥1024) 반응형**: 상단 내비(`SiteHeader`) · 홈 2단 히어로 + "이번 주 레시피" · 카테고리 사이드바 · 상세 2단 + sticky 구매 패널 · 장바구니/결제 2단 + sticky 요약 · 마이 2단 | 앱 골격 · 컴포넌트 · 테마(`app.css` 토큰은 `apps/myr` 와 같은 값) · `npm run dev:myr-shop`(5178) |
-| M5 인플루언서 콘솔 2 | 주문(내 줄 열람 · 줄 환불) · 문의(0058 `myr_cs_*`) · 메일 훅 | 마이그레이션 1개 |
-| M6 운영 콘솔 2 · 실적 | admin 주문표 · **운송장 · 발주서 · 교환 발송**(물류센터 · 운송장은 **0069 `myr_app_admin_ship` 그대로 호출** · `ship.ts` 를 콘솔로 복사) · 문의 열람 · 환불 대행 · 인플루언서 `/sales`(줄 기준) · `seller_margin_rate` 스냅샷. **이때 지우는 것**: `packages/db/scripts/myr-ops.mjs`(+ `lib/myr-ops-plan.mjs` · 테스트) · 샵 `/api/ops/ship` · `.env.example` 의 `MYR_SHOP_URL` · docs/deploy.md MYR 표의 발송 처리 문장 | |
+| **M5-UI 인플루언서 콘솔 화면 · 2026-11-03** | Claude Design "MYR Influencer Admin"(모바일 · PC) 시안을 목 데이터로 — 홈 · 교환/환불 CS · 내 제품 · 8단계 상품 등록 · `ssr=false` · 인증·DB 없음 · `npm run dev:myr-influencer`(5179) | 앱 1 |
+| M5 인플루언서 콘솔 기능 | **§4.2.1 작업 순서 0~11**(배포 · 공용 코드 · 로그인 · 상품 읽기/쓰기 · 문의 · 주문 열람 · 승인형 교환/환불 · 실적 · 프로필 · 가입) — 2026-11-03 이벗 반영으로 주문 탭은 열람만, 환불은 승인 흐름 | 마이그레이션 2~3개 |
+| M6 운영 콘솔 | **§4.3 우선 1~4**. 우선 2(주문 · 송장 수동 입력)가 생기면 **지우는 것**: `packages/db/scripts/myr-ops.mjs`(+ `lib/myr-ops-plan.mjs` · 테스트) · 샵 `/api/ops/ship` · `.env.example` 의 `MYR_SHOP_URL` · docs/deploy.md MYR 표의 발송 처리 문장. 0069 RPC 는 남고 E1-b 에서 재정의 · `ship.ts` 는 콘솔로 복사 | |
+| E1~E4 이벗 연동 | **§6.8 표**. E1-a 는 어드민 상품 검수와 · E1-b 는 인플루언서 6번 직전(샵 수정 포함) · E2~E4 는 이벗 계정·상품 등록 절차 확정 뒤(§9-14) | 마이그레이션 2~3개 · 크론 2 |
 | M7 운영 전환 | 토스 라이브 키 · 크론 · `check-boundaries` 규칙 · 랜딩 루트 이전(§2) · 옛 주소 리다이렉트 | |
 
 M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 결제 리허설 전까지만 끝나면 되지만 도메인 이름은 M2 의 메일 링크·`PUBLIC_*_URL` 에 들어가므로 일찍 정하는 게 좋다. M4 가 가장 크다(`apps/shop` 복사 뒤 캠페인 흔적 제거).
@@ -338,3 +473,5 @@ M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 �
 11. **배송비 규칙** — 무료배송 기준 금액(디자인 Tweaks `freeShipping`) · 기본 배송비 · 도서산간 추가 여부 · 줄 환불 뒤 남은 합계가 기준 아래로 떨어질 때(§6.3 기본 = 사후 청구 없음 · 대안 = 마지막 줄 환불 시 배송비 차감) · 배송비 정산 귀속(MYR 수입 vs 셀러 분배).
 12. **찜 · 포인트** — 디자인 "마이" 에 찜 목록·포인트가 있다. 찜은 셀러리 팔로우(0045) 를 상품 단위로 바꾸면 되지만(`myr_wishes`), 포인트는 🥬 를 가져오지 않기로 했으므로 디자인에서 빼거나 별도 적립 정책을 정해야 한다. 1차 = 찜만(브라우저 저장) · 포인트 없음. **→ 2026-10-30 결정: 찜도 장바구니와 함께 계정 보관(0057 `myr_likes` · §6.2)**. 포인트는 여전히 없음.
 13. **결제수단 UI 영역** — 디자인의 "결제수단 선택" 은 그려진 그림이고, 실제로는 토스 위젯이 그 자리를 렌더한다(§6.7). 위젯 variant 로 디자인에 가깝게 맞추되 완전히 같게는 안 된다.
+14. **이벗 연동 세부(2026-11-03 · §6.8)** — 확인 대기: ① MYR 이 바인허브와 **같은 이벗 계정**(고객코드 · API 키)을 쓰는지, 새로 받는지 ② MYR 상품을 이벗에 등록하는 절차(누가 · 언제 창고 입고와 상품코드 발급을 하는지 · 옵션별 코드인지) ③ 박스 **보내는 사람**을 MYR 로 할지 인플루언서 이름으로 할지(인플루언서별이면 셀러마다 쇼핑몰 코드·발송인 정보 — 바인허브의 한의원별 `ebut_shop_code` 와 같은 구조) ④ 분할 출고(한 주문 여러 박스) 유무 ⑤ 11시 이후·공휴일 주문 처리 ⑥ 발주 후 출고 취소 가능 여부(가능하면 "발주 전" 환불 기준을 늦출 수 있다).
+15. **교환·환불 비용 정책** — 단순 변심 왕복 배송비(UI 시안 ₩6,000 · 고객 부담) · 파손·오배송은 MYR 부담 · 개봉 제품 불가 · 수령 7일 기준. 시안 문구(`POLICY_BY_REASON`)를 정책으로 확정할지.
