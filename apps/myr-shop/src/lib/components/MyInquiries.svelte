@@ -1,7 +1,7 @@
 <script lang="ts">
 	/** 마이 "내 문의" — 아코디언(대표 시안 2026-11-02). 접힌 줄: 상품 타일 · 상태 칩 · 유형 · 상대 시각 · 첫 질문(0064 first_body) · 크리에이터 · 상품.
 	 *  펼치면 GET /api/cs/<code>(세션 user.id) 로 스레드를 한 번 읽어 말풍선으로 — 내 문의(회색 상자 · 첫 질문엔 주문번호) · 크리에이터 답변(주황 테두리). 답변 대기면 안내 줄.
-	 *  추가 문의는 [문의 화면에서 이어서 묻기] → /cs/<code>. */
+	 *  이어 묻는 폼은 없다 — 더 궁금하면 상품 페이지·주문 상세의 문의 시트로 새 문의. */
 	import { csSenderLabel, relTime, type CsConversation, type CsMessage, type CsThread } from '$lib/cs-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
@@ -53,7 +53,7 @@
 					{#if !t || t.state === 'loading'}
 						<p class="py-3 text-center text-[13px] text-fg-faint">불러오는 중…</p>
 					{:else if t.state === 'error'}
-						<p class="py-3 text-center text-[13px] text-fg-faint">문의를 불러오지 못했어요 — <a href="/cs/{q.code}" class="font-bold text-accent">문의 화면에서 보기</a></p>
+						<p class="py-3 text-center text-[13px] text-fg-faint">문의를 불러오지 못했어요 — 접었다가 다시 열어주세요</p>
 					{:else if t.state === 'ok'}
 						{#each t.messages as m, i (m.id)}
 							{#if m.sender === 'customer'}
@@ -72,9 +72,6 @@
 						{/each}
 						{#if q.status === 'OPEN'}
 							<p class="flex items-center gap-1.5 px-1 text-[12px] text-fg-faint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>답변을 기다리고 있어요 · 보통 1영업일 안에 답변돼요</p>
-						{/if}
-						{#if q.status !== 'CLOSED'}
-							<a href="/cs/{q.code}" class="self-end px-1 text-[12.5px] font-bold text-accent">문의 화면에서 이어서 묻기 →</a>
 						{/if}
 					{/if}
 				</div>

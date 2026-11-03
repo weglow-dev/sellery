@@ -13,12 +13,10 @@ import {
 	normalizeCsBody,
 	parseClientToken,
 	relTime,
-	parseCsActionResult,
 	parseCsConversation,
 	parseCsForOrder,
 	parseCsOpenInput,
 	parseCsOpenResult,
-	parseCsReplyInput,
 	parseCsThread
 } from '../lib/cs-rules';
 
@@ -54,10 +52,6 @@ describe('parseCsOpenInput', () => {
 	it('주문번호 형식 밖 → order_code · 비면 null', () => {
 		expect(parseCsOpenInput({ ...ok, order_code: 'MYR 1001' })).toMatchObject({ ok: false, field: 'order_code' });
 		expect(parseCsOpenInput({ ...ok, order_code: '' })).toMatchObject({ ok: true, orderCode: null });
-	});
-	it('parseCsReplyInput', () => {
-		expect(parseCsReplyInput({ body: ' 더요 ' })).toEqual({ ok: true, body: '더요' });
-		expect(parseCsReplyInput({ body: '' })).toMatchObject({ ok: false, field: 'body' });
 	});
 });
 
@@ -112,10 +106,6 @@ describe('파서', () => {
 		expect(parseCsOpenResult({ ok: false, code: 'BAD_TYPE' })).toEqual({ ok: false, code: 'BAD_TYPE' });
 		expect(parseCsOpenResult({ ok: false, code: 'WEIRD' })).toEqual({ ok: false, code: 'DB_ERROR' });
 		expect(parseCsOpenResult({ ok: true })).toEqual({ ok: false, code: 'DB_ERROR' });
-	});
-	it('parseCsActionResult', () => {
-		expect(parseCsActionResult({ ok: true, conversation_id: 'c1', conversation_code: 'cs1001', status: 'OPEN', message: { id: 'm3', sender: 'customer', body: '더요', created_at: 'x' } })).toMatchObject({ ok: true, status: 'OPEN', message: { id: 'm3' } });
-		expect(parseCsActionResult({ ok: false, code: 'CLOSED' })).toEqual({ ok: false, code: 'CLOSED' });
 	});
 });
 

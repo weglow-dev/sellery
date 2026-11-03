@@ -167,7 +167,7 @@ describe('환불(셀러) — 자기 줄만', () => {
 describe('고객 문의 메일 (S7)', () => {
 	const cs = { conversationId: 'c1', code: 'cs1001', type: '배송 문의', buyerName: '홍길동', orderCode: 'myr1001', productName: '민지 글루타치온 스틱', productCode: 'minji-glutathione-lemon', sellerName: '민지 루틴', isMember: false };
 	it('새 문의 → 셀러: 유형·상품·고객·주문번호 · 본문 인용 · 연락처 없음 · 멱등 키 = 메시지', () => {
-		const m = csOpenedSellerMail(cs, { messageId: 'm1', body: '  배송이  언제\n출발하나요?  ', followUp: false }, ctx);
+		const m = csOpenedSellerMail(cs, { messageId: 'm1', body: '  배송이  언제\n출발하나요?  ' }, ctx);
 		expect(m.subject).toBe('[MYR] 새 고객 문의 · CS1001 · 배송 문의');
 		expect(m.text).toContain('민지 루틴님');
 		expect(m.text).toContain('주문번호: MYR1001');
@@ -176,16 +176,12 @@ describe('고객 문의 메일 (S7)', () => {
 		expect(m.idempotencyKey).toBe('myr_cs_opened:m1');
 		expect(m.tag).toBe('myr_cs_opened');
 	});
-	it('추가 문의는 제목·키가 다르다', () => {
-		const m = csOpenedSellerMail(cs, { messageId: 'm2', body: '더요', followUp: true }, ctx);
-		expect(m.subject).toBe('[MYR] 추가 문의 · CS1001 · 배송 문의');
-		expect(m.idempotencyKey).toBe('myr_cs_followup:m2');
-	});
 	it('답변 → 고객: 링크 /cs/<code> · 비회원 안내 · 긴 본문은 200자에서 자름', () => {
 		const m = csRepliedMail(cs, { messageId: 'm3', body: '가'.repeat(300) }, ctx);
 		expect(m.subject).toBe('[MYR] 문의에 답변이 달렸어요 · CS1001');
 		expect(m.html).toContain('https://myr-shop.vercel.app/cs/cs1001');
 		expect(m.text).toContain('비회원 문의는');
+		expect(m.text).not.toContain('추가 문의');
 		expect(m.text).toContain('가'.repeat(199) + '…');
 		expect(m.idempotencyKey).toBe('myr_cs_replied:m3');
 		expect(csRepliedMail({ ...cs, isMember: true }, { messageId: 'm3', body: 'x' }, ctx).text).not.toContain('비회원 문의는');

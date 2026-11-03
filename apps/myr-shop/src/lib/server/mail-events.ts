@@ -3,7 +3,7 @@
  *   notifyOrderPaid(orderId)        checkout-sync `confirmDone` — 새 주문(already 제외). PAID 면 고객 주문 확인 + 줄의 셀러별 새 주문 · WAITING_DEPOSIT 이면 고객 입금 안내만
  *   notifyDepositDone(orderId)      checkout-sync `depositDone` — 입금 확인 → 고객 주문 확인 + 셀러 새 주문
  *   notifyOrderRefunded(orderId, r) refund.ts `refundItems` — record 가 새로 기록했을 때(already 제외) · 고객 + 환불된 줄의 셀러
- *   notifyCsOpened(csId, msg)       cs.ts `openCs`(접수) · `customerReplyCs`(추가 문의) — 셀러에게 · notifyCsReplied(csId, reply) — 콘솔 답변 → 고객(S7 · 0063)
+ *   notifyCsOpened(csId, msg)       cs.ts `openCs`(접수) — 셀러에게 · notifyCsReplied(csId, reply) — 콘솔 답변 → 고객(S7 · 0063)
  * 받는 사람: 고객 = buyer_email → customers.email → 회원 auth 계정 이메일(없으면 조용히 건너뜀 · 카카오 계정은 이메일이 없을 수 있다) · 셀러 = sellers.email(없으면 건너뜀 — 시드 크리에이터는 비어 있다).
  * 멱등: 템플릿 idempotencyKey(Resend Idempotency-Key + 프로세스 24시간 가드).
  */
@@ -187,8 +187,8 @@ async function loadCs(conversationId: string): Promise<LoadedCs | null> {
 	};
 }
 
-/** 새 문의(접수) · 추가 문의 → 셀러. cs.ts `openCs` · `customerReplyCs` 가 부른다 */
-export async function notifyCsOpened(conversationId: string, message: { messageId: string; body: string; followUp: boolean }): Promise<MailSendResult | null> {
+/** 새 문의(접수) → 셀러. cs.ts `openCs` 가 부른다 */
+export async function notifyCsOpened(conversationId: string, message: { messageId: string; body: string }): Promise<MailSendResult | null> {
 	try {
 		const loaded = await loadCs(conversationId);
 		if (!loaded) return null;

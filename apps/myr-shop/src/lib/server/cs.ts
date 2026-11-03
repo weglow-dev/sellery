@@ -2,13 +2,12 @@
  * 고객 문의(CS) — 0063 RPC 를 service role 로 (packages/db/src/server/cs.server.ts 복사 · 캠페인 → 상품 · brand → seller).
  *   openCs(productCode, input, who)            `myr_app_cs_open` — seller 는 상품에서 파생 · 주문 연결은 소유 증명될 때만(§6.6) · 접수 메일(셀러)
  *   getCsThread(code, key)                     `myr_app_cs_thread(actor='customer')` — client_token(비회원 쿠키) 또는 user_id(회원)
- *   customerReplyCs(code, key, body)           `myr_app_cs_reply(actor='customer')` — ANSWERED → OPEN · CLOSED 면 거부 · 추가 문의 메일(셀러)
  *   listCsForUser(userId)                      `myr_app_cs_list(actor='customer')` — 마이
  *   csForOrder(orderId)                        `myr_app_cs_for_order` — 주문 상세(소유는 라우트가 이미 확인)
  * 셀러 답변·종료(actor='seller'|'admin')는 인플루언서·관리자 콘솔이 같은 RPC 를 부른다(결정 12) — 이 앱엔 없다.
  * actor 와 그 id 는 **세션·쿠키에서만**(원칙 6). 레이트리밋은 라우트가 `rateLimit`.
  */
-import { parseCsActionResult, parseCsConversations, parseCsForOrder, parseCsOpenResult, parseCsThread, parseClientToken, PRODUCT_CODE_RE, type CsActionResult, type CsConversation, type CsForOrder, type CsOpenResult, type CsThread, type CsType } from '$lib/cs-rules';
+import { parseCsConversations, parseCsForOrder, parseCsOpenResult, parseCsThread, parseClientToken, PRODUCT_CODE_RE, type CsConversation, type CsForOrder, type CsOpenResult, type CsThread, type CsType } from '$lib/cs-rules';
 import { parseGuestToken } from '$lib/checkout-rules';
 import { admin } from './admin';
 import { notifyCsOpened } from './mail-events';
@@ -48,7 +47,7 @@ export async function openCs(productCode: string, input: CsOpenInput, who: CsOpe
 		return { ok: false, code: 'DB_ERROR' };
 	}
 	const res = parseCsOpenResult(data);
-	if (res.ok) await notifyCsOpened(res.conversationId, { messageId: res.conversationId, body: input.body, followUp: false });
+	if (res.ok) await notifyCsOpened(res.conversationId, { messageId: res.conversationId, body: input.body });
 	return res;
 }
 
@@ -66,19 +65,6 @@ export async function getCsThread(code: string, key: CsCustomerKey): Promise<CsT
 	const { data, error } = await admin().rpc('myr_app_cs_thread', { p_code: code.trim().toLowerCase(), p_actor: 'customer', ...args });
 	if (error) throw new Error(`myr_app_cs_thread failed: ${error.message}`);
 	return parseCsThread(data);
-}
-
-export async function customerReplyCs(code: string, key: CsCustomerKey, body: string): Promise<CsActionResult> {
-	const args = keyArgs(key);
-	if (!args) return { ok: false, code: 'NOT_FOUND' };
-	const { data, error } = await admin().rpc('myr_app_cs_reply', { p_code: code.trim().toLowerCase(), p_actor: 'customer', ...args, p_actor_user_id: args.p_actor_id, p_body: body });
-	if (error) {
-		console.error('[cs] myr_app_cs_reply failed:', error.message);
-		return { ok: false, code: 'DB_ERROR' };
-	}
-	const res = parseCsActionResult(data);
-	if (res.ok && res.message) await notifyCsOpened(res.conversationId, { messageId: res.message.id, body: res.message.body, followUp: true });
-	return res;
 }
 
 export async function listCsForUser(userId: string): Promise<CsConversation[]> {

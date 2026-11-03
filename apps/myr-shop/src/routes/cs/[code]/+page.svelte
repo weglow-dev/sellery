@@ -1,26 +1,19 @@
 <script lang="ts">
-	/** 고객 문의 스레드 — 머리(상품 · 크리에이터 · 유형 · 상태 칩) · 주문 요약(소유 증명된 주문 · 이 상품 줄) · 말풍선(내 글 오른쪽 · 크리에이터/운영팀 왼쪽) · 추가 문의 폼. CLOSED 는 새 문의 링크.
+	/** 고객 문의 스레드(읽기 전용) — 머리(상품 · 크리에이터 · 유형 · 상태 칩) · 주문 요약(소유 증명된 주문 · 이 상품 줄) · 말풍선(내 글 오른쪽 · 크리에이터/운영팀 왼쪽). 이어 묻는 폼은 없고, 더 궁금하면 주문 상세·상품 페이지의 문의 시트로 새 문의.
 	 *  크리에이터가 답변하면 notifyCsReplied(이메일)도 가지만, 이메일이 없는 고객(비회원 미입력 · 카카오)은 이 화면이 정본. */
-	import { enhance } from '$app/forms';
 	import { won } from '$lib/data';
-	import { CS_BODY_MAX, csSenderLabel } from '$lib/cs-rules';
+	import { csSenderLabel } from '$lib/cs-rules';
 	import { shortDate } from '$lib/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { data, form } = $props();
-	let submitting = $state(false);
+	let { data } = $props();
 	const c = $derived(data.conversation);
 	const closed = $derived(c.status === 'CLOSED');
 	// 새 문의는 같은 문의 시트(CsSheet)로 — 주문이 연결돼 있으면 그 주문 상세(회원/비회원), 아니면 상품 페이지
 	const newAskHref = $derived(c.order ? (c.isMember ? `/orders/${c.order.code}` : `/orders/g/${c.order.code}`) : c.product ? `/p/${c.product.code}` : null);
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const fmtTime = (iso: string) => `${shortDate(iso)} ${new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })}`;
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-		e.preventDefault();
-		(e.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
-	}
 </script>
 
 <svelte:head>
@@ -69,18 +62,8 @@
 				{#if c.status === 'OPEN'}<p class="text-center text-[12px] text-fg-faint">크리에이터가 답변하면 여기서 확인할 수 있어요</p>{/if}
 				{#if closed}<p class="text-center text-[12px] text-fg-faint">처리 종료{c.closedAt ? ` · ${fmtTime(c.closedAt)}` : ''}</p>{/if}
 			</div>
-			{#if closed}
-				<p class="mt-4 border-t border-white/8 pt-4 text-[13px] leading-[1.55] text-white/70">처리 종료된 문의예요. 더 궁금한 점은 {#if newAskHref}<a href={newAskHref} class="font-bold text-accent">{c.order ? '주문 상세' : '상품 페이지'}</a>의 [문의]{:else}주문 상세나 상품 페이지의 [문의]{/if}로 새로 남겨주세요.</p>
-			{:else}
-				<form method="post" action="?/reply" class="mt-4 border-t border-white/8 pt-4" use:enhance={() => { submitting = true; return async ({ update, result, formElement }) => { await update(); if (result.type === 'redirect') formElement.reset(); submitting = false; }; }}>
-					<label for="cs-reply" class="mb-1.5 block text-[13px] font-bold text-fg-soft">추가 문의</label>
-					<div class="flex items-end gap-2">
-						<textarea id="cs-reply" name="body" rows="2" maxlength={CS_BODY_MAX} placeholder="추가로 궁금한 점… (Enter 전송 · Shift+Enter 줄바꿈)" required disabled={submitting} aria-invalid={form?.message ? true : undefined} onkeydown={onKeydown} class="min-h-[52px] flex-1 resize-none rounded-[14px] border-[1.5px] border-white/10 bg-white/4 px-4 py-3 text-[14px] leading-[1.5] text-fg outline-none placeholder:text-fg-faint focus:border-accent disabled:opacity-50">{form?.values?.body ?? ''}</textarea>
-						<button type="submit" disabled={submitting} class="h-[52px] shrink-0 rounded-[14px] bg-accent px-5 text-[14px] font-extrabold text-bg disabled:opacity-60">보내기</button>
-					</div>
-					{#if form?.message}<p role="alert" class="mt-2 text-[12px] text-[#ff6b6b]">{form.message}</p>{/if}
-					<p class="mt-2 text-[12px] leading-[1.5] text-fg-faint">결제 문제는 MYR 운영팀이 함께 확인해요. 카드 정보 등 민감한 정보는 적지 마세요.</p>
-				</form>
+			{#if c.status !== 'OPEN'}
+				<p class="mt-4 border-t border-white/8 pt-4 text-[13px] leading-[1.55] text-white/70">더 궁금한 점은 {#if newAskHref}<a href={newAskHref} class="font-bold text-accent">{c.order ? '주문 상세' : '상품 페이지'}</a>의 [문의]{:else}주문 상세나 상품 페이지의 [문의]{/if}로 새로 남겨주세요.</p>
 			{/if}
 		</section>
 	</div>
