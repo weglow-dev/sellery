@@ -15,6 +15,7 @@ import {
 	type OrderLite
 } from '$lib/server/checkout-sync';
 import { rejectCron } from '$lib/server/cron';
+import { pruneRefundPhotos } from '$lib/server/refund-photos';
 import { isTossError, isUncertain, tossGetPayment } from '$lib/server/toss';
 
 /**
@@ -22,6 +23,7 @@ import { isTossError, isUncertain, tossGetPayment } from '$lib/server/toss';
  *   1. myr_expire_checkouts() — PENDING(+ payment_key 없는 CONFIRMING) 만 EXPIRED (?expire=0 생략)
  *   2. myr_stale_checkouts(2m, 50) — payment_key 있는 CONFIRMING(고착) + FAILED(CANCEL_PENDING) → 재조회 → syncFromPayment(웹훅과 같은 분기표)
  *   3. myr_app_deposit_due(50) — 입금 기한 지난 WAITING_DEPOSIT 주문 → 재조회: DONE → deposit_done · CANCELED/EXPIRED → deposit_expire · 그 외 유지
+ *   4. 환불 사진 고아 정리(0068 · 24시간 지난 미참조 · 100개) — ?prune=0 생략
  */
 export const config: Config = { maxDuration: 60 };
 const STALE_AGE = '2 minutes';
@@ -129,7 +131,8 @@ async function run(request: Request, url: URL): Promise<Response> {
 		}
 		deposits.push({ id: d.id, ref: d.code, status: 'WAITING_DEPOSIT', result });
 	}
-	return json({ ok: true, expired, checked: results.length, results, deposits });
+	const prunedPhotos = url.searchParams.get('prune') !== '0' ? await pruneRefundPhotos() : null;
+	return json({ ok: true, expired, checked: results.length, results, deposits, prunedPhotos });
 }
 
 export const GET: RequestHandler = ({ request, url }) => run(request, url);

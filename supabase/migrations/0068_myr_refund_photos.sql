@@ -127,3 +127,22 @@ end;
 $$;
 revoke all on function public.myr_app_refund_record(uuid, jsonb, text, uuid, text, integer, jsonb) from public, anon, authenticated;
 grant execute on function public.myr_app_refund_record(uuid, jsonb, text, uuid, text, integer, jsonb) to service_role;
+
+-- 고아 사진(올렸지만 환불 신청에 안 실린 것) — 줄 refund_photos 에 없고 p_age 보다 오래된 object 의 경로. 지우기는 Storage API 로(storage.objects 직접 delete 는 protect_delete 가 막는다).
+-- 샵 크론 /api/cron/reconcile 이 10분마다 호출해 지운다(0068 · service role 만).
+create or replace function public.myr_refund_photo_orphans(p_age interval default interval '24 hours', p_limit integer default 100)
+returns setof text
+language sql
+stable
+security definer set search_path = public
+as $$
+  select o.name
+    from storage.objects o
+   where o.bucket_id = 'myr-refunds'
+     and o.created_at < now() - p_age
+     and not exists (select 1 from public.myr_order_items i where o.name = any (i.refund_photos))
+   order by o.created_at
+   limit greatest(coalesce(p_limit, 100), 1)
+$$;
+revoke all on function public.myr_refund_photo_orphans(interval, integer) from public, anon, authenticated;
+grant execute on function public.myr_refund_photo_orphans(interval, integer) to service_role;

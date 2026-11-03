@@ -3,7 +3,8 @@
  *   uploadRefundPhoto(orderId, itemId, file)   본인 줄(라우트가 확인) 아래 `<order>/<item>/<uuid>.<ext>` 로 · 줄당 REFUND_PHOTO_MAX 장 · 매직 바이트로 형식 확인
  *   removeRefundPhoto(orderId, path)            그 주문 아래 경로만 지운다(신청 전 되돌리기)
  *   signRefundPhotos(paths)                     셀러 메일·콘솔용 서명 URL(7일) — 실패하면 그 경로는 뺀다(메일을 막지 않는다)
- * 고아 파일(올렸지만 신청 안 함)은 비공개 버킷에 남는다 — 정리는 운영 스크립트(추후). 경로 규칙은 refund-rules.ts(순수).
+ *   pruneRefundPhotos()                          고아(줄 refund_photos 에 없고 24시간 지난 것)를 myr_refund_photo_orphans 로 찾아 지운다 — 크론 /api/cron/reconcile 이 10분마다
+ * 경로 규칙은 refund-rules.ts(순수).
  */
 import { isRefundPhotoPath, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, refundPhotoPath, sniffImageType } from '$lib/refund-rules';
 import { admin } from './admin';
@@ -57,4 +58,22 @@ export async function signRefundPhotos(paths: string[]): Promise<Map<string, str
 		console.error('[refund-photos] sign failed:', e instanceof Error ? e.message : e);
 	}
 	return out;
+}
+
+/** 고아 사진 정리 — 한 번에 100개까지. 실패해도 throw 하지 않는다(크론이 다음 턴에 다시 본다) */
+export async function pruneRefundPhotos(): Promise<{ found: number; removed: number; error?: string }> {
+	const db = admin();
+	const { data, error } = await db.rpc('myr_refund_photo_orphans', { p_age: '24 hours', p_limit: 100 });
+	if (error) {
+		console.error('[refund-photos] orphans failed:', error.message);
+		return { found: 0, removed: 0, error: error.message };
+	}
+	const paths = (Array.isArray(data) ? data : []).filter((p): p is string => typeof p === 'string' && isRefundPhotoPath(p));
+	if (!paths.length) return { found: 0, removed: 0 };
+	const { data: removed, error: rmError } = await db.storage.from(REFUND_PHOTO_BUCKET).remove(paths);
+	if (rmError) {
+		console.error('[refund-photos] prune remove failed:', rmError.message);
+		return { found: paths.length, removed: 0, error: rmError.message };
+	}
+	return { found: paths.length, removed: removed?.length ?? 0 };
 }
