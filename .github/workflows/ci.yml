@@ -53,9 +53,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # version: latest 는 "최신 릴리스" 를 API 로 조회해 익명 한도에 걸리면 "rate limit exceeded" 로 깨진다(2026-11-03 PR #247 · 이 액션은 token 입력이 없다).
+      # 고정 버전은 조회 없이 npm 에서 바로 설치되고, CLI 메이저 업데이트(3.x)에도 흔들리지 않는다.
+      # 로컬과 같은 버전(npx supabase --version). 올릴 때는 로컬에서 npm run test:db 가 통과하는 버전으로.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
       - name: 로컬 Postgres 시작 + 마이그레이션 적용
         run: supabase db start
       - name: pgTAP (supabase/tests)

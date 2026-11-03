@@ -5,7 +5,7 @@ CLAUDE.md "백엔드 변경 원칙" 7(2026-10-29). 두 층이 있고 둘 다 CI(
 | 층 | 대상 | 명령 | 위치 | CI |
 |---|---|---|---|---|
 | **vitest** (순수 모듈) | 규칙 · 계산 · 매핑 · 검증 — `packages/db` `packages/payments` 의 순수 함수, 운영 스크립트의 순수 부분(`scripts/lib/*.mjs`), 앱의 `$env`·`$app`·DB 를 import 하지 않는 모듈 | `npm test` (`vitest run` · 1~2초) | `packages/*/src/test/*.test.ts` · `apps/*/src/test/*.test.ts` | job "프로토타입 점검" |
-| **pgTAP** (SQL) | 마이그레이션이 만든 RPC 의 동작 · 권한(anon/authenticated EXECUTE 없음 · 표 직접 권한 없음 · RLS on) · 상태 전이 · 거부 코드 | `npm run test:db` (`supabase test db --local` · 로컬 Supabase 가 떠 있어야 한다 `npx supabase start`) | `supabase/tests/*.test.sql` | job "DB 테스트 (pgTAP)" — 빈 DB 에 마이그레이션 전부 적용 뒤 실행 |
+| **pgTAP** (SQL) | 마이그레이션이 만든 RPC 의 동작 · 권한(anon/authenticated EXECUTE 없음 · 표 직접 권한 없음 · RLS on) · 상태 전이 · 거부 코드 | `npm run test:db` (`supabase test db --local` · 로컬 Supabase 가 떠 있어야 한다 `npx supabase start`) | `supabase/tests/*.test.sql` | job "DB 테스트 (pgTAP)" — 빈 DB 에 마이그레이션 전부 적용 뒤 실행 · CLI 는 `supabase/setup-cli` 에 버전 고정(`latest` 는 릴리스 조회가 익명 API 한도에 걸려 실패한 적 있음 2026-11-03 · 액션에 token 입력 없음) |
 
 `.svelte` 화면 · 브라우저 · 토스 결제 시나리오는 자동 테스트 대상이 아니다 — docs/monorepo-migration.md §8.2 대로 사람이 미리보기에서 확인한다.
 
