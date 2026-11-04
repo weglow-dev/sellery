@@ -48,16 +48,8 @@ export const CATS: Cat[] = [
 	{ id: 'mens', name: '맨즈 웰니스', ic: 'mens' }
 ];
 
-/** 크리에이터 아바타 — 사진이 없으면 이니셜 + 핸들 해시로 고른 배경색. 디자인의 네 명은 디자인 색 그대로 */
-const AVATAR_BG = ['#FFB088', '#C4B5FD', '#86EFAC', '#FDE68A', '#7DA8FF', '#F9A8D4', '#99F6E4'];
-const DESIGN_BG: Record<string, string> = { 'minji.routine': '#FFB088', 'haru.well': '#C4B5FD', 'jun.fit': '#86EFAC', 'soy.clean': '#FDE68A' };
-export const handleSlug = (handle: string): string => handle.replace(/^@+/, '').toLowerCase();
-export function creatorStyle(c: Creator): { bg: string; initial: string } {
-	const slug = handleSlug(c.handle);
-	let h = 0;
-	for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-	return { bg: DESIGN_BG[slug] ?? AVATAR_BG[h % AVATAR_BG.length], initial: (c.name.trim()[0] ?? 'M').toUpperCase() };
-}
+/** 크리에이터 아바타(이니셜 + 핸들 해시 배경색) · 핸들 정규화 — 크리에이터 콘솔과 같은 모양이라 공용 패키지에 있다 */
+export { creatorStyle, handleSlug } from '@sellery/myr-core/creator';
 
 /** 04 제품 정보 표 — 공통 항목(제조·유통기한·보관)은 서버 정책이라 상품 입력이 아니다 */
 export const infoRowsOf = (p: Product): { k: string; v: string }[] => [

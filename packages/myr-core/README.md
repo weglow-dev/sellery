@@ -10,6 +10,7 @@ MYR 세 앱(`apps/myr-shop` · `apps/myr-influencer` · `apps/myr-admin`)이 같
 | 경로 | 내용 | 서버 전용 |
 |---|---|---|
 | `constants` · `site` · `text` · `company` | 공용 상수(`MAX_QTY` · `won`) · 샵 주소(`siteOrigin`) · 문자열 정리 · 사업자 정보 | |
+| `auth` · `creator` · `seller` | 표시명 · 프로필 사진 · 안전한 `next`(오픈 리다이렉트 방지) / 크리에이터 아바타 이니셜·색 · 핸들 정규화 / 콘솔 게이트 타입 | |
 | `checkout-rules` · `order-view` · `refund-rules` · `cs-rules` · `ship-rules` | 순수 규칙 — 입력 검증 · RPC 응답 파서 · 화면 판정 · 문구 | |
 | `mail/{resend,layout,templates}` | Resend 전송기 · 메일 레이아웃 · 템플릿(순수) | |
 | `server/config` | `configureMyrCore` — 키·주소 주입 | ✓ |
@@ -18,6 +19,7 @@ MYR 세 앱(`apps/myr-shop` · `apps/myr-influencer` · `apps/myr-admin`)이 같
 | `server/payment-events` | 결제 감사 로그 `payment_events` | ✓ |
 | `server/refund` · `server/refund-photos` | 줄 단위 환불(precheck → 토스 부분 취소 → record) · 환불 사진 | ✓ |
 | `server/cs` · `server/ship` · `server/mail` · `server/mail-events` | 문의 · 발송 · 메일 발송 · 메일 훅 | ✓ |
+| `server/seller` | 크리에이터 콘솔 게이트 `sellerContext(user)` — `sellers.user_id = 계정 and active` | ✓ |
 
 샵에만 있는 것(결제 세션 · 웹훅 · 크론 · 장바구니 · 상품 공개 RPC · 주문 조회)은 `apps/myr-shop/src/lib/server` 에 남아 있다.
 

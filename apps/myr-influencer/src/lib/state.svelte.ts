@@ -27,11 +27,11 @@ class ConsoleState {
 		this.toastTimer = setTimeout(() => (this.toast = null), 2400);
 	}
 
-	/** CS 승인(progress) · 반려(rejected) */
-	resolveCs(id: string, status: 'progress' | 'rejected', resolution: Resolution) {
+	/** CS 승인(progress) · 반려(rejected) — actorName 은 로그인한 크리에이터 활동명(타임라인 "방금 · 이름") */
+	resolveCs(id: string, status: 'progress' | 'rejected', resolution: Resolution, actorName: string) {
 		const cur = this.cs.find((c) => c.id === id);
 		if (!cur) return;
-		this.cs = this.cs.map((c) => (c.id === id ? applyResolution(c, status, resolution) : c));
+		this.cs = this.cs.map((c) => (c.id === id ? applyResolution(c, status, resolution, actorName) : c));
 		this.showToast(status === 'rejected' ? `${cur.no} 반려 처리했어요` : `${cur.no} ${approveLabel(cur, resolution)}했어요`);
 	}
 

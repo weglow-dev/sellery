@@ -238,12 +238,14 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 샵: `$lib/server/env.ts` 가 `$env` → `configureMyrCore` 1회 주입 · `$lib/server/{admin,toss,refund,…}.ts` 는 `import './env'; export * from '@sellery/myr-core/server/…'` 재수출이라 라우트 import 경로는 그대로 · 순수 모듈은 `@sellery/myr-core/<모듈>` 직접
     - 동작 변경 없음(코드 이동 · 환경값을 읽는 위치만 바뀜) — vitest 1,147 통과(옮긴 테스트 8파일 95개는 패키지로) · 로컬 `/api/health` 200(서비스 키 주입 확인) · 발송 API 가 패키지 → RPC 까지 동작
     - 이벗 클라이언트(주문 등록 · 송장 조회 · 회수)도 E2~E4 때 여기(`server/ebut`)에 둔다
-- **2. 인증 골격**
-    - `ssr=false` 제거 · `hooks.server.ts`(샵 복사) · `lib/server/{admin,seller}.ts` — `requireSeller` 게이트 복사 · 🥬 잔액 제거 · 상태 anon/guest/suspended/ok
-    - `(console)` 그룹 + `+layout.server.ts` 가 me(sellers 행) 전달 → `ME` 상수 치환
-    - `/login`(이메일+비번) · `/auth/confirm` `/auth/signout` · `/suspended`
-    - 가입은 10번으로 미루고, 테스트는 시드 셀러 행(`@minji.routine` 등)에 `partner-admin.mjs invite --link` 로 계정 연결
-    - Vercel 환경변수 `PUBLIC_SUPABASE_*`(없으면 빌드 실패) · `SUPABASE_SERVICE_ROLE_KEY` · Preview `PUBLIC_DEV_LOGIN=1` · Supabase Redirect URLs `localhost:5179` · `myr-influencer.vercel.app`(Owner 권한) · 값은 `vercel env pull --cwd apps/shop` 에서(루트 `.env.local` 은 로컬 DB)
+- **2. 인증 골격 — 완료(2026-11-04)**
+    - 게이트: `hooks.server.ts`(Supabase SSR 세션 · 공개 경로 밖은 세션 없으면 `/login?next=`) + `@sellery/myr-core/server/seller`(`sellerContext` — **`sellers.user_id = 계정 and active` 가 진실** · 상태 anon / unlinked / suspended / ok · 셀러리의 guest·foreign·🥬 는 없음) + 앱 `$lib/server/seller.ts requireSeller`(요청당 1회 조회 · 서비스 키 없으면 503). 판정 규칙은 순수 `lib/console-auth.ts`(vitest)
+    - 화면 묶음: 기존 화면을 `(console)` 그룹으로(주소 그대로) — `(console)/+layout.server.ts` 가 `me`(활동명 · 핸들 · 사진 · 이니셜 · 색 — 색·이니셜은 샵과 같은 `@sellery/myr-core/creator`)를 넘기고 목 `ME` 를 대체(홈 · 상품 등록 노트/미리보기 · CS 타임라인 "방금 · 이름"). 콘솔 화면은 목 상태 때문에 **아직 `ssr=false`**(3번에서 끈다) — 게이트는 서버에서 돌고, 정지·연결 없음은 데이터 요청이 안내 화면으로 보낸다(빈 셸에 데이터 없음)
+    - 그룹 밖(서버 렌더 · JS 없이 동작): `/login`(서버 form action `signInWithPassword` · 자격 오류는 한 문구 · `next` 는 같은 오리진만) · `/password`(재설정 메일 · 계정 유무 비공개) · `/password/new`(바꾸면 로그아웃 → 새 비밀번호로 로그인) · `/auth/confirm`(token_hash — 재설정·초대 → `/password/new`) · `/auth/signout`(POST 만) · `/unlinked` · `/suspended`. 로그아웃 버튼: PC 상단 내비 · 모바일 홈
+    - 계정: 가입(10번) 전까지 **`packages/db/scripts/myr-creators.mjs`**(`account` · `invite --console` · `list` · `unlink` · `suspend` · `reactivate` — 셀러리 `partner-admin.mjs` 는 셀러리 콘솔로 메일을 보내서 쓰지 않는다). 시드 크리에이터 4명(민지 루틴 · 하루 웰 · 준 피트 · 소이 클린)에 로컬 계정 연결 완료 — docs/deploy.md 크리에이터 콘솔 절
+    - 공용 패키지로 옮김: 샵 `lib/auth.ts`(displayName · avatarOf · safeNext) → `@sellery/myr-core/auth` · 샵 `creatorStyle` · `handleSlug` → `@sellery/myr-core/creator`
+    - Vercel `myr-influencer`: `PUBLIC_SUPABASE_URL` · `PUBLIC_SUPABASE_ANON_KEY` 넣음(production + preview) · **남은 것(대표)**: `SUPABASE_SERVICE_ROLE_KEY`(Secret 이라 복사 불가) · Supabase Redirect URLs `localhost:5179` · `myr-influencer.vercel.app`(Owner) · 클라우드 크리에이터 계정(`myr-creators.mjs` 를 운영 키로)
+    - 확인: 로컬 HTTP 시나리오(비로그인 → 로그인 이동 · 틀린/맞는 비밀번호 · 외부 `next` 무시 · 정지 → `/suspended` · 연결 끊기 → `/unlinked` · 로그아웃 · 만료 링크 · 새 비밀번호 화면 세션 필요) · 프로덕션 빌드에서 다른 출처 로그인·로그아웃 폼 403(dev 서버는 출처 검사를 안 한다)
 - **3. 내 제품 읽기**
     - 새 마이그레이션 `myr_app_seller_products(seller)` + `draft` 상태 추가
     - `/products` 서버 load → 목 products 를 서버 값으로 · 상태 매핑 순수 함수(임시저장 · 심사 중 · 판매 중 · 일시중지 · 반려)

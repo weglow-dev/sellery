@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { env as pub } from '$env/dynamic/public';
-import { avatarOf, displayName } from '$lib/auth';
+import { avatarOf, displayName } from '@sellery/myr-core/auth';
 import { siteOrigin } from '$lib/seo';
 
 /** 헤더·마이 화면용 세션(표시명 · 아바타 · 이메일). 세션 조회 실패는 로그아웃 상태로 — 레이아웃이 죽으면 전 페이지가 죽는다.

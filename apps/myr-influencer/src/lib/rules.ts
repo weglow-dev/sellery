@@ -3,7 +3,7 @@
  *
  *  ⚠ 돈 숫자 두 개는 **디자인 값**이고 정책이 아니다 — 정산 정책이 정해지면(docs/myr.md §9-6) 서버 값으로 바꾼다.
  *    PLATFORM_FEE_RATE 10%(에디터 "예상 정산") · ROUND_TRIP_SHIPPING ₩6,000(부분 환불 · 단순 변심 왕복 배송비). */
-import { ME, type CsRequest, type CsStatus, type CsType, type Category, type Product, type ProductDraft, type ProductStatus, type Resolution, type TimelineEntry } from './data';
+import { type CsRequest, type CsStatus, type CsType, type Category, type Product, type ProductDraft, type ProductStatus, type Resolution, type TimelineEntry } from './data';
 
 export const PLATFORM_FEE_RATE = 0.1;
 export const ROUND_TRIP_SHIPPING = 6000;
@@ -107,12 +107,12 @@ export function approveLabel(c: CsRequest, resolution: Resolution | null): strin
 	return opt ? `${opt.title} 승인` : '처리 방법을 선택하세요';
 }
 
-/** 처리 결과를 요청에 반영 — 승인은 progress(진행 중) · 반려는 rejected. 타임라인을 새로 쓴다 */
-export function resolveCs(c: CsRequest, status: 'progress' | 'rejected', resolution: Resolution): CsRequest {
+/** 처리 결과를 요청에 반영 — 승인은 progress(진행 중) · 반려는 rejected. 타임라인을 새로 쓴다. actorName = 처리한 크리에이터(로그인한 sellers 행의 활동명) */
+export function resolveCs(c: CsRequest, status: 'progress' | 'rejected', resolution: Resolution, actorName: string): CsRequest {
 	const title = status === 'rejected' ? '반려' : approveLabel(c, resolution);
 	const timeline: TimelineEntry[] = [
 		{ title: '요청 접수', when: c.ago },
-		{ title, when: `방금 · ${ME.name}` },
+		{ title, when: actorName.trim() ? `방금 · ${actorName.trim()}` : '방금' },
 		...(status === 'progress' ? [{ title: '처리 진행', when: '대기 중' }] : [])
 	];
 	return { ...c, status, resolution, urgent: false, timeline };

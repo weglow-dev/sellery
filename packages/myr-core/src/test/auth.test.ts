@@ -1,7 +1,7 @@
 // 인증 순수 헬퍼 — apps/myr-shop/src/lib/auth.ts (packages/db auth.ts 복사본 · 셀러리 쪽 테스트 auth.test.ts 와 같은 계약)
 import type { User } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
-import { avatarOf, displayName, safeNext } from '../lib/auth';
+import { avatarOf, displayName, safeNext } from '../auth';
 
 const user = (meta: Record<string, unknown>): User =>
 	({ id: 'u', app_metadata: {}, user_metadata: meta, aud: 'authenticated', created_at: '' }) as unknown as User;

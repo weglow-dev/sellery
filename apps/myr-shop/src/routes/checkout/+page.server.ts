@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { env } from '$env/dynamic/public';
-import { displayName } from '$lib/auth';
+import { displayName } from '@sellery/myr-core/auth';
 import { EMPTY_DRAFT, TOSS_ANONYMOUS_CUSTOMER_KEY, type ShippingDraft } from '@sellery/myr-core/checkout-rules';
 
 /**

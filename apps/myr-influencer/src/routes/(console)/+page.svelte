@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ME, MOCK_STATS } from '$lib/data';
+	import { page } from '$app/state';
+	import { MOCK_STATS, type Me } from '$lib/data';
 	import { CS_TYPE_META, dueText, mockMonthRevenue, won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
@@ -14,6 +15,9 @@
 	const today = $derived(app.pending.slice(0, 3));
 	const maxDay = Math.max(...MOCK_STATS.week);
 	const weekTotal = MOCK_STATS.week.reduce((a, b) => a + b, 0);
+	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
+	const me = $derived(page.data.me as Me);
+	const photo = $derived(app.profilePhoto || me.avatarUrl);
 
 	function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
 		const f = e.currentTarget.files?.[0];
@@ -38,27 +42,31 @@
 
 	<div class="mt-1.5 flex items-center gap-3 lg:mt-0 lg:gap-3.5">
 		<label class="relative h-14 w-14 shrink-0 cursor-pointer" aria-label="프로필 사진 등록">
-			<span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[19px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)] lg:text-[20px]" style:background={ME.avatarBg}>
-				{#if app.profilePhoto}
-					<img src={app.profilePhoto} alt="" class="absolute inset-0 h-full w-full object-cover" />
+			<span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[19px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)] lg:text-[20px]" style:background={me.avatarBg}>
+				{#if photo}
+					<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />
 				{:else}
-					{ME.initial}
+					{me.initial}
 				{/if}
 			</span>
 			<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-			{#if !app.profilePhoto}
+			{#if !photo}
 				<span class="absolute -right-[3px] -bottom-[3px] flex h-6 w-6 items-center justify-center rounded-full border-2 border-bg bg-accent text-bg"><Icon id="cam" size={12} sw={2.4} /></span>
 			{/if}
 		</label>
-		<div>
-			<p class="text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{ME.name}</p>
-			<p class="mt-0.5 text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{ME.handle} · 오늘도 좋은 하루예요</p>
-			{#if app.profilePhoto}
+		<div class="min-w-0 flex-1">
+			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
+			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · 오늘도 좋은 하루예요</p>
+			{#if photo}
 				<label class="relative mt-1.5 block w-fit cursor-pointer text-[12px] font-bold text-accent lg:hidden">
 					사진 변경<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
 				</label>
 			{/if}
 		</div>
+		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
+		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">
+			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
+		</form>
 	</div>
 
 	<div class="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-3.5">
