@@ -204,12 +204,17 @@
 	<div class="pointer-events-none absolute -top-40 -right-[140px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.26),rgba(10,11,14,0))] lg:-top-[240px] lg:-right-[200px] lg:h-[700px] lg:w-[700px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,.22),rgba(10,11,14,0))]"></div>
 	<div class="pointer-events-none absolute -bottom-[300px] -left-[240px] hidden h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(184,196,245,.1),rgba(10,11,14,0))] lg:block"></div>
 
+	{#if data.preview}
+		<!-- 미리보기 주소(dev · Preview 만) — 저장하지 않는다 -->
+		<p class="pointer-events-none fixed top-4 right-4 z-50 rounded-full border border-mint/30 bg-[#0f1a17]/90 px-3 py-1.5 text-[12px] font-bold text-mint lg:top-5 lg:right-auto lg:left-1/2 lg:-translate-x-1/2">미리보기 · 저장되지 않아요</p>
+	{/if}
+
 	<!-- PC 머리 — 로고 · 오른쪽 로그인 링크 -->
 	<header class="relative z-[2] hidden h-[72px] shrink-0 border-b border-white/7 lg:block">
 		<div class="mx-auto flex h-full max-w-[1240px] items-center gap-2.5 px-10">
 			<AuthLogo large />
 			{#if screen !== 'done'}
-				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]">로그인</a></span>
+				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]"> 로그인</a></span>
 			{/if}
 		</div>
 	</header>
@@ -477,8 +482,8 @@
 						<p class="mt-4 text-center text-[13px] text-white/50">비밀번호가 기억나지 않으면 <a href="/password" class="font-bold text-accent">비밀번호 찾기</a></p>
 					</div>
 				{:else}
-				<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">초대 링크가<br class="lg:hidden" /> 만료됐어요</h1>
-				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 {INVITE_DAYS}일 동안만 열리고, 가입에 한 번 쓰면 다시 열 수 없어요. 다시 초대받았다면 가장 최근 메일의 링크를 열어주세요. 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
+				<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">초대 링크가 만료됐어요</h1>
+				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 {INVITE_DAYS}일 동안만 열리고, <br/> 가입에 한 번 쓰면 다시 열 수 없어요.<br class="" /> 다시 초대받았다면 가장 최근 메일의 링크를 열어주세요.<br/> 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
 				<form
 					method="POST"
 					action="?/request"
@@ -490,7 +495,8 @@
 						}}
 				>
 					<button type="submit" class={authButton(true)}>새 초대 요청하기</button>
-					<p class="mt-1.5 text-center text-[13px] text-white/50">이미 계정이 있나요? <a href="/login" class="font-bold text-accent">로그인</a></p>
+					<!-- PC 는 상단 머리에 같은 로그인 링크가 있어 숨긴다 -->
+					<p class="mt-1.5 text-center text-[13px] text-white/50 lg:hidden">이미 계정이 있나요? <a href="/login" class="font-bold text-accent">로그인</a></p>
 				</form>
 				{#if form && 'requested' in form && form.requested === false}<p class="mt-3 text-center text-[13px] text-white/55">지금은 요청을 받을 수 없어요 — MYR 파트너팀에 직접 연락해주세요</p>{/if}
 				{/if}

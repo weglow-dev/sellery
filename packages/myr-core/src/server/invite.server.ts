@@ -8,6 +8,7 @@
  *   checkHandle      가입 폼 핸들 칸을 벗어날 때(유효한 초대 토큰이 있어야 묻는다)
  *   acceptInvite     가입 — 초대 이메일로 로그인 계정(메일 인증 완료 · 비밀번호)을 만들고 RPC 로 크리에이터 행에 연결. RPC 가 거절하면 만든 계정을 지운다
  *   requestReinvite  만료 화면 "새 초대 요청하기" → 그 초대에 요청 시각 기록(운영 목록 requested)
+ *   handleStatusOnly 핸들 판정만(토큰 없이) — 콘솔 미리보기 주소(dev · Preview) 전용
  * 토큰 원문은 저장하지 않는다(DB 에는 sha256) — 발급 응답과 초대 메일에만 실린다.
  */
 import { creatorInviteMail } from '../mail/templates';
@@ -138,4 +139,14 @@ export async function requestReinvite(token: string): Promise<{ ok: true; email:
 	if (!r) return { ok: false, code: 'DB_ERROR' };
 	if (!r.ok) return { ok: false, code: r.code === 'USED' ? 'USED' : 'NOT_FOUND' };
 	return { ok: true, email: String(r.email) };
+}
+
+/** 핸들 판정만(초대 토큰 없이) — 콘솔의 미리보기 주소(dev · Preview)가 실제 DB 규칙으로 보여줄 때만 쓴다. 가입 화면은 checkHandle(토큰 필요) */
+export async function handleStatusOnly(handle: string): Promise<HandleStatus | null> {
+	const { data, error } = await admin().rpc('myr_handle_problem', { p_handle: handle });
+	if (error) {
+		console.error('[invite] myr_handle_problem failed:', error.message);
+		return null;
+	}
+	return data === null ? 'available' : (handleStatusOf({ available: false, code: data }) ?? 'bad');
 }
