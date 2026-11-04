@@ -1,5 +1,5 @@
 // MYR 크리에이터 계정 운영 스크립트 — 크리에이터 콘솔(apps/myr-influencer) 로그인 계정을 sellers 행에 만든다/잇는다(docs/myr.md §4.2.1 2번).
-// 가입 화면(10번) · 운영 콘솔 인플루언서 화면(우선 4) 전까지 여기서. service role · production 허용(셀러리 partner-admin.mjs 의 MYR 판 — 셀러리 스크립트는 셀러리 콘솔 주소로 메일을 보내서 못 쓴다).
+// **이미 있는 크리에이터 행(시드 등)에 계정을 잇는 용도** — 새 크리에이터는 초대 가입(myr-invites.mjs send · 0070). 운영 콘솔 인플루언서 화면(우선 4) 전까지 여기서. service role · production 허용(셀러리 partner-admin.mjs 의 MYR 판 — 셀러리 스크립트는 셀러리 콘솔 주소로 메일을 보내서 못 쓴다).
 //
 //   node packages/db/scripts/myr-creators.mjs <cmd> [args]   (저장소 루트에서 · .env.local 의 PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY)
 //

@@ -1,36 +1,70 @@
-import { dev } from '$app/environment';
-import { env } from '$env/dynamic/private';
+import { fail } from '@sveltejs/kit';
+import { rateLimit } from '@sellery/myr-core/rate-limit';
 import type { Actions, PageServerLoad } from './$types';
+import { acceptFailure, allAgreed, parseSignupForm, signupErrors, SIGNUP_FIELDS } from '$lib/signup-rules';
+import { hasAdmin } from '@sellery/myr-core/server/admin';
+import { acceptInvite, requestReinvite, viewInvite } from '$lib/server/invite';
 
 /**
- * 초대 가입 `/invite/<토큰>` — **UI 단계(목)**. 시안 "MYR Influencer Signup"(모바일) · "… PC" 의 네 화면(초대장 · 가입 폼 · 환영 · 만료).
- * 아직 초대 토큰 · 가입 저장이 없다(docs/myr.md §4.2.1 10번 · 다음 단계에서 `myr_invites` 표 + 가입 함수로 바꾼다):
- *   - `demo` 토큰은 로컬 dev 와 Vercel Preview 에서만 열린다(예시 초대: minji@myr.kr · 7일 남음). 운영(Production)에서는 열리지 않는다.
- *   - `expired` 토큰과 그 밖의 모든 토큰은 만료 화면.
- *   - 가입 폼 제출은 브라우저에서 환영 화면으로만 넘어간다(저장하지 않는다).
+ * 초대 가입 `/invite/<토큰>` — 시안 "MYR Influencer Signup"(모바일 · PC)의 네 화면(초대장 · 가입 폼 · 환영 · 만료) · docs/myr.md 결정 14 · §4.2.1 10번.
+ *   load     토큰 → 초대(0070 myr_app_invite_view). 열리지 않으면(없음 · 만료 · 사용됨 · 취소) 만료 화면
+ *   signup   가입 — 칸 검증(signup-rules · 화면과 같은 함수) → 계정 생성 + 크리에이터 연결(myr-core acceptInvite) → 바로 로그인
+ *   request  만료 화면 "새 초대 요청하기" → 그 초대에 요청 기록(운영 목록 requested)
+ * 토큰은 이 경로에만 실린다(로그 · 응답에 다시 싣지 않는다). 레이트리밋은 IP 기준(함수 인스턴스 메모리 — 느슨한 상한).
  */
-const DEMO_TAKEN = ['minji', 'soy.clean', 'myr', 'admin', 'myr.official'];
-
 export const load: PageServerLoad = async ({ params, setHeaders }) => {
-	setHeaders({ 'cache-control': 'private, no-store' });
-	const demoAllowed = dev || env.VERCEL_ENV === 'preview';
-	if (params.token === 'demo' && demoAllowed) {
-		return {
-			state: 'valid' as const,
-			demo: true,
-			email: 'minji@myr.kr',
-			expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
-			prefill: { name: '', handle: '' },
-			takenHandles: DEMO_TAKEN
-		};
+	setHeaders({ 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer' });
+	if (!hasAdmin()) {
+		console.error('[invite] SUPABASE_SERVICE_ROLE_KEY 없음 — docs/deploy.md 크리에이터 콘솔 절');
+		return { state: 'expired' as const, reason: 'DB_ERROR' };
 	}
-	return { state: 'expired' as const, demo: demoAllowed && params.token === 'expired' };
+	const v = await viewInvite(params.token);
+	if (!v.ok) return { state: 'expired' as const, reason: v.code };
+	return { state: 'valid' as const, email: v.email, expiresAt: v.expiresAt };
 };
 
 export const actions: Actions = {
-	/** 만료 화면의 "새 초대 요청하기" — 요청을 받을 곳(초대 기록 · 운영 알림)이 아직 없다. 미리보기에서는 성공으로 보이고, 운영에서는 직접 연락을 안내한다 */
-	request: async () => {
-		const demoAllowed = dev || env.VERCEL_ENV === 'preview';
-		return demoAllowed ? { requested: true as const } : { requested: false as const };
+	signup: async ({ params, request, locals, getClientAddress }) => {
+		if (!rateLimit(`invite-signup:${getClientAddress()}`, 10)) return fail(429, { action: 'signup' as const, message: '시도가 너무 많아요. 잠시 후 다시 시도해주세요' });
+		if (!hasAdmin()) return fail(503, { action: 'signup' as const, message: '가입 서버 설정이 아직 끝나지 않았어요' });
+		const values = parseSignupForm(await request.formData());
+
+		// 1. 칸 검증 — 화면과 같은 규칙(브라우저 검사를 건너뛴 요청도 여기서 막힌다)
+		const errs = signupErrors(values);
+		const bad = SIGNUP_FIELDS.find((k) => !!errs[k]);
+		if (bad) return fail(400, { action: 'signup' as const, field: bad, message: errs[bad] });
+		if (!allAgreed(values.agreed)) return fail(400, { action: 'signup' as const, field: 'terms' as const, message: '약관과 개인정보 수집 · 이용에 동의해주세요' });
+
+		// 2. 계정 + 크리에이터 연결(RPC 가 핸들 중복 · 예약어 · 초대 상태를 다시 본다)
+		const r = await acceptInvite({
+			token: params.token,
+			password: values.password,
+			name: values.name.trim(),
+			handle: values.handle,
+			platform: values.platform ?? '',
+			phone: values.phone,
+			termsAgreedAt: new Date().toISOString()
+		});
+		if (!r.ok) {
+			const f = acceptFailure(r.code, r.field);
+			if (r.code === 'DB_ERROR') console.error('[invite] accept failed');
+			return fail('screen' in f ? 410 : 400, { action: 'signup' as const, code: r.code, ...f });
+		}
+
+		// 3. 바로 로그인(실패해도 가입은 끝났다 — 환영 화면의 버튼이 로그인으로 보낸다)
+		let signedIn = false;
+		if (locals.supabase) {
+			const { error } = await locals.supabase.auth.signInWithPassword({ email: r.email, password: values.password });
+			if (error) console.warn('[invite] signIn after signup:', error.message);
+			signedIn = !error;
+		}
+		return { action: 'signup' as const, ok: true as const, signedIn, handle: r.handle };
+	},
+
+	request: async ({ params, getClientAddress }) => {
+		if (!rateLimit(`invite-request:${getClientAddress()}`, 5)) return { action: 'request' as const, requested: false as const };
+		if (!hasAdmin()) return { action: 'request' as const, requested: false as const };
+		const r = await requestReinvite(params.token);
+		return { action: 'request' as const, requested: r.ok };
 	}
 };

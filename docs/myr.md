@@ -253,7 +253,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - **로그인 유지**(기본 켜짐) — 끄면 `myr_session_only` 쿠키 + `hooks.server.ts` `setAll` 이 세션 쿠키의 maxAge/expires 를 빼서 브라우저를 닫으면 로그아웃 · 로그아웃 때 쿠키 삭제
     - `/invite/[token]` — 초대장(초대 이메일 · 초대한 곳 · 유효기간 "11월 11일까지 · 7일 남음") → 가입 폼 → 완료 / 만료. 폼: 이메일 고정(자물쇠) · 비밀번호/확인 · 활동명(30자) · 핸들(입력 중 공백·@ 제거 · 소문자) · 대표 채널(인스타그램 · 유튜브 · 틱톡) · 휴대폰(자동 하이픈 · 커서 유지 `@sellery/myr-core/phone`) · 약관 2개(모두 동의). 버튼 "가입 완료하기 · N개 남음" · 빠진 칸으로 스크롤 · PC 는 왼쪽 "샵 미리보기" 카드가 입력대로 바뀌고 스크롤 고정
     - 규칙은 순수 `lib/signup-rules.ts`(오류 문구 · 남은 칸 수 · 유효기간 KST 표시 · vitest) · 입력 스타일 `lib/auth-ui.ts` · 문구 `lib/auth-copy.ts` · 컴포넌트 `lib/components/auth/` · 비밀번호 찾기 · 새 비밀번호 · 연결 없음 · 정지 화면도 같은 톤(`AuthShell`)
-    - **목 상태**: `demo` 토큰만 유효(**dev · Vercel preview 만** — `/invite/demo`), 다른 토큰은 만료 화면 · 가입 버튼은 완료 화면만 보여줌 · 핸들 중복은 목 목록 · "새 초대 요청하기"는 안내만 · 약관 "보기"는 "준비 중" → 10번에서 실제로
+    - 목 상태였던 부분(`demo` 토큰 · 가입 저장 · 핸들 목 목록 · 새 초대 요청)은 **10번에서 실제로 바뀜** — `/invite/demo` 는 없어졌다
     - **출시 전 교체**: PC 로그인 패널 숫자(90% · 1~2일 · 매월 10일)와 후기는 시안 문구(정책 미확정 · 실제 인용 아님) — §9-16
 - **3. 내 제품 읽기**
     - 새 마이그레이션 `myr_app_seller_products(seller)` + `draft` 상태 추가
@@ -284,11 +284,15 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 환불 사진 서명 URL · 단순 변심 왕복 배송비(UI 의 ₩6,000)는 정책 결정 필요
 - **8. 홈 지표 · 실적** — `myr_app_seller_sales(seller)`(이번 달 매출·주문·수량 · CS 비율 · 7일 막대) → `MOCK_STATS` `mockMonthRevenue` 치환 · 정산율은 `platform_settings`(§9-6 전까지 UI 의 10% 는 자리값) · `/sales`(시안 없음)
 - **9. 프로필** — 사진 업로드(Storage) → `sellers.avatar_url` · `/my` 알림 이메일 · 정산 계좌(시안 없음)
-- **10. 초대 가입 기능(결정 14 · 2-1 화면에 붙인다 · 순서는 3번 앞으로 당겨도 된다)**
-    - 새 마이그레이션 `myr_invites`(이메일 · 토큰 sha256 해시만 · 만료 7일 · 사용 시각 · 취소 · 초대한 운영자) + `sellers` 연락처 칸 — Supabase 초대(OTP) 링크는 수명이 짧아 7일을 못 버티므로 자체 토큰
-    - 가입 RPC(`security definer` · anon·authenticated EXECUTE 회수): 토큰 확인 → 핸들 중복 → `sellers` 행 생성 → 계정 연결 → 토큰 사용 처리 한 트랜잭션. 계정은 서버가 admin API 로 메일 인증 완료 상태로 만들고 바로 로그인 · pgTAP 으로 거부 코드 전부(만료 · 사용됨 · 취소 · 핸들 중복 · 이메일 이미 가입)
-    - `/invite/[token]` load/action 을 실제로 · 핸들 중복 서버 확인 · "새 초대 요청" 알림(경로 미정 §9-16)
-    - 초대 발급: 운영 콘솔 전까지 `myr-creators.mjs invite <email>` → 링크 출력 + MYR 브랜드 메일(Resend · Supabase 템플릿 공유 제약(§2.1) 을 피한다) · 재초대 = 이전 링크 취소 · 운영 콘솔 "크리에이터 초대"(§4.3)가 생기면 그 화면으로
+- **10. 초대 가입 기능 — 완료(2026-11-04 · 0070 · 결정 14)**
+    - **0070** `myr_invites`(이메일 · 토큰 sha256 해시만 · 7일 · 사용 시각 · 취소(reissued · canceled) · 초대한 운영자 메모 · 새 초대 요청 시각·횟수 · 이메일당 대기 중 초대 1개 부분 유니크) + `sellers.contact_phone`(숫자만 · 공개 grant 없음). Supabase 초대(OTP) 링크는 수명이 짧아 7일을 못 버티므로 자체 토큰
+    - RPC(전부 service role 만 · anon·authenticated EXECUTE 회수): 운영 `myr_app_admin_invite_create`(이전 링크 취소 → 새 토큰 · 이미 크리에이터 ALREADY_CREATOR · 같은 이메일 로그인 계정이 있으면 EMAIL_HAS_ACCOUNT) · `_revoke` · `_list(state)` / 링크 `myr_app_invite_view` · `myr_app_invite_handle_check`(유효한 토큰이 있어야 답한다) · `myr_app_invite_accept` · `myr_app_invite_request`. **핸들 형식 · 예약어(admin · official · myr · sellery … · `myr.` `sellery_` 로 시작)의 정답은 SQL `myr_handle_problem` 하나** — 화면은 코드(TAKEN · RESERVED · BAD_HANDLE)로 문구만 고른다
+    - 공용: `@sellery/myr-core/invite-rules`(토큰 형식 · 링크 · 코드 · 운영 문구) · `server/invite`(issueInvite · viewInvite · checkHandle · acceptInvite · requestReinvite · listInvites · revokeInvite) · 메일 `creatorInviteMail`(멱등 키 = 초대 id) · 레이트리밋을 샵에서 `@sellery/myr-core/rate-limit` 으로 옮김(샵은 재수출 · 동작 같음)
+    - 가입(`?/signup`): 칸 검증(signup-rules — 화면과 같은 함수) → admin API 로 **초대 이메일 계정(메일 인증 완료 · 비밀번호)** 생성 → RPC 가 초대를 잠그고 다시 검사(핸들 중복 · 예약어 · 입력) → `sellers` 새 행 연결 · 초대 사용 · `profiles.role=seller` → 바로 로그인. RPC 가 거절하면 만든 계정을 지운다(다시 시도 가능). 같은 링크 동시 제출은 행 잠금 + 계정 이메일 유니크로 하나만
+    - 핸들: 칸을 **벗어날 때** 한 번 `GET /invite/<토큰>/handle?h=` (같은 핸들은 화면이 기억 · 고치면 결과를 지운다 · IP 10분 60회) · 칸을 안 벗어나고 제출해도 가입 RPC 가 막고 그 칸에 표시
+    - 닫힌 링크: 만료 · 취소 = "초대 링크가 만료됐어요"(+ 새 초대 요청 → `myr_invites.requested_at` 기록) · 사용됨 = "이미 가입을 마친 초대 링크예요"(로그인 · 비밀번호 찾기)
+    - 초대 발급(운영 콘솔 전까지): **`packages/db/scripts/myr-invites.mjs`** `send <email> [--by 이름]`(메일 + 링크 출력 — 카톡·DM 으로 따로 보낼 수 있게) · `list [--state requested]`(새 초대 요청 확인) · `revoke <email>` → 콘솔 운영 API `/api/ops/invites`(`CRON_SECRET` · 샵 `/api/ops/ship` 과 같은 방식). 운영 콘솔 "크리에이터 초대"(§4.3)는 같은 `server/invite` 함수를 관리자 세션으로 부른다
+    - 확인: pgTAP `myr_invites.test.sql` 69개(권한 · 거부 코드 전부 · 재발급 · 가입 행 값 · 요청 · 목록) · vitest(초대 규칙 · 메일 · 가입 폼 파싱 · 거절 코드 → 화면) · 로컬 끝까지(스크립트 발급 → 링크 → 핸들 확인 3종 → 가입 → 콘솔 홈에 새 크리에이터 · 쓴 링크 화면 · 미확인 중복 핸들 제출 → 칸 오류 + 계정 롤백)
 - **11. 마무리** — `check-boundaries` 규칙(셀러리 모듈 import 금지) · 이 문서 §7 · `docs/deploy.md` MYR 표 · pgTAP/vitest 결과를 PR 본문에
 
 ### 4.3 `apps/myr-admin` (운영)
@@ -496,4 +500,4 @@ M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 �
 13. **결제수단 UI 영역** — 디자인의 "결제수단 선택" 은 그려진 그림이고, 실제로는 토스 위젯이 그 자리를 렌더한다(§6.7). 위젯 variant 로 디자인에 가깝게 맞추되 완전히 같게는 안 된다.
 14. **이벗 연동 세부(2026-11-03 · §6.8)** — 확인 대기: ① MYR 이 바인허브와 **같은 이벗 계정**(고객코드 · API 키)을 쓰는지, 새로 받는지 ② MYR 상품을 이벗에 등록하는 절차(누가 · 언제 창고 입고와 상품코드 발급을 하는지 · 옵션별 코드인지) ③ 박스 **보내는 사람**을 MYR 로 할지 인플루언서 이름으로 할지(인플루언서별이면 셀러마다 쇼핑몰 코드·발송인 정보 — 바인허브의 한의원별 `ebut_shop_code` 와 같은 구조) ④ 분할 출고(한 주문 여러 박스) 유무 ⑤ 11시 이후·공휴일 주문 처리 ⑥ 발주 후 출고 취소 가능 여부(가능하면 "발주 전" 환불 기준을 늦출 수 있다).
 15. **교환·환불 비용 정책** — 단순 변심 왕복 배송비(UI 시안 ₩6,000 · 고객 부담) · 파손·오배송은 MYR 부담 · 개봉 제품 불가 · 수령 7일 기준. 시안 문구(`POLICY_BY_REASON`)를 정책으로 확정할지.
-16. **크리에이터 로그인·가입 화면 남은 결정(2026-11-04 · §4.2.1 2-1)** — ① 만료 화면 "새 초대 요청하기" 알림 경로(운영팀 메일 · 슬랙 · 운영 콘솔 목록) ② 크리에이터 이용약관 · 개인정보 수집·이용 문서(가입 폼 "보기" 링크) ③ PC 로그인 패널 숫자(정산 비율 90% · 심사 1~2일 · 매월 10일 지급)와 후기 — 실제 정책·인용으로 바꾸거나 출시 전 삭제(`apps/myr-influencer/src/lib/auth-copy.ts`).
+16. **크리에이터 로그인·가입 화면 남은 결정(2026-11-04 · §4.2.1 2-1)** — ① 만료 화면 "새 초대 요청하기" 알림 경로(운영팀 메일 · 슬랙 · 운영 콘솔 목록) — 지금은 DB 에 기록만(`myr-invites.mjs list --state requested`) · 알림은 미정 ② 크리에이터 이용약관 · 개인정보 수집·이용 문서(가입 폼 "보기" 링크) ③ PC 로그인 패널 숫자(정산 비율 90% · 심사 1~2일 · 매월 10일 지급)와 후기 — 실제 정책·인용으로 바꾸거나 출시 전 삭제(`apps/myr-influencer/src/lib/auth-copy.ts`).

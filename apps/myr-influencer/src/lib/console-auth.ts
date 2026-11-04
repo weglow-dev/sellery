@@ -4,11 +4,12 @@
  */
 import { safeNext } from '@sellery/myr-core/auth';
 
-/** 로그인 없이 열리는 경로 — 로그인 · 비밀번호 재설정 요청 · 메일 링크 착지(/auth/*) · 초대 가입(/invite/<토큰>) · robots.
+/** 로그인 없이 열리는 경로 — 로그인 · 비밀번호 재설정 요청 · 메일 링크 착지(/auth/*) · 초대 가입(/invite/<토큰>) · robots ·
+ *  운영 API(/api/ops/* — 세션 대신 CRON_SECRET 으로 막는다 · lib/server/ops-auth.ts).
  *  `/password/new` 는 재설정 링크가 만든 세션이 있어야 해서 공개가 아니다 */
 const PUBLIC_EXACT = new Set(['/login', '/password', '/robots.txt']);
 export function isPublicPath(pathname: string): boolean {
-	return PUBLIC_EXACT.has(pathname) || pathname.startsWith('/auth/') || pathname.startsWith('/invite/');
+	return PUBLIC_EXACT.has(pathname) || pathname.startsWith('/auth/') || pathname.startsWith('/invite/') || pathname.startsWith('/api/ops/');
 }
 
 /** 로그인 뒤 돌아갈 곳 — 같은 오리진 경로만(오픈 리다이렉트 방지 · `/auth/` `/login` 은 루프라 제외). 비면 홈 */

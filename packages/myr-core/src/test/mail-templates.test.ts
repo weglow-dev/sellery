@@ -1,7 +1,7 @@
 // 거래 메일 템플릿·레이아웃 — apps/myr-shop/src/lib/mail/{templates,layout}.ts · 셀러는 자기 줄만 · 비회원 링크 · 이스케이프 · 멱등 키
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../mail/layout';
-import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../mail/templates';
+import { creatorInviteMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../mail/templates';
 
 const ctx = { siteUrl: 'https://myr-shop.vercel.app/' };
 const order = (over: Partial<MailOrder> = {}): MailOrder => ({
@@ -223,5 +223,23 @@ describe('배송 시작 메일 (0069)', () => {
 		const g = orderShippedMail(order({ isMember: false }), { courier: '한진택배', trackingNo: '1', trackingUrl: null }, ctx);
 		expect(g.text).toContain('비회원 주문은');
 		expect(g.html).toContain('/orders/g/myr1007');
+	});
+});
+
+describe('크리에이터 초대 메일', () => {
+	const inv = { inviteId: '11111111-aaaa-4bbb-8ccc-222222222222', email: 'creator@myr.kr', link: `https://myr-influencer.vercel.app/invite/${'ab'.repeat(32)}`, expiresAt: '2026-11-11T05:00:00Z', inviter: 'MYR 파트너팀' };
+	it('초대 링크 버튼 · 이메일 · 한국 날짜 유효기간 · 1회용 안내', () => {
+		const m = creatorInviteMail(inv);
+		expect(m.subject).toBe('[MYR] 크리에이터 스튜디오 초대장이 도착했어요');
+		expect(m.html).toContain(`href="${inv.link}"`);
+		expect(m.text).toContain(`초대 수락하고 가입하기: ${inv.link}`);
+		expect(m.text).toContain('초대받은 이메일: creator@myr.kr');
+		expect(m.text).toContain('11월 11일');
+		expect(m.text).toContain('한 번만');
+		expect(m.tag).toBe('myr_creator_invite');
+	});
+	it('멱등 키는 초대 id — 다시 초대(새 id)하면 새 메일', () => {
+		expect(creatorInviteMail(inv).idempotencyKey).toBe(`myr_creator_invite:${inv.inviteId}`);
+		expect(creatorInviteMail({ ...inv, inviteId: 'other' }).idempotencyKey).not.toBe(creatorInviteMail(inv).idempotencyKey);
 	});
 });
