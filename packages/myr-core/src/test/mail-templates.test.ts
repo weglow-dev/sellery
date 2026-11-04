@@ -232,7 +232,7 @@ describe('크리에이터 초대 메일', () => {
 		const m = creatorInviteMail(inv);
 		expect(m.subject).toBe('[MYR] 크리에이터 스튜디오 초대장이 도착했어요');
 		expect(m.html).toContain(`href="${inv.link}"`);
-		expect(m.text).toContain(`초대 수락하고 가입하기: ${inv.link}`);
+		expect(m.text).toContain(`가입하기: ${inv.link}`);
 		expect(m.text).toContain('초대받은 이메일: creator@myr.kr');
 		expect(m.text).toContain('11월 11일');
 		expect(m.text).toContain('한 번만');

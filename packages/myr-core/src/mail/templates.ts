@@ -8,7 +8,7 @@
  * | 새 주문 | orderPaidSellerMail | 줄의 셀러(sellers.email) — **자기 줄만** · 배송지 없음 | (셀러 콘솔 전까지 링크 없음) |
  * | 환불 완료 | orderRefundedMail | 고객 | 주문 화면 |
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
- * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰> |
+ * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰>(버튼 "가입하기") |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
  */
 import { won } from '../constants';
@@ -271,7 +271,7 @@ export function creatorInviteMail(inv: MailInvite): MailTemplate {
 			{ label: '초대받은 이메일', value: inv.email },
 			{ label: '링크 유효기간', value: `${kstDate(inv.expiresAt)}까지` }
 		],
-		button: { label: '초대 수락하고 가입하기', url: inv.link },
+		button: { label: '가입하기', url: inv.link },
 		notes: [
 			'초대 링크는 이 이메일로 한 번만 쓸 수 있어요. 다시 초대받으면 이전 링크는 열리지 않아요.',
 			'링크가 만료됐다면 링크 화면의 "새 초대 요청하기"를 눌러주세요.',
