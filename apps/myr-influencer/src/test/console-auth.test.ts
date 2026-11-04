@@ -5,11 +5,11 @@ import { LINK_ERROR, authErrorMessage, consoleNext, gateLocation, isPublicPath, 
 const fd = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
 describe('isPublicPath — 로그인 없이 열리는 곳', () => {
-	it('로그인 · 비밀번호 찾기 · 메일 링크 착지 · robots', () => {
-		for (const p of ['/login', '/password', '/auth/confirm', '/auth/signout', '/robots.txt']) expect(isPublicPath(p), p).toBe(true);
+	it('로그인 · 비밀번호 찾기 · 메일 링크 착지 · 초대 가입 · 운영 API · robots', () => {
+		for (const p of ['/login', '/password', '/auth/confirm', '/auth/signout', '/invite/ab12', '/invite/ab12/handle', '/api/ops/invites', '/robots.txt']) expect(isPublicPath(p), p).toBe(true);
 	});
 	it('콘솔 화면 · 새 비밀번호 · 안내 화면은 세션이 필요', () => {
-		for (const p of ['/', '/cs', '/cs/cs1', '/products', '/products/new', '/password/new', '/unlinked', '/suspended', '/loginx']) expect(isPublicPath(p), p).toBe(false);
+		for (const p of ['/', '/cs', '/cs/cs1', '/products', '/products/new', '/password/new', '/unlinked', '/suspended', '/loginx', '/invite', '/api/ops']) expect(isPublicPath(p), p).toBe(false);
 	});
 });
 

@@ -8,6 +8,7 @@
  * | 새 주문 | orderPaidSellerMail | 줄의 셀러(sellers.email) — **자기 줄만** · 배송지 없음 | (셀러 콘솔 전까지 링크 없음) |
  * | 환불 완료 | orderRefundedMail | 고객 | 주문 화면 |
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
+ * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰> |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
  */
 import { won } from '../constants';
@@ -253,4 +254,29 @@ export function csRepliedMail(cs: MailCs, reply: { messageId: string; body: stri
 		notes
 	};
 	return finish(doc, `[MYR] 문의에 답변이 달렸어요 · ${code}`, mailIdempotencyKey('myr_cs_replied', reply.messageId), 'myr_cs_replied');
+}
+
+/* ---------------- 크리에이터 초대 (0070 · 결정 14) ---------------- */
+/** 초대 1건 — invite.server.ts issueInvite 가 채운다. link = 콘솔 `/invite/<토큰>`(토큰 원문은 이 메일과 운영자 화면에만) */
+export type MailInvite = { inviteId: string; email: string; link: string; expiresAt: string; inviter: string };
+const kstDate = (iso: string): string => new Date(iso).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short' });
+
+/** 초대장 → 초대받은 크리에이터. 링크가 곧 가입 권한이라 멱등 키는 초대 id(다시 초대하면 새 id · 새 메일) */
+export function creatorInviteMail(inv: MailInvite): MailTemplate {
+	const doc: MailDoc = {
+		title: 'MYR 크리에이터로 초대받았어요',
+		preheader: `${inv.inviter}이 크리에이터 스튜디오로 초대했어요 — ${kstDate(inv.expiresAt)}까지 가입할 수 있어요`,
+		intro: `${inv.inviter}이 MYR 크리에이터 스튜디오로 초대했어요. 계정을 만들면 상품 등록부터 샵 오픈, 주문 · CS 관리까지 한 곳에서 할 수 있어요.`,
+		rows: [
+			{ label: '초대받은 이메일', value: inv.email },
+			{ label: '링크 유효기간', value: `${kstDate(inv.expiresAt)}까지` }
+		],
+		button: { label: '초대 수락하고 가입하기', url: inv.link },
+		notes: [
+			'초대 링크는 이 이메일로 한 번만 쓸 수 있어요. 다시 초대받으면 이전 링크는 열리지 않아요.',
+			'링크가 만료됐다면 링크 화면의 "새 초대 요청하기"를 눌러주세요.',
+			'초대받을 일이 없었다면 이 메일은 무시해도 괜찮아요.'
+		]
+	};
+	return finish(doc, '[MYR] 크리에이터 스튜디오 초대장이 도착했어요', mailIdempotencyKey('myr_creator_invite', inv.inviteId), 'myr_creator_invite');
 }

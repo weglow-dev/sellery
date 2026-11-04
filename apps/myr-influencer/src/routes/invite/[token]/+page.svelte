@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick, untrack } from 'svelte';
 	import { creatorStyle } from '@sellery/myr-core/creator';
+	import { INVITE_DAYS, isInviteClosed, type HandleStatus } from '@sellery/myr-core/invite-rules';
 	import { caretAfterFormat, formatPhone } from '@sellery/myr-core/phone';
 	import { INVITER } from '$lib/auth-copy';
 	import { AUTH_HINT, AUTH_LABEL, authButton, authInput } from '$lib/auth-ui';
@@ -29,7 +32,8 @@
 
 	/**
 	 * 크리에이터 초대 가입 — 시안 "MYR Influencer Signup"(모바일) · "… PC". 화면 넷: 초대장 → 가입 폼 → 환영 / 만료.
-	 * **UI 단계(목)** — 저장은 아직 없다(+page.server.ts 주석). 칸 규칙 · 문구는 lib/signup-rules.ts(가입 기능 단계의 서버 검증도 같은 함수).
+	 * 가입은 form action `?/signup`(+page.server.ts — 계정 생성 · 크리에이터 연결 · 바로 로그인). 칸 규칙 · 문구는 lib/signup-rules.ts(서버 검증도 같은 함수).
+	 * 핸들 중복 · 예약어는 칸을 **벗어날 때** 한 번 서버에 묻는다(`./handle` · 같은 핸들은 기억) — 가입 때 서버가 다시 본다(경합).
 	 * 시안과 다른 점(정한 가입 방식에 맞춤 · docs/myr.md §4.2.1):
 	 *   - 이메일은 초대받은 주소로 **고정**(초대 링크가 이메일 소유를 증명) — 시안은 입력 칸이었다
 	 *   - 환영 화면에 "인증 메일을 보냈어요 · 다시 보내기" 가 없다 — 초대 링크가 이미 인증이라 메일이 필요 없다
@@ -44,12 +48,11 @@
 	const invite = $derived(data.state === 'valid' ? data : null);
 	const validity = $derived(invite ? inviteValidity(invite.expiresAt) : null);
 
-	const prefill = untrack(() => (data.state === 'valid' ? data.prefill : { name: '', handle: '' }));
 	let values = $state({
 		password: '',
 		confirm: '',
-		name: prefill.name,
-		handle: prefill.handle,
+		name: '',
+		handle: '',
 		platform: null as string | null,
 		phone: '',
 		agreed: { tos: false, privacy: false } as Record<TermId, boolean>
@@ -59,12 +62,23 @@
 	let showPw = $state(false);
 	let toast = $state<string | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+	let busy = $state(false);
+	let signedIn = $state(false);
+	/** 링크가 닫힌 이유 — USED 면 "이미 가입" 문구 */
+	let closedReason = $state<string | null>(untrack(() => (data.state === 'expired' ? data.reason : null)));
+	/** 핸들별 서버 확인 결과(칸을 벗어날 때 물어본 것) · 지금 묻는 중인 핸들 */
+	let checked = $state<Record<string, HandleStatus>>({});
+	let checking = $state<string | null>(null);
+	/** 서버가 가입을 거절한 칸 문구(그 칸을 고치면 지운다) · 칸이 없는 안내 */
+	let serverErr = $state<Partial<Record<SignupField, string>>>({});
+	let formError = $state<string | null>(null);
 
-	const errs = $derived(signupErrors(values, data.state === 'valid' ? data.takenHandles : []));
+	const errs = $derived(signupErrors(values, checked));
 	const missing = $derived(missingCount(errs, values.agreed));
-	const shown = (k: SignupField) => (touched[k] || attempted) && !!errs[k];
+	const shown = (k: SignupField) => ((touched[k] || attempted) && !!errs[k]) || !!serverErr[k];
+	const errText = (k: SignupField) => errs[k] || serverErr[k] || '';
 	const handle = $derived(cleanHandleInput(values.handle));
-	const handleOk = $derived(!!handle && !errs.handle);
+	const handleOk = $derived(!!handle && !errs.handle && !serverErr.handle && checked[handle] === 'available');
 	const confirmOk = $derived(!!values.confirm && !errs.confirm && !errs.password);
 	const termsAll = $derived(allAgreed(values.agreed));
 	const termsErr = $derived(attempted && !termsAll);
@@ -83,6 +97,31 @@
 	}
 
 	const touch = (k: SignupField) => () => (touched[k] = true);
+	const clearServer = (k: SignupField) => () => {
+		if (serverErr[k]) serverErr = { ...serverErr, [k]: undefined };
+	};
+
+	/** 핸들 칸을 벗어날 때 — 형식이 맞고 아직 안 물어본 핸들만 서버에 한 번 */
+	async function onHandleBlur() {
+		touched.handle = true;
+		const h = handle;
+		if (!h || checked[h] || errs.handle || checking === h) return;
+		checking = h;
+		try {
+			const res = await fetch(`/invite/${page.params.token}/handle?h=${encodeURIComponent(h)}`, { headers: { accept: 'application/json' } });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; status?: HandleStatus; code?: string } | null;
+			if (r?.ok && r.status) checked = { ...checked, [h]: r.status };
+			else if (r && isInviteClosed(r.code)) {
+				closedReason = r.code ?? null;
+				screen = 'expired';
+			}
+			// 그 밖(요청 과다 · 서버 오류)은 조용히 — 가입 때 서버가 다시 본다
+		} catch {
+			/* 네트워크 — 가입 때 서버가 다시 본다 */
+		} finally {
+			if (checking === h) checking = null;
+		}
+	}
 
 	/** 연락처 — 숫자만 · 하이픈 자동 · 가운데를 고쳐도 커서가 그 자리에(공용 phone 규칙) */
 	function onPhoneInput(e: Event & { currentTarget: HTMLInputElement }) {
@@ -96,6 +135,7 @@
 			el.setSelectionRange(pos, pos);
 		}
 		values.phone = next;
+		if (serverErr.phone) serverErr = { ...serverErr, phone: undefined };
 	}
 
 	/** 핸들 — @ · 공백 제거 · 소문자로 바로 정리 */
@@ -104,6 +144,7 @@
 		const next = cleanHandleInput(el.value);
 		if (el.value !== next) el.value = next;
 		values.handle = next;
+		if (serverErr.handle) serverErr = { ...serverErr, handle: undefined };
 	}
 
 	const toggleAll = () => {
@@ -111,38 +152,69 @@
 		values.agreed = { tos: on, privacy: on };
 	};
 
-	async function submit(e: SubmitEvent) {
-		e.preventDefault();
+	/** 칸으로 — 화면 밖에 있으면 스크롤 · 입력 칸이면 포커스 */
+	async function goToField(k: SignupField | 'terms' | undefined) {
+		await tick();
+		const el = document.getElementById(k ? `f-${k}` : 'f-terms');
+		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		if (el instanceof HTMLInputElement) el.focus({ preventScroll: true });
+	}
+
+	/** 가입 제출 — 빠진 칸이 있으면 보내지 않고 첫 칸으로. 서버 응답: 성공 → 환영 · 링크가 닫힘 → 만료 · 칸 문제 → 그 칸 · 그 밖 → 버튼 위 안내 */
+	const submitSignup: SubmitFunction = ({ cancel }) => {
 		if (missing > 0) {
+			cancel();
 			attempted = true;
-			await tick();
-			// 첫 번째 빠진 칸으로 — 화면 밖에 있으면 스크롤
-			const first = SIGNUP_FIELDS.find((k) => !!errs[k]);
-			const el = document.getElementById(first ? `f-${first}` : 'f-terms');
-			el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			if (el instanceof HTMLInputElement) el.focus({ preventScroll: true });
+			goToField(SIGNUP_FIELDS.find((k) => !!errs[k]));
 			return;
 		}
-		// UI 단계 — 저장 없이 환영 화면으로(가입 기능 단계에서 서버 action 으로 바꾼다)
-		screen = 'done';
-		window.scrollTo(0, 0);
-	}
+		busy = true;
+		formError = null;
+		return async ({ result }) => {
+			busy = false;
+			if (result.type === 'success' && result.data?.ok) {
+				signedIn = result.data.signedIn === true;
+				screen = 'done';
+				window.scrollTo(0, 0);
+				return;
+			}
+			const d = (result.type === 'failure' ? result.data : null) as { screen?: string; code?: string; field?: SignupField | 'terms'; message?: string } | null;
+			if (d?.screen === 'expired') {
+				closedReason = d.code ?? null;
+				screen = 'expired';
+				window.scrollTo(0, 0);
+				return;
+			}
+			if (d?.field && d.field !== 'terms' && d.message) {
+				serverErr = { ...serverErr, [d.field]: d.message };
+				goToField(d.field);
+				return;
+			}
+			formError = d?.message ?? '가입을 마치지 못했어요. 잠시 후 다시 시도해주세요';
+			showToast(formError);
+		};
+	};
 
 	const sectionLabel = 'text-[12px] font-extrabold tracking-[0.02em] text-accent lg:text-[13px]';
 </script>
 
-<svelte:head><title>{screen === 'expired' ? '초대 링크 만료' : '크리에이터 가입'} — MYR Creator</title></svelte:head>
+<svelte:head><title>{screen === 'expired' ? (closedReason === 'USED' ? '이미 가입한 초대 링크' : '초대 링크 만료') : '크리에이터 가입'} — MYR Creator</title></svelte:head>
 
 <div class="relative flex h-dvh flex-col overflow-hidden bg-bg lg:h-auto lg:min-h-dvh lg:overflow-clip">
 	<div class="pointer-events-none absolute -top-40 -right-[140px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.26),rgba(10,11,14,0))] lg:-top-[240px] lg:-right-[200px] lg:h-[700px] lg:w-[700px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,.22),rgba(10,11,14,0))]"></div>
 	<div class="pointer-events-none absolute -bottom-[300px] -left-[240px] hidden h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(184,196,245,.1),rgba(10,11,14,0))] lg:block"></div>
+
+	{#if data.preview}
+		<!-- 미리보기 주소(dev · Preview 만) — 저장하지 않는다 -->
+		<p class="pointer-events-none fixed top-4 right-4 z-50 rounded-full border border-mint/30 bg-[#0f1a17]/90 px-3 py-1.5 text-[12px] font-bold text-mint lg:top-5 lg:right-auto lg:left-1/2 lg:-translate-x-1/2">미리보기 · 저장되지 않아요</p>
+	{/if}
 
 	<!-- PC 머리 — 로고 · 오른쪽 로그인 링크 -->
 	<header class="relative z-[2] hidden h-[72px] shrink-0 border-b border-white/7 lg:block">
 		<div class="mx-auto flex h-full max-w-[1240px] items-center gap-2.5 px-10">
 			<AuthLogo large />
 			{#if screen !== 'done'}
-				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]">로그인</a></span>
+				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]"> 로그인</a></span>
 			{/if}
 		</div>
 	</header>
@@ -206,7 +278,7 @@
 		</div>
 	{:else if screen === 'form' && invite}
 		<!-- 가입 폼 -->
-		<form novalidate onsubmit={submit} class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 animate-up-in flex-col lg:grid lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_minmax(0,580px)] lg:gap-20 lg:px-10">
+		<form method="POST" action="?/signup" novalidate use:enhance={submitSignup} class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 animate-up-in flex-col lg:grid lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_minmax(0,580px)] lg:gap-20 lg:px-10">
 			<!-- 모바일 머리 — 뒤로(초대장) -->
 			<div class="flex h-[60px] shrink-0 items-center gap-1.5 pr-5 pl-2.5 lg:hidden">
 				<button type="button" onclick={() => (screen = 'invite')} aria-label="초대장으로" class="flex h-11 w-11 items-center justify-center rounded-xl text-fg">
@@ -259,18 +331,18 @@
 							<div class="flex flex-col gap-2">
 								<label for="f-password" class={AUTH_LABEL}>비밀번호</label>
 								<div class="relative">
-									<input id="f-password" type={showPw ? 'text' : 'password'} autocomplete="new-password" placeholder="8자 이상" bind:value={values.password} onblur={touch('password')} aria-invalid={shown('password')} aria-describedby={shown('password') ? 'e-password' : undefined} class={authInput({ invalid: shown('password'), filled: !!values.password, size: 'md', padRight: true })} />
+									<input id="f-password" name="password" type={showPw ? 'text' : 'password'} autocomplete="new-password" placeholder="8자 이상" bind:value={values.password} oninput={clearServer('password')} onblur={touch('password')} aria-invalid={shown('password')} aria-describedby={shown('password') ? 'e-password' : undefined} class={authInput({ invalid: shown('password'), filled: !!values.password, size: 'md', padRight: true })} />
 									<PasswordToggle bind:shown={showPw} />
 								</div>
-								{#if shown('password')}<ErrorText id="e-password" text={errs.password} />{/if}
+								{#if shown('password')}<ErrorText id="e-password" text={errText('password')} />{/if}
 							</div>
 							<div class="flex flex-col gap-2">
 								<label for="f-confirm" class={AUTH_LABEL}>비밀번호 확인</label>
 								<div class="relative">
-									<input id="f-confirm" type={showPw ? 'text' : 'password'} autocomplete="new-password" placeholder="한 번 더 입력" bind:value={values.confirm} onblur={touch('confirm')} aria-invalid={shown('confirm')} aria-describedby={shown('confirm') ? 'e-confirm' : undefined} class={authInput({ invalid: shown('confirm'), filled: !!values.confirm, size: 'md', padRight: true })} />
+									<input id="f-confirm" name="confirm" type={showPw ? 'text' : 'password'} autocomplete="new-password" placeholder="한 번 더 입력" bind:value={values.confirm} onblur={touch('confirm')} aria-invalid={shown('confirm')} aria-describedby={shown('confirm') ? 'e-confirm' : undefined} class={authInput({ invalid: shown('confirm'), filled: !!values.confirm, size: 'md', padRight: true })} />
 									{#if confirmOk}<span class="absolute top-1/2 right-4 -translate-y-1/2 text-mint" aria-label="비밀번호가 같아요"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>{/if}
 								</div>
-								{#if shown('confirm')}<ErrorText id="e-confirm" text={errs.confirm} />{/if}
+								{#if shown('confirm')}<ErrorText id="e-confirm" text={errText('confirm')} />{/if}
 							</div>
 						</div>
 					</div>
@@ -281,18 +353,20 @@
 						<div class="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3">
 							<div class="flex flex-col gap-2">
 								<label for="f-name" class={AUTH_LABEL}>활동명</label>
-								<input id="f-name" autocomplete="nickname" placeholder="예: 민지 루틴" maxlength={NAME_MAX + 10} bind:value={values.name} onblur={touch('name')} aria-invalid={shown('name')} aria-describedby={shown('name') ? 'e-name' : 'h-name'} class={authInput({ invalid: shown('name'), filled: !!values.name.trim(), size: 'md' })} />
-								{#if shown('name')}<ErrorText id="e-name" text={errs.name} />{:else}<p id="h-name" class={AUTH_HINT}>샵에 크리에이터 이름으로 보여요.</p>{/if}
+								<input id="f-name" name="name" autocomplete="nickname" placeholder="예: 민지 루틴" maxlength={NAME_MAX + 10} bind:value={values.name} oninput={clearServer('name')} onblur={touch('name')} aria-invalid={shown('name')} aria-describedby={shown('name') ? 'e-name' : 'h-name'} class={authInput({ invalid: shown('name'), filled: !!values.name.trim(), size: 'md' })} />
+								{#if shown('name')}<ErrorText id="e-name" text={errText('name')} />{:else}<p id="h-name" class={AUTH_HINT}>샵에 크리에이터 이름으로 보여요.</p>{/if}
 							</div>
 							<div class="flex flex-col gap-2">
 								<label for="f-handle" class={AUTH_LABEL}>핸들</label>
 								<div class="relative">
 									<span class="absolute top-1/2 left-4 -translate-y-1/2 text-[16px] font-bold text-white/40" aria-hidden="true">@</span>
-									<input id="f-handle" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="minji.routine" maxlength={HANDLE_MAX + 5} value={values.handle} oninput={onHandleInput} onblur={touch('handle')} aria-invalid={shown('handle')} aria-describedby={shown('handle') ? 'e-handle' : 'h-handle'} class={authInput({ invalid: shown('handle'), filled: !!handle, size: 'md', padLeft: true, padRight: true })} />
-									{#if handleOk}<span class="absolute top-1/2 right-4 -translate-y-1/2 text-mint" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>{/if}
+									<input id="f-handle" name="handle" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="minji.routine" maxlength={HANDLE_MAX + 5} value={values.handle} oninput={onHandleInput} onblur={onHandleBlur} aria-invalid={shown('handle')} aria-describedby={shown('handle') ? 'e-handle' : 'h-handle'} class={authInput({ invalid: shown('handle'), filled: !!handle, size: 'md', padLeft: true, padRight: true })} />
+									{#if checking && checking === handle}<span class="absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-white/70" aria-hidden="true"></span>{:else if handleOk}<span class="absolute top-1/2 right-4 -translate-y-1/2 text-mint" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>{/if}
 								</div>
 								{#if shown('handle')}
-									<ErrorText id="e-handle" text={errs.handle} />
+									<ErrorText id="e-handle" text={errText('handle')} />
+								{:else if checking && checking === handle}
+									<p id="h-handle" class={AUTH_HINT} role="status">@{handle} 을 쓸 수 있는지 확인하고 있어요…</p>
 								{:else if handleOk}
 									<p id="h-handle" class="text-[12px] font-semibold text-mint">@{handle} 은 사용할 수 있어요</p>
 								{:else}
@@ -303,6 +377,7 @@
 
 						<div class="flex flex-col gap-2">
 							<span id="platform-label" class={AUTH_LABEL}>대표 채널</span>
+							<input type="hidden" name="platform" value={values.platform ?? ''} />
 							<div id="f-platform" role="radiogroup" aria-labelledby="platform-label" class="grid grid-cols-3 gap-2">
 								{#each PLATFORMS as p (p.id)}
 									{@const on = values.platform === p.id}
@@ -320,7 +395,7 @@
 									</button>
 								{/each}
 							</div>
-							{#if shown('platform')}<ErrorText text={errs.platform} />{/if}
+							{#if shown('platform')}<ErrorText text={errText('platform')} />{/if}
 						</div>
 
 						<!-- 모바일 샵 미리보기(작게) -->
@@ -344,8 +419,8 @@
 					<p class="mt-8 mb-3 lg:mt-9 lg:mb-4 {sectionLabel}">03 · 연락처</p>
 					<div class="flex flex-col gap-2 lg:max-w-[284px]">
 						<label for="f-phone" class={AUTH_LABEL}>휴대폰 번호</label>
-						<input id="f-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" value={values.phone} oninput={onPhoneInput} onblur={touch('phone')} aria-invalid={shown('phone')} aria-describedby={shown('phone') ? 'e-phone' : 'h-phone'} class="{authInput({ invalid: shown('phone'), filled: !!values.phone, size: 'md' })} tabular-nums" />
-						{#if shown('phone')}<ErrorText id="e-phone" text={errs.phone} />{/if}
+						<input id="f-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" value={values.phone} oninput={onPhoneInput} onblur={touch('phone')} aria-invalid={shown('phone')} aria-describedby={shown('phone') ? 'e-phone' : 'h-phone'} class="{authInput({ invalid: shown('phone'), filled: !!values.phone, size: 'md' })} tabular-nums" />
+						{#if shown('phone')}<ErrorText id="e-phone" text={errText('phone')} />{/if}
 					</div>
 					{#if !shown('phone')}<p id="h-phone" class="mt-2 {AUTH_HINT}">제조 미팅 · 발주 연락에만 쓰고 샵에는 보이지 않아요.</p>{/if}
 
@@ -356,7 +431,7 @@
 						</div>
 						{#each TERMS as t (t.id)}
 							<div class="flex items-center gap-2">
-								<div class="flex-1"><CheckBox size={24} bind:checked={values.agreed[t.id]}><span class="text-[14px] text-white/80"><span class="font-bold text-accent">필수</span> {t.name}</span></CheckBox></div>
+								<div class="flex-1"><CheckBox size={24} name="agree_{t.id}" bind:checked={values.agreed[t.id]}><span class="text-[14px] text-white/80"><span class="font-bold text-accent">필수</span> {t.name}</span></CheckBox></div>
 								<!-- 약관 문서가 확정되면 문서 링크로 -->
 								<button type="button" onclick={() => showToast('약관 문서를 준비하고 있어요')} class="shrink-0 py-2 text-[12px] text-white/45 underline underline-offset-2">보기</button>
 							</div>
@@ -366,7 +441,8 @@
 				</div>
 
 				<div class="shrink-0 border-t border-white/6 bg-bg px-6 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:border-white/7 lg:px-1 lg:pt-4 lg:pb-7">
-					<button type="submit" class={authButton(missing === 0)}>{submitLabel(missing)}</button>
+					{#if formError}<div class="mb-3"><ErrorText text={formError} /></div>{/if}
+					<button type="submit" disabled={busy} aria-busy={busy} class={authButton(missing === 0 && !busy)}>{busy ? '가입하고 있어요…' : submitLabel(missing)}</button>
 				</div>
 			</div>
 		</form>
@@ -385,8 +461,9 @@
 					<div class="flex justify-between gap-3 border-b border-white/6 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="text-white/55">대표 채널</dt><dd class="font-bold">{preview.platform}</dd></div>
 					<div class="flex justify-between gap-3 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="text-white/55">연락처</dt><dd class="font-bold tabular-nums">{values.phone}</dd></div>
 				</dl>
-				<a href="/" class="{authButton(true)} mt-auto lg:mt-6">
-					크리에이터 스튜디오로
+				<!-- 가입 action 이 바로 로그인해 둔다 — 로그인이 실패했으면 로그인 화면으로 -->
+				<a href={signedIn ? '/' : '/login'} class="{authButton(true)} mt-auto lg:mt-6">
+					{signedIn ? '크리에이터 스튜디오로' : '로그인하러 가기'}
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
 				</a>
 			</div>
@@ -397,8 +474,16 @@
 			<div class="flex h-16 items-center lg:hidden"><AuthLogo /></div>
 			<div class="flex flex-1 animate-up-in flex-col lg:w-full lg:max-w-[520px] lg:flex-none lg:items-center lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-[#111216] lg:p-12 lg:text-center">
 				<div class="mt-14 flex h-[60px] w-[60px] items-center justify-center rounded-[20px] bg-white/6 text-white/70 lg:mt-0 lg:h-16 lg:w-16" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
-				<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">초대 링크가<br class="lg:hidden" /> 만료됐어요</h1>
-				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 7일 동안만 열리고, 가입에 한 번 쓰면 다시 열 수 없어요. 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
+				{#if closedReason === 'USED'}
+					<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">이미 가입을 마친<br class="lg:hidden" /> 초대 링크예요</h1>
+					<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">이 링크로 크리에이터 가입이 끝났어요. 초대받은 이메일과 가입 때 정한 비밀번호로 로그인해주세요.</p>
+					<div class="mt-auto w-full lg:mt-8">
+						<a href="/login" class={authButton(true)}>로그인하러 가기</a>
+						<p class="mt-4 text-center text-[13px] text-white/50">비밀번호가 기억나지 않으면 <a href="/password" class="font-bold text-accent">비밀번호 찾기</a></p>
+					</div>
+				{:else}
+				<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">초대 링크가 만료됐어요</h1>
+				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 {INVITE_DAYS}일 동안만 열리고, <br/> 가입에 한 번 쓰면 다시 열 수 없어요.<br class="" /> 다시 초대받았다면 가장 최근 메일의 링크를 열어주세요.<br/> 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
 				<form
 					method="POST"
 					action="?/request"
@@ -410,9 +495,11 @@
 						}}
 				>
 					<button type="submit" class={authButton(true)}>새 초대 요청하기</button>
-					<p class="mt-1.5 text-center text-[13px] text-white/50">이미 계정이 있나요? <a href="/login" class="font-bold text-accent">로그인</a></p>
+					<!-- PC 는 상단 머리에 같은 로그인 링크가 있어 숨긴다 -->
+					<p class="mt-1.5 text-center text-[13px] text-white/50 lg:hidden">이미 계정이 있나요? <a href="/login" class="font-bold text-accent">로그인</a></p>
 				</form>
-				{#if form?.requested === false}<p class="mt-3 text-center text-[13px] text-white/55">지금은 요청을 받을 수 없어요 — MYR 파트너팀에 직접 연락해주세요</p>{/if}
+				{#if form && 'requested' in form && form.requested === false}<p class="mt-3 text-center text-[13px] text-white/55">지금은 요청을 받을 수 없어요 — MYR 파트너팀에 직접 연락해주세요</p>{/if}
+				{/if}
 			</div>
 		</div>
 	{/if}

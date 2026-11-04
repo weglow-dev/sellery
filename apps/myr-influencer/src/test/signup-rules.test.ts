@@ -1,6 +1,6 @@
 // 크리에이터 초대 가입 규칙 — apps/myr-influencer/src/lib/signup-rules.ts
 import { describe, expect, it } from 'vitest';
-import { HANDLE_MAX, PLATFORMS, TERMS, allAgreed, cleanHandleInput, inviteValidity, isPlatform, missingCount, platformName, signupErrors, submitLabel, type SignupValues } from '../lib/signup-rules';
+import { HANDLE_MAX, HANDLE_STATUS_MESSAGE, PLATFORMS, SIGNUP_FIELDS, TERMS, acceptFailure, allAgreed, cleanHandleInput, inviteValidity, isPlatform, missingCount, parseSignupForm, platformName, signupErrors, submitLabel, type SignupValues } from '../lib/signup-rules';
 
 const ok: SignupValues = {
 	password: 'abcd1234',
@@ -42,7 +42,12 @@ describe('signupErrors — 시안의 칸별 문구', () => {
 		expect(signupErrors({ ...ok, handle: 'Minji!' }).handle).toBe('영문 소문자, 숫자, . _ 만 쓸 수 있어요');
 		expect(signupErrors({ ...ok, handle: 'm' }).handle).toBe('핸들은 2자 이상이에요');
 		expect(signupErrors({ ...ok, handle: 'a'.repeat(HANDLE_MAX + 1) }).handle).toContain('30자');
-		expect(signupErrors(ok, ['minji.routine']).handle).toBe('이미 다른 크리에이터가 쓰고 있어요');
+		// 중복 · 예약어는 서버 확인 결과(칸을 벗어날 때)로만 — 확인 전이면 형식만 본다
+		expect(signupErrors(ok).handle).toBe('');
+		expect(signupErrors(ok, { 'minji.routine': 'taken' }).handle).toBe('이미 다른 크리에이터가 쓰고 있어요');
+		expect(signupErrors(ok, { 'minji.routine': 'reserved' }).handle).toBe(HANDLE_STATUS_MESSAGE.reserved);
+		expect(signupErrors(ok, { 'minji.routine': 'available' }).handle).toBe('');
+		expect(signupErrors(ok, { 'other.handle': 'taken' }).handle).toBe(''); // 다른 핸들의 결과는 상관없다
 		expect(signupErrors({ ...ok, handle: '@Minji.Routine' }).handle).toBe(''); // 입력 정리 뒤 판정
 	});
 	it('채널 · 연락처', () => {
@@ -76,4 +81,38 @@ describe('inviteValidity — 한국 시각 날짜 · 남은 일수', () => {
 		expect(inviteValidity('nope', now).expired).toBe(true);
 	});
 	it('날짜는 KST — UTC 로는 전날 15시인 시각도 한국 날짜로', () => expect(inviteValidity('2026-11-10T15:30:00Z', now).until).toBe('11월 11일까지'));
+});
+
+describe('parseSignupForm — 가입 action 이 받는 칸', () => {
+	const fd = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
+	it('칸 이름 그대로 · 핸들/연락처는 화면과 같은 정리 · 약관은 "1" 만 동의', () => {
+		const v = parseSignupForm(fd({ password: 'abcd1234', confirm: 'abcd1234', name: ' 민지 ', handle: ' @Minji.Routine', platform: 'youtube', phone: '01012345678', agree_tos: '1', agree_privacy: 'on' }));
+		expect(v).toEqual({ password: 'abcd1234', confirm: 'abcd1234', name: ' 민지 ', handle: 'minji.routine', platform: 'youtube', phone: '010-1234-5678', agreed: { tos: true, privacy: false } });
+	});
+	it('빈 폼 — 모든 칸이 오류 · 대표 채널 null', () => {
+		const v = parseSignupForm(fd({}));
+		expect(v.platform).toBeNull();
+		const e = signupErrors(v);
+		expect(SIGNUP_FIELDS.every((k) => !!e[k])).toBe(true);
+	});
+});
+
+describe('acceptFailure — 서버 거절 코드 → 화면이 할 일', () => {
+	it('링크가 닫혔으면 만료 화면', () => {
+		for (const c of ['NOT_FOUND', 'EXPIRED', 'USED', 'REVOKED']) expect(acceptFailure(c), c).toEqual({ screen: 'expired' });
+	});
+	it('핸들 · 비밀번호 · 입력 문제는 그 칸', () => {
+		expect(acceptFailure('HANDLE_TAKEN')).toEqual({ field: 'handle', message: HANDLE_STATUS_MESSAGE.taken });
+		expect(acceptFailure('RESERVED_HANDLE')).toEqual({ field: 'handle', message: HANDLE_STATUS_MESSAGE.reserved });
+		expect(acceptFailure('WEAK_PASSWORD')).toMatchObject({ field: 'password' });
+		expect(acceptFailure('INVALID_INPUT', 'phone')).toMatchObject({ field: 'phone' });
+		expect(acceptFailure('INVALID_INPUT', 'terms')).toMatchObject({ field: 'terms' });
+		expect(acceptFailure('INVALID_INPUT', 'evil')).not.toHaveProperty('field');
+	});
+	it('계정 문제 · 그 밖은 칸 없는 안내', () => {
+		expect(acceptFailure('EMAIL_HAS_ACCOUNT')).toEqual({ message: expect.stringContaining('계정이 이미') });
+		for (const c of ['ALREADY_CREATOR', 'ALREADY_LINKED', 'EMAIL_MISMATCH']) expect(acceptFailure(c), c).toEqual({ message: expect.stringContaining('로그인') });
+		expect(acceptFailure('DB_ERROR')).toEqual({ message: expect.stringContaining('잠시 후') });
+		expect(acceptFailure('???')).toEqual({ message: expect.stringContaining('잠시 후') });
+	});
 });
