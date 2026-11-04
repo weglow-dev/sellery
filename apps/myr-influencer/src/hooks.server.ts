@@ -3,7 +3,7 @@ import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createServerClient } from '@supabase/ssr';
 import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { isPublicPath, loginPath } from '$lib/console-auth';
+import { SESSION_ONLY_COOKIE, isPublicPath, loginPath } from '$lib/console-auth';
 import '$lib/server/env';
 
 /* Supabase SSR 세션 — apps/myr-shop/src/hooks.server.ts 골격 복사.
@@ -17,7 +17,17 @@ const supabase: Handle = async ({ event, resolve }) => {
 					cookies: {
 						getAll: () => event.cookies.getAll(),
 						setAll: (cookiesToSet, headers) => {
-							for (const { name, value, options } of cookiesToSet) event.cookies.set(name, value, { ...options, path: '/' });
+							// "이 기기에서 로그인 유지" 를 껐으면(로그인 action 이 locals.sessionOnly · 이후 요청은 쿠키) 만료 시각을 빼서 브라우저를 닫으면 지워지는 쿠키로.
+							// 로그아웃(값 비우기 · maxAge 0)은 그대로 둔다 — 지우는 쿠키까지 만료를 빼면 남는다.
+							const sessionOnly = event.locals.sessionOnly ?? event.cookies.get(SESSION_ONLY_COOKIE) === '1';
+							for (const { name, value, options } of cookiesToSet) {
+								const opts = { ...options, path: '/' };
+								if (sessionOnly && value && (opts.maxAge ?? 1) > 0) {
+									delete opts.maxAge;
+									delete opts.expires;
+								}
+								event.cookies.set(name, value, opts);
+							}
 							authHeaders = headers; // Cache-Control: private, no-store … — 쿠키를 쓴 응답을 CDN 이 캐시하지 않게
 						}
 					}

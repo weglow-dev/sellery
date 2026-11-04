@@ -22,6 +22,23 @@
 	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 	/* PC(lg~) 상세·에디터 — 옆으로 밀지 않고 흐리게만 (디자인 "MYR Influencer Admin PC" fadeIn) */
 	--animate-fade-in: fade-in 0.3s both;
+	/* 입력 오류 문구 — 칸 아래에서 살짝 흔들림(시안 "MYR Influencer Login" · "Signup" shake) */
+	--animate-shake: shake 0.35s both;
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		transform: none;
+	}
+	20%,
+	60% {
+		transform: translateX(-5px);
+	}
+	40%,
+	80% {
+		transform: translateX(5px);
+	}
 }
 
 @keyframes fade-in {
