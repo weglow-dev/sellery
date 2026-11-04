@@ -8,6 +8,19 @@
 
 	const TITLE = `${BRAND_NAME} — 나만 팔 수 있는 제품`;
 	const OG_DESCRIPTION = `팔로워가 있다면, 나만의 제품을 만들 수 있어요. 제조·재고·운영은 전부 ${BRAND_NAME}가 할게요.`;
+
+	// 검색 결과의 브랜드 정보(조직 이름 · 로고 · 주소). 값이 전부 상수라 이스케이프만 한다 — `<` 로 스크립트 태그가 닫히지 않게.
+	// 스크립트 태그를 마크업에 직접 쓰면 Svelte 가 컴포넌트 스크립트로 읽으므로 문자열로 넣는다.
+	const ORG_LD = JSON.stringify({
+		'@context': 'https://schema.org',
+		'@type': 'Organization',
+		name: BRAND_NAME,
+		alternateName: 'MYR',
+		url: OEM_PUBLIC_URL,
+		logo: `${OEM_PUBLIC_URL}/logo.png`,
+		description: OG_DESCRIPTION
+	}).replace(/</g, '\\u003c');
+	const ORG_LD_TAG = `<script type="application/ld+json">${ORG_LD}</` + `script>`;
 </script>
 
 <!-- canonical · og:url 은 공개 주소(sellery.life/influencer/oem) — 이 앱의 실제 호스트 makeyourrecipe.vercel.app 이 중복 주소로 색인되지 않게.
@@ -32,6 +45,8 @@
 	<meta name="twitter:title" content={TITLE} />
 	<meta name="twitter:description" content={OG_DESCRIPTION} />
 	<meta name="twitter:image" content={OG_IMAGE_URL} />
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- 상수로 만든 JSON 만 · `<` 이스케이프 -->
+	{@html ORG_LD_TAG}
 </svelte:head>
 
 <Funnel {form} />

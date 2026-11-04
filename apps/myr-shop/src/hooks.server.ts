@@ -2,6 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createServerClient } from '@supabase/ssr';
 import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { isNoindexPath } from '$lib/seo';
 
 /* Supabase SSR 세션 — apps/shop/src/hooks.server.ts 골격 복사(docs/myr.md §7 S3 · 링크 유입 쿠키 훅은 MYR 에 없다).
    요청마다 createServerClient 1회 → locals.supabase · locals.safeGetSession(). cookieOptions 는 지정하지 않는다 — host-only.
@@ -49,4 +50,12 @@ const apiNoStore: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle = sequence(supabase, apiNoStore);
+/* 개인화 · 결제 · 주문 · 문의 · 로그인 · API 는 색인하지 않는다 — 경로 목록은 lib/seo.ts NOINDEX_PREFIXES 한 곳(robots.txt 도 같은 목록).
+   meta 태그와 달리 JS 없이 읽히고 리다이렉트 · JSON 응답에도 붙는다. */
+const noindex: Handle = async ({ event, resolve }) => {
+	const response = await resolve(event);
+	if (isNoindexPath(event.url.pathname)) response.headers.set('x-robots-tag', 'noindex, nofollow');
+	return response;
+};
+
+export const handle = sequence(supabase, apiNoStore, noindex);

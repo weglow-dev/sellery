@@ -7,7 +7,9 @@
 	import CartButton from '$lib/components/CartButton.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import QtyStepper from '$lib/components/QtyStepper.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import Tile from '$lib/components/Tile.svelte';
+	import { breadcrumbJsonLd, categoryPath, productDescription, productImage, productJsonLd, siteOrigin } from '$lib/seo';
 
 	/** 상품 페이지 — 모바일: 풀블리드 타일 → 구매 정보 → 상세 섹션(스크롤) + 하단 고정 담기 바.
 	 *  PC(lg): 왼쪽 상세 스크롤 + 오른쪽 고정 구매 패널(280~360px) (디자인 "MYR Shop PC" 상세).
@@ -36,10 +38,22 @@
 	const card = 'rounded-[20px] border border-white/8 bg-white/4';
 </script>
 
-<svelte:head>
-	<title>{p.name} · {creator.name} — MYR Shop</title>
-	<meta name="description" content="{creator.name}의 {p.name} — {p.form}{p.unit ? ` · ${p.unit}` : ''}" />
-</svelte:head>
+<!-- 검색·공유: 설명 = 레시피 노트(또는 스토리) · 이미지 = 제품 사진(없으면 사이트 기본) · 구조화 데이터 = 상품(가격 · 재고) + 경로(홈 › 카테고리 › 제품) -->
+<Seo
+	title="{p.name} · {creator.name}"
+	description={productDescription(p)}
+	path="/p/{p.code}"
+	image={p.thumbUrl ? productImage(p, siteOrigin(data.site)) : null}
+	type="product"
+	jsonLd={[
+		productJsonLd(p, siteOrigin(data.site)),
+		breadcrumbJsonLd(siteOrigin(data.site), [
+			{ name: '홈', path: '/' },
+			{ name: catName(p.cat), path: categoryPath(p.cat, null) },
+			{ name: p.name, path: `/p/${p.code}` }
+		])
+	]}
+/>
 
 <!-- 모바일: 화면 높이(앱 셸 <main>) 를 꽉 채우는 세로 flex — 내용만 스크롤, 담기 바는 바닥에 보통 흐름으로 (+layout.svelte 주석) -->
 <div class="flex h-full flex-col lg:mx-auto lg:grid lg:h-auto lg:max-w-[1240px] lg:grid-cols-[minmax(0,1fr)_clamp(280px,30%,360px)] lg:items-start lg:gap-10 lg:px-10 lg:pt-6 lg:pb-20">

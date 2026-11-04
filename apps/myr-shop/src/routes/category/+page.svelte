@@ -3,14 +3,19 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import ProductCard from '$lib/components/ProductCard.svelte';
 	import ProductRow from '$lib/components/ProductRow.svelte';
+	import Seo from '$lib/components/Seo.svelte';
+	import { categoryMeta, categoryPath } from '$lib/seo';
 
 	/** 카테고리 — `?cat=<id>` 탭 · `?creator=<handle>` 크리에이터별 보기. 필터는 +page.server.ts 가 적용하고 상태는 URL 에만.
 	 *  모바일: 가로 칩 + 세로 행 카드 · PC: 왼쪽 200px 사이드바 + 4:3 카드 그리드 */
 	let { data } = $props();
 	const tabHref = (id: string) => `/category?cat=${id}${data.creatorParam ? `&creator=${data.creatorParam}` : ''}`;
+	// 검색용 제목·설명 · 정식 주소 — 없는 크리에이터 값은 화면에서도 무시되므로 주소에서도 뺀다. 제품이 없는 목록은 색인하지 않는다(빈 페이지)
+	const meta = $derived(categoryMeta(data.cat, data.creator, data.list.length));
+	const path = $derived(categoryPath(data.cat, data.creator ? data.creatorParam : null));
 </script>
 
-<svelte:head><title>{data.title} — MYR Shop</title></svelte:head>
+<Seo title={meta.title} description={meta.description} {path} noindex={data.list.length === 0} />
 
 <div class="flex animate-slide-in flex-col lg:mx-auto lg:grid lg:max-w-[1240px] lg:grid-cols-[200px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:px-10 lg:pt-7 lg:pb-20">
 	<BackHeader title={data.title} home>
