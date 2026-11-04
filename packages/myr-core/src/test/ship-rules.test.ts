@@ -1,6 +1,6 @@
 // 발송 처리 순수 규칙 — apps/myr-shop/src/lib/ship-rules.ts (0069 · S8)
 import { describe, expect, it } from 'vitest';
-import { normalizeCourier, normalizeTracking, parseShipInput, parseShipResult, parseShipRows, shipMessage, trackingUrl } from '../lib/ship-rules';
+import { normalizeCourier, normalizeTracking, parseShipInput, parseShipResult, parseShipRows, shipMessage, trackingUrl } from '../ship-rules';
 
 describe('parseShipInput', () => {
 	it('코드 소문자(# 무시) · 택배사 별칭 · 운송장 숫자만', () => {

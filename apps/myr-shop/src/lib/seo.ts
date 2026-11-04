@@ -2,12 +2,15 @@
  * SEO 규칙 — 사이트 주소 · 제목 · 설명 · 색인 제외 경로 · 구조화 데이터(JSON-LD) · robots.txt · sitemap.xml.
  * `$env` · `$app` 을 import 하지 않는 순수 모듈 — `src/test/seo.test.ts`. 화면은 `lib/components/Seo.svelte`, 라우트는 `routes/{robots.txt,sitemap.xml}`.
  *
- * 사이트 오리진은 `PUBLIC_SITE_URL`(도메인이 정해지면 값만 교체) · 없으면 `SITE_URL_FALLBACK`. 메일 링크(`lib/server/mail.ts`)도 같은 함수를 쓴다.
+ * 사이트 오리진은 `PUBLIC_SITE_URL`(도메인이 정해지면 값만 교체) · 없으면 `SITE_URL_FALLBACK`. 메일 링크(`@sellery/myr-core` server/mail)도 같은 함수(`@sellery/myr-core/site`)를 쓴다.
  * canonical · og:url · sitemap 은 전부 이 오리진 기준 — 요청 호스트(`*.vercel.app` 프리뷰 등)를 그대로 쓰면 같은 페이지가 주소 여러 개로 색인된다.
  */
+import { siteOrigin } from '@sellery/myr-core/site';
 import { CATS, catName, handleSlug, type Creator, type Product } from './data';
 
-export const SITE_URL_FALLBACK = 'https://myr-shop.vercel.app';
+/** 사이트 오리진 — 메일 링크와 같은 함수(공용 패키지). 여기서 다시 내보내 화면·라우트가 seo 한 곳에서 가져간다 */
+export { SITE_URL_FALLBACK, siteOrigin } from '@sellery/myr-core/site';
+
 export const SITE_NAME = 'MYR Shop';
 export const BRAND_NAME = 'Make Your Recipe';
 export const DEFAULT_TITLE = 'MYR Shop — 내가 믿는 사람이 직접 만든 웰니스';
@@ -24,19 +27,6 @@ export const NOINDEX_PREFIXES = ['/api', '/auth', '/login', '/cart', '/checkout'
 
 export function isNoindexPath(pathname: string): boolean {
 	return NOINDEX_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
-/** `PUBLIC_SITE_URL` 값 → 끝 슬래시 없는 오리진. 비었거나 http(s) URL 이 아니면 기본값 */
-export function siteOrigin(raw: unknown): string {
-	if (typeof raw === 'string' && raw.trim()) {
-		try {
-			const u = new URL(raw.trim());
-			if (u.protocol === 'https:' || u.protocol === 'http:') return u.origin;
-		} catch {
-			/* 기본값으로 */
-		}
-	}
-	return SITE_URL_FALLBACK;
 }
 
 /** 경로(쿼리 포함 가능) 또는 절대 URL → 절대 URL. 이미 http(s) 면 그대로 */

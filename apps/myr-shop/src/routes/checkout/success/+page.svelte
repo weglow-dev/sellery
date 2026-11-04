@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
-	import { depositInfoOf, failText, guestOrderHref, parseSuccessParams, type DepositInfo, type FailText, type RejectedItem } from '$lib/checkout-rules';
+	import { depositInfoOf, failText, guestOrderHref, parseSuccessParams, type DepositInfo, type FailText, type RejectedItem } from '@sellery/myr-core/checkout-rules';
 
 	type Card = { orderCode: string; orderName: string; itemsAmount: number; shippingFee: number; amount: number; buyerName: string; address: string; items: { code: string; name: string; option: string; qty: number; amount: number }[] };
 	type ConfirmOk = { ok: true; orderCode: string; status: string; already?: boolean; card: Card | null; deposit?: DepositInfo | null; guest?: boolean };

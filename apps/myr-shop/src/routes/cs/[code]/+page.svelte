@@ -2,8 +2,8 @@
 	/** 고객 문의 스레드(읽기 전용) — 머리(상품 · 크리에이터 · 유형 · 상태 칩) · 주문 요약(소유 증명된 주문 · 이 상품 줄) · 말풍선(내 글 오른쪽 · 크리에이터/운영팀 왼쪽). 이어 묻는 폼은 없고, 더 궁금하면 주문 상세·상품 페이지의 문의 시트로 새 문의.
 	 *  크리에이터가 답변하면 notifyCsReplied(이메일)도 가지만, 이메일이 없는 고객(비회원 미입력 · 카카오)은 이 화면이 정본. */
 	import { won } from '$lib/data';
-	import { csSenderLabel } from '$lib/cs-rules';
-	import { shortDate } from '$lib/order-view';
+	import { csSenderLabel } from '@sellery/myr-core/cs-rules';
+	import { shortDate } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 

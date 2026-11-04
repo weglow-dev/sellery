@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { failPageReason, failSessionCode, GUEST_CHECKOUT_COOKIE, ownsCheckout, TOSS_KEY_RE } from '$lib/checkout-rules';
+import { failPageReason, failSessionCode, GUEST_CHECKOUT_COOKIE, ownsCheckout, TOSS_KEY_RE } from '@sellery/myr-core/checkout-rules';
 import { admin, hasAdmin } from '$lib/server/admin';
 import { failCheckout } from '$lib/server/checkout-sync';
 

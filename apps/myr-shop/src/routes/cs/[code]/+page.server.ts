@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { CS_CODE_RE, CS_DONE_MESSAGES, csStatusChip, csTokenCookieName } from '$lib/cs-rules';
+import { CS_CODE_RE, CS_DONE_MESSAGES, csStatusChip, csTokenCookieName } from '@sellery/myr-core/cs-rules';
 import { hasAdmin } from '$lib/server/admin';
 import { getCsThread } from '$lib/server/cs';
 

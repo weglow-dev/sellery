@@ -2,7 +2,7 @@
 	/** 마이 "내 문의" — 아코디언(대표 시안 2026-11-02). 접힌 줄: 상품 타일 · 상태 칩 · 유형 · 상대 시각 · 첫 질문(0064 first_body) · 크리에이터 · 상품.
 	 *  펼치면 GET /api/cs/<code>(세션 user.id) 로 스레드를 한 번 읽어 말풍선으로 — 내 문의(회색 상자 · 첫 질문엔 주문번호) · 크리에이터 답변(주황 테두리). 답변 대기면 안내 줄.
 	 *  이어 묻는 폼은 없다 — 더 궁금하면 상품 페이지·주문 상세의 문의 시트로 새 문의. */
-	import { csSenderLabel, relTime, type CsConversation, type CsMessage, type CsThread } from '$lib/cs-rules';
+	import { csSenderLabel, relTime, type CsConversation, type CsMessage, type CsThread } from '@sellery/myr-core/cs-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
 	let { items }: { items: CsConversation[] } = $props();

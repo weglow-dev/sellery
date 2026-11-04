@@ -12,7 +12,7 @@ import {
 	TOSS_KEY_RE,
 	type CheckoutLite,
 	type DepositInfo
-} from '$lib/checkout-rules';
+} from '@sellery/myr-core/checkout-rules';
 import { admin, hasAdmin } from '$lib/server/admin';
 import { clearCart, removeCartCodes } from '$lib/server/cart';
 import { apiError, cancelAndFail, confirmDone, failCheckout, logPaymentEvent, moneyHeld, rejectCrossSite, type Admin } from '$lib/server/checkout-sync';

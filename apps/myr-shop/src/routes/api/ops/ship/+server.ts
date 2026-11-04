@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { parseShipInput, shipMessage } from '$lib/ship-rules';
+import { parseShipInput, shipMessage } from '@sellery/myr-core/ship-rules';
 import { hasAdmin } from '$lib/server/admin';
 import { rejectCron } from '$lib/server/cron';
 import { listShipOrders, shipOrder } from '$lib/server/ship';

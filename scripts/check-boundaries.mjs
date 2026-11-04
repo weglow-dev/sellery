@@ -67,11 +67,15 @@ const isServerFile = (r) =>
 const isServerImport = (spec) =>
   spec.startsWith("@sellery/db/server/") ||
   spec.startsWith("@sellery/payments/server/") ||
+  spec.startsWith("@sellery/myr-core/server/") ||
   spec.startsWith("$lib/server/") ||
   /^\.{1,2}\/.*\.server(\.(ts|js))?$/.test(spec);
 
 const isDemoCoreImport = (spec) =>
   spec === "@sellery/core" || DEMO_CORE_SUBPATHS.some((s) => spec === `@sellery/core/${s}` || spec === `@sellery/core/${s}.ts`);
+
+const isMyrApp = (app) => app === "myr" || app.startsWith("myr-");
+const isSelleryPackageImport = (spec) => /^@sellery\/(db|payments|core|ui)(\/|$)/.test(spec);
 
 const errors = [];
 const warnings = [];
@@ -89,6 +93,10 @@ for (const app of existsSync(appsDir) ? readdirSync(appsDir) : []) {
       // (a) 브라우저 도달 파일의 서버 모듈 import
       if (!server && isServerImport(spec)) {
         report("error", file, line, `(a) 브라우저 도달 파일이 서버 전용 모듈을 import: '${spec}' — +*.server.ts 또는 $lib/server 배럴에서만`);
+      }
+      // (f) MYR 앱의 셀러리 패키지 import
+      if (isMyrApp(app) && isSelleryPackageImport(spec)) {
+        report("error", file, line, `(f) MYR 앱이 셀러리 패키지를 import: '${spec}' — 필요한 코드는 @sellery/myr-core 로 복사한다(docs/myr.md 결정 11)`);
       }
       // (e) 서버 파일의 브라우저 클라이언트 import
       if (server && spec === "@sellery/db/browser") {
@@ -108,17 +116,29 @@ for (const app of existsSync(appsDir) ? readdirSync(appsDir) : []) {
   }
 }
 
-// ---------- packages/db · packages/payments ----------
-for (const pkg of ["db", "payments"]) {
+// ---------- packages/db · packages/payments · packages/myr-core ----------
+for (const pkg of ["db", "payments", "myr-core"]) {
   const srcDir = join(ROOT, "packages", pkg, "src");
   for (const file of walk(srcDir)) {
     const r = rel(file);
     if (/\.server\.ts$/.test(r)) continue;
     for (const { spec, line } of importsOf(file)) {
       const relServer = /^\.{1,2}\/(.*\/)?server\//.test(spec) || /^\.{1,2}\/.*\.server$/.test(spec);
-      if (relServer || spec.startsWith("@sellery/db/server/") || spec.startsWith("@sellery/payments/server/")) {
+      if (relServer || spec.startsWith("@sellery/db/server/") || spec.startsWith("@sellery/payments/server/") || spec.startsWith("@sellery/myr-core/server/")) {
         report("error", file, line, `(c) 순수 파일이 서버 모듈을 import: '${spec}' — 서버 의존은 *.server.ts 에만`);
       }
+    }
+  }
+}
+
+// ---------- packages/myr-core (f · g) — 서버 파일 포함 전부 ----------
+for (const file of walk(join(ROOT, "packages", "myr-core", "src"))) {
+  for (const { spec, line } of importsOf(file)) {
+    if (isSelleryPackageImport(spec)) {
+      report("error", file, line, `(f) @sellery/myr-core 가 셀러리 패키지를 import: '${spec}' — 복사만(docs/myr.md 결정 11)`);
+    }
+    if (/^\$(env|app|lib)(\/|$)/.test(spec)) {
+      report("error", file, line, `(g) @sellery/myr-core 가 SvelteKit 별칭을 import: '${spec}' — 설정은 configureMyrCore 로 주입한다`);
     }
   }
 }

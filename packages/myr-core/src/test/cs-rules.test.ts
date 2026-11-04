@@ -18,7 +18,7 @@ import {
 	parseCsOpenInput,
 	parseCsOpenResult,
 	parseCsThread
-} from '../lib/cs-rules';
+} from '../cs-rules';
 
 describe('normalizeCsBody', () => {
 	it('CR 제거 · 제어문자 제거 · 빈 줄 축소 · 앞뒤 공백 (0063 myr_cs_normalize_body 와 같은 결과)', () => {

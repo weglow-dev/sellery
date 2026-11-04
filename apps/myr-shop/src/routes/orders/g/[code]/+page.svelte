@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { displayCode } from '$lib/order-view';
+	import { displayCode } from '@sellery/myr-core/order-view';
 	import OrderDetail from '$lib/components/OrderDetail.svelte';
 
 	let { data } = $props();

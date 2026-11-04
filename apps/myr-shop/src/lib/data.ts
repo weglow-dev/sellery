@@ -82,11 +82,10 @@ export const DETAIL_ANCHORS = [
 /** 정책 숫자 — 실서비스에서는 서버 규칙(docs/myr.md §6.2 · §9-11). 디자인 Tweaks 의 freeShipping 기본값 */
 export const FREE_SHIPPING = 50000;
 export const SHIPPING_FEE = 3000;
-/** 한 줄 최대 수량 (디자인 9 · 실서비스 체크아웃 가드 1..10 과 맞춘다) */
-export const MAX_QTY = 9;
+/** 한 줄 최대 수량 · 원화 표시 — 체크아웃 규칙 · 메일 템플릿과 같은 값이라 공용 패키지에 있다 */
+export { MAX_QTY, won } from '@sellery/myr-core/constants';
 
 export const catName = (id: string): string => CATS.find((c) => c.id === id)?.name ?? '전체';
-export const won = (n: number): string => '₩' + n.toLocaleString('ko-KR');
 
 /** 목록에서 크리에이터만 모아 상품 수와 함께 — 홈 "지금 뜨는 브랜드" */
 export function creatorsOf(products: Product[]): (Creator & { count: number })[] {

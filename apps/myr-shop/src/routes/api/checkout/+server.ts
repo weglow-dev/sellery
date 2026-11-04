@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import type { RequestHandler } from './$types';
-import { generateOrderId, GUEST_CHECKOUT_COOKIE, GUEST_CHECKOUT_COOKIE_MAX_AGE, parseCheckoutBody, parseCreateResult } from '$lib/checkout-rules';
+import { generateOrderId, GUEST_CHECKOUT_COOKIE, GUEST_CHECKOUT_COOKIE_MAX_AGE, parseCheckoutBody, parseCreateResult } from '@sellery/myr-core/checkout-rules';
 import { displayName } from '$lib/auth';
 import { admin, hasAdmin } from '$lib/server/admin';
 import { apiError, rejectCrossSite } from '$lib/server/checkout-sync';

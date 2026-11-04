@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { CHECKOUT_LITE_COLS, parseCheckoutLite, type CheckoutLite } from '$lib/checkout-rules';
+import { CHECKOUT_LITE_COLS, parseCheckoutLite, type CheckoutLite } from '@sellery/myr-core/checkout-rules';
 import { admin, hasAdmin } from '$lib/server/admin';
 import {
 	depositDone,

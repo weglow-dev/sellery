@@ -20,9 +20,9 @@ import {
 	rejectedItemsText,
 	validateGuestBuyer,
 	validateShipping
-} from '../lib/checkout-rules';
-import { MAX_QTY } from '../lib/data';
-import { cleanText, normalizePhone } from '../lib/text';
+} from '../checkout-rules';
+import { MAX_QTY } from '../constants';
+import { cleanText, normalizePhone } from '../text';
 
 describe('text', () => {
 	it('cleanText 는 이모지·제어문자 제거 + 공백 정리 · normalizePhone 은 숫자 8~15', () => {

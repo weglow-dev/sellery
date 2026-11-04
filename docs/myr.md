@@ -25,7 +25,7 @@
 | 8 | **발송은 MYR 물류(이벗)가 주문 단위로 한 번에 한다**(2026-10-29 전제 — 고객에게 주문 1건 · 배송 1건). 배송비는 **결제당 1건**(무료배송 기준도 장바구니 합계 기준). **2026-11-03 개정 — 발주·송장은 이벗 API 자동**(결정 13): 송장은 이벗이 **주문 줄마다** 돌려주므로 줄 단위로 저장한다(한 박스면 줄들의 송장이 같다). 수동 송장 입력은 이벗 장애·연동 전 대비로 `myr-admin` 에만. 인플루언서 콘솔 "주문" 탭은 내 줄의 **열람**만(환불은 결정 7 승인 흐름) | 랜딩이 "재고·물류는 MYR 이 맡는다" 를 약속하고, 셀러별 배송 N건을 고객에게 보여주지 않기로 했다. 셀러가 각자 보내는 방식으로 바꾸면 배송비 · 무료배송 · 운송장이 전부 셀러별(= 줄 묶음별) 로 갈라진다(§9-9 에 되돌릴 조건을 적어 둔다). |
 | 9 | **운영 콘솔 `myr-admin` 1차 = 상품 검수 + 주문/문의 열람 + 예외 환불(§4.3 우선 2 — 인플루언서 흐름이 막혔을 때만 · 사유 필수).** 게이트는 `profiles.role='admin'`(`requireAdmin()` 복사) | 셀러리 관리자 계정을 그대로 쓴다(같은 Supabase). 정산 실행·지급은 2차. |
 | 10 | **정산은 1차 범위 밖.** 주문에 `seller_margin_rate` 스냅샷만 남기고, 실적 화면은 매출·환불·순매출·예상 정산액을 보여준다 | 요율·주기·지급 방식이 미정. 셀러리 0053 수식(3%+3%+5%) 을 가져오지 않는다. 지급대행(`payouts.server.ts` · 0042) 은 나중에 재사용 가능. |
-| 11 | **셀러리 코드와의 경계** — 서버 모듈은 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 에 복사본. 셀러리 모듈(`brand/*` `partner/*` `campaign*`) 을 import 하지 않는다(`scripts/check-boundaries.mjs` 에 규칙 추가). 순수 모듈(`text` `dates` `carriers` `guest-order` `money` `auth`) 과 `mail/{resend,layout}` 은 공유 | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 서버 폴더만 지우면 되게. |
+| 11 | **셀러리 코드와의 경계** — MYR 공용 코드는 **`packages/myr-core`(`@sellery/myr-core` · 2026-11-04)** 한 곳. 셀러리 패키지(`@sellery/db` · `@sellery/payments` · `@sellery/core` · `@sellery/ui`)는 MYR 앱·패키지에서 import 하지 않고 필요한 코드는 복사한다 — `scripts/check-boundaries.mjs` 규칙 (f)(g) 가 CI 에서 막는다(패키지의 SvelteKit 별칭 `$env`·`$app`·`$lib` 도 금지 · 설정은 `configureMyrCore` 주입). (처음 계획한 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 복사본 위치는 쓰지 않았다 — 셀러리 패키지 안에 두면 셀러리를 걷어낼 때 같이 지워진다) | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 패키지만 지우면 되게. |
 | 12 | **단일 함수 원칙** — 같은 동작(환불 · 운송장 · 문의 답변 · 상품 상태 변경)은 **패키지 함수 하나 + SQL 함수 하나**로 두고 `actor`('customer' · 'seller' · 'admin') 매개변수로 권한만 가른다. 앱 라우트는 세션에서 actor 를 정해 그 함수를 부르는 얇은 껍데기. 외부가 부르는 HTTP 엔드포인트(토스 웹훅 · 크론) 는 `myr-shop` 에만 둔다(§3.1) | 셀러리는 고객 `/api/payments/cancel` · 브랜드 `refundOrderAsBrand` · 관리자 `admin-refund` 로 같은 토스 취소가 세 벌이다. MYR 은 앱이 넷이라 그대로 가면 네 벌이 된다. 앱끼리 HTTP 로 부르지 않는다 — 같은 Supabase 를 service role 로 직접 쓰므로 CORS·인증 전달이 필요 없다. |
 | 13 | **물류 = 이벗 API 자동화(2026-11-03 · 바인허브와 같은 방식)** — ① 평일 11시: 11시 전 결제(가상계좌는 입금) 된 줄을 이벗 주문 등록(`ordercreatem` · 주문번호 = 줄 id · 상품 = 이벗 상품코드) → 줄 상태 "배송준비중" · 실패 3회 재시도 ② 매일 18시: 이벗 상태 조회(`orderstatus`) → 줄마다 송장 → "배송중" · 택배사 배송완료(또는 10일 경과) → "배송완료" · 배송 시작 메일 ③ 반품 회수(`exprtakeback` · 취소 · 상태 조회) ④ 이벗 상품코드는 **운영팀이 상품 검수 때 입력**(인플루언서는 입력·열람하지 않음) ⑤ 재고는 창고(이벗) 기준 — 인플루언서 재고 입력 없음. 크론·이벗 클라이언트는 `myr-shop`(외부 호출 한 곳 · 결정 12) | 물류사가 바인허브와 같은 이벗을 쓰기로 함(2026-11-03). 바인허브 구현(`backend/shop/app/Services/EbutOrderService.php` · `Jobs/OrderStatusToPreparing.php` · `Jobs/OrderStatusToDeliveringOrDelivered.php` · `routes/console.php`) 을 기준으로 삼는다. 이벗 계정 · 상품 등록 절차 · 박스 발송인은 미정(§9-14). |
 
@@ -231,10 +231,13 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - ③ 검색 제외 — **2026-11-04 적용**: `app.html` 의 `<meta name="robots" content="noindex, nofollow">`(ssr=false 라 `<svelte:head>` 로는 크롤러가 못 읽는다) · `vercel.json` 의 `X-Robots-Tag` 헤더 · `static/robots.txt` 는 수집 허용(Disallow 하면 noindex 를 못 읽는다)
     - ④ 첫 배포 확인 `https://myr-influencer.vercel.app` ⑤ `docs/deploy.md` MYR 표에 열 추가
     - 주의 — main 에 앱이 없는 상태에서 Git 을 연결하면 푸시한 브랜치가 Production 으로 한 번 배포됨(myr-shop 때 그랬음 · main 병합 뒤 덮임). 고유 URL(`-weglow-team.vercel.app`)은 SSO 보호로 302 라 확인은 프로젝트 별칭으로
-- **1. 공용 코드 추출**
-    - `packages/myr` — toss · checkout-sync(로그) · refund · mail/* · mail-events · cs · ship + 순수 cs-rules · refund-rules. 나중에 이벗 클라이언트도 여기
-    - 샵을 import 로 바꾸고 기존 vitest 통과 확인
-    - 복사 방식으로 가면 건너뜀. 다만 어드민까지 세 앱이 같은 환불·메일 코드를 쓰므로 추출을 권장(결정 12)
+- **1. 공용 코드 추출 — 완료(2026-11-04)**
+    - **`packages/myr-core`(`@sellery/myr-core`)** — 이름이 `packages/myr` 가 아닌 것은 랜딩 앱 `apps/myr` 가 이미 `@sellery/myr` 라서. 구성·쓰는 법은 `packages/myr-core/README.md`
+    - 옮긴 것: 순수 `constants`(MAX_QTY · won) · `site`(siteOrigin) · `text` · `company` · `checkout-rules` · `order-view` · `refund-rules` · `cs-rules` · `ship-rules` · `mail/{resend,layout,templates}` / 서버 `config`(configureMyrCore) · `admin` · `toss` · `payment-events`(checkout-sync 에서 결제 로그만 분리) · `refund` · `refund-photos` · `cs` · `ship` · `mail` · `mail-events`
+    - 샵에 남은 것: 결제 세션·웹훅·크론(`checkout-sync`) · 장바구니 · 상품 공개 RPC(`db`) · 주문 조회(`orders` · `customers`) · 레이트리밋 · 크론 인증
+    - 샵: `$lib/server/env.ts` 가 `$env` → `configureMyrCore` 1회 주입 · `$lib/server/{admin,toss,refund,…}.ts` 는 `import './env'; export * from '@sellery/myr-core/server/…'` 재수출이라 라우트 import 경로는 그대로 · 순수 모듈은 `@sellery/myr-core/<모듈>` 직접
+    - 동작 변경 없음(코드 이동 · 환경값을 읽는 위치만 바뀜) — vitest 1,147 통과(옮긴 테스트 8파일 95개는 패키지로) · 로컬 `/api/health` 200(서비스 키 주입 확인) · 발송 API 가 패키지 → RPC 까지 동작
+    - 이벗 클라이언트(주문 등록 · 송장 조회 · 회수)도 E2~E4 때 여기(`server/ebut`)에 둔다
 - **2. 인증 골격**
     - `ssr=false` 제거 · `hooks.server.ts`(샵 복사) · `lib/server/{admin,seller}.ts` — `requireSeller` 게이트 복사 · 🥬 잔액 제거 · 상태 anon/guest/suspended/ok
     - `(console)` 그룹 + `+layout.server.ts` 가 me(sellers 행) 전달 → `ME` 상수 치환

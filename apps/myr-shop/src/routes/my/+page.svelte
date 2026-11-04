@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { won } from '$lib/data';
-	import { displayCode, shortDate, statusLabel } from '$lib/order-view';
+	import { displayCode, shortDate, statusLabel } from '@sellery/myr-core/order-view';
 	import { shop } from '$lib/state.svelte';
 	import MyInquiries from '$lib/components/MyInquiries.svelte';
 	import Tile from '$lib/components/Tile.svelte';

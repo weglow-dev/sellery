@@ -9,10 +9,10 @@
 	import { goto } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
-	import { displayCode, type OrderView } from '$lib/order-view';
+	import { displayCode, type OrderView } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '$lib/refund-rules';
+	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
 	let { order, backHref }: { order: OrderView; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
