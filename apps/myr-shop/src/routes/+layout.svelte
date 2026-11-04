@@ -44,10 +44,9 @@
 	const showTabs = $derived(TAB_ROUTES.includes(page.url.pathname));
 </script>
 
-<svelte:head>
-	<title>MYR Shop — 내가 믿는 사람이 직접 만든 웰니스</title>
-	<meta name="description" content="인플루언서가 레시피부터 패키지까지 직접 고른 제품만 모았어요. Make Your Recipe." />
-</svelte:head>
+<!-- 레이아웃은 <title> 을 내지 않는다 — 모든 화면이 자기 제목을 갖는다(공개 페이지는 Seo.svelte · 나머지는 각 화면 · 오류는 +error.svelte).
+     레이아웃과 화면이 둘 다 제목을 내면 Svelte 가 트리 위치로 하나를 고르는데, 상품 페이지에서는 레이아웃 기본 제목이 이겨 모든 상품이 같은 제목으로 나갔다(2026-11-04 확인).
+     설명 · canonical · OG 도 공개 페이지의 Seo.svelte 가 한 벌만 낸다(중복 메타 방지). -->
 
 <!--
 	모바일(~lg): 앱 셸 — 높이 100dvh(보이는 영역) 의 세로 flex. 내용(<main>)만 안에서 스크롤하고 탭바·하단 바는 셸 바닥에 놓인다.

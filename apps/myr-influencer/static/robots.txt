@@ -1,0 +1,4 @@
+# MYR 크리에이터 콘솔 — 검색 노출 제외는 noindex(HTML meta · X-Robots-Tag 헤더)로 한다.
+# 여기서 수집을 막으면(Disallow: /) 크롤러가 noindex 를 읽지 못해 주소만 색인될 수 있으므로 막지 않는다.
+User-agent: *
+Allow: /

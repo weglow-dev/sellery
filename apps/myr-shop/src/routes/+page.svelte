@@ -4,6 +4,8 @@
 	import CartButton from '$lib/components/CartButton.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ProductCard from '$lib/components/ProductCard.svelte';
+	import Seo from '$lib/components/Seo.svelte';
+	import { DEFAULT_DESCRIPTION, organizationJsonLd, siteOrigin, websiteJsonLd } from '$lib/seo';
 
 	/** 홈 — 히어로 → 카테고리 → 크리에이터 브랜드 → 제품 그리드 (docs/myr.md §4.1 `/`). 데이터는 +page.server.ts(0056 RPC).
 	 *  PC(lg): 히어로 + "이번 주 레시피"(첫 제품) 2단, 카테고리·브랜드·제품은 auto-fill 그리드 */
@@ -12,7 +14,10 @@
 	const creators = $derived(data.creators);
 	const featured = $derived(products[0] ?? null);
 	const homeCats = CATS.filter((c) => c.id !== 'all');
+	const origin = $derived(siteOrigin(data.site));
 </script>
+
+<Seo description={DEFAULT_DESCRIPTION} path="/" jsonLd={[websiteJsonLd(origin), organizationJsonLd(origin)]} />
 
 <div class="animate-up-in pb-5 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-20">
 	<header class="flex h-[60px] items-center justify-between px-5 lg:hidden">

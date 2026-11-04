@@ -26,9 +26,9 @@
 	const showTabs = $derived(TAB_ROUTES.includes(page.url.pathname));
 </script>
 
+<!-- noindex 는 app.html(정적 HTML) + vercel.json 헤더에 있다 — ssr=false 라 여기 두면 크롤러가 못 읽는다 -->
 <svelte:head>
 	<title>MYR Creator — 내 제품 · CS 관리</title>
-	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
 <!--

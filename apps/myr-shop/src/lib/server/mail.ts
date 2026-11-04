@@ -7,13 +7,15 @@ import { env } from '$env/dynamic/private';
 import { env as pub } from '$env/dynamic/public';
 import { createMailer, type MailMessage, type MailSendResult, type Mailer } from '$lib/mail/resend';
 import type { MailCtx } from '$lib/mail/templates';
+import { siteOrigin } from '$lib/seo';
 
-export const SITE_URL_FALLBACK = 'https://myr-shop.vercel.app';
+export { SITE_URL_FALLBACK } from '$lib/seo';
 let mailer: Mailer | null = null;
 
 const clean = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 export const isMailEnabled = (): boolean => !!clean(env.RESEND_API_KEY);
-export const mailCtx = (): MailCtx => ({ siteUrl: (clean(pub.PUBLIC_SITE_URL) ?? SITE_URL_FALLBACK).replace(/\/+$/, '') });
+/** 메일 링크 오리진 — canonical 과 같은 함수(`lib/seo.ts siteOrigin`) 로 정한다 */
+export const mailCtx = (): MailCtx => ({ siteUrl: siteOrigin(pub.PUBLIC_SITE_URL) });
 
 function getMailer(): Mailer {
 	if (!mailer) mailer = createMailer({ apiKey: clean(env.RESEND_API_KEY), from: clean(env.MAIL_FROM), apiUrl: clean(env.RESEND_API_URL) });
