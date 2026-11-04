@@ -133,12 +133,12 @@
 
 <svelte:head><title>{screen === 'expired' ? '초대 링크 만료' : '크리에이터 가입'} — MYR Creator</title></svelte:head>
 
-<div class="relative flex h-dvh flex-col overflow-hidden bg-bg lg:block lg:h-auto lg:min-h-dvh">
+<div class="relative flex h-dvh flex-col overflow-hidden bg-bg lg:h-auto lg:min-h-dvh lg:overflow-clip">
 	<div class="pointer-events-none absolute -top-40 -right-[140px] h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.26),rgba(10,11,14,0))] lg:-top-[240px] lg:-right-[200px] lg:h-[700px] lg:w-[700px] lg:bg-[radial-gradient(closest-side,rgba(255,122,61,.22),rgba(10,11,14,0))]"></div>
 	<div class="pointer-events-none absolute -bottom-[300px] -left-[240px] hidden h-[640px] w-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(184,196,245,.1),rgba(10,11,14,0))] lg:block"></div>
 
 	<!-- PC 머리 — 로고 · 오른쪽 로그인 링크 -->
-	<header class="relative z-[2] hidden h-[72px] border-b border-white/7 lg:block">
+	<header class="relative z-[2] hidden h-[72px] shrink-0 border-b border-white/7 lg:block">
 		<div class="mx-auto flex h-full max-w-[1240px] items-center gap-2.5 px-10">
 			<AuthLogo large />
 			{#if screen !== 'done'}
@@ -150,7 +150,7 @@
 	{#if screen === 'invite' && invite && validity}
 		<!-- 초대장 -->
 		<div class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 animate-up-in flex-col lg:max-w-[1120px] lg:px-10 lg:py-20">
-			<div class="no-bar min-h-0 flex-1 overflow-y-auto px-6 pb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center lg:gap-x-24 lg:overflow-visible lg:p-0">
+			<div class="no-bar min-h-0 flex-1 overflow-y-auto px-6 pb-8 lg:grid lg:grid-cols-[minmax(0,1fr)_460px] lg:content-center lg:items-center lg:gap-x-24 lg:overflow-visible lg:p-0">
 				<div class="flex h-16 items-center lg:hidden"><AuthLogo /></div>
 
 				<div class="mt-7 lg:col-start-1 lg:row-start-1 lg:mt-0">
