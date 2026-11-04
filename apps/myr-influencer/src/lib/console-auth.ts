@@ -4,10 +4,11 @@
  */
 import { safeNext } from '@sellery/myr-core/auth';
 
-/** 로그인 없이 열리는 경로 — 로그인 · 비밀번호 재설정 요청 · 메일 링크 착지(/auth/*) · robots. `/password/new` 는 재설정 링크가 만든 세션이 있어야 해서 공개가 아니다 */
+/** 로그인 없이 열리는 경로 — 로그인 · 비밀번호 재설정 요청 · 메일 링크 착지(/auth/*) · 초대 가입(/invite/<토큰>) · robots.
+ *  `/password/new` 는 재설정 링크가 만든 세션이 있어야 해서 공개가 아니다 */
 const PUBLIC_EXACT = new Set(['/login', '/password', '/robots.txt']);
 export function isPublicPath(pathname: string): boolean {
-	return PUBLIC_EXACT.has(pathname) || pathname.startsWith('/auth/');
+	return PUBLIC_EXACT.has(pathname) || pathname.startsWith('/auth/') || pathname.startsWith('/invite/');
 }
 
 /** 로그인 뒤 돌아갈 곳 — 같은 오리진 경로만(오픈 리다이렉트 방지 · `/auth/` `/login` 은 루프라 제외). 비면 홈 */
@@ -33,21 +34,36 @@ export function gateLocation(state: 'anon' | 'unlinked' | 'suspended' | 'ok', fr
 	}
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** 이메일 형식 — 최상위 도메인 2자 이상(시안 "MYR Influencer Login" 과 같은 규칙) */
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const PASSWORD_MIN = 8;
 
 export type LoginInput = { email: string; password: string };
-export type LoginParse = { ok: true; input: LoginInput } | { ok: false; field: 'email' | 'password'; message: string };
+export type LoginField = 'email' | 'password';
+export type LoginParse = { ok: true; input: LoginInput } | { ok: false; field: LoginField; message: string };
+
+/** 칸마다 오류 문구(없으면 빈 문자열) — 로그인 화면이 칸 아래에 바로 보여주고, 서버 검증(parseLoginForm)도 같은 문구를 쓴다 */
+export function loginFieldErrors(emailRaw: string, password: string): Record<LoginField, string> {
+	const email = emailRaw.trim();
+	return {
+		email: !email ? '이메일을 입력해주세요' : !EMAIL_RE.test(email) || email.length > 254 ? '이메일 형식을 확인해주세요 (예: creator@myr.kr)' : '',
+		password: !password ? '비밀번호를 입력해주세요' : password.length < PASSWORD_MIN ? `비밀번호는 ${PASSWORD_MIN}자 이상이에요` : ''
+	};
+}
 
 export function parseLoginForm(fd: { get(name: string): unknown }): LoginParse {
 	const email = String(fd.get('email') ?? '')
 		.trim()
 		.toLowerCase();
 	const password = String(fd.get('password') ?? '');
-	if (!EMAIL_RE.test(email) || email.length > 254) return { ok: false, field: 'email', message: '이메일 주소를 확인해주세요' };
-	if (password.length < PASSWORD_MIN) return { ok: false, field: 'password', message: `비밀번호는 ${PASSWORD_MIN}자 이상이에요` };
+	const errs = loginFieldErrors(email, password);
+	if (errs.email) return { ok: false, field: 'email', message: errs.email };
+	if (errs.password) return { ok: false, field: 'password', message: errs.password };
 	return { ok: true, input: { email, password } };
 }
+
+/** "이 기기에서 로그인 유지" — 끄면 세션 쿠키를 브라우저를 닫을 때 지워지는 쿠키로 쓴다(hooks 가 이 쿠키를 보고 만료 시각을 뺀다) */
+export const SESSION_ONLY_COOKIE = 'myr_session_only';
 
 /** 새 비밀번호 — 8자 이상 · 확인 칸과 같아야 한다 */
 export function parseNewPassword(fd: { get(name: string): unknown }): { ok: true; password: string } | { ok: false; message: string } {

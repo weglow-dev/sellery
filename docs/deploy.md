@@ -83,6 +83,7 @@
 - **테스트 계정(2026-11-04 · `myr-creators.mjs account`)**: 시드 크리에이터 4명 — `minji.routine@myr.test` · `haru.well@myr.test` · `jun.fit@myr.test` · `soy.clean@myr.test` / 비밀번호 `myrlocal1234`. **로컬 DB 와 운영 DB 둘 다**(대표 결정 2026-11-04 · 운영은 루트 `.env.cloud.local` 로 실행 — `node --env-file=.env.cloud.local packages/db/scripts/myr-creators.mjs …`). 로컬은 `supabase db reset` 하면 사라지니 같은 명령으로 다시. **운영 계정은 MYR 실판매 전에 지우거나 비밀번호를 바꾼다**(docs/launch-checklist.md §3) — 공개 콘솔이고 비밀번호가 이 문서에 있다. `@myr.test` 는 예약 도메인이라 크리에이터 알림 메일이 나가지 않는다.
 - **로컬**: `npm run dev:myr-influencer`(5179 · 로컬 DB) · 운영 DB 로 띄우려면 `cd apps/myr-influencer && npx vite dev --mode cloud`(루트 `.env.cloud.local` — 실데이터라 주의). 파일을 옮기거나 이름을 바꾼 브랜치로 바꾸면 dev 서버를 다시 켠다(2026-11-04 — 이름 바꾸기를 감시가 놓쳐 옛 루트 레이아웃이 남아 상단 내비가 두 번 그려졌다).
 - **배포 후 확인**: 비로그인으로 `https://myr-influencer.vercel.app/` → `/login` 302 · 로그인 → 홈에 크리에이터 이름 · 로그아웃 → `/login`.
+- **초대 가입 화면(2026-11-04 · UI 단계 · docs/myr.md §4.2.1 2-1)**: `/invite/demo` 는 **dev · Preview 에서만** 초대장 → 가입 폼 → 완료를 보여준다(목 데이터 · 실제 가입 없음). Production 에서는 모든 토큰이 "초대 링크 만료" 화면 — 실제 초대 토큰은 10번(`myr_invites`)에서.
 
 CLI 로 만들 때 `vercel link` 가 `apps/<앱>/.gitignore`(`.vercel` `.env*`) 와 `.env.local` 을 만들어 두는데, 루트 `.gitignore` 가 이미 둘 다 덮으므로 지운다. 프로젝트 안의 `.vercel/project.json` 은 커밋하지 않는다.
 

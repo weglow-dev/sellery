@@ -11,6 +11,8 @@ declare global {
 			safeGetSession: () => Promise<{ session: Session | null; user: User | null }>;
 			/** 요청당 1회 — 레이아웃과 페이지가 같이 불러도 DB 조회는 한 번(`$lib/server/seller` requireSeller) */
 			sellerCtx?: Promise<SellerContext>;
+			/** 로그인 action 이 정한 "이 기기에서 로그인 유지" 꺼짐 — 이번 요청에서 심는 세션 쿠키를 브라우저 세션 쿠키로(hooks) */
+			sessionOnly?: boolean;
 		}
 		// interface Error {}
 		// interface PageData {}
