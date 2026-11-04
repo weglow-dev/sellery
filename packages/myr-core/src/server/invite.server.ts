@@ -11,7 +11,7 @@
  * 토큰 원문은 저장하지 않는다(DB 에는 sha256) — 발급 응답과 초대 메일에만 실린다.
  */
 import { creatorInviteMail } from '../mail/templates';
-import { inviteLink, isInviteToken, type AcceptCode, type HandleStatus, type InviteClosedCode, type IssueCode, handleStatusOf, isInviteClosed } from '../invite-rules';
+import { INVITE_DAYS, inviteLink, isInviteToken, type AcceptCode, type HandleStatus, type InviteClosedCode, type IssueCode, handleStatusOf, isInviteClosed } from '../invite-rules';
 import { admin } from './admin.server';
 import { sendMail, type MailSendResult } from './mail.server';
 
@@ -33,7 +33,7 @@ export type IssueResult = { ok: true; invite: IssuedInvite } | { ok: false; code
 
 /** 발급 — consoleUrl 은 링크가 가리킬 콘솔 주소(운영 API 는 자기 오리진). 메일이 실패해도 링크는 돌려준다(운영자가 복사해 보낸다) */
 export async function issueInvite(input: { email: string; invitedBy?: string | null; consoleUrl: string; inviter: string; days?: number }): Promise<IssueResult> {
-	const r = await rpc('myr_app_admin_invite_create', { p_email: input.email, p_invited_by: input.invitedBy ?? null, p_days: input.days ?? 7 });
+	const r = await rpc('myr_app_admin_invite_create', { p_email: input.email, p_invited_by: input.invitedBy ?? null, p_days: input.days ?? INVITE_DAYS });
 	if (!r) return { ok: false, code: 'DB_ERROR' };
 	if (!r.ok) return { ok: false, code: (r.code as IssueCode) ?? 'DB_ERROR' };
 	const token = String(r.token);

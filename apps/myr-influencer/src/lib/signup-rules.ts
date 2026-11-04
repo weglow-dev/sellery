@@ -134,7 +134,7 @@ export function acceptFailure(code: AcceptCode | string, field?: string | null):
 export const submitLabel = (missing: number): string => (missing === 0 ? '가입 완료하기' : `가입 완료하기 · ${missing}개 남음`);
 
 /**
- * 초대 유효기간 표시 — "11월 11일까지 · 7일 남음". 날짜는 한국 시각 기준.
+ * 초대 유효기간 표시 — "12월 4일까지 · 30일 남음". 날짜는 한국 시각 기준.
  * daysLeft 는 남은 시간을 하루 단위로 올림(오늘 안에 끝나면 "오늘까지").
  */
 export function inviteValidity(expiresAt: string, now: Date = new Date()): { until: string; left: string; expired: boolean } {

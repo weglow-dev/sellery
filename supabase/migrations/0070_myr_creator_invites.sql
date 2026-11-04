@@ -1,11 +1,11 @@
 -- ============================================================
 -- 0070 — MYR 크리에이터 초대 가입(docs/myr.md 결정 14 · §4.2.1 10번)
 --   가입은 초대 링크로만 — 운영팀이 이메일로 초대하면 링크(`/invite/<토큰>`)를 메일 + 복사 링크로 받는다.
---   링크는 사람마다 다르고 7일 · 1회용 · 다시 초대하면 이전 링크는 무효(취소).
+--   링크는 사람마다 다르고 30일 · 1회용(2026-11-04 대표 결정 — 처음 7일에서 늘림) · 다시 초대하면 이전 링크는 무효(취소).
 --
 --   sellers.contact_phone                       크리에이터 연락처(숫자만 · 제조 미팅 · 발주 연락용 · 샵에 안 보인다 — 공개 grant 없음)
 --   myr_invites                                 초대 기록 — 토큰은 sha256 해시만(원문은 만들 때 한 번 돌려주고 저장하지 않는다)
---   myr_app_admin_invite_create(email, by, days) 초대 발급 → { ok, invite_id, token, email, expires_at, reissued }
+--   myr_app_admin_invite_create(email, by, days) 초대 발급(기본 30일 · 1~90일) → { ok, invite_id, token, email, expires_at, reissued }
 --                                                · { ok:false, code: BAD_EMAIL | ALREADY_CREATOR | EMAIL_HAS_ACCOUNT }
 --   myr_app_admin_invite_revoke(email)          대기 중인 초대 취소 → { ok, revoked } · { ok:false, code: BAD_EMAIL }
 --   myr_app_admin_invite_list(state, limit)     초대 목록(최근순) — state = pending | used | expired | revoked | requested | null(전부)
@@ -122,7 +122,7 @@ grant execute on function public.myr_invite_token_hash(text) to service_role;
 -- ------------------------------------------------------------
 -- 운영: 발급 · 취소 · 목록
 -- ------------------------------------------------------------
-create or replace function public.myr_app_admin_invite_create(p_email text, p_invited_by text default null, p_days integer default 7)
+create or replace function public.myr_app_admin_invite_create(p_email text, p_invited_by text default null, p_days integer default 30)
 returns jsonb
 language plpgsql
 volatile
@@ -154,7 +154,7 @@ begin
 
   insert into public.myr_invites (email, token_hash, invited_by, expires_at)
   values (v_email, encode(extensions.digest(v_token, 'sha256'), 'hex'), nullif(btrim(coalesce(p_invited_by, '')), ''),
-          now() + make_interval(days => least(greatest(coalesce(p_days, 7), 1), 30)))
+          now() + make_interval(days => least(greatest(coalesce(p_days, 30), 1), 90)))
   returning * into i;
 
   return jsonb_build_object('ok', true, 'invite_id', i.id, 'token', v_token, 'email', i.email, 'expires_at', i.expires_at, 'reissued', v_reissued);

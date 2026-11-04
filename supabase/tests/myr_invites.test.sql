@@ -1,6 +1,6 @@
 -- pgTAP — 0070 크리에이터 초대 가입: 권한 · 발급/재발급/취소 · 초대 화면 · 핸들 확인 · 가입 · 새 초대 요청 · 목록 (docs/myr.md §4.2.1 10번)
 begin;
-select plan(69);
+select plan(70);
 
 -- ---------- 권한 ----------
 select table_privs_are('public', 'myr_invites', 'anon', '{}'::text[], 'anon 은 myr_invites 직접 접근 불가');
@@ -38,15 +38,16 @@ select is(public.myr_app_admin_invite_create('pgtap-inv-has@myr.test') ->> 'code
 
 -- 이 테스트에서는 c71 계정을 "가입 때 서버가 만든 계정" 으로 쓴다 — 발급은 계정이 없을 때만 되므로 이메일을 잠깐 비켜 둔다
 update auth.users set email = 'pgtap-inv1-later@myr.test' where id = '00000000-0000-4000-8000-000000000c71';
-create temp table t_first as select public.myr_app_admin_invite_create(' PGTAP-Inv1@myr.test ', '운영 소윤', 7) as r;
+create temp table t_first as select public.myr_app_admin_invite_create(' PGTAP-Inv1@myr.test ', '운영 소윤') as r;
 select ok((select (r ->> 'ok')::boolean and r ->> 'token' ~ '^[0-9a-f]{64}$' and r ->> 'email' = 'pgtap-inv1@myr.test' and (r ->> 'reissued')::boolean = false from t_first),
   '발급 — 토큰 64 hex · 이메일 소문자 · 첫 초대');
 select is((select token_hash from public.myr_invites where id = (select (r ->> 'invite_id')::uuid from t_first)),
   encode(extensions.digest((select r ->> 'token' from t_first), 'sha256'), 'hex'), '저장은 토큰 sha256 해시만');
-select ok((select expires_at between now() + interval '6 days 23 hours' and now() + interval '7 days 1 hour' from public.myr_invites where id = (select (r ->> 'invite_id')::uuid from t_first)), '만료 = 7일 뒤');
+select ok((select expires_at between now() + interval '29 days 23 hours' and now() + interval '30 days 1 hour' from public.myr_invites where id = (select (r ->> 'invite_id')::uuid from t_first)), '만료 = 기본 30일 뒤');
 
 -- 재발급 — 이전 링크는 REVOKED(reissued)
-create temp table t_inv as select public.myr_app_admin_invite_create('pgtap-inv1@myr.test', null, 7) as r;
+create temp table t_inv as select public.myr_app_admin_invite_create('pgtap-inv1@myr.test', null, 500) as r;
+select ok((select expires_at < now() + interval '91 days' and expires_at > now() + interval '89 days' from public.myr_invites where id = (select (r ->> 'invite_id')::uuid from t_inv)), '기간은 최대 90일로 자른다');
 select is((select (r ->> 'reissued')::boolean from t_inv), true, '같은 이메일 다시 초대 → reissued');
 select is(public.myr_app_invite_view((select r ->> 'token' from t_first)) ->> 'code', 'REVOKED', '이전 링크는 REVOKED');
 select is((select revoked_reason from public.myr_invites where id = (select (r ->> 'invite_id')::uuid from t_first)), 'reissued', '이전 초대 취소 사유 reissued');
@@ -58,7 +59,7 @@ select is(public.myr_app_invite_view(repeat('ab', 32)) ->> 'code', 'NOT_FOUND', 
 select is(public.myr_app_invite_view((select r ->> 'token' from t_inv)) - 'invite_id' - 'expires_at', '{"ok": true, "email": "pgtap-inv1@myr.test"}'::jsonb, '유효한 초대 → 이메일');
 create temp table t_old as select public.myr_app_admin_invite_create('pgtap-inv-old@myr.test') as r;
 update public.myr_invites set expires_at = now() - interval '1 minute' where id = (select (r ->> 'invite_id')::uuid from t_old);
-select is(public.myr_app_invite_view((select r ->> 'token' from t_old)) ->> 'code', 'EXPIRED', '7일 지난 초대 EXPIRED');
+select is(public.myr_app_invite_view((select r ->> 'token' from t_old)) ->> 'code', 'EXPIRED', '기한 지난 초대 EXPIRED');
 
 -- ---------- 핸들 확인 ----------
 select is(public.myr_app_invite_handle_check((select r ->> 'token' from t_old), 'minji.new') ->> 'code', 'EXPIRED', '만료된 초대로는 핸들을 못 묻는다');

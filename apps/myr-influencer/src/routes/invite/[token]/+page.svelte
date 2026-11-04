@@ -4,7 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { tick, untrack } from 'svelte';
 	import { creatorStyle } from '@sellery/myr-core/creator';
-	import { isInviteClosed, type HandleStatus } from '@sellery/myr-core/invite-rules';
+	import { INVITE_DAYS, isInviteClosed, type HandleStatus } from '@sellery/myr-core/invite-rules';
 	import { caretAfterFormat, formatPhone } from '@sellery/myr-core/phone';
 	import { INVITER } from '$lib/auth-copy';
 	import { AUTH_HINT, AUTH_LABEL, authButton, authInput } from '$lib/auth-ui';
@@ -478,7 +478,7 @@
 					</div>
 				{:else}
 				<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[34px]">초대 링크가<br class="lg:hidden" /> 만료됐어요</h1>
-				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 7일 동안만 열리고, 가입에 한 번 쓰면 다시 열 수 없어요. 다시 초대받았다면 가장 최근 메일의 링크를 열어주세요. 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
+				<p class="mt-3 text-[15px] leading-[1.6] text-white/62 lg:text-[16px]">초대 링크는 보낸 날부터 {INVITE_DAYS}일 동안만 열리고, 가입에 한 번 쓰면 다시 열 수 없어요. 다시 초대받았다면 가장 최근 메일의 링크를 열어주세요. 새 초대를 요청하면 같은 이메일로 다시 보내드려요.</p>
 				<form
 					method="POST"
 					action="?/request"

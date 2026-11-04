@@ -4,8 +4,8 @@
  * 핸들 형식 · 예약어의 정답은 0070 SQL(`myr_handle_problem`) 이다 — 여기는 코드만 다룬다.
  */
 
-/** 초대 링크 유효기간(일) — 0070 `myr_app_admin_invite_create` 의 기본값과 같다 */
-export const INVITE_DAYS = 7;
+/** 초대 링크 유효기간(일) — 0070 `myr_app_admin_invite_create` 의 기본값과 같다(2026-11-04 대표 결정 30일) */
+export const INVITE_DAYS = 30;
 
 /** 토큰 = 64자리 소문자 hex(0070 `gen_random_bytes(32)`). 형식이 아니면 DB 를 부르지 않는다 */
 export const INVITE_TOKEN_RE = /^[0-9a-f]{64}$/;
