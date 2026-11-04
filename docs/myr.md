@@ -28,6 +28,7 @@
 | 11 | **셀러리 코드와의 경계** — MYR 공용 코드는 **`packages/myr-core`(`@sellery/myr-core` · 2026-11-04)** 한 곳. 셀러리 패키지(`@sellery/db` · `@sellery/payments` · `@sellery/core` · `@sellery/ui`)는 MYR 앱·패키지에서 import 하지 않고 필요한 코드는 복사한다 — `scripts/check-boundaries.mjs` 규칙 (f)(g) 가 CI 에서 막는다(패키지의 SvelteKit 별칭 `$env`·`$app`·`$lib` 도 금지 · 설정은 `configureMyrCore` 주입). (처음 계획한 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 복사본 위치는 쓰지 않았다 — 셀러리 패키지 안에 두면 셀러리를 걷어낼 때 같이 지워진다) | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 패키지만 지우면 되게. |
 | 12 | **단일 함수 원칙** — 같은 동작(환불 · 운송장 · 문의 답변 · 상품 상태 변경)은 **패키지 함수 하나 + SQL 함수 하나**로 두고 `actor`('customer' · 'seller' · 'admin') 매개변수로 권한만 가른다. 앱 라우트는 세션에서 actor 를 정해 그 함수를 부르는 얇은 껍데기. 외부가 부르는 HTTP 엔드포인트(토스 웹훅 · 크론) 는 `myr-shop` 에만 둔다(§3.1) | 셀러리는 고객 `/api/payments/cancel` · 브랜드 `refundOrderAsBrand` · 관리자 `admin-refund` 로 같은 토스 취소가 세 벌이다. MYR 은 앱이 넷이라 그대로 가면 네 벌이 된다. 앱끼리 HTTP 로 부르지 않는다 — 같은 Supabase 를 service role 로 직접 쓰므로 CORS·인증 전달이 필요 없다. |
 | 13 | **물류 = 이벗 API 자동화(2026-11-03 · 바인허브와 같은 방식)** — ① 평일 11시: 11시 전 결제(가상계좌는 입금) 된 줄을 이벗 주문 등록(`ordercreatem` · 주문번호 = 줄 id · 상품 = 이벗 상품코드) → 줄 상태 "배송준비중" · 실패 3회 재시도 ② 매일 18시: 이벗 상태 조회(`orderstatus`) → 줄마다 송장 → "배송중" · 택배사 배송완료(또는 10일 경과) → "배송완료" · 배송 시작 메일 ③ 반품 회수(`exprtakeback` · 취소 · 상태 조회) ④ 이벗 상품코드는 **운영팀이 상품 검수 때 입력**(인플루언서는 입력·열람하지 않음) ⑤ 재고는 창고(이벗) 기준 — 인플루언서 재고 입력 없음. 크론·이벗 클라이언트는 `myr-shop`(외부 호출 한 곳 · 결정 12) | 물류사가 바인허브와 같은 이벗을 쓰기로 함(2026-11-03). 바인허브 구현(`backend/shop/app/Services/EbutOrderService.php` · `Jobs/OrderStatusToPreparing.php` · `Jobs/OrderStatusToDeliveringOrDelivered.php` · `routes/console.php`) 을 기준으로 삼는다. 이벗 계정 · 상품 등록 절차 · 박스 발송인은 미정(§9-14). |
+| 14 | **크리에이터 가입은 초대 링크로만(2026-11-04).** 공개 `/signup` 없음 — 운영팀이 이메일로 초대하면 **메일 + 복사 링크** 두 가지로 받는다(`/invite/<토큰>`). 링크는 사람마다 다르고 7일 · 1회용, 다시 초대하면 이전 링크는 무효. 가입 폼 = 이메일(초대 주소로 고정) · 비밀번호 · 활동명 · 핸들 · 대표 채널 · 휴대폰 · 약관 동의(§4.2.1 2-1 · 10번) | MYR 은 제조의뢰 미팅을 거친 크리에이터만 상품을 올린다. 초대 링크를 연 것이 이메일 확인이라 인증 메일 단계가 없다. |
 
 ---
 
@@ -208,7 +209,7 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 
 | 탭 | 경로 | 내용 | 원본 |
 |---|---|---|---|
-| 가입·로그인 | `/signup` `/verify-sent` `/login` `/password/*` `/auth/confirm` | 이메일+비밀번호 · token_hash · `sellers` 행 생성(`createSellerFromSignup`) | `apps/influencer` 그대로 |
+| 가입·로그인 | `/invite/[token]` `/login` `/password/*` `/auth/confirm` | 이메일+비밀번호 로그인 · **가입은 초대 링크로만**(결정 14 · 공개 `/signup` 없음) · token_hash(비밀번호 재설정) | `apps/influencer` 로그인 축소 + 새 초대 가입(시안 "MYR Influencer Login" · "Signup") |
 | 홈 | `/home` | 검수 상태 · 미발송 · 미답변 문의 · 오늘 매출 카드 | `partner/home.server.ts` 축소 |
 | 상품 | `/products` `/products/new` `/products/[code]` | 목록(상태 칩) · 등록 · 수정 · 판매중/일시중지 · 반려 사유 · 재제출. **재고 입력 없음 · 이벗 상품코드 없음**(결정 13) | `apps/brand/(console)/products/*` |
 | 주문 | `/orders` `/orders/[code]` | 내 줄이 있는 주문 목록(줄 · 수량 · 금액 · **줄별 배송 상태 · 송장** 읽기) · 문의 연결. **운송장 입력 · 환불 버튼 없음**(결정 7 · 8) | `apps/brand/(console)/orders` 에서 발송·환불 제거 |
@@ -246,6 +247,14 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 공용 패키지로 옮김: 샵 `lib/auth.ts`(displayName · avatarOf · safeNext) → `@sellery/myr-core/auth` · 샵 `creatorStyle` · `handleSlug` → `@sellery/myr-core/creator`
     - Vercel `myr-influencer`: `PUBLIC_SUPABASE_URL` · `PUBLIC_SUPABASE_ANON_KEY` 넣음(production + preview) · **남은 것(대표)**: `SUPABASE_SERVICE_ROLE_KEY`(Secret 이라 복사 불가) · Supabase Redirect URLs `localhost:5179` · `myr-influencer.vercel.app`(Owner) · 클라우드 크리에이터 계정(`myr-creators.mjs` 를 운영 키로)
     - 확인: 로컬 HTTP 시나리오(비로그인 → 로그인 이동 · 틀린/맞는 비밀번호 · 외부 `next` 무시 · 정지 → `/suspended` · 연결 끊기 → `/unlinked` · 로그아웃 · 만료 링크 · 새 비밀번호 화면 세션 필요) · 프로덕션 빌드에서 다른 출처 로그인·로그아웃 폼 403(dev 서버는 출처 검사를 안 한다)
+- **2-1. 로그인 · 초대 가입 화면 UI — 완료(2026-11-04 · PR #260 · 가입은 목 데이터)**
+    - 시안: Claude Design "MYR Influencer Login" · "… PC" · "MYR Influencer Signup" · "… PC"
+    - `/login` — 모바일 한 줄 / PC(`lg`) 왼쪽 브랜드 패널(숫자 카드 3개 · 후기) + 오른쪽 카드 · 칸별 오류(벗어날 때 · 제출 시도 뒤 · `loginFieldErrors`) · 다 채우기 전 버튼 잠금 · "비밀번호를 잊으셨나요?" = 입력한 이메일로 그 자리에서 재설정 메일(`?/forgot`) · 초대 전용 안내 + 제조 의뢰 링크
+    - **로그인 유지**(기본 켜짐) — 끄면 `myr_session_only` 쿠키 + `hooks.server.ts` `setAll` 이 세션 쿠키의 maxAge/expires 를 빼서 브라우저를 닫으면 로그아웃 · 로그아웃 때 쿠키 삭제
+    - `/invite/[token]` — 초대장(초대 이메일 · 초대한 곳 · 유효기간 "11월 11일까지 · 7일 남음") → 가입 폼 → 완료 / 만료. 폼: 이메일 고정(자물쇠) · 비밀번호/확인 · 활동명(30자) · 핸들(입력 중 공백·@ 제거 · 소문자) · 대표 채널(인스타그램 · 유튜브 · 틱톡) · 휴대폰(자동 하이픈 · 커서 유지 `@sellery/myr-core/phone`) · 약관 2개(모두 동의). 버튼 "가입 완료하기 · N개 남음" · 빠진 칸으로 스크롤 · PC 는 왼쪽 "샵 미리보기" 카드가 입력대로 바뀌고 스크롤 고정
+    - 규칙은 순수 `lib/signup-rules.ts`(오류 문구 · 남은 칸 수 · 유효기간 KST 표시 · vitest) · 입력 스타일 `lib/auth-ui.ts` · 문구 `lib/auth-copy.ts` · 컴포넌트 `lib/components/auth/` · 비밀번호 찾기 · 새 비밀번호 · 연결 없음 · 정지 화면도 같은 톤(`AuthShell`)
+    - **목 상태**: `demo` 토큰만 유효(**dev · Vercel preview 만** — `/invite/demo`), 다른 토큰은 만료 화면 · 가입 버튼은 완료 화면만 보여줌 · 핸들 중복은 목 목록 · "새 초대 요청하기"는 안내만 · 약관 "보기"는 "준비 중" → 10번에서 실제로
+    - **출시 전 교체**: PC 로그인 패널 숫자(90% · 1~2일 · 매월 10일)와 후기는 시안 문구(정책 미확정 · 실제 인용 아님) — §9-16
 - **3. 내 제품 읽기**
     - 새 마이그레이션 `myr_app_seller_products(seller)` + `draft` 상태 추가
     - `/products` 서버 load → 목 products 를 서버 값으로 · 상태 매핑 순수 함수(임시저장 · 심사 중 · 판매 중 · 일시중지 · 반려)
@@ -275,7 +284,11 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 환불 사진 서명 URL · 단순 변심 왕복 배송비(UI 의 ₩6,000)는 정책 결정 필요
 - **8. 홈 지표 · 실적** — `myr_app_seller_sales(seller)`(이번 달 매출·주문·수량 · CS 비율 · 7일 막대) → `MOCK_STATS` `mockMonthRevenue` 치환 · 정산율은 `platform_settings`(§9-6 전까지 UI 의 10% 는 자리값) · `/sales`(시안 없음)
 - **9. 프로필** — 사진 업로드(Storage) → `sellers.avatar_url` · `/my` 알림 이메일 · 정산 계좌(시안 없음)
-- **10. 가입** — `/signup` `/verify-sent` · `create_seller_from_signup`(0010) 재사용 또는 MYR 축소판 · Supabase 이메일 템플릿이 셀러리와 공유되는 제약(§2.1)
+- **10. 초대 가입 기능(결정 14 · 2-1 화면에 붙인다 · 순서는 3번 앞으로 당겨도 된다)**
+    - 새 마이그레이션 `myr_invites`(이메일 · 토큰 sha256 해시만 · 만료 7일 · 사용 시각 · 취소 · 초대한 운영자) + `sellers` 연락처 칸 — Supabase 초대(OTP) 링크는 수명이 짧아 7일을 못 버티므로 자체 토큰
+    - 가입 RPC(`security definer` · anon·authenticated EXECUTE 회수): 토큰 확인 → 핸들 중복 → `sellers` 행 생성 → 계정 연결 → 토큰 사용 처리 한 트랜잭션. 계정은 서버가 admin API 로 메일 인증 완료 상태로 만들고 바로 로그인 · pgTAP 으로 거부 코드 전부(만료 · 사용됨 · 취소 · 핸들 중복 · 이메일 이미 가입)
+    - `/invite/[token]` load/action 을 실제로 · 핸들 중복 서버 확인 · "새 초대 요청" 알림(경로 미정 §9-16)
+    - 초대 발급: 운영 콘솔 전까지 `myr-creators.mjs invite <email>` → 링크 출력 + MYR 브랜드 메일(Resend · Supabase 템플릿 공유 제약(§2.1) 을 피한다) · 재초대 = 이전 링크 취소 · 운영 콘솔 "크리에이터 초대"(§4.3)가 생기면 그 화면으로
 - **11. 마무리** — `check-boundaries` 규칙(셀러리 모듈 import 금지) · 이 문서 §7 · `docs/deploy.md` MYR 표 · pgTAP/vitest 결과를 PR 본문에
 
 ### 4.3 `apps/myr-admin` (운영)
@@ -310,7 +323,8 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 회수 접수 · 취소 · 상태 확인(이벗 `exprtakeback` 등) — E4 전에는 "회수 완료" 수동 처리
     - 회수 확인 뒤 환불 실행 · 교환 재발송 등록(E4 전에는 재발송 송장 수동 입력)
 - **우선 4 · 재고** `/stock` — 이벗 재고와 판매 가능 수량 비교 · 재고 부족 기준 · 알림(바인허브 `EbutStockService` · `SendWarehouseLowStockNotification` 참고)
-- **우선 4 · 인플루언서** `/sellers` — 목록 · 상품 수 · 계정 연결 여부 · 정지·복구 · 초대(운영팀이 만든 셀러 행에 계정 연결) · 박스에 인플루언서 이름을 찍기로 하면 인플루언서별 이벗 쇼핑몰 코드·보내는 사람(바인허브는 한의원별 `ebut_shop_code`)
+- **우선 1 · 크리에이터 초대** `/sellers/invite`(2026-11-04 추가 · 인플루언서 10번과 짝) — 이메일 입력 → 초대 링크 발급 + 메일 발송 · 링크 복사 버튼 · 보낸 초대 목록(대기 · 가입 완료 · 만료 · 취소) · 재발송(이전 링크 무효) · 취소 · "새 초대 요청" 받은 것
+- **우선 4 · 인플루언서** `/sellers` — 목록 · 상품 수 · 계정 연결 여부 · 정지·복구 · 박스에 인플루언서 이름을 찍기로 하면 인플루언서별 이벗 쇼핑몰 코드·보내는 사람(바인허브는 한의원별 `ebut_shop_code`)
 - **우선 4 · 설정** `/settings` — 이벗 공통 설정(쇼핑몰 코드 · 보내는 사람) · 발주 마감 시각 · 배송비 · 무료배송 기준 · 공휴일(선택 · 바인허브에도 없음)
 - **나중 · 정산** `/settle` — 정산 정책(마진율 · 지급 주기)이 정해진 뒤 · 0020 패턴
 
@@ -319,7 +333,8 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 ## 5. 랜딩(`apps/myr`) 과의 연결
 
 - 지금 랜딩은 접수를 Slack 웹훅으로만 보낸다(`docs/branding-plan.md` §1 · §6-3). 1차에서는 **그대로 둔다** — 미팅 뒤 인플루언서가 `myr-influencer` 에 직접 가입해 상품을 올린다.
-- 2차(§9-7): 접수를 `myr_applications` 테이블에 남기고, 운영팀이 승인하면 `sellers` 행을 미리 만들어 **초대 링크로 가입 → 계정 연결**(`auth/callback` 의 `linkSellerIdOf` · `app_metadata.link_seller_id` 경로가 이미 있다). 그러면 "접수 → 미팅 → 가입 → 상품" 이 한 줄로 추적된다.
+- 가입은 1차부터 **초대 링크로만**(결정 14) — 미팅 뒤 운영팀이 초대하고, 크리에이터는 초대 링크에서 가입해 상품을 올린다.
+- 2차(§9-7): 접수를 `myr_applications` 테이블에 남기고, 운영팀이 승인하면 그 접수에서 바로 초대(`myr_invites` 에 접수 id). 그러면 "접수 → 미팅 → 가입 → 상품" 이 한 줄로 추적된다.
 - 랜딩의 CTA "내 제품 만들기" 는 그대로 제조의뢰 퍼널이고, 가입한 인플루언서용 "콘솔 로그인" 링크를 푸터에 하나 둔다(`PUBLIC_MYR_INFLUENCER_URL`).
 
 ---
@@ -481,3 +496,4 @@ M1~M3 는 결제 없이 끝까지 돌아가므로 먼저 보낸다. M0 는 M4 �
 13. **결제수단 UI 영역** — 디자인의 "결제수단 선택" 은 그려진 그림이고, 실제로는 토스 위젯이 그 자리를 렌더한다(§6.7). 위젯 variant 로 디자인에 가깝게 맞추되 완전히 같게는 안 된다.
 14. **이벗 연동 세부(2026-11-03 · §6.8)** — 확인 대기: ① MYR 이 바인허브와 **같은 이벗 계정**(고객코드 · API 키)을 쓰는지, 새로 받는지 ② MYR 상품을 이벗에 등록하는 절차(누가 · 언제 창고 입고와 상품코드 발급을 하는지 · 옵션별 코드인지) ③ 박스 **보내는 사람**을 MYR 로 할지 인플루언서 이름으로 할지(인플루언서별이면 셀러마다 쇼핑몰 코드·발송인 정보 — 바인허브의 한의원별 `ebut_shop_code` 와 같은 구조) ④ 분할 출고(한 주문 여러 박스) 유무 ⑤ 11시 이후·공휴일 주문 처리 ⑥ 발주 후 출고 취소 가능 여부(가능하면 "발주 전" 환불 기준을 늦출 수 있다).
 15. **교환·환불 비용 정책** — 단순 변심 왕복 배송비(UI 시안 ₩6,000 · 고객 부담) · 파손·오배송은 MYR 부담 · 개봉 제품 불가 · 수령 7일 기준. 시안 문구(`POLICY_BY_REASON`)를 정책으로 확정할지.
+16. **크리에이터 로그인·가입 화면 남은 결정(2026-11-04 · §4.2.1 2-1)** — ① 만료 화면 "새 초대 요청하기" 알림 경로(운영팀 메일 · 슬랙 · 운영 콘솔 목록) ② 크리에이터 이용약관 · 개인정보 수집·이용 문서(가입 폼 "보기" 링크) ③ PC 로그인 패널 숫자(정산 비율 90% · 심사 1~2일 · 매월 10일 지급)와 후기 — 실제 정책·인용으로 바꾸거나 출시 전 삭제(`apps/myr-influencer/src/lib/auth-copy.ts`).
