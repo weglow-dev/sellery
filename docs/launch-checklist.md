@@ -87,6 +87,7 @@
 - [ ] **`RRN_ENC_KEY` 백업** — 지금은 대표 PC 루트 `.env.cloud.local` + Vercel `sellery-influencer`/`sellery-admin` 에만 있다(단일 사본). 잃으면 저장된 주민등록번호 복구 불가(deploy.md §6.4-3). 비밀번호 관리 도구(팀 금고)에 보관하고 Production/Preview 값이 다른지 확인. **(2026-10-06: Production 양쪽을 새 키로 통일 — deploy.md §6.4 재발급 기록. 금고 보관 확인 필요)**
 - [ ] **2단계 인증(대표 계정)**: Supabase · Vercel(`weglow-team`) · GitHub(`weglow-dev` 조직 2FA 강제) · 토스 개발자센터 · 카카오 개발자 · Resend · 호스팅케이알(DNS). 저장소로 확인 불가 — **확인 필요(대표)**.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` 를 가진 PC 목록 정리(운영 스크립트 실행자 = 실 DB 쓰기 권한). 퇴사·기기 교체 시 회전.
+- [ ] **MYR 크리에이터 콘솔 테스트 계정 정리(MYR 실판매 전)** — 운영 DB 에 시드 크리에이터 4명(`@minji.routine` · `@haru.well` · `@jun.fit` · `@soy.clean`)의 로그인 계정 `*@myr.test` 를 2026-11-04 에 만들었고, **비밀번호가 로컬 테스트용과 같아 저장소 문서로 알 수 있다**. 콘솔은 공개 주소라 이 계정으로 상품 · 주문 · 교환/환불(승인 · 환불 실행)을 건드릴 수 있으니, 시드 상품을 내리거나 실제 크리에이터로 바꿀 때 `myr-creators.mjs unlink` + Supabase → Authentication → Users 에서 `*@myr.test` 삭제(또는 `account … --password <새 값>` 으로 교체). 알림 메일은 `@myr.test` 가 예약 도메인이라 나가지 않는다(`@sellery/myr-core/mail/resend` isReservedAddress).
 
 ---
 

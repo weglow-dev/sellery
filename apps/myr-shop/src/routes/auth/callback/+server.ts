@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { safeNext } from '$lib/auth';
+import { safeNext } from '@sellery/myr-core/auth';
 
 /**
  * GET /auth/callback — 카카오 OAuth 콜백 (apps/shop auth/callback 에서 파트너 분기를 뺀 것).

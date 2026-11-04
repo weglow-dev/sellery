@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import type { Resolution } from '$lib/data';
+	import type { Me, Resolution } from '$lib/data';
 	import { goBack } from '$lib/nav';
 	import { CS_STATUS_META, CS_TYPE_META, REPLY_CHIPS, approveLabel, canApprove, dueText, isUrgentPending, policyOf, resolutionName, resolutionOptions, timelineRows, won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
@@ -27,12 +27,12 @@
 
 	function approve() {
 		if (!c || !resolution || !ok) return;
-		app.resolveCs(c.id, 'progress', resolution);
+		app.resolveCs(c.id, 'progress', resolution, (page.data.me as Me).name);
 		goBack('/cs');
 	}
 	function reject() {
 		if (!c) return;
-		app.resolveCs(c.id, 'rejected', 'reject');
+		app.resolveCs(c.id, 'rejected', 'reject', (page.data.me as Me).name);
 		goBack('/cs');
 	}
 </script>

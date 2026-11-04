@@ -1,18 +1,8 @@
 // 상품 모델 헬퍼 — apps/myr-shop/src/lib/data.ts
 import { describe, expect, it } from 'vitest';
-import { catName, creatorStyle, creatorsOf, handleSlug, MOCK_PRODUCTS, relatedOf, won } from '../lib/data';
+import { catName, creatorsOf, MOCK_PRODUCTS, relatedOf, won } from '../lib/data';
 
-describe('creatorStyle · handleSlug', () => {
-	it('디자인의 네 크리에이터는 디자인 색 · 그 밖은 핸들 해시로 결정적', () => {
-		expect(creatorStyle({ id: '1', name: '민지 루틴', handle: '@minji.routine', avatarUrl: null })).toEqual({ bg: '#FFB088', initial: '민' });
-		const x = creatorStyle({ id: '2', name: 'alice', handle: '@Alice.Kim', avatarUrl: null });
-		expect(x.initial).toBe('A');
-		expect(creatorStyle({ id: '3', name: 'alice', handle: '@alice.kim', avatarUrl: null }).bg).toBe(x.bg);
-	});
-	it('handleSlug 는 @ 제거 + 소문자', () => {
-		expect(handleSlug('@@Minji.Routine')).toBe('minji.routine');
-	});
-});
+// creatorStyle · handleSlug 는 공용 패키지로 옮겼다 — packages/myr-core/src/test/creator.test.ts
 
 describe('creatorsOf · relatedOf', () => {
 	it('크리에이터를 모으고 상품 수를 센다', () => {

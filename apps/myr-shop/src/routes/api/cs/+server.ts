@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import type { RequestHandler } from './$types';
-import { displayName } from '$lib/auth';
+import { displayName } from '@sellery/myr-core/auth';
 import { guestTokenCookieName } from '@sellery/myr-core/checkout-rules';
 import { CS_TOKEN_COOKIE_DAYS, csFailMessage, csTokenCookieName, parseCsOpenInput, PRODUCT_CODE_RE } from '@sellery/myr-core/cs-rules';
 import { hasAdmin } from '$lib/server/admin';

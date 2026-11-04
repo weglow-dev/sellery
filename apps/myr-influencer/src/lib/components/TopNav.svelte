@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import type { Me } from '$lib/data';
 	import { app } from '$lib/state.svelte';
 	import Icon from './Icon.svelte';
 
@@ -11,6 +12,8 @@
 		{ href: '/products', name: '내 제품' }
 	];
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
+	/** 로그인한 크리에이터 — 오른쪽 끝 이름 · 로그아웃 */
+	const me = $derived(page.data.me as Me | undefined);
 </script>
 
 <header class="z-10 hidden h-[72px] shrink-0 border-b border-white/7 bg-bg/85 backdrop-blur-md lg:block">
@@ -35,5 +38,13 @@
 			<Icon id="bell" size={20} />
 			{#if app.pending.length}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
 		</a>
+		{#if me}
+			<div class="flex items-center gap-3">
+				<span class="max-w-[160px] truncate text-[14px] font-bold text-white/80" title={me.handle}>{me.name}</span>
+				<form method="POST" action="/auth/signout">
+					<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[13px] font-bold text-white/70 transition-colors hover:border-white/25 hover:text-fg">로그아웃</button>
+				</form>
+			</div>
+		{/if}
 	</div>
 </header>

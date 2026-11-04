@@ -1,4 +1,4 @@
-/** 표시명 · next 검증 — `packages/db/src/auth.ts` 의 순수부 복사(MYR 은 셀러리 패키지를 import 하지 않는다 · docs/myr.md 결정 11).
+/** 표시명 · next 검증 — `packages/db/src/auth.ts` 의 순수부 복사(MYR 은 셀러리 패키지를 import 하지 않는다 · docs/myr.md 결정 11). 샵 · 크리에이터 콘솔 공용.
  *  브라우저·서버 어디서나 import 가능 — Supabase 클라이언트를 만들지 않는다. */
 import type { User } from '@supabase/supabase-js';
 

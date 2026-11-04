@@ -25,8 +25,9 @@ export const TILE_ICON: Record<TileKey, string> = {
 
 export const TILE_KEYS = Object.keys(TILE_BG) as TileKey[];
 
-/** 로그인한 인플루언서(목) — 인증을 붙이면 sellers 행(name · handle · avatar_url) */
-export const ME = { name: '민지 루틴', handle: '@minji.routine', initial: 'M', noteInitial: '민', avatarBg: '#F8B4A0' };
+/** 로그인한 크리에이터 — `(console)/+layout.server.ts` 가 sellers 행에서 만들어 `page.data.me` 로 넘긴다.
+ *  initial · avatarBg 는 샵 상품 카드와 같은 계산(`@sellery/myr-core/creator` creatorStyle) — 같은 사람이 두 앱에서 같은 모양 */
+export type Me = { id: string; name: string; handle: string; avatarUrl: string | null; initial: string; avatarBg: string };
 
 /* ---------- 교환 · 환불 CS ---------- */
 

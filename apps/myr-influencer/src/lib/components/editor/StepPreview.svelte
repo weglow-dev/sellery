@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ME, TILE_BG, TILE_ICON, type ProductDraft } from '$lib/data';
+	import { page } from '$app/state';
+	import { TILE_BG, TILE_ICON, type Me, type ProductDraft } from '$lib/data';
 	import { parsePrice, previewSections, won } from '$lib/rules';
 	import CheckDot from '../CheckDot.svelte';
 	import Icon from '../Icon.svelte';
@@ -8,6 +9,8 @@
 	/** 8단계 미리보기 · 제출 — 샵 상세페이지 순서대로 요약하고, 섹션마다 [수정] 으로 그 단계에 간다.
 	 *  모바일: 카드 하나 안에 섹션 목록 · 아래 안내 / PC(lg~): 왼쪽 카드(사진 · 이름 · 가격 · 노트) · 오른쪽 섹션 목록 + 안내 */
 	let { ed, onedit }: { ed: ProductDraft; onedit: (step: number) => void } = $props();
+	/** 로그인한 크리에이터 — 미리보기에 실제 활동명 · 핸들 · 아바타 색 */
+	const me = $derived(page.data.me as Me);
 
 	const price = $derived(parsePrice(ed.price));
 	const chips = $derived(ed.chips.map((c) => c.trim()).filter(Boolean));
@@ -56,7 +59,7 @@
 			</div>
 		</div>
 		<div class="p-4">
-			<p class="text-[11px] font-bold text-accent">{ME.name}</p>
+			<p class="text-[11px] font-bold text-accent">{me.name}</p>
 			<p class="mt-1 text-[18px] font-extrabold tracking-[-0.02em]">{ed.name.trim() || '제품명을 입력하면 여기에 보여요'}</p>
 			<p class="mt-2.5 text-[18px] font-extrabold">{price ? won(price) : '₩ —'} <span class="text-[12px] font-medium text-white/45">{ed.unit}</span></p>
 			<div class="mt-3.5 rounded-[14px] border border-accent/20 bg-accent/8 p-3.5">

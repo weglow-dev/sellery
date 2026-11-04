@@ -67,26 +67,28 @@ describe('처리 방법', () => {
 
 describe('처리 결과 반영 · 타임라인', () => {
 	it('승인 → 진행 중 · 긴급 해제 · 마지막 줄 "처리 진행" 은 아직', () => {
-		const r = resolveCs(byId('cs1'), 'progress', 'refund');
+		const r = resolveCs(byId('cs1'), 'progress', 'refund', '하루 웰');
 		expect(r.status).toBe('progress');
 		expect(r.urgent).toBe(false);
 		expect(r.timeline?.map((t) => t.title)).toEqual(['요청 접수', '전액 환불 승인', '처리 진행']);
 		expect(timelineRows(r).map((t) => t.done)).toEqual([true, true, false]);
+		expect(r.timeline?.[1].when).toBe('방금 · 하루 웰');
 	});
 	it('반려 → 두 줄 · 전부 완료 점', () => {
-		const r = resolveCs(byId('cs2'), 'rejected', 'reject');
+		const r = resolveCs(byId('cs2'), 'rejected', 'reject', '');
 		expect(r.timeline?.map((t) => t.title)).toEqual(['요청 접수', '반려']);
 		expect(timelineRows(r).every((t) => t.done)).toBe(true);
+		expect(r.timeline?.[1].when).toBe('방금'); // 이름이 비면 시각만
 	});
 	it('처리 결과 이름 — 요청 종류와 무관하게 한 이름 · 처리 전은 "—"', () => {
 		expect(resolutionName(byId('cs4'))).toBe('새 제품 재발송');
 		expect(resolutionName(byId('cs6'))).toBe('반려');
-		expect(resolutionName(resolveCs(byId('cs1'), 'progress', 'reship'))).toBe('새 제품 재발송');
+		expect(resolutionName(resolveCs(byId('cs1'), 'progress', 'reship', '민지 루틴'))).toBe('새 제품 재발송');
 		expect(resolutionName(byId('cs1'))).toBe('—');
 	});
 	it('원본 요청은 바꾸지 않는다', () => {
 		const before = byId('cs3');
-		resolveCs(before, 'progress', 'refund');
+		resolveCs(before, 'progress', 'refund', '민지 루틴');
 		expect(before.status).toBe('pending');
 	});
 });

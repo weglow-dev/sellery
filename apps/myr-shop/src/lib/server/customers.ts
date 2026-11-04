@@ -1,6 +1,6 @@
 /** customers 행 — 회원(ensureCustomer · packages/db customers.server.ts 복사) · 비회원(0021 app_guest_customer_upsert 그대로 · 토큰은 0058 myr_app_guest_*). service role. */
 import type { User } from '@supabase/supabase-js';
-import { displayName } from '$lib/auth';
+import { displayName } from '@sellery/myr-core/auth';
 import { ORDER_CODE_RE, parseGuestToken, type GuestBuyer, type Shipping } from '@sellery/myr-core/checkout-rules';
 import { admin } from './admin';
 

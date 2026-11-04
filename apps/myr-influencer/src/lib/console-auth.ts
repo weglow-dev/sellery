@@ -1,0 +1,80 @@
+/**
+ * 크리에이터 콘솔 로그인 규칙 — 공개 경로 · 상태별 이동 · 로그인 폼 검증 · 오류 문구.
+ * `$env` · `$app` 을 import 하지 않는 순수 모듈 — `src/test/console-auth.test.ts`. 게이트(hooks · requireSeller)와 로그인 화면이 같이 쓴다.
+ */
+import { safeNext } from '@sellery/myr-core/auth';
+
+/** 로그인 없이 열리는 경로 — 로그인 · 비밀번호 재설정 요청 · 메일 링크 착지(/auth/*) · robots. `/password/new` 는 재설정 링크가 만든 세션이 있어야 해서 공개가 아니다 */
+const PUBLIC_EXACT = new Set(['/login', '/password', '/robots.txt']);
+export function isPublicPath(pathname: string): boolean {
+	return PUBLIC_EXACT.has(pathname) || pathname.startsWith('/auth/');
+}
+
+/** 로그인 뒤 돌아갈 곳 — 같은 오리진 경로만(오픈 리다이렉트 방지 · `/auth/` `/login` 은 루프라 제외). 비면 홈 */
+export const consoleNext = (next: string | null | undefined): string => safeNext(next);
+
+/** 세션이 없을 때 — 원래 가려던 곳을 `next` 로 싣는다(홈이면 생략) */
+export function loginPath(from: string): string {
+	const next = consoleNext(from);
+	return next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`;
+}
+
+/** 콘솔 상태 → 이동할 곳. ok 면 null(그대로 진행) */
+export function gateLocation(state: 'anon' | 'unlinked' | 'suspended' | 'ok', from: string): string | null {
+	switch (state) {
+		case 'anon':
+			return loginPath(from);
+		case 'unlinked':
+			return '/unlinked';
+		case 'suspended':
+			return '/suspended';
+		default:
+			return null;
+	}
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const PASSWORD_MIN = 8;
+
+export type LoginInput = { email: string; password: string };
+export type LoginParse = { ok: true; input: LoginInput } | { ok: false; field: 'email' | 'password'; message: string };
+
+export function parseLoginForm(fd: { get(name: string): unknown }): LoginParse {
+	const email = String(fd.get('email') ?? '')
+		.trim()
+		.toLowerCase();
+	const password = String(fd.get('password') ?? '');
+	if (!EMAIL_RE.test(email) || email.length > 254) return { ok: false, field: 'email', message: '이메일 주소를 확인해주세요' };
+	if (password.length < PASSWORD_MIN) return { ok: false, field: 'password', message: `비밀번호는 ${PASSWORD_MIN}자 이상이에요` };
+	return { ok: true, input: { email, password } };
+}
+
+/** 새 비밀번호 — 8자 이상 · 확인 칸과 같아야 한다 */
+export function parseNewPassword(fd: { get(name: string): unknown }): { ok: true; password: string } | { ok: false; message: string } {
+	const password = String(fd.get('password') ?? '');
+	const confirm = String(fd.get('confirm') ?? '');
+	if (password.length < PASSWORD_MIN) return { ok: false, message: `비밀번호는 ${PASSWORD_MIN}자 이상이에요` };
+	if (password.length > 72) return { ok: false, message: '비밀번호는 72자까지 쓸 수 있어요' };
+	if (password !== confirm) return { ok: false, message: '두 비밀번호가 달라요' };
+	return { ok: true, password };
+}
+
+/**
+ * Supabase Auth 오류 → 화면 문구. 계정이 있는지 없는지 드러내지 않도록 자격 증명 오류는 한 문구로 묶는다.
+ * 원문 메시지는 로그에만 남긴다.
+ */
+export function authErrorMessage(raw: string | null | undefined): string {
+	const m = (raw ?? '').toLowerCase();
+	if (m.includes('invalid login credentials') || m.includes('invalid credentials')) return '이메일 또는 비밀번호가 맞지 않아요';
+	if (m.includes('email not confirmed')) return '메일 인증이 아직 끝나지 않았어요 — 받은 메일의 버튼을 먼저 눌러주세요';
+	if (m.includes('rate limit') || m.includes('too many')) return '시도가 너무 많아요 — 잠시 후 다시 해주세요';
+	if (m.includes('same password') || m.includes('should be different')) return '지금 쓰는 비밀번호와 다른 비밀번호를 정해주세요';
+	if (m.includes('weak') || m.includes('at least')) return '비밀번호가 너무 쉬워요 — 더 길게 정해주세요';
+	return '잠시 후 다시 시도해주세요';
+}
+
+/** 로그인 화면 `?error=` — 메일 링크 착지(/auth/confirm) 실패 */
+export const LINK_ERROR: Record<string, string> = {
+	expired: '링크가 만료됐거나 이미 사용됐어요. 비밀번호를 정했다면 로그인하고, 아니라면 비밀번호 찾기로 메일을 다시 받아주세요.',
+	auth: '로그인에 실패했어요. 잠시 후 다시 시도해주세요.'
+};
