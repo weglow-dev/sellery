@@ -33,21 +33,24 @@ const supabase: Handle = async ({ event, resolve }) => {
 					}
 				})
 			: null;
-	// createServerClient 와 getUser() 사이에 다른 코드를 두지 않는다 — safeGetSession 이 그 자리
-	event.locals.safeGetSession = async () => {
-		const sb = event.locals.supabase;
-		if (!sb) return { session: null, user: null };
-		const {
-			data: { session }
-		} = await sb.auth.getSession();
-		if (!session) return { session: null, user: null };
-		const {
-			data: { user },
-			error
-		} = await sb.auth.getUser(); // JWT 검증 — 쿠키 값만 믿지 않는다
-		if (error || !user) return { session: null, user: null };
-		return { session, user };
-	};
+	// createServerClient 와 getUser() 사이에 다른 코드를 두지 않는다 — safeGetSession 이 그 자리.
+	// 요청당 한 번만 Supabase Auth 에 묻는다(gate · 콘솔 게이트 · 페이지 load 가 같은 결과를 쓴다 — 매번 묻던 것이 화면 이동을 늦췄다 2026-11-04)
+	let sessionOnce: ReturnType<App.Locals['safeGetSession']> | undefined;
+	event.locals.safeGetSession = () =>
+		(sessionOnce ??= (async () => {
+			const sb = event.locals.supabase;
+			if (!sb) return { session: null, user: null };
+			const {
+				data: { session }
+			} = await sb.auth.getSession();
+			if (!session) return { session: null, user: null };
+			const {
+				data: { user },
+				error
+			} = await sb.auth.getUser(); // JWT 검증 — 쿠키 값만 믿지 않는다
+			if (error || !user) return { session: null, user: null };
+			return { session, user };
+		})());
 	const response = await resolve(event, {
 		filterSerializedResponseHeaders: (name) => name === 'content-range' || name === 'x-supabase-api-version'
 	});
