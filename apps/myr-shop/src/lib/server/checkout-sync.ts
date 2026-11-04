@@ -8,7 +8,6 @@
  *     myr_app_deposit_done / expire 로. 주문이 PAID 된 뒤의 토스 콘솔 취소(CANCELED/PARTIAL_CANCELED)는 줄 환불 RPC 가 들어올 때까지 운영 큐(handled=false).
  * 감사 로그는 셀러리와 같은 `payment_events` 표(공유 · toss_order_id 'myr_' 접두로 구분).
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
 import {
 	CHECKOUT_LITE_COLS,
 	failMessage,
@@ -18,12 +17,14 @@ import {
 	type CheckoutLite,
 	type ConfirmFnResult,
 	type RejectedItem
-} from '$lib/checkout-rules';
+} from '@sellery/myr-core/checkout-rules';
+import { logPaymentEvent, markPaymentEvent, type Admin, type EventSource } from './payment-events';
 import { notifyDepositDone, notifyOrderPaid } from './mail-events';
 import { isTossError, tossCancel, tossCanceledTotal, type TossPayment, type TossResult } from './toss';
 
-export type Admin = SupabaseClient;
-export type EventSource = 'webhook' | 'deposit_callback' | 'confirm' | 'cancel';
+// 결제 감사 로그는 환불(인플루언서 · 운영 콘솔)도 쓰므로 공용 패키지에 있다 — 라우트가 여기서 가져가던 이름은 그대로 다시 내보낸다
+export { logPaymentEvent, markPaymentEvent };
+export type { Admin, EventSource } from './payment-events';
 
 export const apiError = (status: number, code: string, message?: string | null, extra?: Record<string, unknown>): Response =>
 	Response.json({ ok: false, code, message: failMessage(code, message), ...(extra ?? {}) }, { status });
@@ -40,52 +41,6 @@ export function rejectCrossSite(request: Request, opts: { multipart?: boolean } 
 
 export { CHECKOUT_LITE_COLS, parseCheckoutLite };
 export type { CheckoutLite };
-
-// ---- payment_events (best-effort) ----
-export async function logPaymentEvent(
-	admin: Admin,
-	ev: {
-		source: EventSource;
-		event_type?: string | null;
-		toss_order_id?: string | null;
-		/** 샵 주문번호(myr_orders.code · 0062) — 주문이 생긴 뒤의 로그(승인 성공 · 환불 · 입금)에 적는다 */
-		order_code?: string | null;
-		payment_key?: string | null;
-		payload: unknown;
-		handled?: boolean;
-		result?: string | null;
-	}
-): Promise<string | null> {
-	try {
-		const { data, error } = await admin
-			.from('payment_events')
-			.insert({
-				source: ev.source,
-				event_type: ev.event_type ?? null,
-				toss_order_id: ev.toss_order_id ?? null,
-				order_code: ev.order_code ?? null,
-				payment_key: ev.payment_key ?? null,
-				payload: ev.payload ?? {},
-				handled: ev.handled ?? false,
-				result: ev.result ?? null
-			})
-			.select('id')
-			.single();
-		if (error) {
-			console.error('[payment_events] insert failed:', error.message);
-			return null;
-		}
-		return (data as { id: string }).id;
-	} catch (e) {
-		console.error('[payment_events] insert threw:', e instanceof Error ? e.message : e);
-		return null;
-	}
-}
-export async function markPaymentEvent(admin: Admin, id: string | null, patch: { handled: boolean; result: string }): Promise<void> {
-	if (!id) return;
-	const { error } = await admin.from('payment_events').update(patch).eq('id', id);
-	if (error) console.error('[payment_events] update failed:', error.message);
-}
 
 // ---- 세션 전이 (조건부 update) ----
 export async function failCheckout(

@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { csOrderOptions, PRODUCT_CODE_RE } from '$lib/cs-rules';
-import { shortDate } from '$lib/order-view';
+import { csOrderOptions, PRODUCT_CODE_RE } from '@sellery/myr-core/cs-rules';
+import { shortDate } from '@sellery/myr-core/order-view';
 import { hasAdmin } from '$lib/server/admin';
 import { myOrders } from '$lib/server/orders';
 

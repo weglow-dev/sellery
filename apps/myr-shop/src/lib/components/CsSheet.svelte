@@ -5,7 +5,7 @@
 	 *  주문 상세(회원·비회원): preset 으로 그 주문을 고정해 넘긴다 — 목록 = 그 주문 하나 · 유형과 무관하게 그 주문에 연결 · 비회원은 서버가 주문 조회 토큰으로 확인. */
 	import { tick } from 'svelte';
 	import { shop } from '$lib/state.svelte';
-	import { CS_BODY_MAX, CS_PLACEHOLDERS, CS_TYPES, csNeedsOrder, type CsOrderOption, type CsType } from '$lib/cs-rules';
+	import { CS_BODY_MAX, CS_PLACEHOLDERS, CS_TYPES, csNeedsOrder, type CsOrderOption, type CsType } from '@sellery/myr-core/cs-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
 	type P = { code: string; name: string; tile: string; ic: string; thumbUrl: string | null };

@@ -1,7 +1,7 @@
 // 거래 메일 템플릿·레이아웃 — apps/myr-shop/src/lib/mail/{templates,layout}.ts · 셀러는 자기 줄만 · 비회원 링크 · 이스케이프 · 멱등 키
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../lib/mail/layout';
-import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../lib/mail/templates';
+import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../mail/layout';
+import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../mail/templates';
 
 const ctx = { siteUrl: 'https://myr-shop.vercel.app/' };
 const order = (over: Partial<MailOrder> = {}): MailOrder => ({

@@ -10,7 +10,7 @@
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
  */
-import { won } from '../data';
+import { won } from '../constants';
 import { mailIdempotencyKey, renderMailHtml, renderMailText, type MailDoc, type MailRow } from './layout';
 
 export type MailCtx = { siteUrl: string };

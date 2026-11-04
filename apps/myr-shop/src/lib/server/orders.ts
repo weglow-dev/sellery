@@ -1,6 +1,6 @@
 /** 주문 조회 — 0060 RPC 를 service role 로. 소유 확인: 회원은 RPC 안에서 user_id 대조 · 비회원은 토큰 검증(0058 myr_app_guest_order_verify) 뒤 guest 주문만 열린다. */
-import { ORDER_CODE_RE } from '$lib/checkout-rules';
-import { orderFromJson, ordersFromJson, parseLookupResult, type LookupResult, type OrderView } from '$lib/order-view';
+import { ORDER_CODE_RE } from '@sellery/myr-core/checkout-rules';
+import { orderFromJson, ordersFromJson, parseLookupResult, type LookupResult, type OrderView } from '@sellery/myr-core/order-view';
 import { admin } from './admin';
 import { verifyGuestOrder } from './customers';
 

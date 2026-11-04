@@ -5,9 +5,9 @@
 	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로. */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
-	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '$lib/cs-rules';
-	import { displayCode, refundSteps, shortDate, statusLabel, type OrderItem, type OrderView } from '$lib/order-view';
-	import { customerCanRefund } from '$lib/refund-rules';
+	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
+	import { displayCode, refundSteps, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
 	import Tile from '$lib/components/Tile.svelte';

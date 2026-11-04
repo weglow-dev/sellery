@@ -1,6 +1,6 @@
 // 주문 조회 순수 규칙 — apps/myr-shop/src/lib/order-view.ts
 import { describe, expect, it } from 'vitest';
-import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, refundSteps, shortDate, statusLabel } from '../lib/order-view';
+import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, refundSteps, shortDate, statusLabel } from '../order-view';
 
 const json = {
 	id: 'o1',

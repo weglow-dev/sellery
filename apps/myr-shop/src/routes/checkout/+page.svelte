@@ -15,7 +15,7 @@
 		type GuestBuyerDraft,
 		type RejectedItem,
 		type ShippingDraft
-	} from '$lib/checkout-rules';
+	} from '@sellery/myr-core/checkout-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import PaymentWidget from '$lib/components/PaymentWidget.svelte';
 	import PriceSummary from '$lib/components/PriceSummary.svelte';

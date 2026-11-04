@@ -1,6 +1,6 @@
 // Resend 전송기(복사본) — apps/myr-shop/src/lib/mail/resend.ts · 비활성 · 멱등 가드 · 예약 주소 · HTTP 실패 · 네트워크 실패에 throw 없음
 import { describe, expect, it, vi } from 'vitest';
-import { asciiToken, createMailer, GUARD_TTL_MS, isEmailAddress, isReservedAddress, MAIL_FROM_FALLBACK, type MailMessage } from '../lib/mail/resend';
+import { asciiToken, createMailer, GUARD_TTL_MS, isEmailAddress, isReservedAddress, MAIL_FROM_FALLBACK, type MailMessage } from '../mail/resend';
 
 const msg = (over: Partial<MailMessage> = {}): MailMessage => ({ to: 'buyer@gmail.com', subject: '제목', html: '<p>hi</p>', text: 'hi', tag: 'myr_order_paid', idempotencyKey: 'myr_order_paid:customer:o1', ...over });
 const okFetch = (status = 200, body: unknown = { id: 'em_1' }) => vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));

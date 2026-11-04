@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { CS_CODE_RE, csTokenCookieName } from '$lib/cs-rules';
+import { CS_CODE_RE, csTokenCookieName } from '@sellery/myr-core/cs-rules';
 import { hasAdmin } from '$lib/server/admin';
 import { getCsThread } from '$lib/server/cs';
 

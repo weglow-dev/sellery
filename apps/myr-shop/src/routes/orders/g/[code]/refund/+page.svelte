@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { displayCode } from '$lib/order-view';
+	import { displayCode } from '@sellery/myr-core/order-view';
 	import RefundPage from '$lib/components/RefundPage.svelte';
 
 	let { data } = $props();

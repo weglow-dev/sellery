@@ -1,6 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { guestTokenCookieName, ORDER_CODE_RE } from '$lib/checkout-rules';
+import { guestTokenCookieName, ORDER_CODE_RE } from '@sellery/myr-core/checkout-rules';
 import { hasAdmin } from '$lib/server/admin';
 import { csForOrder } from '$lib/server/cs';
 import { guestOrder } from '$lib/server/orders';

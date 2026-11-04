@@ -1,6 +1,6 @@
 // 환불 순수 규칙 — apps/myr-shop/src/lib/refund-rules.ts
 import { describe, expect, it } from 'vitest';
-import type { OrderItem, OrderView } from '../lib/order-view';
+import type { OrderItem, OrderView } from '../order-view';
 import {
 	customerCanRefund,
 	estimateRefund,
@@ -13,7 +13,7 @@ import {
 	refundMessage,
 	refundPhotoPath,
 	sniffImageType
-} from '../lib/refund-rules';
+} from '../refund-rules';
 
 const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID'): OrderItem => ({
 	id,

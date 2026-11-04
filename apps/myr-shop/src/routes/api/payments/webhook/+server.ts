@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { CHECKOUT_LITE_COLS, parseCheckoutLite, TOSS_KEY_RE, type CheckoutLite } from '$lib/checkout-rules';
+import { CHECKOUT_LITE_COLS, parseCheckoutLite, TOSS_KEY_RE, type CheckoutLite } from '@sellery/myr-core/checkout-rules';
 import { admin, hasAdmin } from '$lib/server/admin';
 import { logPaymentEvent, markPaymentEvent, ORDER_LITE_COLS, syncFromPayment, type EventSource, type OrderLite } from '$lib/server/checkout-sync';
 import { isTossError, isUncertain, tossGetPayment } from '$lib/server/toss';

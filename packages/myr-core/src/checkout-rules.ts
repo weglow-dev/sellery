@@ -3,7 +3,7 @@
  * 셀러리 packages/payments checkout-rules.ts · checkout-sync 의 파서 · packages/db guest-order.ts 를 MYR 구조(줄 N개 · 주문 1건)로 복사.
  * Svelte·SvelteKit·DB 를 import 하지 않는다 — 라우트 · 화면 · vitest 공용.
  */
-import { MAX_QTY } from './data';
+import { MAX_QTY } from './constants';
 import { cleanText, normalizePhone } from './text';
 
 /* ---------------- 토스 식별자 ---------------- */

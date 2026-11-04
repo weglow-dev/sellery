@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { env } from '$env/dynamic/public';
 import { displayName } from '$lib/auth';
-import { EMPTY_DRAFT, TOSS_ANONYMOUS_CUSTOMER_KEY, type ShippingDraft } from '$lib/checkout-rules';
+import { EMPTY_DRAFT, TOSS_ANONYMOUS_CUSTOMER_KEY, type ShippingDraft } from '@sellery/myr-core/checkout-rules';
 
 /**
  * /checkout — 주문 상품은 브라우저 상태(장바구니 · 로그인이면 계정 장바구니를 이미 읽어 둠)에서 오고, 서버는 세션·프리필·위젯 키만 준다.
