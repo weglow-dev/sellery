@@ -4,7 +4,7 @@
 //
 //   DB 를 직접 만지지 않는다 — 크리에이터 콘솔 서버의 운영 API(apps/myr-influencer /api/ops/invites · 0070 RPC + 초대 메일)를 부른다. 환경변수는 둘:
 //     MYR_INFLUENCER_URL  기본 https://myr-influencer.vercel.app (로컬은 http://localhost:5179) — 초대 링크도 이 주소로 만들어진다
-//     CRON_SECRET         그 콘솔(Vercel 프로젝트 myr-influencer)의 CRON_SECRET 과 같은 값 — 루트 .env.local 에 있다(샵 myr-shop 과 같은 값)
+//     CRON_SECRET         그 콘솔(Vercel 프로젝트 myr-influencer)의 CRON_SECRET 과 같은 값 — 루트 .env.local 에 있다(2026-11-04 확인: 콘솔 값 = .env.local · 샵 myr-shop 값과는 다르다)
 //
 //   send <email> [--by 이름]       초대 발급 + 초대 메일 · 링크를 출력한다(카톡 · DM 으로 따로 보낼 수 있게). 같은 이메일을 다시 보내면 이전 링크는 취소
 //   list [--state pending|used|expired|revoked|requested] [--limit N]
