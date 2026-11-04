@@ -6,7 +6,7 @@ import { EMAIL_RE, LINK_ERROR, SESSION_ONLY_COOKIE, authErrorMessage, consoleNex
 /**
  * 크리에이터 콘솔 로그인 — 이메일 + 비밀번호(docs/myr.md §4.2.1 2번 · 시안 "MYR Influencer Login" · "… PC").
  * 서버 form action 이 처리한다(JS 없이도 동작 · 비밀번호가 브라우저 Supabase 클라이언트를 거치지 않는다).
- *   default  로그인 — `signInWithPassword` · "이 기기에서 로그인 유지"를 끄면 세션 쿠키를 브라우저 종료 때 지워지게(hooks 가 SESSION_ONLY_COOKIE 를 본다)
+ *   login    로그인 — `signInWithPassword` · "이 기기에서 로그인 유지"를 끄면 세션 쿠키를 브라우저 종료 때 지워지게(hooks 가 SESSION_ONLY_COOKIE 를 본다)
  *   forgot   비밀번호 찾기 — 로그인 칸에 적은 이메일로 재설정 메일(시안: 버튼을 누르면 바로 보내고 토스트). 계정 유무는 드러내지 않는다
  * 이미 로그인했으면 `next`(같은 오리진 경로만 · 기본 홈)로. 가입은 초대 링크(/invite/<토큰>)로만.
  */
@@ -19,7 +19,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, url, locals, cookies }) => {
+	// 이름 있는 액션(forgot)과 default 는 같이 둘 수 없다(SvelteKit — 섞으면 POST 가 500) → 둘 다 이름으로
+	login: async ({ request, url, locals, cookies }) => {
 		const fd = await request.formData();
 		const next = consoleNext(String(fd.get('next') ?? url.searchParams.get('next') ?? ''));
 		const remember = fd.get('remember') === '1';

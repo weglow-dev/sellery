@@ -101,6 +101,7 @@
 
 				<form
 					method="POST"
+					action="?/login"
 					novalidate
 					class="mt-8 flex flex-col gap-4 lg:mt-7"
 					onsubmit={(e) => {

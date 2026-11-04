@@ -23,9 +23,10 @@ export function sellerCtxOf(event: RequestEvent): Promise<SellerContext> {
 	return event.locals.sellerCtx;
 }
 
-export async function requireSeller(event: RequestEvent): Promise<SellerSummary> {
+/** from = 로그인 뒤 돌아올 경로(기본 지금 주소). 콘솔 레이아웃은 `event.untrack` 으로 읽어 넘긴다 — 주소를 읽으면 탭을 옮길 때마다 레이아웃 load 가 서버에서 다시 돈다 */
+export async function requireSeller(event: RequestEvent, from?: string): Promise<SellerSummary> {
 	const ctx = await sellerCtxOf(event);
-	const to = gateLocation(ctx.state, event.url.pathname + event.url.search);
+	const to = gateLocation(ctx.state, from ?? event.url.pathname + event.url.search);
 	if (to || ctx.state !== 'ok') redirect(303, to ?? '/login');
 	return ctx.seller;
 }
