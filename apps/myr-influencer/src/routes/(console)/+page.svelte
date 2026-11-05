@@ -19,6 +19,11 @@
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
 	const photo = $derived(app.profilePhoto || me.avatarUrl);
+	// 고객 문의 답변 대기(0075) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
+	$effect(() => {
+		app.inqWaiting = data.inqWaiting;
+	});
+	const csCount = $derived(app.pending.length + data.inqWaiting);
 
 	function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
 		const f = e.currentTarget.files?.[0];
@@ -35,9 +40,9 @@
 			<img src="/myr-logo.svg" alt="MYR" class="block h-7 w-auto" />
 			<span class="rounded-md bg-accent/14 px-2 py-1 text-[11px] font-extrabold tracking-[0.06em] text-accent">CREATOR</span>
 		</div>
-		<a href="/cs" aria-label="처리 대기 CS {app.pending.length}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
+		<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
 			<Icon id="bell" size={20} />
-			{#if app.pending.length}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
 		</a>
 	</div>
 
@@ -84,11 +89,11 @@
 		<a href="/cs" class="flex flex-col gap-2.5 rounded-[20px] border border-accent/25 bg-accent/8 p-4 text-left transition-colors lg:justify-between lg:gap-3.5 lg:rounded-3xl lg:p-[22px] lg:hover:border-accent/55">
 			<span class="flex items-center justify-between">
 				<span class="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-bg lg:h-10 lg:w-10"><Icon id="cs" size={18} sw={2.2} class="lg:h-5 lg:w-5" /></span>
-				<span class="text-[26px] font-extrabold tracking-[-0.04em] text-accent tabular-nums lg:text-[32px]">{app.pending.length}</span>
+				<span class="text-[26px] font-extrabold tracking-[-0.04em] text-accent tabular-nums lg:text-[32px]">{csCount}</span>
 			</span>
 			<span>
 				<span class="block text-[15px] font-bold lg:text-[16px]">처리 대기 CS</span>
-				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">교환 · 환불 요청</span>
+				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">교환·환불 {app.pending.length} · 고객 문의 {data.inqWaiting}</span>
 			</span>
 		</a>
 		<a href="/products" class="flex flex-col gap-2.5 rounded-[20px] border border-white/8 bg-white/3 p-4 text-left transition-colors lg:justify-between lg:gap-3.5 lg:rounded-3xl lg:p-[22px] lg:hover:border-white/28">

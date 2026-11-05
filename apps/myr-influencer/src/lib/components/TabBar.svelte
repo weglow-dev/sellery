@@ -9,6 +9,8 @@
 		{ href: '/cs', name: 'CS 관리', ic: 'cs' },
 		{ href: '/products', name: '내 제품', ic: 'box' }
 	];
+	/** 처리 대기 CS = 교환·환불(목) + 고객 문의 답변 대기(0075) */
+	const csCount = $derived(app.csBadge(page.data.inqWaiting));
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 </script>
 
@@ -20,8 +22,8 @@
 			<a href={t.href} aria-current={on ? 'page' : undefined} class="relative flex h-[52px] flex-col items-center justify-center gap-1 transition-colors {on ? 'text-accent' : 'text-white/45'}">
 				<Icon id={t.ic} size={22} />
 				<span class="text-[11px] font-bold">{t.name}</span>
-				{#if t.href === '/cs' && app.pending.length}
-					<span class="absolute top-2 right-[calc(50%-18px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold tabular-nums text-bg" aria-label="처리 대기 {app.pending.length}건">{app.pending.length}</span>
+				{#if t.href === '/cs' && csCount}
+					<span class="absolute top-2 right-[calc(50%-18px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold tabular-nums text-bg" aria-label="처리 대기 {csCount}건">{csCount}</span>
 				{/if}
 			</a>
 		{/each}

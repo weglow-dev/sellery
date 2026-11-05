@@ -14,6 +14,13 @@ class ConsoleState {
 	lastSubmitted = $state<string | null>(null);
 	/** 방금 제출이 새 상품 심사인지 수정 심사인지 — 완료 화면 문구(product-edit MODE_COPY) */
 	lastSubmitMode = $state<CopyKey>('new');
+	/** 고객 문의 답변 대기 수(0075) — 첫 값은 콘솔 레이아웃 데이터, CS · 홈 화면이 새로 읽을 때마다 덮는다(뱃지 · 홈 카드). null = 아직 화면이 안 읽음 */
+	inqWaiting = $state<number | null>(null);
+
+	/** CS 관리 뱃지 — 교환·환불 대기(목) + 고객 문의 답변 대기. layoutWaiting = 콘솔 레이아웃의 첫 값(page.data.inqWaiting) */
+	csBadge(layoutWaiting: unknown): number {
+		return this.pending.length + (this.inqWaiting ?? (typeof layoutWaiting === 'number' ? layoutWaiting : 0));
+	}
 
 	pending = $derived(this.cs.filter((c) => c.status === 'pending'));
 
