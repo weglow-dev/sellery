@@ -6,6 +6,13 @@ export type Row = Record<string, unknown>;
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
+/** 상품 사진 목록(0073 image_urls · 첫 장 = 대표) — http(s) 주소만 · 중복 제거 · 최대 6. 목록이 비었는데 대표 사진만 있으면(예전 상품) 그 한 장 */
+export function imagesOf(r: Row): string[] {
+	const list = [...new Set(arr<unknown>(r.image_urls).filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u)))].slice(0, 6);
+	if (list.length) return list;
+	return typeof r.thumb_url === 'string' && /^https?:\/\//.test(r.thumb_url) ? [r.thumb_url] : [];
+}
+
 export function creatorOfRow(c: unknown): Creator {
 	const r = (c ?? {}) as Row;
 	return { id: str(r.id), name: str(r.name, '크리에이터'), handle: str(r.handle, '@'), avatarUrl: typeof r.avatar_url === 'string' ? r.avatar_url : null };
@@ -27,6 +34,7 @@ export function fromRow(r: Row): Product {
 		unit: str(r.unit),
 		tile: str(r.tile, 'linear-gradient(145deg,#6b7280,#262a33)'),
 		thumbUrl: typeof r.thumb_url === 'string' ? r.thumb_url : null,
+		images: imagesOf(r),
 		ic: str(r.icon, 'pill'),
 		form: str(r.form),
 		pack: str(r.pack),

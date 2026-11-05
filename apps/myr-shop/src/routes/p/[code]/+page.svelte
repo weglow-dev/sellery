@@ -5,6 +5,7 @@
 	import Avatar from '$lib/components/Avatar.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
 	import CartButton from '$lib/components/CartButton.svelte';
+	import ProductGallery from '$lib/components/ProductGallery.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import QtyStepper from '$lib/components/QtyStepper.svelte';
 	import Seo from '$lib/components/Seo.svelte';
@@ -22,6 +23,9 @@
 	const related = $derived(data.related);
 	const liked = $derived(shop.liked(p.code));
 
+	/** 사진 넘겨보기 — 지금 보는 사진 번호 · PC 썸네일 줄이 go(i) 로 옮긴다 */
+	let photo = $state(0);
+	let gallery: ReturnType<typeof ProductGallery> | undefined = $state();
 	let qty = $state(1);
 	let added = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -65,10 +69,14 @@
 			<span class="text-white/85">{p.name}</span>
 		</nav>
 
-		<!-- 타일: 모바일 풀블리드 정사각 / PC 16:10 둥근 카드 -->
-		<div class="relative flex aspect-square items-center justify-center overflow-hidden text-white/95 lg:mt-[18px] lg:aspect-[16/10] lg:rounded-[30px]" style="background:{p.tile}">
-			<div class="absolute -right-[60px] -bottom-[60px] h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,.14),rgba(255,255,255,0))] lg:-right-[100px] lg:-bottom-[100px] lg:h-[460px] lg:w-[460px]"></div>
-			<span class="relative lg:[&>svg]:h-[260px] lg:[&>svg]:w-[260px]"><Icon id={p.ic} size={150} /></span>
+		<!-- 사진(여러 장이면 넘겨보기) · 없으면 타일: 모바일 풀블리드 정사각 / PC 16:10 둥근 카드 -->
+		<div class="group relative flex aspect-square items-center justify-center overflow-hidden text-white/95 lg:mt-[18px] lg:aspect-[16/10] lg:rounded-[30px]" style="background:{p.images.length ? 'transparent' : p.tile}">
+			{#if p.images.length}
+				{#key p.code}<ProductGallery bind:this={gallery} bind:index={photo} images={p.images} alt={p.name} />{/key}
+			{:else}
+				<div class="absolute -right-[60px] -bottom-[60px] h-[260px] w-[260px] rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,.14),rgba(255,255,255,0))] lg:-right-[100px] lg:-bottom-[100px] lg:h-[460px] lg:w-[460px]"></div>
+				<span class="relative lg:[&>svg]:h-[260px] lg:[&>svg]:w-[260px]"><Icon id={p.ic} size={150} /></span>
+			{/if}
 			<div class="absolute top-2.5 right-3 left-3 flex justify-between lg:hidden">
 				<button type="button" onclick={goBack} aria-label="뒤로" class="flex h-11 w-11 items-center justify-center rounded-[14px] bg-bg/45 text-fg backdrop-blur-md">
 					<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
@@ -81,6 +89,16 @@
 				{/each}
 			</div>
 		</div>
+		{#if p.images.length > 1}
+			<!-- PC 썸네일 줄 -->
+			<div class="mt-3 hidden gap-2.5 lg:flex" role="group" aria-label="사진 고르기">
+				{#each p.images as src, i (src)}
+					<button type="button" onclick={() => gallery?.go(i)} aria-label="사진 {i + 1}" aria-current={photo === i ? 'true' : undefined} class="h-[72px] w-[72px] overflow-hidden rounded-[14px] border-2 transition-colors {photo === i ? 'border-accent' : 'border-transparent opacity-60 hover:opacity-100'}">
+						<img {src} alt="" class="h-full w-full object-cover" loading="lazy" />
+					</button>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="px-5 pt-5 lg:px-0 lg:pt-0">
 			<!-- 모바일 구매 정보 (PC 는 오른쪽 패널) -->

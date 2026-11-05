@@ -1,6 +1,6 @@
 // 0056 RPC 행 → Product 매핑 — apps/myr-shop/src/lib/product-row.ts
 import { describe, expect, it } from 'vitest';
-import { fromRow } from '../lib/product-row';
+import { fromRow, imagesOf } from '../lib/product-row';
 
 const row = {
 	id: 'p-1',
@@ -66,5 +66,17 @@ describe('fromRow', () => {
 		expect(p.price).toBe(0);
 		expect(p.chips).toEqual([]);
 		expect(p.creator.name).toBe('크리에이터');
+	});
+});
+
+describe('imagesOf — 상품 페이지 사진 넘겨보기(0073 image_urls)', () => {
+	const U = (n: number) => `https://x.supabase.co/storage/v1/object/public/myr-products/s/${n}.jpg`;
+	it('순서 그대로 · http(s) 만 · 중복 제거 · 최대 6', () => {
+		expect(imagesOf({ image_urls: [U(1), U(2), U(1), 'javascript:alert(1)', 3, U(3), U(4), U(5), U(6), U(7)] })).toEqual([U(1), U(2), U(3), U(4), U(5), U(6)]);
+	});
+	it('목록이 비면 대표 사진 한 장(예전 상품) · 그것도 없으면 빈 목록(타일)', () => {
+		expect(imagesOf({ image_urls: [], thumb_url: U(9) })).toEqual([U(9)]);
+		expect(imagesOf({ thumb_url: null })).toEqual([]);
+		expect(fromRow({ ...row, image_urls: [U(1), U(2)], thumb_url: U(1) }).images).toEqual([U(1), U(2)]);
 	});
 });
