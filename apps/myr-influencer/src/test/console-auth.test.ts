@@ -1,6 +1,6 @@
 // 크리에이터 콘솔 로그인 규칙 — apps/myr-influencer/src/lib/console-auth.ts
 import { describe, expect, it } from 'vitest';
-import { LINK_ERROR, authErrorMessage, consoleNext, gateLocation, isPublicPath, loginPath, parseLoginForm, parseNewPassword } from '../lib/console-auth';
+import { LINK_ERROR, authErrorMessage, consoleNext, gateLocation, isPublicPath, linkFailureTarget, loginPath, parseLoginForm, parseNewPassword } from '../lib/console-auth';
 
 const fd = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
@@ -68,6 +68,19 @@ describe('authErrorMessage — 계정 존재 여부를 드러내지 않는다', 
 		expect(authErrorMessage(null)).toBe('잠시 후 다시 시도해주세요');
 	});
 	it('메일 링크 오류 문구', () => {
+		expect(LINK_ERROR.expired).toContain('만료');
+	});
+});
+
+describe('linkFailureTarget — 거절된 메일 링크(이미 씀 · 만료)', () => {
+	it('로그인된 상태의 재설정 · 초대 링크 → 새 비밀번호 화면(안내 표시)', () => {
+		expect(linkFailureTarget('recovery', true)).toBe('/password/new?link=used');
+		expect(linkFailureTarget('invite', true)).toBe('/password/new?link=used');
+	});
+	it('로그인 안 된 상태 · 그 밖의 링크 → 로그인 화면 만료 안내', () => {
+		expect(linkFailureTarget('recovery', false)).toBe('/login?error=expired');
+		expect(linkFailureTarget('signup', true)).toBe('/login?error=expired');
+		expect(linkFailureTarget('magiclink', false)).toBe('/login?error=expired');
 		expect(LINK_ERROR.expired).toContain('만료');
 	});
 });

@@ -91,6 +91,16 @@ export function authErrorMessage(raw: string | null | undefined): string {
 }
 
 /** 로그인 화면 `?error=` — 메일 링크 착지(/auth/confirm) 실패 */
+/**
+ * 메일 링크(재설정 · 초대)가 거절됐을 때 갈 곳 — 이미 쓴 링크를 다시 누르거나 메일 앱이 링크를 먼저 열어 버린 경우.
+ * 로그인된 상태(첫 클릭이 만든 세션 등)면 로그인 화면이 바로 홈으로 넘겨 안내가 사라지므로(2026-11-05 실제 발생),
+ * 재설정 · 초대 링크는 새 비밀번호 화면으로 보내 "링크는 이미 쓰였지만 바로 바꿀 수 있어요" 를 보여준다.
+ */
+export function linkFailureTarget(type: string, loggedIn: boolean): string {
+	if (loggedIn && (type === 'recovery' || type === 'invite')) return '/password/new?link=used';
+	return '/login?error=expired';
+}
+
 export const LINK_ERROR: Record<string, string> = {
 	expired: '링크가 만료됐거나 이미 사용됐어요. 비밀번호를 정했다면 로그인하고, 아니라면 비밀번호 찾기로 메일을 다시 받아주세요.',
 	auth: '로그인에 실패했어요. 잠시 후 다시 시도해주세요.'

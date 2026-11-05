@@ -18,6 +18,9 @@
 <svelte:head><title>새 비밀번호 — MYR Creator</title></svelte:head>
 
 <AuthShell title="새 비밀번호 정하기" sub={data.email ? `${data.email} 계정의 비밀번호를 정해요` : null}>
+	{#if data.linkUsed}
+		<p class="mb-5 rounded-2xl border border-white/10 bg-white/4 px-4 py-3.5 text-[13px] leading-[1.6] text-white/75" role="status">메일 링크는 이미 사용됐어요. 지금 로그인된 계정이라 여기서 바로 새 비밀번호를 정할 수 있어요.</p>
+	{/if}
 	<form
 		method="POST"
 		class="flex flex-col gap-4"

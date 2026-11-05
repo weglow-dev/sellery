@@ -42,14 +42,20 @@
 		toastTimer = setTimeout(() => (toast = null), 2600);
 	}
 
-	/** 비밀번호 찾기 — 이메일이 맞지 않으면 보내지 않고 안내(시안 forgot) */
-	function onForgot(e: MouseEvent) {
+	let formEl: HTMLFormElement | undefined = $state();
+	let forgotSubmit: HTMLButtonElement | undefined = $state();
+
+	/** 비밀번호 찾기 — 이메일이 맞지 않으면 보내지 않고 안내(시안 forgot).
+	 *  눈에 보이는 버튼은 type="button" — 칸에서 Enter 를 누르면 브라우저가 폼의 **첫 번째 제출 버튼**을 누르는데, 이 버튼이 로그인 버튼보다 앞에 있어
+	 *  Enter 가 재설정 메일을 보내던 문제(2026-11-05)를 막는다. 실제 제출은 로그인 버튼 뒤에 둔 숨은 제출 버튼으로(`?/forgot`). */
+	function onForgot() {
 		if (!EMAIL_RE.test(email.trim())) {
-			e.preventDefault();
 			touched.email = true;
 			attempted = true;
 			showToast('먼저 가입한 이메일을 입력해주세요');
+			return;
 		}
+		formEl?.requestSubmit(forgotSubmit);
 	}
 </script>
 
@@ -100,6 +106,7 @@
 				{/if}
 
 				<form
+					bind:this={formEl}
 					method="POST"
 					action="?/login"
 					novalidate
@@ -149,7 +156,7 @@
 					<div class="flex flex-col gap-2">
 						<div class="flex items-baseline justify-between">
 							<label for="password" class={AUTH_LABEL}>비밀번호</label>
-							<button type="submit" formaction="?/forgot" formnovalidate onclick={onForgot} class="text-[12px] font-semibold text-white/50 transition-colors hover:text-accent">비밀번호를 잊으셨나요?</button>
+							<button type="button" onclick={onForgot} class="text-[12px] font-semibold text-white/50 transition-colors hover:text-accent">비밀번호를 잊으셨나요?</button>
 						</div>
 						<div class="relative">
 							<input
@@ -177,6 +184,8 @@
 						{busy ? '로그인 중…' : '로그인'}
 						{#if canSubmit && !busy}<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>{/if}
 					</button>
+					<!-- 비밀번호 찾기 실제 제출 — 로그인 버튼 **뒤**에 둬야 Enter 가 로그인으로 간다(위 onForgot 주석) -->
+					<button bind:this={forgotSubmit} type="submit" formaction="?/forgot" formnovalidate hidden tabindex="-1" aria-hidden="true"></button>
 				</form>
 
 				<div class="mt-6 flex items-start gap-3 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5">

@@ -1,19 +1,21 @@
-# 파트너 인증 메일 템플릿 (Supabase Auth → Emails → Templates)
+# Supabase Auth 메일 템플릿 (Authentication → Emails → Templates)
 
-옛 `web/emails/*` 의 이동본 — S5 PR-11 에서 `web/` 삭제, 이 폴더가 정본 (docs/monorepo-migration.md 결정 K · §5.4). 본문은 각 html 파일 내용을 Supabase 대시보드에 그대로 붙여넣는다 — **대시보드 값 변경 없음**.
-로고는 `apps/shop/static/email/celery.png`(URL `https://sellery.life/email/celery.png` 불변). 링크는 token_hash 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=…`) —
-`.RedirectTo` 에 앱이 준 `emailRedirectTo`/`redirectTo`(콘솔은 `/influencer/auth/confirm?next=…`, 고객은 `/auth/confirm?next=…`)가 그대로 실리므로 템플릿은 라우트 위치를 모른다.
-설계는 docs/inf-console-plan.md §4.1 · §4.8, 대시보드 설정 항목·현재값 기록은 docs/deploy.md §5.5.
+**2026-11-05 MYR 문구로 교체**(셀러리 운영 중단 · 대표 결정). 각 html 파일 내용을 Supabase 대시보드의 같은 템플릿에 그대로 붙여넣고, 제목(Subject)도 아래 표대로 바꾼다.
+html 은 손으로 고치지 않는다 — MYR 거래 메일과 같은 레이아웃 코드(`packages/myr-core/src/mail/auth-templates.ts` → `layout.ts`)의 출력이고,
+문구를 바꾸면 그 파일을 고친 뒤 `node_modules/.bin/jiti packages/myr-core/scripts/render-auth-emails.ts` 로 다시 만든다(테스트 `apps/myr-influencer/src/test/auth-emails.test.ts` 가 파일과 코드가 같은지 본다).
+링크는 token_hash 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=…`) — 앱이 준 `redirectTo` 그대로라 템플릿은 라우트 위치를 모른다(MYR 콘솔은 `/auth/confirm`).
 
-| 템플릿 | 파일 | 제목 | 링크 type |
-|---|---|---|---|
-| Confirm signup | emails/confirm-signup.html | 셀러리 파트너 이메일 인증 | `signup` |
-| Reset password | emails/reset-password.html | 셀러리 비밀번호 재설정 | `recovery` |
-| Invite user | emails/invite.html | 셀러리 파트너 초대 | `invite` (`packages/db/scripts/partner-admin.mjs invite`) |
+| 템플릿 | 파일 | 제목(Subject) | 링크 type | 언제 나가나 |
+|---|---|---|---|---|
+| Confirm signup | emails/confirm-signup.html | [MYR] 이메일 주소를 확인해주세요 | `signup` | MYR 은 이메일 가입이 없다(초대 가입은 자체 메일) — 셀러리 가입 화면용으로 남은 템플릿 |
+| Reset password | emails/reset-password.html | [MYR] 비밀번호 재설정 | `recovery` | **크리에이터 콘솔은 쓰지 않는다** — 콘솔 서버가 MYR 재설정 메일을 직접 보낸다(`@sellery/myr-core/server/password-reset`). Supabase 가 직접 보낼 때만 |
+| Invite user | emails/invite.html | [MYR] 크리에이터 스튜디오에 초대합니다 | `invite` | `packages/db/scripts/myr-creators.mjs invite`(기존 크리에이터 행에 계정 연결) — 새 크리에이터 초대는 자체 메일(`myr-invites.mjs`) |
 
-문구는 역할 중립('셀러리 파트너') — 템플릿은 프로젝트당 1벌이라 브랜드 가입 메일과 공유된다.
+SMTP 보낸 사람 이름(Authentication → Emails → SMTP Settings → Sender name)도 `MYR` 로 바꾼다(주소 `noreply@sellery.life` 는 Resend 에 Verified 된 도메인이라 그대로).
 
-## 거래 메일 (앱이 Resend HTTP API 로 직접 발송 · 2026-09-22)
+이전(2026-09 ~ 11-04)에는 셀러리 문구 · 초록 디자인(`celery.png` 로고 · 제목 "셀러리 파트너 이메일 인증" · "셀러리 비밀번호 재설정" · "셀러리 파트너 초대")이었다 — git 기록에 남아 있다.
+
+## 셀러리 거래 메일 (기록 · 앱이 Resend HTTP API 로 직접 발송 · 2026-09-22) — MYR 거래 메일은 `packages/myr-core/src/mail/templates.ts`
 
 주문·발송·환불·문의 알림은 Supabase 가 아니라 **앱 서버가 Resend `POST /emails` 로 보낸다** — 대시보드 템플릿이 아니라 코드다(대표 결정 2026-09-22 "이메일 보내야지", docs/launch-checklist.md §5).
 같은 디자인(테이블 레이아웃 · 배경 `#eef3dc` · 버튼 `#4f8a2c` · 로고 `https://sellery.life/email/celery.png` · 푸터 사업자 정보는 `packages/db/src/company.ts` COMPANY) 을 `packages/db/src/mail/layout.ts` 가 만든다.

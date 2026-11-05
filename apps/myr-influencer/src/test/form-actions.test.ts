@@ -27,3 +27,15 @@ describe('form actions — default 와 이름 있는 액션을 섞지 않는다'
 		}
 	});
 });
+
+// 칸에서 Enter = 폼의 첫 번째 제출 버튼. 로그인 폼에서 그게 "비밀번호 찾기"(formaction ?/forgot)면 Enter 가 재설정 메일을 보낸다(2026-11-05 실제 발생)
+const loginPage = import.meta.glob<string>('../routes/login/+page.svelte', { query: '?raw', import: 'default', eager: true });
+describe('로그인 폼 — Enter 는 로그인', () => {
+	it('폼의 첫 번째 type="submit" 버튼에 formaction 이 없다', () => {
+		const src = Object.values(loginPage)[0] ?? '';
+		const form = src.slice(src.indexOf('<form'), src.indexOf('</form>'));
+		const first = form.match(/<button[^>]*type="submit"[^>]*>/);
+		expect(first, '제출 버튼이 있어야 한다').not.toBeNull();
+		expect(first![0]).not.toContain('formaction');
+	});
+});
