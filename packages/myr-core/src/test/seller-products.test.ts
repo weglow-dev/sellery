@@ -1,0 +1,28 @@
+// 내 제품 행 파서 — 0071 myr_app_seller_products 응답
+import { describe, expect, it } from 'vitest';
+import { SELLER_PRODUCT_STATUSES, parseSellerProductRows } from '../seller-products';
+
+const row = (o: Record<string, unknown> = {}) => ({
+	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', reject_reason: null, category: 'diet', price: 32000, option_count: 2,
+	stock: 100, sold_qty: 30, stock_left: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumb_url: null,
+	submitted_at: '2026-10-29T00:00:00Z', reviewed_at: null, created_at: '2026-10-29T00:00:00Z', updated_at: '2026-11-01T00:00:00Z', ...o
+});
+
+describe('parseSellerProductRows', () => {
+	it('필드 이름을 화면 쪽 이름으로', () => {
+		expect(parseSellerProductRows([row()])).toEqual([
+			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' }
+		]);
+	});
+	it('여섯 상태 모두 받는다 · 모르는 상태 · id 없는 행은 버린다', () => {
+		expect(parseSellerProductRows(SELLER_PRODUCT_STATUSES.map((s, i) => row({ id: `p${i}`, status: s }))).map((r) => r.status)).toEqual([...SELLER_PRODUCT_STATUSES]);
+		expect(parseSellerProductRows([row({ status: 'sold_out' }), row({ id: 1 }), null, 'x'])).toEqual([]);
+	});
+	it('숫자 방어(음수 · 문자 → 0) · 아이콘 기본값 · 빈 문자열은 null', () => {
+		const [r] = parseSellerProductRows([row({ price: -5, stock_left: '7', icon: '', tile: '', reject_reason: '' })]);
+		expect([r.price, r.stockLeft, r.icon, r.tile, r.rejectReason]).toEqual([0, 0, 'pill', null, null]);
+	});
+	it('배열이 아니면 빈 목록', () => {
+		for (const v of [null, undefined, {}, 'x']) expect(parseSellerProductRows(v)).toEqual([]);
+	});
+});

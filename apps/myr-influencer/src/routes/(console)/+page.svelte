@@ -9,7 +9,8 @@
 
 	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 최근 7일 판매 막대.
 	 *  모바일은 한 줄로 쌓고, PC(lg~)는 지표 3단(1.6 : 1 : 1) + 아래 2단(할 일 · 7일 판매, 합계와 막대 값 표시).
-	 *  지표는 목(MOCK_STATS · mockMonthRevenue) — 실적 RPC(myr_app_seller_sales)를 붙이면 서버 값으로 바뀐다. */
+	 *  "판매 중 제품" 카드는 서버 값(+page.server.ts · 0071). 나머지 지표는 목(MOCK_STATS · mockMonthRevenue) — 실적 RPC(8번)를 붙이면 서버 값으로 바뀐다. */
+	let { data } = $props();
 	const live = $derived(app.products.filter((p) => p.status === 'live'));
 	const monthUnits = $derived(live.reduce((n, p) => n + p.sold, 0));
 	const today = $derived(app.pending.slice(0, 3));
@@ -93,11 +94,11 @@
 		<a href="/products" class="flex flex-col gap-2.5 rounded-[20px] border border-white/8 bg-white/3 p-4 text-left transition-colors lg:justify-between lg:gap-3.5 lg:rounded-3xl lg:p-[22px] lg:hover:border-white/28">
 			<span class="flex items-center justify-between">
 				<span class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/6 lg:h-10 lg:w-10"><Icon id="box" size={18} class="lg:h-5 lg:w-5" /></span>
-				<span class="text-[26px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[32px]">{app.liveCount}</span>
+				<span class="text-[26px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[32px]">{data.productCounts.live}</span>
 			</span>
 			<span>
 				<span class="block text-[15px] font-bold lg:text-[16px]">판매 중 제품</span>
-				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">{app.draftCount}개 심사 · 임시저장</span>
+				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">{data.productCounts.pending}개 심사 · 임시저장</span>
 			</span>
 		</a>
 	</div>
