@@ -105,3 +105,23 @@ export const LINK_ERROR: Record<string, string> = {
 	expired: '링크가 만료됐거나 이미 사용됐어요. 비밀번호를 정했다면 로그인하고, 아니라면 비밀번호 찾기로 메일을 다시 받아주세요.',
 	auth: '로그인에 실패했어요. 잠시 후 다시 시도해주세요.'
 };
+
+/**
+ * 비밀번호 재설정 요청 결과 → 화면 문구(보냈으면 null). 2026-11-05 대표 결정 — 크리에이터가 아닌 이메일이면 "보냈어요" 대신 아니라고 알린다
+ * (계정 유무가 드러나는 대신 이메일당 10분 3회 · IP 30분 10회 레이트리밋이 대량 조회를 막는다 · lib/server/password-reset).
+ */
+export type ResetOutcome = 'sent' | 'not_creator' | 'suspended' | 'rate_limited' | 'error';
+export function resetOutcomeMessage(o: ResetOutcome): string | null {
+	switch (o) {
+		case 'sent':
+			return null;
+		case 'not_creator':
+			return 'MYR 크리에이터로 가입된 이메일이 아니에요. 이메일을 다시 확인해주세요';
+		case 'suspended':
+			return '이용이 정지된 계정이에요. MYR 파트너팀에 문의해주세요';
+		case 'rate_limited':
+			return '요청이 너무 많아요. 잠시 후 다시 시도해주세요';
+		default:
+			return '메일을 보내지 못했어요. 잠시 후 다시 시도해주세요';
+	}
+}
