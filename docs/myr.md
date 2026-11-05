@@ -266,7 +266,9 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 콘솔: 에디터 저장 `POST /api/products` · 사진은 고르는 즉시 `POST /api/products/photos`(매직 바이트 · 크리에이터 폴더 · 올리는 동안 저장 막음) · `?id=` 로 임시저장 · 반려 상품 이어 쓰기(반려 사유 배너) · 내 제품 메뉴(`ProductMenu` — 이어서 작성 · 삭제 / 고쳐서 다시 심사 요청 / 일시중지 · 다시 판매 · 판매 종료(확인)) · 변환 순수 `lib/product-draft.ts`(vitest) · API 게이트 `apiSeller`(JSON 401 · 403)
     - 샵: "04 · 제품 정보" 유통기한 · 보관을 입력값으로(비면 예전 기본 문구)
     - 검수는 운영 콘솔 전까지 `myr-products.mjs review <code> approve|reject` · **승인할 때 재고(`stock`)를 넣어야 샵에서 품절로 안 보인다**(크리에이터는 재고를 입력하지 않는다 · 결정 13)
-    - 남은 것: 지운 사진 · 버린 업로드는 저장소에 남는다(고아 정리 — 운영 작업 · 나중에 환불 사진처럼 크론) · 샵은 대표 사진 1장만(여러 장 넘겨보기는 샵 별도 작업)
+    - **버려진 이미지 정리**: 에디터에서 지운 사진 · 올리고 저장하지 않은 사진은 `myr_product_image_orphans`(24시간 지난 · 어느 상품 행(삭제 · 종료 포함)에도 없는 것)로 찾아 **샵 크론 `/api/cron/reconcile`(10분마다 · 환불 사진 정리와 같은 자리 · `?prune=0` 생략)** 이 Storage API 로 지운다(`@sellery/myr-core/server/product-images`) · 4-2 수정본의 이미지도 참조에 넣을 것
+    - **한글 입력(IME)**: 값을 다시 쓰는 칸(판매가 · 가입 핸들 · 연락처)은 조합 중(`isComposing`)에 다시 쓰지 않고 조합이 끝날 때 정리 — 조합 중에 바꾸면 덜 끝난 글자("ㅇ")가 다음 칸(내용량)에 남던 문제(대표 제보)
+    - 남은 것: 샵은 대표 사진 1장만(여러 장 넘겨보기는 샵 별도 작업)
 - **5. 문의 답변(스레드형)**
     - `/cs` = `myr_app_cs_list(actor='seller')` · `/cs/[code]` = `myr_app_cs_thread` + `myr_app_cs_reply` + `myr_app_cs_close` + `notifyCsReplied` 메일
     - 대상은 상품 문의 · 배송 문의. 교환·환불은 7번 화면 · 마이그레이션 없음

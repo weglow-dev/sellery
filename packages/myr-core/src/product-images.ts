@@ -7,3 +7,6 @@ export const PRODUCT_IMAGE_MAX = 6;
 export const PRODUCT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 export const PRODUCT_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
 export const productImagePath = (sellerId: string, ext: string, rand: string = crypto.randomUUID()): string => `${sellerId}/${rand}.${ext}`;
+
+/** 버킷 안 경로 `<seller id>/<이름>.<ext>` 모양인지 — 지우기 전 한 번 더(다른 경로를 지우지 않게) */
+export const isProductImagePath = (p: string): boolean => /^[0-9a-f-]{36}\/[A-Za-z0-9-]{8,64}\.(jpg|png|webp)$/.test(p);

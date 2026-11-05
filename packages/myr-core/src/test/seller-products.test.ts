@@ -26,3 +26,12 @@ describe('parseSellerProductRows', () => {
 		for (const v of [null, undefined, {}, 'x']) expect(parseSellerProductRows(v)).toEqual([]);
 	});
 });
+
+describe('상품 이미지 경로 — 지우기 전 확인(0073)', () => {
+	it('<seller uuid>/<이름>.<jpg|png|webp> 만', async () => {
+		const { isProductImagePath, productImagePath } = await import('../product-images');
+		const sid = '867dec23-1250-4351-b8c2-5c97853c6096';
+		expect(isProductImagePath(productImagePath(sid, 'png', '0f8a1c2e-1111-2222-3333-444455556666'))).toBe(true);
+		for (const bad of [`${sid}/../x.png`, `${sid}/a.gif`, 'refunds/x.jpg', `${sid}/sub/x.jpg`, '']) expect(isProductImagePath(bad), bad).toBe(false);
+	});
+});

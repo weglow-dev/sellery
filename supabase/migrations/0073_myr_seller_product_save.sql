@@ -20,6 +20,7 @@
 --       pause listed→paused · resume paused→listed · end listed|paused→ended(되돌릴 수 없음) · delete draft→삭제(deleted_at)
 --       → { ok, status } · { ok:false, code: NOT_FOUND | BAD_ACTION | WRONG_STATUS(status) }
 --   myr_product_public_json 에 shelf_life · storage_method · image_urls 추가(샵 상세)
+--   myr_product_image_orphans(age, limit)  버려진 상품 이미지(24시간 지난 미참조) — 샵 크론이 지운다
 --
 --   권한: 위 세 RPC 는 service role 만 — 크리에이터 id 는 콘솔 서버가 세션(requireSeller)에서 정해 넘긴다(결정 3).
 --   테스트: supabase/tests/myr_seller_product_save.test.sql. 재실행 가능.
@@ -250,3 +251,25 @@ end;
 $$;
 revoke all on function public.myr_app_seller_set_status(uuid, uuid, text) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_set_status(uuid, uuid, text) to service_role;
+
+-- ------------------------------------------------------------
+-- 버려진 상품 이미지 찾기 — 버킷 myr-products 에서 p_age 보다 오래됐고 어느 상품 행(삭제 · 종료 포함)의 image_urls 에도 없는 것.
+--   에디터에서 지운 사진 · 올리고 저장하지 않은 사진. 지우기는 샵 크론(/api/cron/reconcile · 10분마다)이 Storage API 로(0068 환불 사진과 같은 방식).
+--   24시간 여유 — 에디터를 열어 둔 채 저장 전인 사진을 지우지 않게. 4-2(수정 심사)에서 수정본의 이미지도 "참조" 에 넣는다.
+-- ------------------------------------------------------------
+create or replace function public.myr_product_image_orphans(p_age interval default interval '24 hours', p_limit integer default 100)
+returns setof text
+language sql
+stable
+security definer set search_path = public
+as $$
+  select o.name
+    from storage.objects o
+   where o.bucket_id = 'myr-products'
+     and o.created_at < now() - p_age
+     and not exists (select 1 from public.myr_products p, unnest(p.image_urls) u where right(u, length(o.name) + 1) = '/' || o.name)
+   order by o.created_at
+   limit greatest(coalesce(p_limit, 100), 1)
+$$;
+revoke all on function public.myr_product_image_orphans(interval, integer) from public, anon, authenticated;
+grant execute on function public.myr_product_image_orphans(interval, integer) to service_role;

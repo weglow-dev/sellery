@@ -1,6 +1,6 @@
 -- pgTAP — 0073 상품 등록 저장: 권한 · 임시저장 · 심사 요청 · 반려 재제출 · 수정 가능 상태 · 입력 검사 · 이미지 폴더 · 상태 바꾸기 · 에디터 1건 · 샵 응답 (docs/myr.md §4.2.1 4-1)
 begin;
-select plan(48);
+select plan(52);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_save_product', '{uuid,uuid,jsonb,boolean}'::text[], 'anon', '{}'::text[], 'anon 은 save_product 불가');
@@ -95,6 +95,18 @@ select ok((select deleted_at is not null from public.myr_products where id = (se
 -- ---------- 제약 · 샵 응답 ----------
 select throws_ok($$insert into public.myr_products (seller_id, name, price, status) values ('00000000-0000-4000-8000-000000000a91', '카테고리 없음', 1000, 'pending')$$, '23514', null, '임시저장이 아니면 카테고리 필수(제약)');
 select ok((select public.myr_product_public_json(p, s) ?& array['shelf_life', 'storage_method', 'image_urls'] from public.myr_products p join public.sellers s on s.id = p.seller_id where p.code = 'pgtap-save-pending'), '샵 응답에 유통기한 · 보관 · 이미지 목록');
+
+-- ---------- 버려진 이미지 ----------
+select function_privs_are('public', 'myr_product_image_orphans', '{interval,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 orphans 불가');
+insert into storage.objects (bucket_id, name, created_at)
+values ('myr-products', '00000000-0000-4000-8000-000000000a91/0f8a1c2e-1111.webp', now() - interval '2 days'),
+       ('myr-products', '00000000-0000-4000-8000-000000000a91/00000000-dead-beef.jpg', now() - interval '2 days'),
+       ('myr-products', '00000000-0000-4000-8000-000000000a91/11111111-fresh.jpg', now() - interval '1 minute');
+select is((select array_agg(o) from public.myr_product_image_orphans() o where o like '00000000-0000-4000-8000-000000000a91/%'),
+  array['00000000-0000-4000-8000-000000000a91/00000000-dead-beef.jpg'], '고아 = 어느 상품에도 없고 24시간 지난 것만(저장된 사진 · 방금 올린 사진 제외)');
+select is((select count(*) from public.myr_product_image_orphans(interval '0', 100) o where o like '00000000-0000-4000-8000-000000000a91/%'), 2::bigint, 'age 0 이면 방금 올린 미참조 사진도');
+update public.myr_products set deleted_at = now() where id = (select (r ->> 'id')::uuid from t_new);
+select ok(not exists (select 1 from public.myr_product_image_orphans() o where o = '00000000-0000-4000-8000-000000000a91/0f8a1c2e-1111.webp'), '삭제된 상품의 사진도 지우지 않는다(주문 · 기록이 참조할 수 있다)');
 
 select * from finish();
 rollback;

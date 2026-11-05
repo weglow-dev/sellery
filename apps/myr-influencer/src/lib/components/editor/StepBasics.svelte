@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isComposing } from '$lib/ime';
 	import { MYR_CATEGORIES } from '@sellery/myr-core/categories';
 	import { PRODUCT_IMAGE_ACCEPT, PRODUCT_IMAGE_MAX_BYTES } from '@sellery/myr-core/product-images';
 	import { TILE_BG, TILE_KEYS, type ProductDraft } from '$lib/data';
@@ -13,6 +14,15 @@
 	const uid = $props.id();
 
 	const TAG_PH = ['짜먹는', '스틱포', '레몬맛'];
+
+	/** 판매가 — 숫자만 · 천 단위 콤마. 한글 입력이 조합 중(isComposing)일 때는 값을 다시 쓰지 않는다 — 조합 중에 값을 바꾸면
+	 *  덜 끝난 글자("ㅇ")가 다음 칸(내용량)으로 넘어가는 문제가 있었다(2026-11-05). 조합이 끝날 때(compositionend) · 칸을 벗어날 때 정리한다 */
+	function onPriceInput(e: Event & { currentTarget: HTMLInputElement }) {
+		if (isComposing(e)) return;
+		const next = formatPriceInput(e.currentTarget.value);
+		if (e.currentTarget.value !== next) e.currentTarget.value = next;
+		ed.price = next;
+	}
 
 	/** 사진 — 고르는 즉시 1장씩 서버로 올린다(POST /api/products/photos → 공개 URL · 0073). 올리는 동안은 브라우저 미리보기(blob:)로 보여주고,
 	 *  끝나면 그 자리를 공개 URL 로 바꾼다. 실패하면 빼고 안내. 미리보기가 남아 있으면 저장을 막는다(에디터 save) */
@@ -74,7 +84,9 @@
 					class="{INPUT_LG} pl-[34px] font-bold tabular-nums"
 					inputmode="numeric"
 					value={ed.price}
-					oninput={(e) => (ed.price = formatPriceInput(e.currentTarget.value))}
+					oninput={onPriceInput}
+					oncompositionend={onPriceInput}
+					onblur={onPriceInput}
 					placeholder="36,000"
 				/>
 			</div>

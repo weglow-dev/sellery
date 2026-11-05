@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { isComposing } from '$lib/ime';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -125,6 +126,7 @@
 
 	/** 연락처 — 숫자만 · 하이픈 자동 · 가운데를 고쳐도 커서가 그 자리에(공용 phone 규칙) */
 	function onPhoneInput(e: Event & { currentTarget: HTMLInputElement }) {
+		if (isComposing(e)) return; // 한글 조합 중에 값을 바꾸면 덜 끝난 글자가 다른 칸으로 넘어간다 — 조합이 끝나면(compositionend) 정리
 		const el = e.currentTarget;
 		const before = el.value;
 		const caret = el.selectionStart ?? before.length;
@@ -140,6 +142,7 @@
 
 	/** 핸들 — @ · 공백 제거 · 소문자로 바로 정리 */
 	function onHandleInput(e: Event & { currentTarget: HTMLInputElement }) {
+		if (isComposing(e)) return; // 한글 조합 중에는 다시 쓰지 않는다(판매가 칸과 같은 이유)
 		const el = e.currentTarget;
 		const next = cleanHandleInput(el.value);
 		if (el.value !== next) el.value = next;
@@ -360,7 +363,7 @@
 								<label for="f-handle" class={AUTH_LABEL}>핸들</label>
 								<div class="relative">
 									<span class="absolute top-1/2 left-4 -translate-y-1/2 text-[16px] font-bold text-white/40" aria-hidden="true">@</span>
-									<input id="f-handle" name="handle" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="minji.routine" maxlength={HANDLE_MAX + 5} value={values.handle} oninput={onHandleInput} onblur={onHandleBlur} aria-invalid={shown('handle')} aria-describedby={shown('handle') ? 'e-handle' : 'h-handle'} class={authInput({ invalid: shown('handle'), filled: !!handle, size: 'md', padLeft: true, padRight: true })} />
+									<input id="f-handle" name="handle" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="minji.routine" maxlength={HANDLE_MAX + 5} value={values.handle} oninput={onHandleInput} oncompositionend={onHandleInput} onblur={onHandleBlur} aria-invalid={shown('handle')} aria-describedby={shown('handle') ? 'e-handle' : 'h-handle'} class={authInput({ invalid: shown('handle'), filled: !!handle, size: 'md', padLeft: true, padRight: true })} />
 									{#if checking && checking === handle}<span class="absolute top-1/2 right-4 h-[18px] w-[18px] -translate-y-1/2 animate-spin rounded-full border-2 border-white/20 border-t-white/70" aria-hidden="true"></span>{:else if handleOk}<span class="absolute top-1/2 right-4 -translate-y-1/2 text-mint" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span>{/if}
 								</div>
 								{#if shown('handle')}
@@ -419,7 +422,7 @@
 					<p class="mt-8 mb-3 lg:mt-9 lg:mb-4 {sectionLabel}">03 · 연락처</p>
 					<div class="flex flex-col gap-2 lg:max-w-[284px]">
 						<label for="f-phone" class={AUTH_LABEL}>휴대폰 번호</label>
-						<input id="f-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" value={values.phone} oninput={onPhoneInput} onblur={touch('phone')} aria-invalid={shown('phone')} aria-describedby={shown('phone') ? 'e-phone' : 'h-phone'} class="{authInput({ invalid: shown('phone'), filled: !!values.phone, size: 'md' })} tabular-nums" />
+						<input id="f-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" maxlength="13" value={values.phone} oninput={onPhoneInput} oncompositionend={onPhoneInput} onblur={touch('phone')} aria-invalid={shown('phone')} aria-describedby={shown('phone') ? 'e-phone' : 'h-phone'} class="{authInput({ invalid: shown('phone'), filled: !!values.phone, size: 'md' })} tabular-nums" />
 						{#if shown('phone')}<ErrorText id="e-phone" text={errText('phone')} />{/if}
 					</div>
 					{#if !shown('phone')}<p id="h-phone" class="mt-2 {AUTH_HINT}">제조 미팅 · 발주 연락에만 쓰고 샵에는 보이지 않아요.</p>{/if}
