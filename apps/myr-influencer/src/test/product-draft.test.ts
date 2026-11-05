@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SellerProductDetail } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON } from '../lib/data';
 import { blankDraft } from '../lib/rules';
-import { detailToDraft, draftToPayload, isEditableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
+import { detailToDraft, draftToPayload, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
 
 const IMG = 'https://x.supabase.co/storage/v1/object/public/myr-products/s1/0f8a1c2e.jpg';
 
@@ -62,14 +62,18 @@ describe('saveFailure · 메뉴', () => {
 		expect(saveFailure('NOT_EDITABLE').step).toBeUndefined();
 		expect(saveFailure('???').message).toContain('잠시 후');
 	});
-	it('에디터로 여는 건 임시저장 · 반려만', () => {
+	it('에디터로 바로 고치는 건 임시저장 · 반려 · 수정 심사로 고치는 건 판매 중 · 일시중지', () => {
 		expect((['draft', 'rejected', 'review', 'live', 'paused', 'ended'] as const).filter(isEditableStatus)).toEqual(['draft', 'rejected']);
+		expect((['draft', 'rejected', 'review', 'live', 'paused', 'ended'] as const).filter(isRevisableStatus)).toEqual(['live', 'paused']);
 	});
 	it('상태별 메뉴 — 판매 종료 · 삭제는 확인을 받는다', () => {
 		expect(productMenu('draft').map((m) => m.kind)).toEqual(['edit', 'delete']);
 		expect(productMenu('rejected').map((m) => m.kind)).toEqual(['edit']);
-		expect(productMenu('live').map((m) => m.kind)).toEqual(['pause', 'end']);
-		expect(productMenu('paused').map((m) => m.kind)).toEqual(['resume', 'end']);
+		expect(productMenu('live').map((m) => m.kind)).toEqual(['edit', 'pause', 'end']);
+		expect(productMenu('paused').map((m) => m.kind)).toEqual(['edit', 'resume', 'end']);
+		expect(productMenu('live')[0].label).toBe('내용 수정');
+		// 수정 심사 중이면 "내용 수정" 이 빠진다
+		expect(productMenu('live', true).map((m) => m.kind)).toEqual(['pause', 'end']);
 		expect(productMenu('review')).toEqual([]);
 		expect(productMenu('ended')).toEqual([]);
 		expect(productMenu('live').find((m) => m.kind === 'end')?.confirm).toContain('다시 열 수 없어요');

@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { TILE_BG, TILE_ICON, type Me, type ProductDraft } from '$lib/data';
-	import { parsePrice, previewSections, won } from '$lib/rules';
+	import { MODE_COPY, type EditorMode } from '$lib/product-edit';
+	import { parsePrice, previewSections, won, type SectionKey } from '$lib/rules';
 	import CheckDot from '../CheckDot.svelte';
 	import Icon from '../Icon.svelte';
 	import StepHead from './StepHead.svelte';
 
 	/** 8단계 미리보기 · 제출 — 샵 상세페이지 순서대로 요약하고, 섹션마다 [수정] 으로 그 단계에 간다.
+	 *  수정 모드(4-2)는 "수정 내용 확인" — 바꾼 섹션에 "변경됨" · 안내 문구가 "판매는 계속돼요"(시안 isEdit · product-edit MODE_COPY).
 	 *  모바일: 카드 하나 안에 섹션 목록 · 아래 안내 / PC(lg~): 왼쪽 카드(사진 · 이름 · 가격 · 노트) · 오른쪽 섹션 목록 + 안내 */
-	let { ed, onedit }: { ed: ProductDraft; onedit: (step: number) => void } = $props();
+	let { ed, onedit, mode = 'new', changed = null }: { ed: ProductDraft; onedit: (step: number) => void; mode?: EditorMode; changed?: Record<SectionKey, boolean> | null } = $props();
+	const copy = $derived(MODE_COPY[mode]);
 	/** 로그인한 크리에이터 — 미리보기에 실제 활동명 · 핸들 · 아바타 색 */
 	const me = $derived(page.data.me as Me);
 
@@ -24,7 +27,7 @@
 			<div class="flex items-center gap-2.5 rounded-[14px] border border-white/7 bg-white/3 px-3.5 py-3">
 				<CheckDot on={sec.filled} size={20} />
 				<span class="min-w-0 flex-1">
-					<span class="block text-[13px] font-bold {sec.filled ? 'text-fg' : 'text-white/60'}">{sec.name}</span>
+					<span class="flex items-center gap-1.5 text-[13px] font-bold {sec.filled ? 'text-fg' : 'text-white/60'}">{sec.name}{#if changed?.[sec.key]}<span class="rounded-[5px] bg-accent/16 px-1.5 py-0.5 text-[10px] font-extrabold text-accent">변경됨</span>{/if}</span>
 					<span class="block truncate text-[12px] text-white/50">{sec.summary}</span>
 				</span>
 				<button type="button" onclick={() => onedit(sec.step)} class="shrink-0 p-1.5 text-[12px] font-bold text-accent">수정</button>
@@ -35,11 +38,11 @@
 
 {#snippet notice(cls: string)}
 	<div class="rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 text-[13px] leading-[1.55] text-white/65 {cls}">
-		제출하면 MYR 운영팀이 표시·광고 문구를 검토해요. 보통 영업일 1~2일 안에 승인되고, 수정이 필요하면 알림으로 알려드려요.
+		{copy.step8Notice}
 	</div>
 {/snippet}
 
-<StepHead n={8} name="미리보기 · 제출" title={'팔로워에게\n이렇게 보여요'} desc="샵 상세페이지 순서 그대로예요. 비어 있는 섹션은 샵에서 숨겨져요." />
+<StepHead n={8} name={copy.step8Name} title={copy.step8Title} desc={copy.step8Desc} />
 
 <div class="mt-[18px] lg:mt-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
 	<div class="overflow-hidden rounded-3xl border border-white/8 bg-white/2">

@@ -97,13 +97,16 @@ export function saveFailure(code: string, field?: string | null): { message: str
 	return { message: '저장하지 못했어요. 잠시 후 다시 시도해주세요' };
 }
 
-/** 에디터로 열 수 있는 상태(4-1) — 임시저장 · 반려. 판매 중 수정은 4-2(수정 심사) */
+/** 에디터로 바로 고치는 상태(4-1) — 임시저장 · 반려 */
 export const isEditableStatus = (s: ProductStatus) => s === 'draft' || s === 'rejected';
+/** 수정 심사로 고치는 상태(4-2) — 판매 중 · 일시중지(샵은 승인 전까지 지금 내용) */
+export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'paused';
 
 export type ProductMenuItem = { kind: 'edit' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
-/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만 */
-export function productMenu(s: ProductStatus): ProductMenuItem[] {
+/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠진다 */
+export function productMenu(s: ProductStatus, revisionPending = false): ProductMenuItem[] {
+	const revise: ProductMenuItem[] = revisionPending ? [] : [{ kind: 'edit', label: '내용 수정' }];
 	const end: ProductMenuItem = { kind: 'end', label: '판매 종료', danger: true, confirm: '판매를 종료하면 샵에서 내려가고 다시 열 수 없어요. 종료할까요?' };
 	switch (s) {
 		case 'draft':
@@ -111,9 +114,9 @@ export function productMenu(s: ProductStatus): ProductMenuItem[] {
 		case 'rejected':
 			return [{ kind: 'edit', label: '고쳐서 다시 심사 요청' }];
 		case 'live':
-			return [{ kind: 'pause', label: '일시중지' }, end];
+			return [...revise, { kind: 'pause', label: '일시중지' }, end];
 		case 'paused':
-			return [{ kind: 'resume', label: '다시 판매' }, end];
+			return [...revise, { kind: 'resume', label: '다시 판매' }, end];
 		default:
 			return [];
 	}

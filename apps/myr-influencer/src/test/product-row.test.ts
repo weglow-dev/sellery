@@ -63,3 +63,12 @@ describe('탭 · 재고 표시 · 홈 카운트', () => {
 		expect(homeProductCounts([])).toEqual({ live: 0, pending: 0 });
 	});
 });
+
+describe('수정 심사 중(4-2) — 탭 · 홈 카운트', () => {
+	it('수정 심사 중인 판매 중 상품은 판매 중 · 심사 중 탭 둘 다 · 홈 심사 수에 포함', () => {
+		const p = { ...productFromRow(row({ id: 'r1', status: 'listed' }), NOW), revision: { meta: '방금 수정 요청' } };
+		expect(filterProducts([p], 'live')).toHaveLength(1);
+		expect(filterProducts([p], 'review')).toHaveLength(1);
+		expect(homeProductCounts([p])).toEqual({ live: 1, pending: 1 });
+	});
+});
