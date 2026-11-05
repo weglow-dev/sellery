@@ -241,8 +241,6 @@ export function nextLabel(step: number, ed: ProductDraft): string {
 	return '다음';
 }
 
-export const STEP_NAMES = ['기본 정보', '레시피 노트', '왜 만들었나요', '성분', '섭취법', '제품 정보', 'FAQ', '미리보기'];
-
 /** 에디터 헤더 아래 한 줄 — "제품명 · ₩가격 · 카테고리" (비면 "새 상품 등록") · 카테고리는 MYR 6개(@sellery/myr-core/categories) */
 export function editorTrail(ed: ProductDraft): string {
 	const price = parsePrice(ed.price);

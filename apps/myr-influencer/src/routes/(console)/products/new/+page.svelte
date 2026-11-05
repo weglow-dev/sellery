@@ -5,7 +5,7 @@
 	import { goBack } from '$lib/nav';
 	import { detailToDraft, draftToPayload, saveFailure } from '$lib/product-draft';
 	import { MODE_COPY, anyChanged, changedSections, primaryEnabled, primaryLabel, type EditorMode } from '$lib/product-edit';
-	import { EDITOR_STEPS, STEP_NAMES, blankDraft, editorTrail, stepValid } from '$lib/rules';
+	import { EDITOR_STEPS, blankDraft, editorTrail, stepValid } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import BottomBar from '$lib/components/BottomBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -48,7 +48,6 @@
 	const label = $derived(primaryLabel(mode, step, ed, isChanged));
 	const enabled = $derived(primaryEnabled(mode, step, valid, isChanged));
 	const trail = $derived(copy.trailPrefix + editorTrail(ed));
-	const stepName = (n: number) => (n === EDITOR_STEPS ? copy.exampleStep8 : STEP_NAMES[n - 1]);
 	const segments = Array.from({ length: EDITOR_STEPS }, (_, i) => i);
 
 	// 단계가 바뀌면 입력 영역을 맨 위로 — 모바일·PC 모두 이 화면의 입력 스크롤 영역
@@ -211,10 +210,7 @@
 		<aside class="hidden min-h-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0d0e12] lg:flex" aria-label="완성된 상세페이지 예시">
 			<div class="flex shrink-0 items-center gap-3 border-b border-white/6 px-6 py-[18px]">
 				<span class="rounded-lg bg-accent/14 px-2.5 py-1.5 text-[12px] font-extrabold tracking-[0.06em] text-accent">예시</span>
-				<div class="min-w-0 flex-1">
-					<p class="text-[16px] font-extrabold">완성된 상세페이지</p>
-					{#if copy.examplePrefix}<p class="mt-[3px] text-[13px] text-white/55">{copy.examplePrefix} · <b class="font-bold text-accent">{stepName(step)}</b></p>{/if}
-				</div>
+				<p class="min-w-0 flex-1 text-[16px] font-extrabold">완성된 상세페이지</p>
 				<span class="shrink-0 text-[12px] text-white/40">소이 클린의 샵</span>
 			</div>
 			<ExampleBody {step} class="pb-10" />
@@ -224,6 +220,6 @@
 	<BottomBar>{@render buttons('w-[104px]')}</BottomBar>
 
 	{#if exOpen}
-		<ExampleSheet {step} prefix={copy.examplePrefix} stepName={stepName(step)} onclose={() => (exOpen = false)} />
+		<ExampleSheet {step} onclose={() => (exOpen = false)} />
 	{/if}
 </div>
