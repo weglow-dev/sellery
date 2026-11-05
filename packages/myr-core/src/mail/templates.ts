@@ -9,6 +9,7 @@
  * | 환불 완료 | orderRefundedMail | 고객 | 주문 화면 |
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
  * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰>(버튼 "가입하기") |
+ * | 비밀번호 재설정 | passwordResetMail | 크리에이터 로그인 이메일 | 콘솔 /auth/confirm?token_hash=…&type=recovery |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
  */
 import { won } from '../constants';
@@ -279,4 +280,22 @@ export function creatorInviteMail(inv: MailInvite): MailTemplate {
 		]
 	};
 	return finish(doc, '[MYR] 크리에이터 스튜디오 초대장이 도착했어요', mailIdempotencyKey('myr_creator_invite', inv.inviteId), 'myr_creator_invite');
+}
+
+/* ---------------- 크리에이터 비밀번호 재설정 (2026-11-05 · Supabase 기본 메일 대신) ---------------- */
+/** link = 콘솔 /auth/confirm(token_hash · 1회용 · Supabase 링크 만료 설정 — 기본 1시간). 멱등 키 = 토큰(요청마다 새 메일) */
+export type MailPasswordReset = { name: string; email: string; link: string; tokenHash: string };
+export function passwordResetMail(r: MailPasswordReset): MailTemplate {
+	const doc: MailDoc = {
+		title: '비밀번호를 새로 정해주세요',
+		preheader: 'MYR 크리에이터 스튜디오 비밀번호 재설정 링크예요',
+		intro: `${r.name}님, MYR 크리에이터 스튜디오 비밀번호 재설정을 요청하셨어요. 아래 버튼을 눌러 새 비밀번호를 정해주세요.`,
+		rows: [{ label: '계정', value: r.email }],
+		button: { label: '새 비밀번호 정하기', url: r.link },
+		notes: [
+			'링크는 한 번만 쓸 수 있고, 1시간이 지나면 열리지 않아요. 그때는 로그인 화면의 "비밀번호를 잊으셨나요?"로 다시 받아주세요.',
+			'요청하지 않았다면 이 메일은 무시해도 괜찮아요. 비밀번호는 바뀌지 않아요.'
+		]
+	};
+	return finish(doc, '[MYR] 크리에이터 스튜디오 비밀번호 재설정', mailIdempotencyKey('myr_password_reset', r.tokenHash.slice(0, 40)), 'myr_password_reset');
 }
