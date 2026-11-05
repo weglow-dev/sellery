@@ -12,3 +12,10 @@ export async function listSellerProducts(sellerId: string): Promise<SellerProduc
 	if (error) throw new Error(`myr_app_seller_products failed: ${error.message}`);
 	return parseSellerProductRows(data);
 }
+
+/** 로그인 계정으로 바로 조회(0072) — 콘솔이 크리에이터 게이트와 **동시에** 보내 DB 왕복 대기를 1번 줄인다. 게이트가 통과해야 결과를 쓴다(호출자 책임) */
+export async function listSellerProductsOfUser(userId: string): Promise<SellerProductRow[]> {
+	const { data, error } = await admin().rpc('myr_app_seller_products_of_user', { p_user: userId });
+	if (error) throw new Error(`myr_app_seller_products_of_user failed: ${error.message}`);
+	return parseSellerProductRows(data);
+}
