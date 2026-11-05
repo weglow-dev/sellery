@@ -101,8 +101,9 @@ export function seedCs(): CsRequest[] {
 
 /* ---------- 내 제품 · 상품 등록 ---------- */
 
-/** live 판매 중 · review 심사 중(운영팀 검수 대기) · draft 임시저장 · ended 판매 종료 */
-export type ProductStatus = 'live' | 'review' | 'draft' | 'ended';
+/** live 판매 중 · paused 일시중지 · review 심사 중(운영팀 검수 대기) · rejected 반려 · draft 임시저장 · ended 판매 종료
+ *  DB(0071 myr_products.status)와의 대응은 lib/product-row.ts STATUS_FROM_DB */
+export type ProductStatus = 'live' | 'paused' | 'review' | 'rejected' | 'draft' | 'ended';
 
 export type Ingredient = { name: string; why: string; amount: string };
 export type HowtoStep = { title: string; desc: string };
@@ -134,6 +135,12 @@ export type Product = {
 	status: ProductStatus;
 	tile: TileKey;
 	thumbUrl?: string | null;
+	/** DB 상품의 비주얼 — 타일 배경(CSS gradient) · 제형 아이콘 id. 있으면 tile 키 대신 이 값으로 그린다(샵과 같은 그림) */
+	bg?: string | null;
+	iconId?: string;
+	/** 샵 주소 /p/<code> */
+	code?: string;
+	rejectReason?: string | null;
 	sold: number;
 	/** 상태 옆 보조 문구("2주 전 승인" · "심사 1일차") */
 	meta: string;

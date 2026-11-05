@@ -255,10 +255,11 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 규칙은 순수 `lib/signup-rules.ts`(오류 문구 · 남은 칸 수 · 유효기간 KST 표시 · vitest) · 입력 스타일 `lib/auth-ui.ts` · 문구 `lib/auth-copy.ts` · 컴포넌트 `lib/components/auth/` · 비밀번호 찾기 · 새 비밀번호 · 연결 없음 · 정지 화면도 같은 톤(`AuthShell`)
     - 목 상태였던 부분(`demo` 토큰 · 가입 저장 · 핸들 목 목록 · 새 초대 요청)은 **10번에서 실제로 바뀜** — `/invite/demo` 는 없어졌다
     - **출시 전 교체**: PC 로그인 패널 숫자(90% · 1~2일 · 매월 10일)와 후기는 시안 문구(정책 미확정 · 실제 인용 아님) — §9-16
-- **3. 내 제품 읽기**
-    - 새 마이그레이션 `myr_app_seller_products(seller)` + `draft` 상태 추가
-    - `/products` 서버 load → 목 products 를 서버 값으로 · 상태 매핑 순수 함수(임시저장 · 심사 중 · 판매 중 · 일시중지 · 반려)
-    - 재고는 **읽기 전용**(창고 기준 · 이벗 재고 연동 전에는 운영팀 입력값)
+- **3. 내 제품 읽기 — 완료(2026-11-05 · 0071)**
+    - **0071** `myr_products.status` 에 `draft`(임시저장) · `ended`(판매 종료) 추가 → draft · pending · listed · paused · rejected · ended(샵 공개 RPC · 체크아웃은 원래 listed 만이라 영향 없음) · RPC `myr_app_seller_products(seller)`(내 상품만 · 삭제 제외 · 최근 수정순 · 남은 재고 `stock_left = stock − sold_qty` · 마진율 · 검수자 없음 · service role 만 · pgTAP 14)
+    - 공용 `@sellery/myr-core/seller-products`(행 파서) · `server/seller-products`(`listSellerProducts`) · 콘솔 순수 `lib/product-row.ts`(상태 대응 listed→판매 중 · paused→일시중지 · pending→심사 중 · rejected→반려 · draft→임시저장 · ended→종료 · 보조 문구 "2주 전 승인" · "심사 3일차" · "어제 저장" · "사유 · …" · 샵과 같은 비주얼 — `Tile` 이 DB 그라데이션 · 아이콘을 그린다 · 아이콘 8개 샵에서 복사)
+    - `/products` 서버 load(requireSeller → 세션의 크리에이터) · 탭 전체 · 판매 중(일시중지 포함) · 심사 중(반려 포함) · 임시저장 · 종료 · 재고는 판매 중 · 일시중지만 읽기 전용 · 상품이 없으면 "아직 등록한 제품이 없어요" + 첫 제품 등록 · 홈 "판매 중 제품 N · N개 심사 · 임시저장" 도 서버 값(나머지 지표는 8번까지 목)
+    - 남은 것: 상품 등록 에디터(임시저장 · 제출)는 4번 전까지 목 — 저장해도 목록에 안 나온다 · 콘솔 서버 렌더링(`(console)/+layout.ts ssr=false`)은 CS · 에디터가 목 상태를 쓰는 동안 그대로(목 상태가 요청 사이에 섞이지 않게) · 내 제품 · 홈은 서버 load 라 탭 이동 때 요청 1번
 - **4. 상품 등록 쓰기**
     - `myr_app_seller_save_product(seller, code?, payload, submit)` — 임시저장 = draft · 제출 = pending · rejected → pending 재제출 · `myr_app_seller_set_status`(listed ↔ paused)
     - ProductDraft → `myr_products` 매핑 순수 모듈(+vitest: info 표 5줄 ↔ form/pack/unit · ingredient_rows → ingredients)

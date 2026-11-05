@@ -131,19 +131,31 @@ export function timelineRows(c: CsRequest) {
 
 export const PRODUCT_STATUS_META: Record<ProductStatus, { label: string; cls: string }> = {
 	live: { label: '판매 중', cls: 'bg-mint/16 text-mint' },
+	paused: { label: '일시중지', cls: 'bg-white/10 text-white/75' },
 	review: { label: '심사 중', cls: 'bg-accent/16 text-accent' },
+	rejected: { label: '반려', cls: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' },
 	draft: { label: '임시저장', cls: 'bg-white/8 text-white/75' },
 	ended: { label: '종료', cls: 'bg-white/6 text-white/45' }
 };
 
-export type ProductTab = 'all' | 'live' | 'review' | 'draft';
+/** 탭 — 시안의 판매 중 · 심사 중 · 임시저장 · 종료. 일시중지는 "판매 중"(다시 켤 수 있다), 반려는 "심사 중"(고쳐서 다시 제출)에 함께 둔다(2026-11-05) */
+export type ProductTab = 'all' | 'live' | 'review' | 'draft' | 'ended';
 export const PRODUCT_TABS: { id: ProductTab; name: string }[] = [
 	{ id: 'all', name: '전체' },
 	{ id: 'live', name: '판매 중' },
 	{ id: 'review', name: '심사 중' },
-	{ id: 'draft', name: '임시저장' }
+	{ id: 'draft', name: '임시저장' },
+	{ id: 'ended', name: '종료' }
 ];
-export const filterProducts = (list: Product[], tab: ProductTab) => (tab === 'all' ? list : list.filter((p) => p.status === tab));
+const PRODUCT_TAB_STATUSES: Record<Exclude<ProductTab, 'all'>, ProductStatus[]> = {
+	live: ['live', 'paused'],
+	review: ['review', 'rejected'],
+	draft: ['draft'],
+	ended: ['ended']
+};
+export const filterProducts = (list: Product[], tab: ProductTab) => (tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status)));
+/** 재고를 보여줄 상태 — 샵에서 팔리는 중이거나 잠깐 멈춘 것만(나머지는 "—") */
+export const showsStock = (s: ProductStatus) => s === 'live' || s === 'paused';
 export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
 
 /** 홈 "이번 달 정산 예정"(목) — 디자인 계산 그대로: 판매 중 제품의 누적 매출 × 0.62. 실적 RPC 를 붙이면 서버 값으로 바뀐다 */
@@ -255,4 +267,12 @@ export function imageHelp(count: number): string {
 	if (count > 1) return '첫 번째가 대표 이미지예요. 사진을 탭하면 대표로 바뀌고, 나머지는 샵에서 옆으로 넘겨볼 수 있어요.';
 	if (count === 1) return `사진을 더 올리면 샵에서 옆으로 넘겨볼 수 있어요. (최대 ${MAX_IMAGES}장)`;
 	return '정사각형 또는 16:10 이미지를 권장해요. 여러 장 올릴 수 있고, 첫 번째가 대표 이미지예요.';
+}
+
+/** 홈 "판매 중 제품" 카드 — 판매 중 수 · 심사 중(반려 포함) + 임시저장 수 */
+export function homeProductCounts(list: Product[]): { live: number; pending: number } {
+	return {
+		live: list.filter((p) => p.status === 'live').length,
+		pending: list.filter((p) => p.status === 'review' || p.status === 'rejected' || p.status === 'draft').length
+	};
 }

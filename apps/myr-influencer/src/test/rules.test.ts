@@ -94,9 +94,9 @@ describe('처리 결과 반영 · 타임라인', () => {
 });
 
 describe('내 제품 탭', () => {
-	it('전체 · 판매 중 · 심사 중 · 임시저장 (종료는 전체에만)', () => {
+	it('전체 · 판매 중 · 심사 중 · 임시저장 · 종료 (2026-11-05 종료 탭 추가 · 상태 대응은 product-row.test)', () => {
 		const ps = seedProducts();
-		expect(productTabCounts(ps).map((t) => t.count)).toEqual([5, 2, 1, 1]);
+		expect(productTabCounts(ps).map((t) => t.count)).toEqual([5, 2, 1, 1, 1]);
 		expect(filterProducts(ps, 'live').map((p) => p.id)).toEqual(['p1', 'p7']);
 	});
 });
