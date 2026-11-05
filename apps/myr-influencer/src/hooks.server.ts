@@ -34,7 +34,9 @@ const supabase: Handle = async ({ event, resolve }) => {
 				})
 			: null;
 	// createServerClient 와 getUser() 사이에 다른 코드를 두지 않는다 — safeGetSession 이 그 자리.
-	// 요청당 한 번만 Supabase Auth 에 묻는다(gate · 콘솔 게이트 · 페이지 load 가 같은 결과를 쓴다 — 매번 묻던 것이 화면 이동을 늦췄다 2026-11-04)
+	// 요청당 한 번만 Supabase Auth 에 묻는다(gate · 콘솔 게이트 · 페이지 load 가 같은 결과를 쓴다 — 2026-11-04).
+	// getUser(Auth 서버 확인)를 유지한다 — getClaims(공개키로 서버 안 검증)는 왕복 1번을 아끼지만, 다른 기기에서 로그아웃 · 비밀번호 재설정한 세션이
+	// 토큰 만료(기본 1시간)까지 통과한다. 함수가 서울(icn1)이라 Auth 왕복은 수 ms — 그 차이 때문에 로그아웃 즉시 반영을 포기하지 않는다(2026-11-05 대표 결정).
 	let sessionOnce: ReturnType<App.Locals['safeGetSession']> | undefined;
 	event.locals.safeGetSession = () =>
 		(sessionOnce ??= (async () => {

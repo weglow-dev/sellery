@@ -1,10 +1,13 @@
--- pgTAP — 0071 내 제품 읽기: 권한 · 새 상태(draft · ended) · 내 상품만 · 삭제 제외 · 남은 재고 · 정렬 · 샵 공개 RPC 에 안 나옴 (docs/myr.md §4.2.1 3번)
+-- pgTAP — 0071 · 0072 내 제품 읽기: 권한 · 새 상태(draft · ended) · 내 상품만 · 삭제 제외 · 남은 재고 · 정렬 · 샵 공개 RPC 에 안 나옴 (docs/myr.md §4.2.1 3번)
 begin;
-select plan(14);
+select plan(19);
 
 select function_privs_are('public', 'myr_app_seller_products', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 seller_products 실행 불가');
 select function_privs_are('public', 'myr_app_seller_products', '{uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 seller_products 실행 불가');
 select function_privs_are('public', 'myr_app_seller_products', '{uuid}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 seller_products 실행 가능');
+
+select function_privs_are('public', 'myr_app_seller_products_of_user', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 seller_products_of_user 실행 불가');
+select function_privs_are('public', 'myr_app_seller_products_of_user', '{uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 seller_products_of_user 실행 불가');
 
 -- 픽스처: 크리에이터 2명 · 내 상품 5개(상태별 + 삭제 1) · 남의 상품 1개
 insert into public.sellers (id, name, handle, platform, active)
@@ -40,6 +43,15 @@ select ok(not exists (select 1 from jsonb_array_elements(public.myr_app_seller_p
 
 -- 샵 공개 RPC 는 draft · ended 를 보여주지 않는다(listed 만)
 select ok(not exists (select 1 from jsonb_array_elements(public.myr_home_products()) e where e ->> 'code' in ('pgtap-sp-draft', 'pgtap-sp-ended', 'pgtap-sp-rejected')), '샵 홈에 임시저장 · 종료 · 반려 없음');
+
+-- 0072 계정으로 조회 — 연결된 크리에이터의 0071 결과와 같다 · 연결 없으면 빈 배열
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-4000-8000-000000000c81', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-sp1@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+       ('00000000-0000-4000-8000-000000000c82', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-sp-none@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
+update public.sellers set user_id = '00000000-0000-4000-8000-000000000c81' where id = '00000000-0000-4000-8000-000000000a81';
+select is(public.myr_app_seller_products_of_user('00000000-0000-4000-8000-000000000c81'), public.myr_app_seller_products('00000000-0000-4000-8000-000000000a81'), '계정으로 조회 = 연결된 크리에이터 조회(행 모양 · 순서 같음)');
+select is(jsonb_array_length(public.myr_app_seller_products_of_user('00000000-0000-4000-8000-000000000c81')), 4, '내 상품 4개(삭제 제외)');
+select is(public.myr_app_seller_products_of_user('00000000-0000-4000-8000-000000000c82'), '[]'::jsonb, '크리에이터가 아닌 계정은 빈 배열');
 
 select * from finish();
 rollback;
