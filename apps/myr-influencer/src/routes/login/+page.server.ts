@@ -52,7 +52,7 @@ export const actions: Actions = {
 			return fail(400, { action: 'forgot' as const, email, remember: fd.get('remember') === '1', field: 'email' as const, message: '먼저 가입한 이메일을 입력해주세요' });
 		}
 		if (!locals.supabase) return fail(503, { action: 'forgot' as const, email, remember: true, field: null, message: '로그인 서버 설정이 아직 안 됐어요' });
-		await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress(), supabase: locals.supabase });
+		await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress() });
 		return { action: 'forgot' as const, sent: true, email, remember: fd.get('remember') === '1' };
 	}
 };

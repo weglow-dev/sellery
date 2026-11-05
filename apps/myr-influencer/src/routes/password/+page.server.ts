@@ -16,7 +16,7 @@ export const actions: Actions = {
 			.toLowerCase();
 		if (!EMAIL_RE.test(email) || email.length > 254) return fail(400, { email, message: '이메일 주소를 확인해주세요' });
 		if (!locals.supabase) return fail(503, { email, message: '로그인 서버 설정이 아직 안 됐어요' });
-		await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress(), supabase: locals.supabase });
+		await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress() });
 		return { sent: true, email };
 	}
 };
