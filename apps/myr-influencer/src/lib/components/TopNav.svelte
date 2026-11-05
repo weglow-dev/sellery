@@ -14,6 +14,8 @@
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 	/** 로그인한 크리에이터 — 오른쪽 끝 이름 · 로그아웃 */
 	const me = $derived(page.data.me as Me | undefined);
+	/** 처리 대기 CS = 교환·환불(목) + 고객 문의 답변 대기(0075) */
+	const csCount = $derived(app.csBadge(page.data.inqWaiting));
 </script>
 
 <header class="z-10 hidden h-[72px] shrink-0 border-b border-white/7 bg-bg/85 backdrop-blur-md lg:block">
@@ -27,16 +29,16 @@
 				{@const on = active(l.href)}
 				<a href={l.href} aria-current={on ? 'page' : undefined} class="relative flex h-[72px] items-center gap-[7px] text-[15px] font-bold transition-colors {on ? 'text-fg' : 'text-white/55 hover:text-fg'}">
 					{l.name}
-					{#if l.href === '/cs' && app.pending.length}
-						<span class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold tabular-nums text-bg" aria-label="처리 대기 {app.pending.length}건">{app.pending.length}</span>
+					{#if l.href === '/cs' && csCount}
+						<span class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold tabular-nums text-bg" aria-label="처리 대기 {csCount}건">{csCount}</span>
 					{/if}
 					<span class="absolute inset-x-0 bottom-0 h-0.5 rounded-[1px] transition-colors {on ? 'bg-accent' : 'bg-transparent'}" aria-hidden="true"></span>
 				</a>
 			{/each}
 		</nav>
-		<a href="/cs" aria-label="알림 · 처리 대기 CS {app.pending.length}건" class="relative ml-auto flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
+		<a href="/cs" aria-label="알림 · 처리 대기 CS {csCount}건" class="relative ml-auto flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
 			<Icon id="bell" size={20} />
-			{#if app.pending.length}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
 		</a>
 		{#if me}
 			<div class="flex items-center gap-3">

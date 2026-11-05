@@ -170,3 +170,12 @@ describe('문의 시트 — 주문 드롭다운은 배송 문의 · 교환·반�
 		expect(csOrderOptions(orders, 'zzz', () => 'D')).toEqual([]);
 	});
 });
+
+describe('크리에이터 답변(0075)', () => {
+	it('answer — 가장 최근 크리에이터 답변 · 없으면 null · 모양이 어긋나면 null', () => {
+		expect(parseCsConversation(convJson)!.answer).toBeNull();
+		const a = { id: 'm9', body: '네 괜찮아요', created_at: '2026-11-05T01:00:00Z' };
+		expect(parseCsConversation({ ...convJson, answer: a })!.answer).toEqual({ id: 'm9', body: '네 괜찮아요', createdAt: '2026-11-05T01:00:00Z' });
+		expect(parseCsConversation({ ...convJson, answer: { body: 'id 없음' } })!.answer).toBeNull();
+	});
+});

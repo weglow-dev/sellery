@@ -84,9 +84,12 @@ export type CsConversation = {
 	messageCount: number;
 	/** 첫 질문(0064 · 200자) — 마이 "내 문의" 제목 */
 	firstBody: string | null;
+	/** 가장 최근 크리에이터 답변(0075 · 운영 대행 포함 · 300자) — 콘솔 "내 답변" · 목록 "↩ 답변" 줄. 답변 전이면 null */
+	answer: CsAnswer | null;
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null; status: string } | null;
 	seller: { id: string; name: string; handle: string } | null;
 };
+export type CsAnswer = { id: string; body: string; createdAt: string };
 export type CsMessage = { id: string; sender: 'customer' | 'seller' | 'admin'; actorRole: string; body: string; createdAt: string };
 export type CsThread = { conversation: CsConversation; messages: CsMessage[] };
 
@@ -100,6 +103,7 @@ export function parseCsConversation(json: unknown): CsConversation | null {
 	const it = ord ? obj(ord.item) : null;
 	const p = obj(o.product);
 	const s = obj(o.seller);
+	const a = obj(o.answer);
 	return {
 		id,
 		code,
@@ -129,6 +133,7 @@ export function parseCsConversation(json: unknown): CsConversation | null {
 		createdAt: str(o.created_at),
 		messageCount: intOr(o.message_count),
 		firstBody: strOrNull(o.first_body),
+		answer: a && strOrNull(a.id) && typeof a.body === 'string' ? { id: str(a.id), body: a.body, createdAt: str(a.created_at) } : null,
 		product: p && strOrNull(p.id) ? { id: str(p.id), code: str(p.code), name: str(p.name), tile: strOrNull(p.tile), icon: str(p.icon, 'pill'), thumbUrl: strOrNull(p.thumb_url), status: str(p.status) } : null,
 		seller: s && strOrNull(s.id) ? { id: str(s.id), name: str(s.name), handle: str(s.handle) } : null
 	};
