@@ -52,9 +52,9 @@
 	 *  Enter 가 재설정 메일을 보내던 문제(2026-11-05)를 막는다. 실제 제출은 로그인 버튼 뒤에 둔 숨은 제출 버튼으로(`?/forgot`). */
 	function onForgot() {
 		if (!EMAIL_RE.test(email.trim())) {
+			// 안내는 이메일 칸 아래(errs.email)에만 — 토스트는 보낸 경우에만(2026-11-05)
 			touched.email = true;
 			attempted = true;
-			showToast('먼저 가입한 이메일을 입력해주세요');
 			return;
 		}
 		formEl?.requestSubmit(forgotSubmit);
@@ -130,7 +130,7 @@
 								return;
 							}
 							await update({ reset: false });
-							if (isForgot && result.type === 'failure') showToast(String(result.data?.message ?? '먼저 가입한 이메일을 입력해주세요'));
+							// 거절(크리에이터가 아닌 이메일 · 정지 · 요청 과다)은 이메일 칸 아래 forgotError 로만 — 토스트 없음
 						};
 					}}
 				>
