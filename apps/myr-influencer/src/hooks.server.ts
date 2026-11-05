@@ -2,7 +2,6 @@ import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createServerClient } from '@supabase/ssr';
-import type { User } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_ANON_KEY, PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { SESSION_ONLY_COOKIE, isPublicPath, loginPath } from '$lib/console-auth';
 import '$lib/server/env';
@@ -35,10 +34,9 @@ const supabase: Handle = async ({ event, resolve }) => {
 				})
 			: null;
 	// createServerClient 와 getUser() 사이에 다른 코드를 두지 않는다 — safeGetSession 이 그 자리.
-	// 요청당 한 번만 확인한다(gate · 콘솔 게이트 · 페이지 load 가 같은 결과를 쓴다 — 2026-11-04).
-	// 확인은 getClaims — 이 프로젝트의 세션 토큰은 비대칭 키(ES256)로 서명돼 공개키(JWKS · 인스턴스 메모리 캐시)로 **서버 안에서** 서명을 검증한다.
-	// 매 요청 Auth 서버에 묻던 getUser 대신이라 탭 이동마다 네트워크 1번이 줄었다(2026-11-05). 쿠키 값만 믿지 않는다 — 서명 · 만료를 검증하고, id 등은 검증된 claims 값으로 덮는다.
-	// 차이: 다른 곳에서 로그아웃한 세션은 토큰이 만료될 때(기본 1시간)까지 통과한다 — 정지 · 연결 해제는 콘솔 게이트(sellers 조회)가 요청마다 막는다.
+	// 요청당 한 번만 Supabase Auth 에 묻는다(gate · 콘솔 게이트 · 페이지 load 가 같은 결과를 쓴다 — 2026-11-04).
+	// getUser(Auth 서버 확인)를 유지한다 — getClaims(공개키로 서버 안 검증)는 왕복 1번을 아끼지만, 다른 기기에서 로그아웃 · 비밀번호 재설정한 세션이
+	// 토큰 만료(기본 1시간)까지 통과한다. 함수가 서울(icn1)이라 Auth 왕복은 수 ms — 그 차이 때문에 로그아웃 즉시 반영을 포기하지 않는다(2026-11-05 대표 결정).
 	let sessionOnce: ReturnType<App.Locals['safeGetSession']> | undefined;
 	event.locals.safeGetSession = () =>
 		(sessionOnce ??= (async () => {
@@ -48,10 +46,11 @@ const supabase: Handle = async ({ event, resolve }) => {
 				data: { session }
 			} = await sb.auth.getSession();
 			if (!session) return { session: null, user: null };
-			const { data, error } = await sb.auth.getClaims(session.access_token);
-			const claims = data?.claims;
-			if (error || !claims?.sub || claims.sub !== session.user?.id) return { session: null, user: null };
-			const user: User = { ...session.user, id: claims.sub, email: claims.email ?? session.user.email, app_metadata: claims.app_metadata ?? {}, user_metadata: claims.user_metadata ?? {} };
+			const {
+				data: { user },
+				error
+			} = await sb.auth.getUser(); // JWT 검증 — 쿠키 값만 믿지 않는다
+			if (error || !user) return { session: null, user: null };
 			return { session, user };
 		})());
 	const response = await resolve(event, {
