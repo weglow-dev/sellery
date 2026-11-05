@@ -66,7 +66,7 @@
 	}
 </script>
 
-<StepHead n={1} name="기본 정보" title={'어떤 제품을\n올릴까요?'} desc="제품명, 가격, 카테고리 — 샵 오른쪽 구매 패널에 보이는 정보예요." where="구매 패널" />
+<StepHead n={1} name="기본 정보" title={'어떤 제품을 올릴까요?'} desc="제품명, 가격, 카테고리 — 샵 오른쪽 구매 패널에 보이는 정보예요." where="구매 패널" />
 
 <div class="mt-4 flex flex-col gap-3.5 lg:mt-5 lg:gap-4">
 	<div class="flex flex-col gap-2">

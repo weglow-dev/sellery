@@ -9,7 +9,7 @@
 
 <p class="text-[13px] font-bold text-accent">{String(n).padStart(2, '0')} · {name}</p>
 <h1 class="mt-2 text-[26px] leading-[1.3] font-extrabold tracking-[-0.025em] lg:text-[30px]">
-	{#each lines as line, i (i)}{#if i}<br class="lg:hidden" /><span class="hidden lg:inline">{' '}</span>{/if}{line}{/each}
+	{#each lines as line, i (i)}{#if i}<span class="hidden lg:inline">{' '}</span>{/if}{line}{/each}
 </h1>
 <p class="mt-2.5 text-[14px] text-white/60 lg:text-[15px]">{desc}</p>
 {#if where}

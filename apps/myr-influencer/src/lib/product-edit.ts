@@ -72,7 +72,7 @@ export const MODE_COPY = {
 	edit: {
 		trailPrefix: '수정 중  ·  ',
 		step8Name: '수정 내용 확인',
-		step8Title: '바꾼 내용을\n확인해 주세요',
+		step8Title: '바꾼 내용을 확인해 주세요',
 		step8Desc: '바꾼 섹션에는 ‘변경됨’이 표시돼요. 섹션 옆 수정을 눌러 고칠 수 있어요.',
 		step8Notice: '수정 심사 중에도 지금 상세페이지로 판매는 계속돼요. 승인되면 샵에 바로 반영돼요',
 		secondary: '취소',
