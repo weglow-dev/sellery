@@ -9,7 +9,7 @@ const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 const H = 3_600_000;
 const D = 24 * H;
 const row = (o: Partial<SellerProductRow> = {}): SellerProductRow => ({
-	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, category: 'diet', price: 32000, optionCount: 0,
+	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 0,
 	stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null,
 	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), revision: null, ...o
 });
@@ -38,8 +38,8 @@ describe('productFromRow · productMeta', () => {
 		expect(productMeta(row({ status: 'pending', submittedAt: ago(2 * D + H) }), NOW)).toBe('심사 3일차');
 		expect(productMeta(row({ status: 'draft', updatedAt: ago(30 * H) }), NOW)).toBe('어제 저장');
 		expect(productMeta(row({ status: 'paused', updatedAt: ago(3 * H) }), NOW)).toBe('3시간 전 일시중지');
-		expect(productMeta(row({ status: 'rejected', rejectReason: '성분 표기 보완' }), NOW)).toBe('사유 · 성분 표기 보완');
-		expect(productMeta(row({ status: 'rejected', rejectReason: null }), NOW)).toBe('반려됨');
+		expect(productMeta(row({ status: 'rejected', rejectReason: '성분 표기 보완', reviewedAt: ago(2 * H) }), NOW)).toBe('오늘 반려 · 1건 수정 필요'); // 의견이 없으면 사유 한 줄 = 1건
+		expect(productMeta(row({ status: 'rejected', rejectReason: null }), NOW)).toBe('2주 전 반려'); // 의견 · 사유가 없으면 건수 없이
 		expect(productMeta(row({ status: 'ended' }), NOW)).toBe('판매 종료');
 	});
 	it('이름이 비면 자리표시', () => expect(productFromRow(row({ name: '' }), NOW).name).toBe('이름 없는 제품'));
@@ -65,14 +65,14 @@ describe('탭 · 재고 표시 · 홈 카운트', () => {
 });
 
 describe('수정 심사(0074 · 4-2) — 칩 문구 · 탭 · 홈 카운트', () => {
-	it('DB 수정본 → 심사 중 "수정 심사 N일차" · 반려 "사유 · …" · 없으면 null', () => {
+	it('DB 수정본 → 심사 중 "수정 심사 N일차" · 반려 "어제 수정 반려 · N건 수정 필요"(시안) · 없으면 null', () => {
 		expect(revisionFromRow(row(), NOW)).toBeNull();
-		expect(revisionFromRow(row({ revision: { status: 'pending', rejectReason: null, submittedAt: ago(D + H), reviewedAt: null } }), NOW)).toEqual({ state: 'review', meta: '수정 심사 2일차' });
-		expect(revisionFromRow(row({ revision: { status: 'rejected', rejectReason: '효능 표현', submittedAt: ago(3 * D), reviewedAt: ago(D) } }), NOW)).toEqual({ state: 'rejected', meta: '사유 · 효능 표현' });
-		expect(productFromRow(row({ revision: { status: 'pending', rejectReason: null, submittedAt: ago(H), reviewedAt: null } }), NOW).revision?.state).toBe('review');
+		expect(revisionFromRow(row({ revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(D + H), reviewedAt: null } }), NOW)).toEqual({ state: 'review', meta: '수정 심사 2일차' });
+		expect(revisionFromRow(row({ revision: { status: 'rejected', rejectReason: '효능 표현', rejectItems: [{ step: 2, msg: '효능 표현' }, { step: 4, msg: '함량' }], submittedAt: ago(3 * D), reviewedAt: ago(D) } }), NOW)).toEqual({ state: 'rejected', meta: '어제 수정 반려 · 2건 수정 필요' });
+		expect(productFromRow(row({ revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(H), reviewedAt: null } }), NOW).revision?.state).toBe('review');
 	});
 	it('수정 심사 중인 판매 중 상품은 판매 중 · 심사 중 탭 둘 다 · 홈 심사 수에 포함', () => {
-		const p = productFromRow(row({ id: 'r1', status: 'listed', revision: { status: 'pending', rejectReason: null, submittedAt: ago(H), reviewedAt: null } }), NOW);
+		const p = productFromRow(row({ id: 'r1', status: 'listed', revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(H), reviewedAt: null } }), NOW);
 		expect(filterProducts([p], 'live')).toHaveLength(1);
 		expect(filterProducts([p], 'review')).toHaveLength(1);
 		expect(homeProductCounts([p])).toEqual({ live: 1, pending: 1 });

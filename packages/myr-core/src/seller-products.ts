@@ -8,12 +8,17 @@ export const SELLER_PRODUCT_STATUSES = ['draft', 'pending', 'listed', 'paused', 
 export type SellerProductStatus = (typeof SELLER_PRODUCT_STATUSES)[number];
 export const isSellerProductStatus = (v: unknown): v is SellerProductStatus => SELLER_PRODUCT_STATUSES.includes(v as SellerProductStatus);
 
+/** 반려 의견(0074 · 섹션별) — step 1~7 = 에디터 단계 · null = 상품 전체 */
+export type RejectItem = { step: number | null; msg: string };
+
 export type SellerProductRow = {
 	id: string;
 	code: string;
 	name: string;
 	status: SellerProductStatus;
 	rejectReason: string | null;
+	/** 상품 반려(status rejected)의 섹션별 의견 — 비면 rejectReason 하나 */
+	rejectItems: RejectItem[];
 	category: string;
 	price: number;
 	optionCount: number;
@@ -35,16 +40,28 @@ export type SellerProductRow = {
 
 /** 수정본 상태(0074) — 목록 · 에디터가 보는 것은 심사 중 · 반려 둘뿐 */
 export type SellerRevisionStatus = 'pending' | 'rejected';
-export type SellerProductRevisionState = { status: SellerRevisionStatus; rejectReason: string | null; submittedAt: string | null; reviewedAt: string | null };
+export type SellerProductRevisionState = { status: SellerRevisionStatus; rejectReason: string | null; rejectItems: RejectItem[]; submittedAt: string | null; reviewedAt: string | null };
 
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 const int = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
 
+/** 반려 의견 — 모양이 어긋난 줄 · 빈 의견은 버리고, 1~7 밖 단계는 전체(null) */
+export function parseRejectItems(v: unknown): RejectItem[] {
+	if (!Array.isArray(v)) return [];
+	const out: RejectItem[] = [];
+	for (const x of v as Record<string, unknown>[]) {
+		if (!x || typeof x !== 'object' || typeof x.msg !== 'string' || !x.msg.trim()) continue;
+		const step = typeof x.step === 'number' && Number.isInteger(x.step) && x.step >= 1 && x.step <= 7 ? x.step : null;
+		out.push({ step, msg: x.msg.trim() });
+	}
+	return out;
+}
+
 function parseRevisionState(v: unknown): SellerProductRevisionState | null {
 	const r = v as Record<string, unknown> | null;
 	if (!r || typeof r !== 'object' || (r.status !== 'pending' && r.status !== 'rejected')) return null;
-	return { status: r.status, rejectReason: strOrNull(r.reject_reason), submittedAt: strOrNull(r.submitted_at), reviewedAt: strOrNull(r.reviewed_at) };
+	return { status: r.status, rejectReason: strOrNull(r.reject_reason), rejectItems: parseRejectItems(r.reject_items), submittedAt: strOrNull(r.submitted_at), reviewedAt: strOrNull(r.reviewed_at) };
 }
 
 /** RPC 응답(jsonb 배열) → 행. 모양이 어긋난 행(id · 상태 없음)은 버린다 */
@@ -59,6 +76,7 @@ export function parseSellerProductRows(data: unknown): SellerProductRow[] {
 			name: str(r.name),
 			status: r.status,
 			rejectReason: strOrNull(r.reject_reason),
+			rejectItems: parseRejectItems(r.reject_items),
 			category: str(r.category),
 			price: int(r.price),
 			optionCount: int(r.option_count),
@@ -103,7 +121,15 @@ export type SellerProductPayload = {
 };
 
 /** 에디터로 다시 여는 상품 1건(0073 myr_app_seller_product) */
-export type SellerProductDetail = SellerProductPayload & { id: string; code: string; status: SellerProductStatus; rejectReason: string | null };
+export type SellerProductDetail = SellerProductPayload & {
+	id: string;
+	code: string;
+	status: SellerProductStatus;
+	rejectReason: string | null;
+	/** 상품 반려 의견(0074) · 검수 시각 — "심사 결과" 화면 · 반려 고치기 */
+	rejectItems: RejectItem[];
+	reviewedAt: string | null;
+};
 
 const arrOf = <T>(v: unknown, f: (x: Record<string, unknown>) => T): T[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object').map((x) => f(x as Record<string, unknown>)) : []);
 const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
@@ -135,20 +161,36 @@ function parsePayload(r: Record<string, unknown>): SellerProductPayload {
 export function parseSellerProductDetail(v: unknown): SellerProductDetail | null {
 	const r = v as Record<string, unknown> | null;
 	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !isSellerProductStatus(r.status)) return null;
-	return { id: r.id, code: str(r.code), status: r.status, rejectReason: strOrNull(r.reject_reason), ...parsePayload(r) };
+	return { id: r.id, code: str(r.code), status: r.status, rejectReason: strOrNull(r.reject_reason), rejectItems: parseRejectItems(r.reject_items), reviewedAt: strOrNull(r.reviewed_at), ...parsePayload(r) };
 }
 
 /* ---------------- 판매 중 상품 수정 심사(0074 · 4-2) ---------------- */
 
 /** 에디터가 이어서 고칠 열린 수정본(0074 myr_app_seller_product 의 revision) — 심사 중이면 에디터를 열지 않고, 반려면 이 내용으로 연다 */
-export type SellerProductRevision = { id: string; status: SellerRevisionStatus; rejectReason: string | null; submittedAt: string | null; fields: SellerProductPayload };
+export type SellerProductRevision = {
+	id: string;
+	status: SellerRevisionStatus;
+	rejectReason: string | null;
+	rejectItems: RejectItem[];
+	submittedAt: string | null;
+	reviewedAt: string | null;
+	fields: SellerProductPayload;
+};
 
 export function parseSellerProductRevision(v: unknown): SellerProductRevision | null {
 	const r = v as Record<string, unknown> | null;
 	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || (r.status !== 'pending' && r.status !== 'rejected')) return null;
 	const f = r.fields;
 	if (!f || typeof f !== 'object') return null;
-	return { id: r.id, status: r.status, rejectReason: strOrNull(r.reject_reason), submittedAt: strOrNull(r.submitted_at), fields: parsePayload(f as Record<string, unknown>) };
+	return {
+		id: r.id,
+		status: r.status,
+		rejectReason: strOrNull(r.reject_reason),
+		rejectItems: parseRejectItems(r.reject_items),
+		submittedAt: strOrNull(r.submitted_at),
+		reviewedAt: strOrNull(r.reviewed_at),
+		fields: parsePayload(f as Record<string, unknown>)
+	};
 }
 
 /** 수정 심사 요청 거절 코드(0074) */

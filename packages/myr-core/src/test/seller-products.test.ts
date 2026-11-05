@@ -1,6 +1,6 @@
 // 내 제품 행 파서 — 0071 myr_app_seller_products 응답
 import { describe, expect, it } from 'vitest';
-import { SELLER_PRODUCT_STATUSES, parseSellerProductRevision, parseSellerProductRows } from '../seller-products';
+import { SELLER_PRODUCT_STATUSES, parseRejectItems, parseSellerProductRevision, parseSellerProductRows } from '../seller-products';
 
 const row = (o: Record<string, unknown> = {}) => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', reject_reason: null, category: 'diet', price: 32000, option_count: 2,
@@ -11,7 +11,7 @@ const row = (o: Record<string, unknown> = {}) => ({
 describe('parseSellerProductRows', () => {
 	it('필드 이름을 화면 쪽 이름으로', () => {
 		expect(parseSellerProductRows([row()])).toEqual([
-			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null }
+			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null }
 		]);
 	});
 	it('여섯 상태 모두 받는다 · 모르는 상태 · id 없는 행은 버린다', () => {
@@ -44,7 +44,7 @@ describe('수정 심사(0074) — 목록 행 · 열린 수정본', () => {
 			row({ id: 'c', revision: { status: 'approved' } }),
 			row({ id: 'd' })
 		]);
-		expect(a.revision).toEqual({ status: 'pending', rejectReason: null, submittedAt: '2026-11-05T00:00:00Z', reviewedAt: null });
+		expect(a.revision).toEqual({ status: 'pending', rejectReason: null, rejectItems: [], submittedAt: '2026-11-05T00:00:00Z', reviewedAt: null });
 		expect(b.revision?.rejectReason).toBe('효능 표현');
 		expect([c.revision, d.revision]).toEqual([null, null]);
 	});
@@ -53,5 +53,21 @@ describe('수정 심사(0074) — 목록 행 · 열린 수정본', () => {
 		expect(r?.fields).toMatchObject({ name: '포도 젤리', price: 33000, category: 'diet', image_urls: ['u1'], faq: [{ q: 'Q', a: 'A' }], note: '', icon: 'pill' });
 		expect(r?.rejectReason).toBe('사진 교체');
 		for (const bad of [null, { id: 'r1', status: 'approved', fields: {} }, { id: 'r1', status: 'pending' }, { status: 'pending', fields: {} }]) expect(parseSellerProductRevision(bad)).toBeNull();
+	});
+});
+
+describe('반려 의견(0074 · 섹션별)', () => {
+	it('단계 1~7 은 그대로 · 밖이면 전체(null) · 빈 의견 · 모양 틀린 줄은 버린다', () => {
+		expect(parseRejectItems([{ step: 2, msg: ' 효능 표현 ' }, { step: 9, msg: '전체' }, { step: 4, msg: '  ' }, { step: '4', msg: '문자' }, null, 'x'])).toEqual([
+			{ step: 2, msg: '효능 표현' },
+			{ step: null, msg: '전체' },
+			{ step: null, msg: '문자' }
+		]);
+		for (const v of [null, {}, 'x']) expect(parseRejectItems(v)).toEqual([]);
+	});
+	it('행 · 수정본 모두 reject_items 를 읽는다', () => {
+		const [r] = parseSellerProductRows([row({ status: 'rejected', reject_reason: '요약', reject_items: [{ step: 2, msg: '노트' }] })]);
+		expect(r.rejectItems).toEqual([{ step: 2, msg: '노트' }]);
+		expect(parseSellerProductRevision({ id: 'r', status: 'rejected', reject_items: [{ step: 4, msg: '함량' }], fields: {} })?.rejectItems).toEqual([{ step: 4, msg: '함량' }]);
 	});
 });

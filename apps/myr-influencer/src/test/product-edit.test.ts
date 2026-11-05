@@ -29,7 +29,7 @@ describe('changedSections', () => {
 
 describe('운영팀 상품(콘솔 색 밖 비주얼)', () => {
 	it('열자마자는 바뀐 게 없다 · 색을 고르면 basics 만 바뀜', () => {
-		const d = { id: 'p1', code: 'jun', status: 'listed' as const, rejectReason: null, name: '멀티', price: 30000, unit: '30정', category: 'mens', tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill',
+		const d = { id: 'p1', code: 'jun', status: 'listed' as const, rejectReason: null, rejectItems: [], reviewedAt: null, name: '멀티', price: 30000, unit: '30정', category: 'mens', tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill',
 			image_urls: [], chips: [], note: '노트', story_title: '', story: '', ingredient_rows: [], howto_steps: [], faq: [], form: '', pack: '', shelf_life: '', storage_method: '' };
 		const orig = detailToDraft(d);
 		expect(anyChanged(changedSections(detailToDraft(d), orig))).toBe(false);
@@ -51,6 +51,22 @@ describe('버튼', () => {
 		expect(primaryEnabled('edit', 8, true, true)).toBe(true);
 		expect(primaryEnabled('edit', 2, true, false)).toBe(true);
 		expect(primaryEnabled('new', 8, true, false)).toBe(true);
+	});
+	it('반려 고치기 — "수정 필요 N곳 남았어요" 가 0 이고 바꾼 게 있어야 "다시 심사 요청하기"(시안 isFix)', () => {
+		expect(primaryLabel('fix', 3, base(), false, 2)).toBe('수정 완료');
+		expect(primaryLabel('fix', 8, base(), true, 2)).toBe('수정 필요 2곳 남았어요');
+		expect(primaryEnabled('fix', 8, true, true, 2)).toBe(false);
+		expect(primaryLabel('fix', 8, base(), true, 0)).toBe('다시 심사 요청하기');
+		expect(primaryEnabled('fix', 8, true, true, 0)).toBe(true);
+		// 섹션 의견이 없던 반려(사유 한 줄)도 바꾼 게 있어야
+		expect([primaryLabel('fix', 8, base(), false, 0), primaryEnabled('fix', 8, true, false, 0)]).toEqual(['변경된 내용이 없어요', false]);
+	});
+	it('고치기 문구 — 상품 반려는 MYR Shop 오픈 · 수정 반려는 판매 계속 · 샵에 반영', () => {
+		expect(MODE_COPY.fix.trailPrefix).toBe('반려 수정 중  ·  ');
+		expect(MODE_COPY.fix.doneSteps[2].title).toBe('MYR Shop 오픈');
+		expect(MODE_COPY.fixRev.doneSteps[2].title).toBe('샵에 반영');
+		expect(MODE_COPY.fixRev.step8Notice).toContain('판매가 계속');
+		expect([MODE_COPY.fix.secondary, MODE_COPY.fixRev.secondary]).toEqual(['취소', '취소']);
 	});
 	it('모드 문구 — 수정은 취소 · 수정 중 · 샵에 반영', () => {
 		expect(MODE_COPY.edit.secondary).toBe('취소');

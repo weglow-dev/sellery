@@ -1,14 +1,14 @@
 -- pgTAP — 0074 판매 중 상품 수정 심사: 권한 · 요청 대상 · 필수 칸 · 바뀐 게 없음 · 대기 1건 · 이미지(내 폴더 · 이미 붙은 것) · 샵은 승인 전까지 그대로 ·
 --         반려(사유) → 다시 요청 · 승인 반영(상태 유지) · 판매 종료 때 접힘 · 목록/에디터 응답 · 버려진 이미지 (docs/myr.md §4.2.1 4-2)
 begin;
-select plan(52);
+select plan(64);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_submit_revision', '{uuid,uuid,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 submit_revision 불가');
 select function_privs_are('public', 'myr_app_seller_submit_revision', '{uuid,uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 submit_revision 불가');
 select function_privs_are('public', 'myr_app_seller_submit_revision', '{uuid,uuid,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 submit_revision 가능');
-select function_privs_are('public', 'myr_app_admin_review_revision', '{uuid,text,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 review_revision 불가');
-select function_privs_are('public', 'myr_app_admin_review_revision', '{uuid,text,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 review_revision 불가');
+select function_privs_are('public', 'myr_app_admin_review_revision', '{uuid,text,text,uuid,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 review_revision 불가');
+select function_privs_are('public', 'myr_app_admin_review_revision', '{uuid,text,text,uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 review_revision 불가');
 select function_privs_are('public', 'myr_product_fields', '{uuid,jsonb,boolean,text[]}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_product_fields 불가');
 select function_privs_are('public', 'myr_product_apply_fields', '{uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_product_apply_fields 불가');
 select table_privs_are('public', 'myr_product_revisions', 'anon', '{}'::text[], 'anon 은 수정본 표 접근 불가');
@@ -67,7 +67,7 @@ select is(public.myr_app_admin_review_revision('00000000-0000-4000-8000-00000000
 select is((select jsonb_build_object('name', name, 'status', status, 'reject_reason', reject_reason) from public.myr_products where id = '00000000-0000-4000-8000-000000000d91'),
   '{"name": "포도 젤리", "status": "listed", "reject_reason": null}'::jsonb, '수정 반려 — 상품은 그대로 · 판매 중 · 상품 반려 사유 없음');
 select is((select e -> 'revision' from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000c91')) e where e ->> 'code' = 'pgtap-rev-listed') - 'submitted_at' - 'reviewed_at',
-  '{"status": "rejected", "reject_reason": "효능 표현 수정"}'::jsonb, '내 제품 행 — 반려 수정본 · 사유(공백 정리)');
+  '{"status": "rejected", "reject_reason": "효능 표현 수정", "reject_items": []}'::jsonb, '내 제품 행 — 반려 수정본 · 사유(공백 정리) · 의견 없음');
 create temp table t_rev2 as select public.myr_app_seller_submit_revision('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d91', (select b || '{"name":"포도 젤리 리뉴얼2"}' from t_body)) as r;
 select is((select r ->> 'status' from t_rev2), 'pending', '반려 뒤 다시 요청 → pending');
 select is((select e -> 'revision' ->> 'status' from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000c91')) e where e ->> 'code' = 'pgtap-rev-listed'), 'pending', '가장 최근 수정본 기준 — 다시 pending');
@@ -114,6 +114,27 @@ select is((select array_agg(o order by o) from public.myr_product_image_orphans(
 select is(public.myr_app_admin_review_revision('00000000-0000-4000-8000-000000000d91', 'approve') ->> 'status', 'approved', '사진 교체 승인');
 select is((select array_agg(o order by o) from public.myr_product_image_orphans() o where o like '00000000-0000-4000-8000-000000000c91/%'),
   array['00000000-0000-4000-8000-000000000c91/aaaaaaaa-0001.jpg', '00000000-0000-4000-8000-000000000c91/cccccccc-0004.jpg'], '승인 뒤 — 바뀌기 전 사진이 고아가 된다');
+
+-- ---------- 섹션별 반려 의견 ----------
+select function_privs_are('public', 'myr_reject_items', '{jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_reject_items 불가');
+select is(public.myr_reject_items('[{"step":2,"msg":"  효능   표현 "},{"step":9,"msg":"전체"},{"step":4,"msg":"  "},{"step":"4","msg":"문자 단계"}]'),
+  '[{"step": 2, "msg": "효능 표현"}, {"step": null, "msg": "전체"}, {"step": null, "msg": "문자 단계"}]'::jsonb, '의견 정리 — 공백 · 빈 의견 제외 · 1~7 밖 · 문자 단계는 전체(null)');
+select is(public.myr_app_seller_submit_revision('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d91', (select b || '{"name":"의견 테스트"}' from t_body)) ->> 'status', 'pending', '(의견용) 수정 요청');
+select is(public.myr_app_admin_review_revision('00000000-0000-4000-8000-000000000d91', 'reject', null, null, '[]') ->> 'code', 'REASON_REQUIRED', '사유도 의견도 없으면 REASON_REQUIRED');
+select is(public.myr_app_admin_review_revision('00000000-0000-4000-8000-000000000d91', 'reject', null, null,
+  '[{"step":2,"msg":"효능 표현을 바꿔주세요"},{"step":4,"msg":"함량을 mg 로"}]') ->> 'status', 'rejected', '사유 없이 섹션별 의견만으로 수정 반려');
+select is((select jsonb_build_object('reason', e #>> '{revision,reject_reason}', 'items', e #> '{revision,reject_items}') from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000c91')) e where e ->> 'code' = 'pgtap-rev-listed'),
+  '{"reason": "효능 표현을 바꿔주세요 / 함량을 mg 로", "items": [{"step": 2, "msg": "효능 표현을 바꿔주세요"}, {"step": 4, "msg": "함량을 mg 로"}]}'::jsonb, '목록 — 수정 반려 의견 · 사유는 의견을 이어 붙인 요약');
+select is(public.myr_app_seller_product('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d91') #> '{revision,reject_items,1,step}', '4'::jsonb, '에디터 1건 — 수정본 의견');
+-- 상품 반려 의견 → 다시 심사 요청하면 비움
+insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, note, icon)
+values ('00000000-0000-4000-8000-000000000d96', 'pgtap-rev-new', '00000000-0000-4000-8000-000000000c91', 'diet', '새 상품', 30000, 0, 'pending', '노트', 'pill');
+select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000d96', 'reject', '표시 문구 보완', null, '[{"step":2,"msg":"효능 표현"}]') ->> 'status', 'rejected', '상품 반려 — 사유 + 섹션별 의견');
+select is((select jsonb_build_object('reason', reject_reason, 'items', reject_items) from public.myr_products where id = '00000000-0000-4000-8000-000000000d96'),
+  '{"reason": "표시 문구 보완", "items": [{"step": 2, "msg": "효능 표현"}]}'::jsonb, '상품 반려 — 사유는 준 값 · 의견 저장');
+select is(public.myr_app_seller_product('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d96') #> '{product,reject_items,0,step}', '2'::jsonb, '에디터 1건 — 상품 반려 의견');
+select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d96', '{"name":"새 상품","price":30000,"category":"diet","note":"고친 노트"}', true) ->> 'status', 'pending', '반려 상품 다시 심사 요청');
+select is((select reject_items from public.myr_products where id = '00000000-0000-4000-8000-000000000d96'), '[]'::jsonb, '다시 심사 요청하면 의견을 비운다');
 
 select * from finish();
 rollback;

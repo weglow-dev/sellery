@@ -14,7 +14,8 @@
 	 *  [상품 등록] → 8단계 에디터(0073 저장). 상품을 누르면 메뉴(product-draft productMenu): 임시저장 이어서 작성 · 삭제 / 반려 고쳐서 다시 심사 요청 /
 	 *  판매 중 일시중지 · 판매 종료 / 일시중지 다시 판매 · 판매 종료(종료 · 삭제는 확인). 심사 중 · 종료는 안내만. 재고는 읽기 전용(남은 재고 = 입고 − 판매).
 	 *  모바일은 한 줄 목록, PC(lg~)는 32px 제목 + 2단 카드(누적 판매 수량까지).
-	 *  판매 중 · 일시중지 상품은 "내용 수정" → 수정 심사(0074) — 심사 중이면 "수정 심사 중" 칩(메뉴에서 안내) · 반려면 "수정 반려" 칩 + 사유 · 고쳐서 다시 요청. */
+	 *  판매 중 · 일시중지 상품은 "내용 수정" → 수정 심사(0074) — 심사 중이면 "수정 심사 중" 칩(메뉴에서 안내) · 반려면 "수정 반려" 칩 + "오늘 수정 반려 · N건 수정 필요" · 메뉴 "심사 결과 보기".
+	 *  반려 상품(상품 심사)은 누르면 바로 "심사 결과"([id]/review) → 반려 내용 고치기. */
 	let { data } = $props();
 	let tab = $state<ProductTab>('all');
 	const products = $derived(data.products);
@@ -25,8 +26,10 @@
 	let busy = $state(false);
 	const menuItems = $derived(menuFor ? productMenu(menuFor.status, menuFor.revision?.state ?? null) : []);
 
+	/** 반려 상품은 바로 "심사 결과"(시안) · 그 밖은 메뉴(수정 반려면 "심사 결과 보기" 가 맨 위) */
 	function open(p: Product) {
-		if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
+		if (p.status === 'rejected') goto(`/products/${encodeURIComponent(p.id)}/review`);
+		else if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
 	}
@@ -36,6 +39,10 @@
 		if (!p || busy) return;
 		if (it.kind === 'edit') {
 			goto(`/products/new?id=${encodeURIComponent(p.id)}`);
+			return;
+		}
+		if (it.kind === 'review') {
+			goto(`/products/${encodeURIComponent(p.id)}/review`);
 			return;
 		}
 		busy = true;

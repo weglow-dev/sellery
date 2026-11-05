@@ -19,12 +19,18 @@
 --   myr_app_seller_submit_revision(seller, id, payload)   수정 심사 요청
 --       → { ok, revision_id, status: 'pending' } · { ok:false, code: NOT_FOUND | NOT_REVISABLE(status) | REVISION_PENDING | NO_CHANGE | INVALID_INPUT(field) | BAD_IMAGE }
 --       필수 칸은 심사 요청과 같다(제품명 · 가격 > 0 · 카테고리 · 레시피 노트) · 지금 내용과 같으면 NO_CHANGE
---   myr_app_admin_review_revision(product, decision, reason, reviewer)   운영 검수(상품의 대기 중 수정본)
---       approve → 상품에 반영(판매 상태는 그대로) · reject → 반려(사유 필수 · 상품은 그대로)
+--   myr_app_admin_review_revision(product, decision, reason, reviewer, items)   운영 검수(상품의 대기 중 수정본)
+--       approve → 상품에 반영(판매 상태는 그대로) · reject → 반려(사유 또는 섹션별 의견 필수 · 상품은 그대로)
 --       → { ok, code, status } · { ok:false, code: NOT_FOUND | BAD_DECISION | REASON_REQUIRED | WRONG_STATUS(status) }
+--
+--   반려 의견(섹션별 · 시안 "심사 결과" · 2026-11-05) — 반려 사유 한 줄 대신 "몇 단계 섹션에 무슨 의견" 목록
+--     reject_items jsonb  [{ step: 1~7 | null(전체), msg }] — myr_products(상품 반려) · myr_product_revisions(수정 반려) 둘 다
+--     myr_reject_items(items)  정리(의견 10개 · 300자 · 빈 의견 제외 · 모르는 단계는 null) — 운영 검수 두 RPC 가 같이 쓴다
+--     reject_reason 은 그대로 필수(요약) — 사유를 따로 안 주면 의견을 " / " 로 이어 붙인다(200자)
+--     myr_app_admin_review_product(0056) 에 p_items 추가(4인자 → 5인자) · 다시 심사 요청하면 상품의 의견은 비운다
 --   myr_app_seller_set_status — 판매 종료(end) 때 대기 중 수정본을 canceled 로 접는다(나머지 0073 그대로)
---   myr_app_seller_products(0071) 행에 revision { status, reject_reason, submitted_at, reviewed_at } — 가장 최근 수정본이 심사 중 · 반려일 때만(반영 · 취소면 null)
---   myr_app_seller_product(0073) 응답에 revision { id, status, reject_reason, submitted_at, fields } — 같은 기준 · 반려된 수정본은 에디터가 이어서 고친다
+--   myr_app_seller_products(0071) 행에 reject_items · revision { status, reject_reason, reject_items, submitted_at, reviewed_at } — 가장 최근 수정본이 심사 중 · 반려일 때만(반영 · 취소면 null)
+--   myr_app_seller_product(0073) 응답에 revision { id, status, reject_reason, reject_items, submitted_at, reviewed_at, fields } · product 에 reject_items · reviewed_at — 같은 기준 · 반려된 수정본은 에디터가 이어서 고친다
 --   myr_product_image_orphans(0073) — 심사 중 · (가장 최근인) 반려 수정본의 이미지도 "쓰는 중" 으로 본다
 --
 --   권한: 새 RPC 는 service role 만(anon · authenticated EXECUTE 회수) — 크리에이터 id 는 콘솔 서버가 세션(requireSeller)에서 정해 넘긴다(결정 3).
@@ -38,6 +44,7 @@ create table if not exists public.myr_product_revisions (
   fields         jsonb not null,
   status         text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'canceled')),
   reject_reason  text,
+  reject_items   jsonb not null default '[]'::jsonb,
   submitted_at   timestamptz not null default now(),
   reviewed_at    timestamptz,
   reviewed_by    uuid references auth.users (id) on delete set null,
@@ -45,6 +52,9 @@ create table if not exists public.myr_product_revisions (
   constraint myr_product_revisions_reject_reason check (status <> 'rejected' or reject_reason is not null)
 );
 comment on table public.myr_product_revisions is 'MYR 판매 중 상품 수정본 — 운영 승인 때 myr_products 에 반영 (docs/myr.md §4.2.1 4-2 · 0074)';
+alter table public.myr_product_revisions add column if not exists reject_items jsonb not null default '[]'::jsonb;
+alter table public.myr_products add column if not exists reject_items jsonb not null default '[]'::jsonb;
+comment on column public.myr_products.reject_items is '반려 의견(섹션별) [{ step: 1~7 | null, msg }] — 다시 심사 요청하면 비운다 (0074)';
 create unique index if not exists myr_product_revisions_one_pending on public.myr_product_revisions (product_id) where status = 'pending';
 create index if not exists myr_product_revisions_product_idx on public.myr_product_revisions (product_id, created_at desc);
 create index if not exists myr_product_revisions_pending_idx on public.myr_product_revisions (submitted_at) where status = 'pending';
@@ -203,6 +213,7 @@ begin
        set status = v_status,
            submitted_at = case when p_submit then now() else submitted_at end,
            reject_reason = case when p_submit then null else reject_reason end,
+           reject_items = case when p_submit then '[]'::jsonb else reject_items end,
            reviewed_at = case when p_submit then null else reviewed_at end
      where id = p.id;
   end if;
@@ -254,9 +265,79 @@ revoke all on function public.myr_app_seller_submit_revision(uuid, uuid, jsonb) 
 grant execute on function public.myr_app_seller_submit_revision(uuid, uuid, jsonb) to service_role;
 
 -- ------------------------------------------------------------
+-- 반려 의견 정리 — [{ step: 1~7 | null, msg }] · 10개 · 300자 · 빈 의견 제외
+-- ------------------------------------------------------------
+create or replace function public.myr_reject_items(p_items jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('step', st, 'msg', m) order by o), '[]'::jsonb)
+    from (
+      select o,
+             case when jsonb_typeof(e -> 'step') = 'number' and (e ->> 'step')::numeric in (1, 2, 3, 4, 5, 6, 7) then (e ->> 'step')::numeric::integer end as st,
+             left(regexp_replace(btrim(coalesce(case when jsonb_typeof(e -> 'msg') = 'string' then e ->> 'msg' end, '')), '\s+', ' ', 'g'), 300) as m
+        from jsonb_array_elements(case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end) with ordinality as t(e, o)
+       where o <= 10
+    ) x
+   where m <> ''
+$$;
+revoke all on function public.myr_reject_items(jsonb) from public, anon, authenticated;
+
+-- 반려 사유(요약) — 따로 주면 그것, 없으면 의견을 이어 붙인다
+create or replace function public.myr_reject_reason(p_reason text, p_items jsonb)
+returns text
+language sql
+immutable
+set search_path = public
+as $$
+  select coalesce(
+    nullif(left(regexp_replace(btrim(coalesce(p_reason, '')), '\s+', ' ', 'g'), 200), ''),
+    nullif(left((select string_agg(e ->> 'msg', ' / ' order by o) from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) with ordinality t(e, o)), 200), '')
+  )
+$$;
+revoke all on function public.myr_reject_reason(text, jsonb) from public, anon, authenticated;
+
+-- ------------------------------------------------------------
+-- 상품 검수(0056) — 섹션별 의견(p_items) 추가 · 나머지 규칙 그대로
+-- ------------------------------------------------------------
+drop function if exists public.myr_app_admin_review_product(uuid, text, text, uuid);
+create or replace function public.myr_app_admin_review_product(p_product_id uuid, p_decision text, p_reason text default null, p_reviewer uuid default null, p_items jsonb default null)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  p          public.myr_products%rowtype;
+  v_decision text := lower(btrim(coalesce(p_decision, '')));
+  v_items    jsonb := public.myr_reject_items(p_items);
+  v_reason   text := public.myr_reject_reason(p_reason, v_items);
+begin
+  select * into p from public.myr_products where id = p_product_id and deleted_at is null for update;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if v_decision not in ('approve', 'reject', 'pause') then return jsonb_build_object('ok', false, 'code', 'BAD_DECISION'); end if;
+  if v_decision = 'reject' and v_reason is null then return jsonb_build_object('ok', false, 'code', 'REASON_REQUIRED'); end if;
+  if v_decision = 'pause' and p.status <> 'listed' then return jsonb_build_object('ok', false, 'code', 'WRONG_STATUS', 'status', p.status); end if;
+  update public.myr_products
+     set status = case v_decision when 'approve' then 'listed' when 'reject' then 'rejected' else 'paused' end,
+         reject_reason = case v_decision when 'reject' then v_reason else null end,
+         reject_items = case v_decision when 'reject' then v_items else '[]'::jsonb end,
+         reviewed_at = now(),
+         reviewed_by = p_reviewer
+   where id = p.id;
+  return jsonb_build_object('ok', true, 'code', p.code, 'status', case v_decision when 'approve' then 'listed' when 'reject' then 'rejected' else 'paused' end);
+end;
+$$;
+revoke all on function public.myr_app_admin_review_product(uuid, text, text, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.myr_app_admin_review_product(uuid, text, text, uuid, jsonb) to service_role;
+
+-- ------------------------------------------------------------
 -- 수정 심사 검수(운영) — 상품의 대기 중 수정본
 -- ------------------------------------------------------------
-create or replace function public.myr_app_admin_review_revision(p_product_id uuid, p_decision text, p_reason text default null, p_reviewer uuid default null)
+drop function if exists public.myr_app_admin_review_revision(uuid, text, text, uuid);
+create or replace function public.myr_app_admin_review_revision(p_product_id uuid, p_decision text, p_reason text default null, p_reviewer uuid default null, p_items jsonb default null)
 returns jsonb
 language plpgsql
 volatile
@@ -266,7 +347,8 @@ declare
   p          public.myr_products%rowtype;
   rv         public.myr_product_revisions%rowtype;
   v_decision text := lower(btrim(coalesce(p_decision, '')));
-  v_reason   text := nullif(left(regexp_replace(btrim(coalesce(p_reason, '')), '\s+', ' ', 'g'), 200), '');
+  v_items    jsonb := public.myr_reject_items(p_items);
+  v_reason   text := public.myr_reject_reason(p_reason, v_items);
 begin
   if v_decision not in ('approve', 'reject') then return jsonb_build_object('ok', false, 'code', 'BAD_DECISION'); end if;
   select * into p from public.myr_products where id = p_product_id and deleted_at is null for update;
@@ -283,14 +365,15 @@ begin
   update public.myr_product_revisions
      set status = case v_decision when 'approve' then 'approved' else 'rejected' end,
          reject_reason = case v_decision when 'reject' then v_reason end,
+         reject_items = case v_decision when 'reject' then v_items else '[]'::jsonb end,
          reviewed_at = now(),
          reviewed_by = p_reviewer
    where id = rv.id;
   return jsonb_build_object('ok', true, 'code', p.code, 'status', case v_decision when 'approve' then 'approved' else 'rejected' end);
 end;
 $$;
-revoke all on function public.myr_app_admin_review_revision(uuid, text, text, uuid) from public, anon, authenticated;
-grant execute on function public.myr_app_admin_review_revision(uuid, text, text, uuid) to service_role;
+revoke all on function public.myr_app_admin_review_revision(uuid, text, text, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.myr_app_admin_review_revision(uuid, text, text, uuid, jsonb) to service_role;
 
 -- ------------------------------------------------------------
 -- 판매 상태(0073) — 판매 종료 때 대기 중 수정본을 접는다
@@ -353,13 +436,13 @@ stable
 security definer set search_path = public
 as $$
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', p.id, 'code', p.code, 'name', p.name, 'status', p.status, 'reject_reason', p.reject_reason,
+           'id', p.id, 'code', p.code, 'name', p.name, 'status', p.status, 'reject_reason', p.reject_reason, 'reject_items', p.reject_items,
            'category', p.category, 'price', p.price, 'option_count', jsonb_array_length(p.options),
            'stock', p.stock, 'sold_qty', p.sold_qty, 'stock_left', greatest(p.stock - p.sold_qty, 0),
            'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url,
            'submitted_at', p.submitted_at, 'reviewed_at', p.reviewed_at, 'created_at', p.created_at, 'updated_at', p.updated_at,
            'revision', case when rv.id is null then null
-                            else jsonb_build_object('status', rv.status, 'reject_reason', rv.reject_reason, 'submitted_at', rv.submitted_at, 'reviewed_at', rv.reviewed_at) end
+                            else jsonb_build_object('status', rv.status, 'reject_reason', rv.reject_reason, 'reject_items', rv.reject_items, 'submitted_at', rv.submitted_at, 'reviewed_at', rv.reviewed_at) end
          ) order by p.updated_at desc, p.created_at desc), '[]'::jsonb)
     from public.myr_products p
     left join lateral public.myr_product_open_revision(p.id) rv on true
@@ -368,6 +451,23 @@ as $$
 $$;
 revoke all on function public.myr_app_seller_products(uuid) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_products(uuid) to service_role;
+
+-- 에디터용 상품 1건(0073) — 반려 의견 · 검수 시각 추가
+create or replace function public.myr_seller_product_json(p public.myr_products)
+returns jsonb
+language sql
+immutable
+as $$
+  select jsonb_build_object(
+    'id', p.id, 'code', p.code, 'status', p.status, 'reject_reason', p.reject_reason, 'reject_items', p.reject_items,
+    'name', p.name, 'price', p.price, 'unit', p.unit, 'category', p.category,
+    'tile', p.tile, 'icon', p.icon, 'image_urls', to_jsonb(p.image_urls), 'chips', to_jsonb(p.chips), 'note', p.note,
+    'story_title', p.story_title, 'story', p.story, 'ingredient_rows', p.ingredient_rows, 'howto_steps', p.howto_steps, 'faq', p.faq,
+    'form', p.form, 'pack', p.pack, 'shelf_life', p.shelf_life, 'storage_method', p.storage_method,
+    'submitted_at', p.submitted_at, 'reviewed_at', p.reviewed_at, 'updated_at', p.updated_at
+  )
+$$;
+revoke all on function public.myr_seller_product_json(public.myr_products) from public, anon, authenticated;
 
 create or replace function public.myr_app_seller_product(p_seller uuid, p_id uuid)
 returns jsonb
@@ -384,7 +484,7 @@ begin
   rv := public.myr_product_open_revision(p.id);
   return jsonb_build_object('ok', true, 'product', public.myr_seller_product_json(p),
     'revision', case when rv.id is null then null
-                     else jsonb_build_object('id', rv.id, 'status', rv.status, 'reject_reason', rv.reject_reason, 'submitted_at', rv.submitted_at, 'fields', rv.fields) end);
+                     else jsonb_build_object('id', rv.id, 'status', rv.status, 'reject_reason', rv.reject_reason, 'reject_items', rv.reject_items, 'submitted_at', rv.submitted_at, 'reviewed_at', rv.reviewed_at, 'fields', rv.fields) end);
 end;
 $$;
 revoke all on function public.myr_app_seller_product(uuid, uuid) from public, anon, authenticated;
