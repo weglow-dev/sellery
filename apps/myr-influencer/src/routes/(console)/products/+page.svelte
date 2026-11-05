@@ -1,26 +1,54 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { Product } from '$lib/data';
+	import { STATUS_ACTION_DONE, productMenu, type ProductMenuItem } from '$lib/product-draft';
 	import { PRODUCT_STATUS_META, filterProducts, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import ProductMenu from '$lib/components/ProductMenu.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 내 제품 — 로그인한 크리에이터의 실제 상품(+page.server.ts · 0071). 탭 전체 · 판매 중(일시중지 포함) · 심사 중(반려 포함) · 임시저장 · 종료.
-	 *  [상품 등록] → 8단계 에디터(4번 전까지 목 — 에디터에서 저장한 것은 아직 이 목록에 안 나온다). 재고는 읽기 전용(남은 재고 = 입고 − 판매).
+	 *  [상품 등록] → 8단계 에디터(0073 저장). 상품을 누르면 메뉴(product-draft productMenu): 임시저장 이어서 작성 · 삭제 / 반려 고쳐서 다시 심사 요청 /
+	 *  판매 중 일시중지 · 판매 종료 / 일시중지 다시 판매 · 판매 종료(종료 · 삭제는 확인). 심사 중 · 종료는 안내만. 재고는 읽기 전용(남은 재고 = 입고 − 판매).
 	 *  모바일은 한 줄 목록, PC(lg~)는 32px 제목 + 2단 카드(누적 판매 수량까지).
-	 *  상세(가격·소개글 수정 · 판매/일시중지 토글)는 시안이 아직 없어 토스트로 상태만 알린다. */
+	 *  판매 중 상품의 내용 수정(수정 심사)은 4-2. */
 	let { data } = $props();
 	let tab = $state<ProductTab>('all');
 	const tabs = $derived(productTabCounts(data.products));
 	const list = $derived(filterProducts(data.products, tab));
 
+	let menuFor = $state<Product | null>(null);
+	let busy = $state(false);
+	const menuItems = $derived(menuFor ? productMenu(menuFor.status) : []);
+
 	function open(p: Product) {
-		if (p.status === 'draft') goto(`/products/new?draft=${encodeURIComponent(p.id)}`);
-		else if (p.status === 'rejected' && p.rejectReason) app.showToast(`반려 사유 · ${p.rejectReason}`);
+		if (productMenu(p.status).length) menuFor = p;
+		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
+	}
+
+	async function pick(it: ProductMenuItem) {
+		const p = menuFor;
+		if (!p || busy) return;
+		if (it.kind === 'edit') {
+			goto(`/products/new?id=${encodeURIComponent(p.id)}`);
+			return;
+		}
+		busy = true;
+		try {
+			const res = await fetch(`/api/products/${encodeURIComponent(p.id)}/status`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: it.kind }) });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+			app.showToast(r?.ok ? STATUS_ACTION_DONE[it.kind] : '바꾸지 못했어요. 목록을 새로 불러올게요');
+			menuFor = null;
+			await invalidateAll();
+		} catch {
+			app.showToast('바꾸지 못했어요. 인터넷 연결을 확인해주세요');
+		} finally {
+			busy = false;
+		}
 	}
 </script>
 
@@ -63,3 +91,7 @@
 		</div>
 	</div>
 </div>
+
+{#if menuFor}
+	<ProductMenu product={menuFor} items={menuItems} {busy} onpick={pick} onclose={() => (menuFor = null)} />
+{/if}

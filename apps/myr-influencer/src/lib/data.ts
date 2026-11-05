@@ -123,7 +123,10 @@ export type ProductDraft = {
 	story: string;
 	ingredients: Ingredient[];
 	steps: HowtoStep[];
-	info: string[];
+	/** 6단계 제품 정보 — 제형/포장("액상 / 스틱포") · 유통기한 · 보관. 내용량은 1단계 unit 과 같은 값 · 제조는 고정(INFO_MAKER) */
+	formPack: string;
+	shelfLife: string;
+	storageMethod: string;
 	faq: Faq[];
 };
 
@@ -158,22 +161,9 @@ export function seedProducts(): Product[] {
 	];
 }
 
-/** 상품 카테고리 — 디자인 기본 3개. 인플루언서가 에디터에서 [+ 추가] 로 늘릴 수 있다(목 · 운영 정책은 docs/myr.md §9-5) */
-export type Category = { id: string; name: string };
-export const BASE_CATEGORIES: Category[] = [
-	{ id: 'diet', name: '다이어트' },
-	{ id: 'inner', name: '이너뷰티' },
-	{ id: 'mental', name: '멘탈 웰니스' }
-];
-
-/** 제품 정보 표 — 라벨과 자리표시 (에디터 6단계) */
-export const INFO_ROWS: { label: string; ph: string }[] = [
-	{ label: '제형 / 포장', ph: '액상 / 스틱포' },
-	{ label: '내용량', ph: '14포 / 2주분' },
-	{ label: '제조', ph: 'MYR 파트너 제조시설' },
-	{ label: '유통기한', ph: '제조일로부터 24개월' },
-	{ label: '보관', ph: '직사광선을 피해 서늘한 곳' }
-];
+/** 제품 정보 표(에디터 6단계 · 샵 "04 · 제품 정보") — 제조만 고정, 나머지는 크리에이터 입력(2026-11-05 대표 결정) */
+export const INFO_MAKER = 'MYR 파트너 제조시설';
+export const INFO_PH = { formPack: '액상 / 스틱포', unit: '14포 / 2주분', shelfLife: '제조일로부터 24개월', storageMethod: '직사광선을 피해 서늘한 곳' } as const;
 
 /** 홈 지표(목) — 주문 수 · CS 비율 · 최근 7일 판매 막대. 실적 RPC(myr_app_seller_sales)를 붙이면 바뀐다 */
 export const MOCK_STATS = {

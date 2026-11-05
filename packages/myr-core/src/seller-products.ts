@@ -64,3 +64,68 @@ export function parseSellerProductRows(data: unknown): SellerProductRow[] {
 	}
 	return out;
 }
+
+/* ---------------- 상품 등록 저장(0073 · 4-1) ---------------- */
+
+/** 저장 요청 본문 — 0073 myr_app_seller_save_product p_payload 와 같은 키 */
+export type SellerProductPayload = {
+	name: string;
+	price: number;
+	unit: string;
+	category: string | null;
+	tile: string | null;
+	icon: string;
+	image_urls: string[];
+	chips: string[];
+	note: string;
+	story_title: string;
+	story: string;
+	ingredient_rows: { name: string; why: string; amount: string }[];
+	howto_steps: { t: string; d: string }[];
+	faq: { q: string; a: string }[];
+	form: string;
+	pack: string;
+	shelf_life: string;
+	storage_method: string;
+};
+
+/** 에디터로 다시 여는 상품 1건(0073 myr_app_seller_product) */
+export type SellerProductDetail = SellerProductPayload & { id: string; code: string; status: SellerProductStatus; rejectReason: string | null };
+
+const arrOf = <T>(v: unknown, f: (x: Record<string, unknown>) => T): T[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object').map((x) => f(x as Record<string, unknown>)) : []);
+const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+export function parseSellerProductDetail(v: unknown): SellerProductDetail | null {
+	const r = v as Record<string, unknown> | null;
+	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !isSellerProductStatus(r.status)) return null;
+	return {
+		id: r.id,
+		code: str(r.code),
+		status: r.status,
+		rejectReason: strOrNull(r.reject_reason),
+		name: str(r.name),
+		price: int(r.price),
+		unit: str(r.unit),
+		category: strOrNull(r.category),
+		tile: strOrNull(r.tile),
+		icon: str(r.icon, 'pill') || 'pill',
+		image_urls: strs(r.image_urls),
+		chips: strs(r.chips),
+		note: str(r.note),
+		story_title: str(r.story_title),
+		story: str(r.story),
+		ingredient_rows: arrOf(r.ingredient_rows, (x) => ({ name: str(x.name), why: str(x.why), amount: str(x.amount) })),
+		howto_steps: arrOf(r.howto_steps, (x) => ({ t: str(x.t), d: str(x.d) })),
+		faq: arrOf(r.faq, (x) => ({ q: str(x.q), a: str(x.a) })),
+		form: str(r.form),
+		pack: str(r.pack),
+		shelf_life: str(r.shelf_life),
+		storage_method: str(r.storage_method)
+	};
+}
+
+/** 저장 · 상태 바꾸기 거절 코드(0073) */
+export type SaveProductCode = 'NOT_FOUND' | 'NOT_EDITABLE' | 'INVALID_INPUT' | 'BAD_IMAGE' | 'DB_ERROR';
+export type SetStatusAction = 'pause' | 'resume' | 'end' | 'delete';
+export const SET_STATUS_ACTIONS: readonly SetStatusAction[] = ['pause', 'resume', 'end', 'delete'];
+export const isSetStatusAction = (v: unknown): v is SetStatusAction => SET_STATUS_ACTIONS.includes(v as SetStatusAction);
