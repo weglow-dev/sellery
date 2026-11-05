@@ -213,7 +213,7 @@
 				<span class="rounded-lg bg-accent/14 px-2.5 py-1.5 text-[12px] font-extrabold tracking-[0.06em] text-accent">예시</span>
 				<div class="min-w-0 flex-1">
 					<p class="text-[16px] font-extrabold">완성된 상세페이지</p>
-					<p class="mt-[3px] text-[13px] text-white/55">{copy.examplePrefix} · <b class="font-bold text-accent">{stepName(step)}</b></p>
+					{#if copy.examplePrefix}<p class="mt-[3px] text-[13px] text-white/55">{copy.examplePrefix} · <b class="font-bold text-accent">{stepName(step)}</b></p>{/if}
 				</div>
 				<span class="shrink-0 text-[12px] text-white/40">소이 클린의 샵</span>
 			</div>

@@ -44,6 +44,8 @@ describe('버튼', () => {
 		expect(MODE_COPY.edit.secondary).toBe('취소');
 		expect(MODE_COPY.new.secondary).toBe('임시저장');
 		expect(MODE_COPY.edit.trailPrefix).toBe('수정 중  ·  ');
+		expect(MODE_COPY.edit.examplePrefix).toBe(''); // 예시 패널 "지금 수정 중 · …" 줄은 없다
+		expect(MODE_COPY.new.examplePrefix).toBe('지금 작성 중');
 		expect(MODE_COPY.edit.doneSteps.map((s) => s.title)).toEqual(['제출 완료', '운영팀 검토', '샵에 반영']);
 	});
 });
