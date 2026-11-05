@@ -154,7 +154,9 @@ const PRODUCT_TAB_STATUSES: Record<Exclude<ProductTab, 'all'>, ProductStatus[]> 
 	draft: ['draft'],
 	ended: ['ended']
 };
-export const filterProducts = (list: Product[], tab: ProductTab) => (tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status)));
+/** 수정 심사 중인 판매 중 상품은 "판매 중" 과 "심사 중" 탭에 함께(시안) */
+export const filterProducts = (list: Product[], tab: ProductTab) =>
+	tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status) || (tab === 'review' && !!p.revision));
 /** 재고를 보여줄 상태 — 샵에서 팔리는 중이거나 잠깐 멈춘 것만(나머지는 "—") */
 export const showsStock = (s: ProductStatus) => s === 'live' || s === 'paused';
 export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
@@ -239,8 +241,6 @@ export function nextLabel(step: number, ed: ProductDraft): string {
 	return '다음';
 }
 
-export const STEP_NAMES = ['기본 정보', '레시피 노트', '왜 만들었나요', '성분', '섭취법', '제품 정보', 'FAQ', '미리보기'];
-
 /** 에디터 헤더 아래 한 줄 — "제품명 · ₩가격 · 카테고리" (비면 "새 상품 등록") · 카테고리는 MYR 6개(@sellery/myr-core/categories) */
 export function editorTrail(ed: ProductDraft): string {
 	const price = parsePrice(ed.price);
@@ -270,10 +270,10 @@ export function imageHelp(count: number): string {
 	return '정사각형 또는 16:10 이미지를 권장해요. 여러 장 올릴 수 있고, 첫 번째가 대표 이미지예요.';
 }
 
-/** 홈 "판매 중 제품" 카드 — 판매 중 수 · 심사 중(반려 포함) + 임시저장 수 */
+/** 홈 "판매 중 제품" 카드 — 판매 중 수 · 심사 중(반려 · 수정 심사 포함) + 임시저장 수 */
 export function homeProductCounts(list: Product[]): { live: number; pending: number } {
 	return {
 		live: list.filter((p) => p.status === 'live').length,
-		pending: list.filter((p) => p.status === 'review' || p.status === 'rejected' || p.status === 'draft').length
+		pending: list.filter((p) => p.status === 'review' || p.status === 'rejected' || p.status === 'draft' || !!p.revision).length
 	};
 }

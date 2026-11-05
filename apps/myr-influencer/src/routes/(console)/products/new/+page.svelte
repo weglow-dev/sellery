@@ -4,7 +4,8 @@
 	import type { ProductDraft } from '$lib/data';
 	import { goBack } from '$lib/nav';
 	import { detailToDraft, draftToPayload, saveFailure } from '$lib/product-draft';
-	import { EDITOR_STEPS, STEP_NAMES, blankDraft, editorTrail, nextLabel, stepValid } from '$lib/rules';
+	import { MODE_COPY, anyChanged, changedSections, primaryEnabled, primaryLabel, type EditorMode } from '$lib/product-edit';
+	import { EDITOR_STEPS, blankDraft, editorTrail, stepValid } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import BottomBar from '$lib/components/BottomBar.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -23,21 +24,30 @@
 	/** 상품 등록 — 8단계 위저드. 1 기본 정보(필수) · 2 레시피 노트(필수) · 3~7 선택(비우면 샵에서 숨김 · 버튼이 "건너뛰기") · 8 미리보기 → 심사 요청.
 	 *  저장은 서버(0073 · POST /api/products): 임시저장 = draft · 심사 요청 = pending(운영팀 검수 → 승인되면 MYR Shop · docs/myr.md §6.1).
 	 *  `?id=<상품>` 이면 내 임시저장 · 반려 상품을 이어 쓴다(+page.server.ts). 반려 상품은 사유를 보여주고, 다시 심사 요청하면 사유가 지워진다.
+	 *  **수정 모드(4-2 · 시안의 isEdit)** — 판매 중 · 일시중지 상품: 8단계(수정 내용 확인)에서 시작 · 섹션 [수정] → 그 단계 → "수정 완료" 로 8단계 · 바꾼 섹션 "변경됨" ·
+	 *  바꾼 게 없으면 요청 못 함 · 보조 버튼 "취소" · 뒤로는 8단계로. 수정 심사 저장(서버)은 다음 단계 — 지금은 dev · Preview 에서만 완료 화면까지(UI 확인).
 	 *  모바일: 단계 막대 헤더 · 하단 버튼 줄 · [예시] 바텀시트 / PC(lg~): 화면 높이 고정 — 왼쪽 입력(안에서 스크롤) + 바닥 버튼, 오른쪽 460px 예시 패널이 늘 보이고 쓰는 단계로 스크롤된다. */
 	let { data } = $props();
 	// 첫 값만 서버 데이터에서(이후는 이 화면 안에서 바뀐다)
 	const source = untrack(() => data.product);
+	const mode: EditorMode = untrack(() => data.mode);
+	const copy = MODE_COPY[mode];
 	let productId = $state<string | null>(source?.id ?? null);
 	let ed = $state<ProductDraft>(source ? detailToDraft(source) : blankDraft());
+	/** 수정 모드의 비교 기준(지금 샵에 보이는 내용) */
+	const orig = mode === 'edit' && source ? detailToDraft(source) : null;
 	const rejectReason = source?.status === 'rejected' ? source.rejectReason : null;
-	let step = $state(1);
+	let step = $state(mode === 'edit' ? EDITOR_STEPS : 1);
 	let saving = $state(false);
 	let exOpen = $state(false);
 	let scroller: HTMLDivElement | undefined = $state();
 
 	const valid = $derived(stepValid(step, ed));
-	const label = $derived(nextLabel(step, ed));
-	const trail = $derived(editorTrail(ed));
+	const changed = $derived(orig ? changedSections(ed, orig) : null);
+	const isChanged = $derived(!!changed && anyChanged(changed));
+	const label = $derived(primaryLabel(mode, step, ed, isChanged));
+	const enabled = $derived(primaryEnabled(mode, step, valid, isChanged));
+	const trail = $derived(copy.trailPrefix + editorTrail(ed));
 	const segments = Array.from({ length: EDITOR_STEPS }, (_, i) => i);
 
 	// 단계가 바뀌면 입력 영역을 맨 위로 — 모바일·PC 모두 이 화면의 입력 스크롤 영역
@@ -46,8 +56,12 @@
 		scroller?.scrollTo(0, 0);
 	});
 
+	/** 뒤로 — 수정 모드는 단계 안에서 8단계(수정 내용 확인)로, 8단계에서는 나가기 */
 	function back() {
-		if (step > 1) step -= 1;
+		if (mode === 'edit') {
+			if (step < EDITOR_STEPS) step = EDITOR_STEPS;
+			else goBack('/products');
+		} else if (step > 1) step -= 1;
 		else goBack('/products');
 	}
 	/** 서버 저장 — 임시저장(submit=false) · 심사 요청(submit=true). 실패하면 안내 + 그 칸이 있는 단계로 */
@@ -81,14 +95,40 @@
 	}
 
 	async function next() {
-		if (!valid || saving) return;
+		if (!enabled || saving) return;
+		if (mode === 'edit') {
+			if (step < EDITOR_STEPS) step = EDITOR_STEPS;
+			else submitRevision();
+			return;
+		}
 		if (step < EDITOR_STEPS) {
 			step += 1;
 			return;
 		}
 		if (!(await save(true))) return;
 		app.lastSubmitted = ed.name.trim();
+		app.lastSubmitMode = 'new';
 		goto('/products/new/done', { replaceState: true });
+	}
+	/** 수정 심사 요청 — 서버 저장(수정본 보관 · 운영팀 승인 시 반영)은 다음 단계. 지금은 dev · Preview 에서만 완료 화면(UI 확인) */
+	function submitRevision() {
+		if (ed.images.some((u) => u.startsWith('blob:'))) {
+			app.showToast('사진을 올리는 중이에요. 잠시 후 다시 눌러주세요');
+			return;
+		}
+		if (!data.revisionPreview) {
+			app.showToast('수정 심사는 곧 열려요. 조금만 기다려주세요');
+			return;
+		}
+		app.lastSubmitted = ed.name.trim();
+		app.lastSubmitMode = 'edit';
+		if (productId) app.mockRevisions = { ...app.mockRevisions, [productId]: true };
+		goto('/products/new/done', { replaceState: true });
+	}
+	/** 보조 버튼 — 새 상품은 임시저장, 수정 모드는 취소(바꾼 내용은 버린다 · 샵은 그대로) */
+	function secondary() {
+		if (mode === 'edit') goBack('/products');
+		else saveDraft();
 	}
 	async function saveDraft() {
 		if (await save(false)) app.showToast('임시저장했어요');
@@ -105,8 +145,8 @@
 {/snippet}
 
 {#snippet buttons(saveCls: string)}
-	<button type="button" onclick={saveDraft} disabled={saving} class="h-14 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {saveCls}">{saving ? '저장 중…' : '임시저장'}</button>
-	<button type="button" onclick={next} disabled={!valid || saving} aria-busy={saving} class="h-14 flex-1 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {valid && !saving ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{saving && step >= EDITOR_STEPS ? '심사 요청 중…' : label}</button>
+	<button type="button" onclick={secondary} disabled={saving} class="h-14 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {saveCls}">{saving ? '저장 중…' : copy.secondary}</button>
+	<button type="button" onclick={next} disabled={!enabled || saving} aria-busy={saving} class="h-14 flex-1 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {enabled && !saving ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{saving && step >= EDITOR_STEPS ? '심사 요청 중…' : label}</button>
 {/snippet}
 
 <!--
@@ -117,7 +157,7 @@
 	<!-- 모바일 헤더 -->
 	<div class="flex h-[84px] shrink-0 flex-col pt-1.5 pr-4 pl-1.5 lg:hidden">
 		<div class="flex h-[52px] items-center gap-2.5">
-			<button type="button" onclick={back} aria-label={step > 1 ? '이전 단계' : '나가기'} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-fg">
+			<button type="button" onclick={back} aria-label={mode === 'edit' ? (step < EDITOR_STEPS ? '수정 내용 확인으로' : '나가기') : step > 1 ? '이전 단계' : '나가기'} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-fg">
 				<Icon id="back" size={22} sw={2.2} />
 			</button>
 			{@render bar('')}
@@ -133,7 +173,7 @@
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 			<!-- PC 헤더 — 단계 막대는 왼쪽 열 전체 폭, N / 8 은 오른쪽 끝 -->
 			<div class="hidden shrink-0 items-center gap-3.5 pb-5 lg:flex">
-				<PcBack onclick={back} label={step > 1 ? '이전 단계' : '나가기'} />
+				<PcBack onclick={back} label={mode === 'edit' ? (step < EDITOR_STEPS ? '수정 내용 확인으로' : '나가기') : step > 1 ? '이전 단계' : '나가기'} />
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-[12px] font-semibold text-white/50">{trail}</p>
 					<div class="mt-2 flex">{@render bar('')}</div>
@@ -157,7 +197,7 @@
 						{:else if step === 5}<StepHowto bind:ed />
 						{:else if step === 6}<StepInfo bind:ed />
 						{:else if step === 7}<StepFaq bind:ed />
-						{:else}<StepPreview {ed} onedit={editStep} />
+						{:else}<StepPreview {ed} {mode} {changed} onedit={editStep} />
 						{/if}
 					</div>
 				{/key}
@@ -170,10 +210,7 @@
 		<aside class="hidden min-h-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0d0e12] lg:flex" aria-label="완성된 상세페이지 예시">
 			<div class="flex shrink-0 items-center gap-3 border-b border-white/6 px-6 py-[18px]">
 				<span class="rounded-lg bg-accent/14 px-2.5 py-1.5 text-[12px] font-extrabold tracking-[0.06em] text-accent">예시</span>
-				<div class="min-w-0 flex-1">
-					<p class="text-[16px] font-extrabold">완성된 상세페이지</p>
-					<p class="mt-[3px] text-[13px] text-white/55">지금 작성 중 · <b class="font-bold text-accent">{STEP_NAMES[step - 1]}</b></p>
-				</div>
+				<p class="min-w-0 flex-1 text-[16px] font-extrabold">완성된 상세페이지</p>
 				<span class="shrink-0 text-[12px] text-white/40">소이 클린의 샵</span>
 			</div>
 			<ExampleBody {step} class="pb-10" />

@@ -1,29 +1,28 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { MODE_COPY } from '$lib/product-edit';
 	import { app } from '$lib/state.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 
 	/** 심사 요청 완료 — 제출 → 운영팀 검토 → MYR Shop 오픈 세 단계 안내. 방금 제출한 제품이 없으면(주소로 바로 들어옴) 내 제품으로.
+	 *  수정 심사(4-2)면 "수정 심사 요청했어요" · 판매는 계속 · 샵에 반영(시안 isEdit · product-edit MODE_COPY).
 	 *  모바일: 왼쪽 정렬 + 하단 [내 제품으로] / PC(lg~): 가운데 640px 카드 + [상품 하나 더 등록] [내 제품으로] */
 	const name = app.lastSubmitted;
 	onMount(() => {
 		if (!name) goto('/products', { replaceState: true });
 	});
 
-	const STEPS = [
-		{ title: '제출 완료', desc: '방금 상세페이지가 전달됐어요', done: true },
-		{ title: '운영팀 검토', desc: '표시·광고 문구와 성분 표기를 확인해요', done: false },
-		{ title: 'MYR Shop 오픈', desc: '승인되면 바로 판매가 시작돼요', done: false }
-	];
+	const copy = MODE_COPY[app.lastSubmitMode];
+	const STEPS = copy.doneSteps.map((st, i) => ({ ...st, done: i === 0 }));
 </script>
 
 {#if name}
 	<div class="flex min-h-0 flex-1 animate-slide-in flex-col lg:block lg:animate-up-in">
 		<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-16 pb-5 lg:mx-auto lg:max-w-[640px] lg:overflow-visible lg:px-10 lg:pt-[72px] lg:pb-20 lg:text-center">
 			<div class="flex h-16 w-16 animate-pop items-center justify-center rounded-full bg-accent text-bg lg:mx-auto lg:h-[72px] lg:w-[72px]"><Icon id="check" size={32} sw={2.8} class="lg:h-9 lg:w-9" /></div>
-			<h1 class="mt-[22px] text-[30px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:mt-6 lg:text-[36px] lg:leading-[1.25]">심사 요청했어요</h1>
-			<p class="mt-2.5 text-[15px] leading-[1.6] text-white/65 lg:mt-3 lg:text-[16px]"><b class="font-bold text-fg">{name}</b><br />영업일 1~2일 안에 검토 결과를 알려드려요.</p>
+			<h1 class="mt-[22px] text-[30px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:mt-6 lg:text-[36px] lg:leading-[1.25]">{copy.doneTitle}</h1>
+			<p class="mt-2.5 text-[15px] leading-[1.6] text-white/65 lg:mt-3 lg:text-[16px]"><b class="font-bold text-fg">{name}</b><br />{copy.doneDesc}</p>
 
 			<ol class="mt-7 flex flex-col lg:mt-8 lg:rounded-3xl lg:border lg:border-white/7 lg:bg-white/3 lg:px-7 lg:pt-6 lg:pb-2.5 lg:text-left">
 				{#each STEPS as s, i (s.title)}

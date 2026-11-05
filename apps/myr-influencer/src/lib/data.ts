@@ -144,6 +144,8 @@ export type Product = {
 	/** 샵 주소 /p/<code> */
 	code?: string;
 	rejectReason?: string | null;
+	/** 판매 중 상품의 수정 심사(4-2) — 있으면 "수정 심사 중" 칩 + meta("방금 수정 요청" · "수정 심사 1일차"). 샵은 승인 전까지 지금 내용 */
+	revision?: { meta: string } | null;
 	sold: number;
 	/** 상태 옆 보조 문구("2주 전 승인" · "심사 1일차") */
 	meta: string;

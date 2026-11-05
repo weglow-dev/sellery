@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { STEP_NAMES } from '$lib/rules';
 	import Icon from '../Icon.svelte';
 	import ExampleBody from './ExampleBody.svelte';
 
@@ -19,10 +18,7 @@
 		<div class="flex shrink-0 justify-center pt-2"><span class="h-1 w-10 rounded-sm bg-white/20"></span></div>
 		<div class="flex shrink-0 items-center gap-2.5 px-5 py-3">
 			<span class="rounded-lg bg-accent/14 px-[9px] py-[5px] text-[11px] font-extrabold tracking-[0.06em] text-accent">예시</span>
-			<div class="min-w-0 flex-1">
-				<p class="text-[15px] font-extrabold">완성된 상세페이지</p>
-				<p class="mt-0.5 text-[12px] text-white/55">지금 작성 중 · <b class="font-bold text-accent">{STEP_NAMES[step - 1]}</b></p>
-			</div>
+			<p class="min-w-0 flex-1 text-[15px] font-extrabold">완성된 상세페이지</p>
 			<button type="button" onclick={onclose} aria-label="닫기" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/6 text-fg">
 				<Icon id="x" size={18} sw={2.2} />
 			</button>

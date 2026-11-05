@@ -17,15 +17,17 @@
 	 *  판매 중 상품의 내용 수정(수정 심사)은 4-2. */
 	let { data } = $props();
 	let tab = $state<ProductTab>('all');
-	const tabs = $derived(productTabCounts(data.products));
-	const list = $derived(filterProducts(data.products, tab));
+	/** 수정 심사 — 서버(4-2) 전까지는 미리보기에서 요청한 상품만 화면 메모리로(app.mockRevisions) */
+	const products = $derived(data.products.map((p) => (p.revision || !app.mockRevisions[p.id] ? p : { ...p, revision: { meta: '방금 수정 요청' } })));
+	const tabs = $derived(productTabCounts(products));
+	const list = $derived(filterProducts(products, tab));
 
 	let menuFor = $state<Product | null>(null);
 	let busy = $state(false);
-	const menuItems = $derived(menuFor ? productMenu(menuFor.status) : []);
+	const menuItems = $derived(menuFor ? productMenu(menuFor.status, !!menuFor.revision) : []);
 
 	function open(p: Product) {
-		if (productMenu(p.status).length) menuFor = p;
+		if (productMenu(p.status, !!p.revision).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
 	}
@@ -67,7 +69,7 @@
 				<button type="button" onclick={() => open(p)} class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 text-left transition-colors lg:gap-4 lg:rounded-[20px] lg:p-4 lg:hover:border-white/30">
 					<Tile tile={p.tile} thumbUrl={p.thumbUrl} bg={p.bg} iconId={p.iconId} icon={36} iconCls="lg:h-11 lg:w-11" class="h-16 w-16 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-[18px] {p.status === 'ended' || p.status === 'paused' ? 'opacity-50' : ''}" />
 					<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge><span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.meta}</span></span>
+						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if p.revision}<Badge cls="bg-accent/16 text-accent">수정 심사 중</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
 						<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{p.name}</span>
 						<span class="text-[12px] text-white/55 lg:text-[13px]">
 							{p.price ? won(p.price) : '가격 미정'} · 재고 {showsStock(p.status) ? `${p.stock.toLocaleString('ko-KR')}개` : '—'}<span class="hidden lg:inline">{' · '}누적 판매 {p.sold ? `${p.sold.toLocaleString('ko-KR')}개` : '—'}</span>
@@ -76,7 +78,7 @@
 					<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
 				</button>
 			{:else}
-				{#if data.products.length === 0}
+				{#if products.length === 0}
 					<!-- 아직 상품이 하나도 없는 크리에이터(가입 직후) -->
 					<div class="flex flex-col items-center py-[60px] text-center lg:col-span-2 lg:py-20">
 						<span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/6 text-white/60"><Icon id="box" size={26} /></span>
