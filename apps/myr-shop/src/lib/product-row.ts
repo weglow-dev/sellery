@@ -37,6 +37,8 @@ export function fromRow(r: Row): Product {
 		note: str(r.note),
 		howto,
 		soldOut: r.sold_out === true,
+		shelfLife: str(r.shelf_life),
+		storageMethod: str(r.storage_method),
 		storyTitle: str(r.story_title) || fallback.storyTitle,
 		story: str(r.story) || fallback.story,
 		ingredientRows: arr(r.ingredient_rows).length ? arr(r.ingredient_rows) : fallback.ingredientRows,

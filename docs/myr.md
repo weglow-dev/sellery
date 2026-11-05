@@ -260,12 +260,13 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 공용 `@sellery/myr-core/seller-products`(행 파서) · `server/seller-products`(`listSellerProducts`) · 콘솔 순수 `lib/product-row.ts`(상태 대응 listed→판매 중 · paused→일시중지 · pending→심사 중 · rejected→반려 · draft→임시저장 · ended→종료 · 보조 문구 "2주 전 승인" · "심사 3일차" · "어제 저장" · "사유 · …" · 샵과 같은 비주얼 — `Tile` 이 DB 그라데이션 · 아이콘을 그린다 · 아이콘 8개 샵에서 복사)
     - `/products` 서버 load(requireSeller → 세션의 크리에이터) · 탭 전체 · 판매 중(일시중지 포함) · 심사 중(반려 포함) · 임시저장 · 종료 · 재고는 판매 중 · 일시중지만 읽기 전용 · 상품이 없으면 "아직 등록한 제품이 없어요" + 첫 제품 등록 · 홈 "판매 중 제품 N · N개 심사 · 임시저장" 도 서버 값(나머지 지표는 8번까지 목)
     - 남은 것: 상품 등록 에디터(임시저장 · 제출)는 4번 전까지 목 — 저장해도 목록에 안 나온다 · 콘솔 서버 렌더링(`(console)/+layout.ts ssr=false`)은 CS · 에디터가 목 상태를 쓰는 동안 그대로(목 상태가 요청 사이에 섞이지 않게) · 내 제품 · 홈은 서버 load 라 탭 이동 때 요청 1번 — **속도(2026-11-05)**: 함수 리전을 서울(icn1)로(워싱턴 iad1 기본값이었다 · 샵도) · 세션 확인은 `getUser` 유지(getClaims 는 다른 기기 로그아웃이 최대 1시간 늦게 반영돼 쓰지 않음 · 서울이라 Auth 왕복은 수 ms) · 크리에이터 게이트와 상품 조회를 동시에(0072 `myr_app_seller_products_of_user` — 계정으로 바로 조회 · 게이트 redirect 가 먼저)
-- **4. 상품 등록 쓰기**
-    - `myr_app_seller_save_product(seller, code?, payload, submit)` — 임시저장 = draft · 제출 = pending · rejected → pending 재제출 · `myr_app_seller_set_status`(listed ↔ paused)
-    - ProductDraft → `myr_products` 매핑 순수 모듈(+vitest: info 표 5줄 ↔ form/pack/unit · ingredient_rows → ingredients)
-    - 이미지 업로드 `POST /api/products/photos` — Storage 버킷 · `image_urls` 컬럼 · 샵 환불 사진 API 와 같은 틀
-    - **재고 칸 제거 · 이벗 상품코드 칸 없음** · 카테고리 자유 추가 제거(DB 6개 고정) · 제출 완료 화면 연결
-    - 검수는 어드민 상품 검수 전까지 `myr-products.mjs review` · pgTAP(거부 코드 전부) · 가격·옵션 수정 시 재검수 여부 결정 필요(§9-3)
+- **4. 상품 등록 쓰기 — 4-1 완료(2026-11-05 · 0073) · 4-2(판매 중 상품 수정 심사) 다음**
+    - **결정(2026-11-05 대표)**: 카테고리는 DB 6개 고정(자유 추가 없음 · `@sellery/myr-core/categories`) · 제품 정보는 **제조만 고정**("MYR 파트너 제조시설"), 제형/포장 · 내용량(1단계와 같은 값) · 유통기한 · 보관은 입력 · 처음 심사 중인 상품은 수정 불가 · **판매 중 상품 수정은 수정 심사**(4-2 — 승인 전까지 샵은 기존 내용 · 승인되면 반영 · 반려 사유 · "모든 수정은 재심사" 로 §9-3 정리)
+    - **0073** `myr_products` + `image_urls`(최대 6 · 첫 장 = `thumb_url`) · `shelf_life` · `storage_method` · 카테고리는 임시저장일 때만 비울 수 있다 · Storage 공개 버킷 `myr-products`(`<seller id>/<uuid>.<ext>` · jpg/png/webp · 4MB — Vercel 요청 4.5MB 한도 · 올리기는 서버만) · RPC(service role 만): `myr_app_seller_save_product`(새 상품 · 내 draft/rejected — 임시저장 = 제품명만 필수 · 심사 요청 = 제품명 · 가격 · 카테고리 · 레시피 노트 · 반려 재제출은 사유 · 검수 시각 비움 · 이미지는 그 크리에이터 폴더 공개 URL 만 · 거부 NOT_FOUND · NOT_EDITABLE · INVALID_INPUT(field) · BAD_IMAGE) · `myr_app_seller_product`(에디터로 다시 열기) · `myr_app_seller_set_status`(pause · resume · end(되돌릴 수 없음) · delete(임시저장만 · 소프트)) · 샵 공개 응답에 유통기한 · 보관 · 이미지 목록 · pgTAP 48
+    - 콘솔: 에디터 저장 `POST /api/products` · 사진은 고르는 즉시 `POST /api/products/photos`(매직 바이트 · 크리에이터 폴더 · 올리는 동안 저장 막음) · `?id=` 로 임시저장 · 반려 상품 이어 쓰기(반려 사유 배너) · 내 제품 메뉴(`ProductMenu` — 이어서 작성 · 삭제 / 고쳐서 다시 심사 요청 / 일시중지 · 다시 판매 · 판매 종료(확인)) · 변환 순수 `lib/product-draft.ts`(vitest) · API 게이트 `apiSeller`(JSON 401 · 403)
+    - 샵: "04 · 제품 정보" 유통기한 · 보관을 입력값으로(비면 예전 기본 문구)
+    - 검수는 운영 콘솔 전까지 `myr-products.mjs review <code> approve|reject` · **승인할 때 재고(`stock`)를 넣어야 샵에서 품절로 안 보인다**(크리에이터는 재고를 입력하지 않는다 · 결정 13)
+    - 남은 것: 지운 사진 · 버린 업로드는 저장소에 남는다(고아 정리 — 운영 작업 · 나중에 환불 사진처럼 크론) · 샵은 대표 사진 1장만(여러 장 넘겨보기는 샵 별도 작업)
 - **5. 문의 답변(스레드형)**
     - `/cs` = `myr_app_cs_list(actor='seller')` · `/cs/[code]` = `myr_app_cs_thread` + `myr_app_cs_reply` + `myr_app_cs_close` + `notifyCsReplied` 메일
     - 대상은 상품 문의 · 배송 문의. 교환·환불은 7번 화면 · 마이그레이션 없음

@@ -30,3 +30,11 @@ export async function requireSeller(event: RequestEvent, from?: string): Promise
 	if (to || ctx.state !== 'ok') redirect(303, to ?? '/login');
 	return ctx.seller;
 }
+
+/** API 라우트용 게이트 — 페이지처럼 redirect 하지 않고 JSON 401 · 403 · 503 을 돌려준다(fetch 가 로그인 HTML 을 받지 않게) */
+export async function apiSeller(event: RequestEvent): Promise<SellerSummary | Response> {
+	const ctx = await sellerCtxOf(event);
+	if (ctx.state === 'ok') return ctx.seller;
+	const status = ctx.state === 'anon' ? 401 : 403;
+	return new Response(JSON.stringify({ ok: false, code: ctx.state === 'anon' ? 'UNAUTHORIZED' : ctx.state === 'suspended' ? 'SUSPENDED' : 'UNLINKED' }), { status, headers: { 'content-type': 'application/json' } });
+}

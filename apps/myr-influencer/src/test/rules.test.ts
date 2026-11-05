@@ -148,12 +148,19 @@ describe('상품 에디터', () => {
 		expect(s.howto.summary).toBe('비어 있음 (샵에서 숨김)');
 		expect(filledSections(ed).ingredients).toBe(true);
 	});
-	it('헤더 한 줄 — 채운 값만 · 비면 "새 상품 등록"', () => {
+	it('헤더 한 줄 — 채운 값만 · 비면 "새 상품 등록" · 카테고리 이름은 MYR 6개', () => {
 		const ed = blankDraft();
-		const cats = [{ id: 'diet', name: '다이어트' }];
-		expect(editorTrail(ed, cats)).toBe('새 상품 등록');
+		expect(editorTrail(ed)).toBe('새 상품 등록');
 		ed.name = '포도 젤리';
 		ed.cat = 'diet';
-		expect(editorTrail(ed, cats)).toBe('포도 젤리  ·  다이어트');
+		expect(editorTrail(ed)).toBe('포도 젤리  ·  다이어트');
+		ed.cat = 'hair';
+		expect(editorTrail(ed)).toBe('포도 젤리  ·  헤어 & 바디');
+	});
+	it('제품 정보 — 제형/포장 · 유통기한 · 보관 중 하나라도 채우면 채운 섹션', () => {
+		const ed = blankDraft();
+		expect(filledSections(ed).info).toBe(false);
+		ed.shelfLife = '24개월';
+		expect(filledSections(ed).info).toBe(true);
 	});
 });

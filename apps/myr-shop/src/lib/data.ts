@@ -36,6 +36,9 @@ export type Product = {
 	note: string;
 	howto: string;
 	soldOut: boolean;
+	/** 제품 정보 — 크리에이터 입력(0073). 비면 infoRowsOf 가 기본 문구 */
+	shelfLife?: string;
+	storageMethod?: string;
 } & Detail;
 
 export const CATS: Cat[] = [
@@ -51,14 +54,15 @@ export const CATS: Cat[] = [
 /** 크리에이터 아바타(이니셜 + 핸들 해시 배경색) · 핸들 정규화 — 크리에이터 콘솔과 같은 모양이라 공용 패키지에 있다 */
 export { creatorStyle, handleSlug } from '@sellery/myr-core/creator';
 
-/** 04 제품 정보 표 — 공통 항목(제조·유통기한·보관)은 서버 정책이라 상품 입력이 아니다 */
+/** 04 제품 정보 표 — 제조만 고정, 유통기한 · 보관은 크리에이터 입력(0073 · 2026-11-05). 비어 있으면(이전에 등록한 상품) 예전 기본 문구 */
+export const INFO_DEFAULTS = { shelfLife: '제조일로부터 24개월', storageMethod: '직사광선을 피해 서늘한 곳' } as const;
 export const infoRowsOf = (p: Product): { k: string; v: string }[] => [
 	{ k: '제품명', v: p.name },
-	{ k: '제형 / 포장', v: `${p.form} / ${p.pack}` },
+	{ k: '제형 / 포장', v: [p.form, p.pack].filter((x) => x && x.trim()).join(' / ') },
 	{ k: '내용량', v: p.unit },
 	{ k: '제조', v: 'MYR 파트너 제조시설 (식약처 인증)' },
-	{ k: '유통기한', v: '제조일로부터 24개월' },
-	{ k: '보관', v: '직사광선을 피해 서늘한 곳' }
+	{ k: '유통기한', v: p.shelfLife?.trim() || INFO_DEFAULTS.shelfLife },
+	{ k: '보관', v: p.storageMethod?.trim() || INFO_DEFAULTS.storageMethod }
 ];
 
 /** 상세 섹션 앵커 칩 */

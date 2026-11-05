@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
+	import { untrack } from 'svelte';
+	import { goto, replaceState } from '$app/navigation';
 	import type { ProductDraft } from '$lib/data';
 	import { goBack } from '$lib/nav';
+	import { detailToDraft, draftToPayload, saveFailure } from '$lib/product-draft';
 	import { EDITOR_STEPS, STEP_NAMES, blankDraft, editorTrail, nextLabel, stepValid } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import BottomBar from '$lib/components/BottomBar.svelte';
@@ -20,20 +21,23 @@
 	import StepStory from '$lib/components/editor/StepStory.svelte';
 
 	/** 상품 등록 — 8단계 위저드. 1 기본 정보(필수) · 2 레시피 노트(필수) · 3~7 선택(비우면 샵에서 숨김 · 버튼이 "건너뛰기") · 8 미리보기 → 심사 요청.
-	 *  `?draft=<id>` 면 임시저장한 입력값을 이어 쓴다. 심사 요청 = 운영팀 검수 대기(review) — 승인되면 MYR Shop 에 열린다(docs/myr.md §6.1).
+	 *  저장은 서버(0073 · POST /api/products): 임시저장 = draft · 심사 요청 = pending(운영팀 검수 → 승인되면 MYR Shop · docs/myr.md §6.1).
+	 *  `?id=<상품>` 이면 내 임시저장 · 반려 상품을 이어 쓴다(+page.server.ts). 반려 상품은 사유를 보여주고, 다시 심사 요청하면 사유가 지워진다.
 	 *  모바일: 단계 막대 헤더 · 하단 버튼 줄 · [예시] 바텀시트 / PC(lg~): 화면 높이 고정 — 왼쪽 입력(안에서 스크롤) + 바닥 버튼, 오른쪽 460px 예시 패널이 늘 보이고 쓰는 단계로 스크롤된다. */
-	const draftParam = page.url.searchParams.get('draft');
-	const source = draftParam ? app.products.find((p) => p.id === draftParam && p.status === 'draft') : undefined;
-
-	let draftId = $state<string | null>(source?.id ?? null);
-	let ed = $state<ProductDraft>(source?.draft ? structuredClone(source.draft) : source ? { ...blankDraft(), name: source.name, tile: source.tile } : blankDraft());
+	let { data } = $props();
+	// 첫 값만 서버 데이터에서(이후는 이 화면 안에서 바뀐다)
+	const source = untrack(() => data.product);
+	let productId = $state<string | null>(source?.id ?? null);
+	let ed = $state<ProductDraft>(source ? detailToDraft(source) : blankDraft());
+	const rejectReason = source?.status === 'rejected' ? source.rejectReason : null;
 	let step = $state(1);
+	let saving = $state(false);
 	let exOpen = $state(false);
 	let scroller: HTMLDivElement | undefined = $state();
 
 	const valid = $derived(stepValid(step, ed));
 	const label = $derived(nextLabel(step, ed));
-	const trail = $derived(editorTrail(ed, app.categories));
+	const trail = $derived(editorTrail(ed));
 	const segments = Array.from({ length: EDITOR_STEPS }, (_, i) => i);
 
 	// 단계가 바뀌면 입력 영역을 맨 위로 — 모바일·PC 모두 이 화면의 입력 스크롤 영역
@@ -46,18 +50,48 @@
 		if (step > 1) step -= 1;
 		else goBack('/products');
 	}
-	function next() {
-		if (!valid) return;
+	/** 서버 저장 — 임시저장(submit=false) · 심사 요청(submit=true). 실패하면 안내 + 그 칸이 있는 단계로 */
+	async function save(submit: boolean): Promise<boolean> {
+		if (saving) return false;
+		if (ed.images.some((u) => u.startsWith('blob:'))) {
+			app.showToast('사진을 올리는 중이에요. 잠시 후 다시 눌러주세요');
+			return false;
+		}
+		saving = true;
+		try {
+			const res = await fetch('/api/products', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: productId, payload: draftToPayload(ed), submit }) });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; code?: string; field?: string } | null;
+			if (!r?.ok || !r.id) {
+				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field);
+				app.showToast(f.message);
+				if (f.step) step = f.step;
+				return false;
+			}
+			if (!productId) {
+				productId = r.id;
+				replaceState(`/products/new?id=${r.id}`, {});
+			}
+			return true;
+		} catch {
+			app.showToast('저장하지 못했어요. 인터넷 연결을 확인해주세요');
+			return false;
+		} finally {
+			saving = false;
+		}
+	}
+
+	async function next() {
+		if (!valid || saving) return;
 		if (step < EDITOR_STEPS) {
 			step += 1;
 			return;
 		}
-		app.submitProduct(ed, draftId);
+		if (!(await save(true))) return;
+		app.lastSubmitted = ed.name.trim();
 		goto('/products/new/done', { replaceState: true });
 	}
-	function saveDraft() {
-		const id = app.saveDraft(ed, draftId);
-		if (id) draftId = id;
+	async function saveDraft() {
+		if (await save(false)) app.showToast('임시저장했어요');
 	}
 	const editStep = (n: number) => (step = n);
 </script>
@@ -71,8 +105,8 @@
 {/snippet}
 
 {#snippet buttons(saveCls: string)}
-	<button type="button" onclick={saveDraft} class="h-14 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {saveCls}">임시저장</button>
-	<button type="button" onclick={next} disabled={!valid} class="h-14 flex-1 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {valid ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{label}</button>
+	<button type="button" onclick={saveDraft} disabled={saving} class="h-14 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {saveCls}">{saving ? '저장 중…' : '임시저장'}</button>
+	<button type="button" onclick={next} disabled={!valid || saving} aria-busy={saving} class="h-14 flex-1 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {valid && !saving ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'}">{saving && step >= EDITOR_STEPS ? '심사 요청 중…' : label}</button>
 {/snippet}
 
 <!--
@@ -109,6 +143,11 @@
 
 			<!-- 입력 — 모바일·PC 모두 이 영역만 스크롤 (PC 는 포커스 테두리가 잘리지 않게 -4px 여유) -->
 			<div bind:this={scroller} class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-2 pb-8 lg:-mx-1 lg:-mt-1 lg:px-1 lg:pt-1 lg:pb-2">
+				{#if rejectReason}
+					<p class="mb-4 rounded-2xl border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3 text-[13px] leading-[1.55] text-white/80" role="status">
+						<b class="font-bold text-[#ff8a8a]">반려 사유</b> · {rejectReason}<br /><span class="text-white/55">고친 뒤 마지막 단계에서 다시 심사 요청해주세요.</span>
+					</p>
+				{/if}
 				{#key step}
 					<div class="animate-up-in lg:animate-slide-in">
 						{#if step === 1}<StepBasics bind:ed />

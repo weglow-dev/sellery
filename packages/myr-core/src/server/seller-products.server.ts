@@ -2,10 +2,20 @@
  * 크리에이터 "내 제품" 조회(서버 전용 · 0071) — 크리에이터 id 는 호출자가 세션(requireSeller)에서 정해 넘긴다(결정 3 · 폼 값을 받지 않는다).
  * DB 오류는 throw — 화면이 "제품 없음" 으로 잘못 보이지 않게(페이지 500).
  */
-import { parseSellerProductRows, type SellerProductRow } from '../seller-products';
+import { PRODUCT_IMAGE_BUCKET, PRODUCT_IMAGE_MAX_BYTES, productImagePath } from '../product-images';
+import { sniffImageType } from '../refund-rules';
+import {
+	parseSellerProductDetail,
+	parseSellerProductRows,
+	type SaveProductCode,
+	type SellerProductDetail,
+	type SellerProductPayload,
+	type SellerProductRow,
+	type SetStatusAction
+} from '../seller-products';
 import { admin } from './admin.server';
 
-export type { SellerProductRow } from '../seller-products';
+export type { SellerProductDetail, SellerProductPayload, SellerProductRow } from '../seller-products';
 
 export async function listSellerProducts(sellerId: string): Promise<SellerProductRow[]> {
 	const { data, error } = await admin().rpc('myr_app_seller_products', { p_seller: sellerId });
@@ -18,4 +28,59 @@ export async function listSellerProductsOfUser(userId: string): Promise<SellerPr
 	const { data, error } = await admin().rpc('myr_app_seller_products_of_user', { p_user: userId });
 	if (error) throw new Error(`myr_app_seller_products_of_user failed: ${error.message}`);
 	return parseSellerProductRows(data);
+}
+
+/* ---------------- 상품 등록 저장(0073 · 4-1) — 판정은 전부 RPC 안에 있다 ---------------- */
+
+/** 에디터로 다시 열 상품 1건 — 내 상품이 아니면 null */
+export async function getSellerProduct(sellerId: string, productId: string): Promise<SellerProductDetail | null> {
+	const { data, error } = await admin().rpc('myr_app_seller_product', { p_seller: sellerId, p_id: productId });
+	if (error) throw new Error(`myr_app_seller_product failed: ${error.message}`);
+	const r = data as { ok?: boolean; product?: unknown } | null;
+	return r?.ok ? parseSellerProductDetail(r.product) : null;
+}
+
+export type SaveProductResult = { ok: true; id: string; code: string; status: string } | { ok: false; code: SaveProductCode; field?: string; status?: string };
+
+/** 임시저장(submit=false) · 심사 요청(submit=true). id 없으면 새 상품 */
+export async function saveSellerProduct(sellerId: string, productId: string | null, payload: SellerProductPayload, submit: boolean): Promise<SaveProductResult> {
+	const { data, error } = await admin().rpc('myr_app_seller_save_product', { p_seller: sellerId, p_id: productId, p_payload: payload, p_submit: submit });
+	if (error) {
+		console.error('[seller-products] save failed:', error.message);
+		return { ok: false, code: 'DB_ERROR' };
+	}
+	const r = (data ?? {}) as Record<string, unknown>;
+	if (r.ok) return { ok: true, id: String(r.id), code: String(r.code), status: String(r.status) };
+	return { ok: false, code: (r.code as SaveProductCode) ?? 'DB_ERROR', ...(r.field ? { field: String(r.field) } : {}), ...(r.status ? { status: String(r.status) } : {}) };
+}
+
+export type SetStatusResult = { ok: true; status: string } | { ok: false; code: 'NOT_FOUND' | 'BAD_ACTION' | 'WRONG_STATUS' | 'DB_ERROR'; status?: string };
+
+/** 일시중지 · 다시 판매 · 판매 종료 · 임시저장 삭제 */
+export async function setSellerProductStatus(sellerId: string, productId: string, action: SetStatusAction): Promise<SetStatusResult> {
+	const { data, error } = await admin().rpc('myr_app_seller_set_status', { p_seller: sellerId, p_id: productId, p_action: action });
+	if (error) {
+		console.error('[seller-products] set_status failed:', error.message);
+		return { ok: false, code: 'DB_ERROR' };
+	}
+	const r = (data ?? {}) as Record<string, unknown>;
+	if (r.ok) return { ok: true, status: String(r.status) };
+	return { ok: false, code: (r.code as 'NOT_FOUND' | 'BAD_ACTION' | 'WRONG_STATUS') ?? 'DB_ERROR', ...(r.status ? { status: String(r.status) } : {}) };
+}
+
+export type UploadProductImageResult = { ok: true; url: string } | { ok: false; code: 'BAD_FILE' | 'DB_ERROR' };
+
+/** 상품 이미지 1장 — 그 크리에이터 폴더에 올리고 공개 URL. 형식은 매직 바이트로 확인(확장자 · Content-Type 은 믿지 않는다) */
+export async function uploadProductImage(sellerId: string, file: { bytes: Uint8Array; size: number }): Promise<UploadProductImageResult> {
+	if (file.size <= 0 || file.size > PRODUCT_IMAGE_MAX_BYTES || file.bytes.byteLength !== file.size) return { ok: false, code: 'BAD_FILE' };
+	const kind = sniffImageType(file.bytes);
+	if (!kind) return { ok: false, code: 'BAD_FILE' };
+	const store = admin().storage.from(PRODUCT_IMAGE_BUCKET);
+	const path = productImagePath(sellerId, kind.ext);
+	const { error } = await store.upload(path, file.bytes, { contentType: kind.type, upsert: false, cacheControl: '31536000' });
+	if (error) {
+		console.error('[seller-products] image upload failed:', error.message);
+		return { ok: false, code: 'DB_ERROR' };
+	}
+	return { ok: true, url: store.getPublicUrl(path).data.publicUrl };
 }

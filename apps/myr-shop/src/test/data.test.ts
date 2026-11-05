@@ -1,6 +1,6 @@
 // 상품 모델 헬퍼 — apps/myr-shop/src/lib/data.ts
 import { describe, expect, it } from 'vitest';
-import { catName, creatorsOf, MOCK_PRODUCTS, relatedOf, won } from '../lib/data';
+import { catName, creatorsOf, INFO_DEFAULTS, infoRowsOf, MOCK_PRODUCTS, relatedOf, won } from '../lib/data';
 
 // creatorStyle · handleSlug 는 공용 패키지로 옮겼다 — packages/myr-core/src/test/creator.test.ts
 
@@ -24,5 +24,16 @@ describe('포맷', () => {
 		expect(won(32000)).toBe('₩32,000');
 		expect(catName('diet')).toBe('다이어트');
 		expect(catName('nope')).toBe('전체');
+	});
+});
+
+describe('infoRowsOf — 04 제품 정보(0073)', () => {
+	const base = { name: '포도 젤리', form: '젤리', pack: '스틱포', unit: '14포' } as unknown as Parameters<typeof infoRowsOf>[0];
+	it('유통기한 · 보관은 입력값 · 비면 기본 문구 · 제조는 고정', () => {
+		const rows = Object.fromEntries(infoRowsOf({ ...base, shelfLife: '제조일로부터 18개월', storageMethod: '냉장' }).map((r) => [r.k, r.v]));
+		expect(rows).toMatchObject({ '제형 / 포장': '젤리 / 스틱포', 내용량: '14포', 유통기한: '제조일로부터 18개월', 보관: '냉장' });
+		expect(rows['제조']).toContain('MYR 파트너 제조시설');
+		const empty = Object.fromEntries(infoRowsOf({ ...base, shelfLife: ' ', pack: '' }).map((r) => [r.k, r.v]));
+		expect(empty).toMatchObject({ '제형 / 포장': '젤리', 유통기한: INFO_DEFAULTS.shelfLife, 보관: INFO_DEFAULTS.storageMethod });
 	});
 });

@@ -3,7 +3,8 @@
  *
  *  ⚠ 돈 숫자 두 개는 **디자인 값**이고 정책이 아니다 — 정산 정책이 정해지면(docs/myr.md §9-6) 서버 값으로 바꾼다.
  *    PLATFORM_FEE_RATE 10%(에디터 "예상 정산") · ROUND_TRIP_SHIPPING ₩6,000(부분 환불 · 단순 변심 왕복 배송비). */
-import { type CsRequest, type CsStatus, type CsType, type Category, type Product, type ProductDraft, type ProductStatus, type Resolution, type TimelineEntry } from './data';
+import { myrCategoryName } from '@sellery/myr-core/categories';
+import { type CsRequest, type CsStatus, type CsType, type Product, type ProductDraft, type ProductStatus, type Resolution, type TimelineEntry } from './data';
 
 export const PLATFORM_FEE_RATE = 0.1;
 export const ROUND_TRIP_SHIPPING = 6000;
@@ -184,7 +185,9 @@ export function blankDraft(): ProductDraft {
 			{ title: '', desc: '' },
 			{ title: '', desc: '' }
 		],
-		info: ['', '', '', '', ''],
+		formPack: '',
+		shelfLife: '',
+		storageMethod: '',
 		faq: [
 			{ q: '', a: '' },
 			{ q: '', a: '' },
@@ -213,7 +216,7 @@ export function filledSections(ed: ProductDraft): Record<SectionKey, boolean> {
 		story: has(ed.storyTitle) && has(ed.story),
 		ingredients: ed.ingredients.some((r) => has(r.name)),
 		howto: ed.steps.some((s) => has(s.title)),
-		info: ed.info.some(has),
+		info: has(ed.formPack) || has(ed.shelfLife) || has(ed.storageMethod),
 		faq: ed.faq.some((f) => has(f.q) && has(f.a))
 	};
 }
@@ -238,12 +241,10 @@ export function nextLabel(step: number, ed: ProductDraft): string {
 
 export const STEP_NAMES = ['기본 정보', '레시피 노트', '왜 만들었나요', '성분', '섭취법', '제품 정보', 'FAQ', '미리보기'];
 
-export const categoryName = (cats: Category[], id: string | null) => cats.find((c) => c.id === id)?.name ?? '';
-
-/** 에디터 헤더 아래 한 줄 — "제품명 · ₩가격 · 카테고리" (비면 "새 상품 등록") */
-export function editorTrail(ed: ProductDraft, cats: Category[]): string {
+/** 에디터 헤더 아래 한 줄 — "제품명 · ₩가격 · 카테고리" (비면 "새 상품 등록") · 카테고리는 MYR 6개(@sellery/myr-core/categories) */
+export function editorTrail(ed: ProductDraft): string {
 	const price = parsePrice(ed.price);
-	return [ed.name.trim(), price ? won(price) : '', categoryName(cats, ed.cat)].filter(Boolean).join('  ·  ') || '새 상품 등록';
+	return [ed.name.trim(), price ? won(price) : '', myrCategoryName(ed.cat)].filter(Boolean).join('  ·  ') || '새 상품 등록';
 }
 
 /** 8단계 미리보기의 섹션 목록 — 비어 있는 섹션은 샵에서 숨긴다 */
@@ -257,7 +258,7 @@ export function previewSections(ed: ProductDraft) {
 		{ key: 'story', name: '01 · 왜 만들었나요', step: 3, filled: f.story, summary: has(ed.storyTitle) ? ed.storyTitle.trim() : hidden },
 		{ key: 'ingredients', name: '02 · 성분', step: 4, filled: f.ingredients, summary: f.ingredients ? ed.ingredients.filter((r) => has(r.name)).map((r) => r.name.trim()).join(', ') : hidden },
 		{ key: 'howto', name: '03 · 섭취법', step: 5, filled: f.howto, summary: f.howto ? `${ed.steps.filter((s) => has(s.title)).length}스텝` : hidden },
-		{ key: 'info', name: '04 · 제품 정보', step: 6, filled: f.info, summary: f.info ? `${ed.info.filter(has).length}개 항목` : hidden },
+		{ key: 'info', name: '04 · 제품 정보', step: 6, filled: f.info, summary: f.info ? `${[ed.formPack, ed.unit, ed.shelfLife, ed.storageMethod].filter(has).length + 1}개 항목` : hidden },
 		{ key: 'faq', name: '05 · FAQ', step: 7, filled: f.faq, summary: f.faq ? `${ed.faq.filter((x) => has(x.q)).length}개 질문` : hidden }
 	] satisfies { key: SectionKey; name: string; step: number; filled: boolean; summary: string }[];
 }
