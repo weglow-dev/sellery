@@ -1,6 +1,6 @@
 // 크리에이터 콘솔 로그인 규칙 — apps/myr-influencer/src/lib/console-auth.ts
 import { describe, expect, it } from 'vitest';
-import { LINK_ERROR, authErrorMessage, consoleNext, gateLocation, isPublicPath, linkFailureTarget, loginPath, parseLoginForm, parseNewPassword } from '../lib/console-auth';
+import { LINK_ERROR, authErrorMessage, consoleNext, gateLocation, isPublicPath, linkFailureTarget, loginPath, parseLoginForm, parseNewPassword, resetOutcomeMessage } from '../lib/console-auth';
 
 const fd = (o: Record<string, string>) => ({ get: (k: string) => o[k] ?? null });
 
@@ -82,5 +82,15 @@ describe('linkFailureTarget — 거절된 메일 링크(이미 씀 · 만료)', 
 		expect(linkFailureTarget('signup', true)).toBe('/login?error=expired');
 		expect(linkFailureTarget('magiclink', false)).toBe('/login?error=expired');
 		expect(LINK_ERROR.expired).toContain('만료');
+	});
+});
+
+describe('resetOutcomeMessage — 비밀번호 재설정 요청 결과 안내(2026-11-05)', () => {
+	it('보냈으면 안내 없음("보냈어요" 화면)', () => expect(resetOutcomeMessage('sent')).toBeNull());
+	it('크리에이터가 아닌 이메일 · 정지 · 요청 과다 · 실패는 각각 안내', () => {
+		expect(resetOutcomeMessage('not_creator')).toContain('크리에이터로 가입된 이메일이 아니에요');
+		expect(resetOutcomeMessage('suspended')).toContain('정지');
+		expect(resetOutcomeMessage('rate_limited')).toContain('잠시 후');
+		expect(resetOutcomeMessage('error')).toContain('보내지 못했어요');
 	});
 });

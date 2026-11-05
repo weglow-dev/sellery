@@ -2,13 +2,13 @@ import { dev } from '$app/environment';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { requestPasswordReset } from '$lib/server/password-reset';
-import { EMAIL_RE, LINK_ERROR, SESSION_ONLY_COOKIE, authErrorMessage, consoleNext, parseLoginForm } from '$lib/console-auth';
+import { EMAIL_RE, LINK_ERROR, SESSION_ONLY_COOKIE, authErrorMessage, consoleNext, parseLoginForm, resetOutcomeMessage } from '$lib/console-auth';
 
 /**
  * 크리에이터 콘솔 로그인 — 이메일 + 비밀번호(docs/myr.md §4.2.1 2번 · 시안 "MYR Influencer Login" · "… PC").
  * 서버 form action 이 처리한다(JS 없이도 동작 · 비밀번호가 브라우저 Supabase 클라이언트를 거치지 않는다).
  *   login    로그인 — `signInWithPassword` · "이 기기에서 로그인 유지"를 끄면 세션 쿠키를 브라우저 종료 때 지워지게(hooks 가 SESSION_ONLY_COOKIE 를 본다)
- *   forgot   비밀번호 찾기 — 로그인 칸에 적은 이메일로 재설정 메일(시안: 버튼을 누르면 바로 보내고 토스트). 계정 유무는 드러내지 않는다 · MYR 메일(lib/server/password-reset)
+ *   forgot   비밀번호 찾기 — 로그인 칸에 적은 이메일로 재설정 메일(시안: 버튼을 누르면 바로 보내고 토스트). 크리에이터가 아닌 이메일 · 정지 · 요청 과다면 그 안내(resetOutcomeMessage) · MYR 메일(lib/server/password-reset)
  * 이미 로그인했으면 `next`(같은 오리진 경로만 · 기본 홈)로. 가입은 초대 링크(/invite/<토큰>)로만.
  */
 export const load: PageServerLoad = async ({ url, locals }) => {
@@ -52,7 +52,8 @@ export const actions: Actions = {
 			return fail(400, { action: 'forgot' as const, email, remember: fd.get('remember') === '1', field: 'email' as const, message: '먼저 가입한 이메일을 입력해주세요' });
 		}
 		if (!locals.supabase) return fail(503, { action: 'forgot' as const, email, remember: true, field: null, message: '로그인 서버 설정이 아직 안 됐어요' });
-		await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress() });
+		const message = resetOutcomeMessage(await requestPasswordReset({ email, origin: url.origin, ip: getClientAddress() }));
+		if (message) return fail(400, { action: 'forgot' as const, email, remember: fd.get('remember') === '1', field: 'email' as const, message });
 		return { action: 'forgot' as const, sent: true, email, remember: fd.get('remember') === '1' };
 	}
 };

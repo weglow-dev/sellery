@@ -33,6 +33,8 @@
 	const showEmailErr = $derived((touched.email || attempted) && !!errs.email);
 	const showPwErr = $derived((touched.password || attempted) && !!errs.password);
 	/** 서버가 돌려준 오류(자격 증명 불일치 등) — 칸 오류가 없을 때 버튼 위에 */
+	/** 비밀번호 찾기 거절(크리에이터가 아닌 이메일 · 정지 · 요청 과다) — 이메일 칸 아래에, 이메일을 고치면 사라진다 */
+	const forgotError = $derived(form && form.action === 'forgot' && 'message' in form && form.message && form.email === email.trim().toLowerCase() ? form.message : null);
 	const serverMessage = $derived(form && 'message' in form && form.action === 'login' && !form.field ? form.message : null);
 	const notice = $derived(data.reset ? '비밀번호를 바꿨어요. 새 비밀번호로 로그인해주세요.' : null);
 
@@ -50,9 +52,9 @@
 	 *  Enter 가 재설정 메일을 보내던 문제(2026-11-05)를 막는다. 실제 제출은 로그인 버튼 뒤에 둔 숨은 제출 버튼으로(`?/forgot`). */
 	function onForgot() {
 		if (!EMAIL_RE.test(email.trim())) {
+			// 안내는 이메일 칸 아래(errs.email)에만 — 토스트는 보낸 경우에만(2026-11-05)
 			touched.email = true;
 			attempted = true;
-			showToast('먼저 가입한 이메일을 입력해주세요');
 			return;
 		}
 		formEl?.requestSubmit(forgotSubmit);
@@ -128,7 +130,7 @@
 								return;
 							}
 							await update({ reset: false });
-							if (isForgot && result.type === 'failure') showToast('먼저 가입한 이메일을 입력해주세요');
+							// 거절(크리에이터가 아닌 이메일 · 정지 · 요청 과다)은 이메일 칸 아래 forgotError 로만 — 토스트 없음
 						};
 					}}
 				>
@@ -150,7 +152,7 @@
 							aria-describedby={showEmailErr ? 'email-err' : undefined}
 							class={authInput({ invalid: showEmailErr, filled: !!email.trim() })}
 						/>
-						{#if showEmailErr}<ErrorText id="email-err" text={errs.email} />{/if}
+						{#if showEmailErr}<ErrorText id="email-err" text={errs.email} />{:else if forgotError}<ErrorText id="email-err" text={forgotError} />{/if}
 					</div>
 
 					<div class="flex flex-col gap-2">
