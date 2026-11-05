@@ -26,6 +26,8 @@ export type Product = {
 	/** 타일 배경(그라데이션) — 실제 제품 사진(thumbUrl)이 없을 때 */
 	tile: string;
 	thumbUrl: string | null;
+	/** 상품 페이지에서 넘겨보는 사진(0073 · 첫 장 = 대표 = thumbUrl) — 비면 타일 */
+	images: string[];
 	ic: string;
 	form: string;
 	pack: string;
@@ -116,7 +118,7 @@ const T = {
 	plum: 'linear-gradient(145deg,#a05ac8,#3f1f57)',
 	slate: 'linear-gradient(145deg,#6b7280,#262a33)'
 };
-type Base = Omit<Product, keyof Detail | 'creator' | 'thumbUrl' | 'soldOut'> & { creator: string };
+type Base = Omit<Product, keyof Detail | 'creator' | 'thumbUrl' | 'images' | 'soldOut'> & { creator: string };
 const ig = (name: string, why: string, amount: string): IngredientRow => ({ name, why, amount });
 const st = (t: string, d: string): Step => ({ t, d });
 const qa = (q: string, a: string): Faq => ({ q, a });
@@ -166,6 +168,7 @@ export const MOCK_PRODUCTS: Product[] = BASE.map((p) => ({
 	...p,
 	creator: MOCK_CREATORS[p.creator],
 	thumbUrl: null,
+	images: [],
 	soldOut: false,
 	...(DETAIL[p.id] ?? genericDetail(p))
 }));

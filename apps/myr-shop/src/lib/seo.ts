@@ -77,6 +77,8 @@ export function categoryPath(cat: string, creatorSlug: string | null): string {
 export function productImage(p: Product, origin: string): string {
 	return p.thumbUrl ? absUrl(origin, p.thumbUrl) : absUrl(origin, OG_IMAGE.path);
 }
+/** 구조화 데이터의 이미지 목록 — 사진 전부(넘겨보기와 같은 순서) · 없으면 공유 이미지 하나 */
+export const productImages = (p: Product, origin: string): string[] => (p.images.length ? p.images.map((u) => absUrl(origin, u)) : [productImage(p, origin)]);
 
 type JsonLd = Record<string, unknown>;
 
@@ -111,7 +113,7 @@ export function productJsonLd(p: Product, origin: string): JsonLd {
 		name: p.name,
 		sku: p.code,
 		url,
-		image: [productImage(p, origin)],
+		image: productImages(p, origin),
 		description: productDescription(p),
 		category: catName(p.cat),
 		brand: { '@type': 'Brand', name: p.creator.name },

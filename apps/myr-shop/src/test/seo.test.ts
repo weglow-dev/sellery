@@ -97,6 +97,11 @@ describe('구조화 데이터', () => {
 		expect(ld).not.toHaveProperty('aggregateRating');
 		expect((productJsonLd({ ...p0, soldOut: true }, O) as Record<string, any>).offers.availability).toBe('https://schema.org/OutOfStock');
 	});
+	it('productJsonLd 이미지 — 사진 전부(넘겨보기 순서) · 없으면 공유 이미지 하나', () => {
+		const imgs = ['https://x.supabase.co/a.jpg', 'https://x.supabase.co/b.jpg'];
+		expect((productJsonLd({ ...p0, thumbUrl: imgs[0], images: imgs }, O) as Record<string, any>).image).toEqual(imgs);
+		expect((productJsonLd(p0, O) as Record<string, any>).image).toEqual([productImage(p0, O)]);
+	});
 	it('productImage — 제품 사진이 있으면 그것, 없으면 사이트 기본 og.png', () => {
 		expect(productImage({ ...p0, thumbUrl: null }, O)).toBe(`${O}/og.png`);
 		expect(productImage({ ...p0, thumbUrl: 'https://cdn.example.com/a.jpg' }, O)).toBe('https://cdn.example.com/a.jpg');
