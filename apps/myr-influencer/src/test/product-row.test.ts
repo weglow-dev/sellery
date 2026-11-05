@@ -1,7 +1,7 @@
 // 내 제품 — DB 행 → 화면(상태 · 보조 문구 · 비주얼) · 탭 · 홈 카운트 (0071 · docs/myr.md §4.2.1 3번)
 import { describe, expect, it } from 'vitest';
 import type { SellerProductRow } from '@sellery/myr-core/seller-products';
-import { STATUS_FROM_DB, productFromRow, productMeta, relativeTime, reviewDay } from '../lib/product-row';
+import { STATUS_FROM_DB, productFromRow, productMeta, relativeTime, reviewDay, revisionFromRow } from '../lib/product-row';
 import { PRODUCT_TABS, filterProducts, homeProductCounts, productTabCounts, showsStock } from '../lib/rules';
 
 const NOW = new Date('2026-11-05T12:00:00Z');
@@ -11,7 +11,7 @@ const D = 24 * H;
 const row = (o: Partial<SellerProductRow> = {}): SellerProductRow => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, category: 'diet', price: 32000, optionCount: 0,
 	stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null,
-	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), ...o
+	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), revision: null, ...o
 });
 
 describe('relativeTime · reviewDay', () => {
@@ -64,9 +64,15 @@ describe('탭 · 재고 표시 · 홈 카운트', () => {
 	});
 });
 
-describe('수정 심사 중(4-2) — 탭 · 홈 카운트', () => {
+describe('수정 심사(0074 · 4-2) — 칩 문구 · 탭 · 홈 카운트', () => {
+	it('DB 수정본 → 심사 중 "수정 심사 N일차" · 반려 "사유 · …" · 없으면 null', () => {
+		expect(revisionFromRow(row(), NOW)).toBeNull();
+		expect(revisionFromRow(row({ revision: { status: 'pending', rejectReason: null, submittedAt: ago(D + H), reviewedAt: null } }), NOW)).toEqual({ state: 'review', meta: '수정 심사 2일차' });
+		expect(revisionFromRow(row({ revision: { status: 'rejected', rejectReason: '효능 표현', submittedAt: ago(3 * D), reviewedAt: ago(D) } }), NOW)).toEqual({ state: 'rejected', meta: '사유 · 효능 표현' });
+		expect(productFromRow(row({ revision: { status: 'pending', rejectReason: null, submittedAt: ago(H), reviewedAt: null } }), NOW).revision?.state).toBe('review');
+	});
 	it('수정 심사 중인 판매 중 상품은 판매 중 · 심사 중 탭 둘 다 · 홈 심사 수에 포함', () => {
-		const p = { ...productFromRow(row({ id: 'r1', status: 'listed' }), NOW), revision: { meta: '방금 수정 요청' } };
+		const p = productFromRow(row({ id: 'r1', status: 'listed', revision: { status: 'pending', rejectReason: null, submittedAt: ago(H), reviewedAt: null } }), NOW);
 		expect(filterProducts([p], 'live')).toHaveLength(1);
 		expect(filterProducts([p], 'review')).toHaveLength(1);
 		expect(homeProductCounts([p])).toEqual({ live: 1, pending: 1 });

@@ -14,20 +14,19 @@
 	 *  [상품 등록] → 8단계 에디터(0073 저장). 상품을 누르면 메뉴(product-draft productMenu): 임시저장 이어서 작성 · 삭제 / 반려 고쳐서 다시 심사 요청 /
 	 *  판매 중 일시중지 · 판매 종료 / 일시중지 다시 판매 · 판매 종료(종료 · 삭제는 확인). 심사 중 · 종료는 안내만. 재고는 읽기 전용(남은 재고 = 입고 − 판매).
 	 *  모바일은 한 줄 목록, PC(lg~)는 32px 제목 + 2단 카드(누적 판매 수량까지).
-	 *  판매 중 상품의 내용 수정(수정 심사)은 4-2. */
+	 *  판매 중 · 일시중지 상품은 "내용 수정" → 수정 심사(0074) — 심사 중이면 "수정 심사 중" 칩(메뉴에서 안내) · 반려면 "수정 반려" 칩 + 사유 · 고쳐서 다시 요청. */
 	let { data } = $props();
 	let tab = $state<ProductTab>('all');
-	/** 수정 심사 — 서버(4-2) 전까지는 미리보기에서 요청한 상품만 화면 메모리로(app.mockRevisions) */
-	const products = $derived(data.products.map((p) => (p.revision || !app.mockRevisions[p.id] ? p : { ...p, revision: { meta: '방금 수정 요청' } })));
+	const products = $derived(data.products);
 	const tabs = $derived(productTabCounts(products));
 	const list = $derived(filterProducts(products, tab));
 
 	let menuFor = $state<Product | null>(null);
 	let busy = $state(false);
-	const menuItems = $derived(menuFor ? productMenu(menuFor.status, !!menuFor.revision) : []);
+	const menuItems = $derived(menuFor ? productMenu(menuFor.status, menuFor.revision?.state ?? null) : []);
 
 	function open(p: Product) {
-		if (productMenu(p.status, !!p.revision).length) menuFor = p;
+		if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
 	}
@@ -69,7 +68,7 @@
 				<button type="button" onclick={() => open(p)} class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 text-left transition-colors lg:gap-4 lg:rounded-[20px] lg:p-4 lg:hover:border-white/30">
 					<Tile tile={p.tile} thumbUrl={p.thumbUrl} bg={p.bg} iconId={p.iconId} icon={36} iconCls="lg:h-11 lg:w-11" class="h-16 w-16 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-[18px] {p.status === 'ended' || p.status === 'paused' ? 'opacity-50' : ''}" />
 					<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if p.revision}<Badge cls="bg-accent/16 text-accent">수정 심사 중</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
+						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if p.revision}<Badge cls={PRODUCT_STATUS_META[p.revision.state].cls}>{p.revision.state === 'review' ? '수정 심사 중' : '수정 반려'}</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
 						<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{p.name}</span>
 						<span class="text-[12px] text-white/55 lg:text-[13px]">
 							{p.price ? won(p.price) : '가격 미정'} · 재고 {showsStock(p.status) ? `${p.stock.toLocaleString('ko-KR')}개` : '—'}<span class="hidden lg:inline">{' · '}누적 판매 {p.sold ? `${p.sold.toLocaleString('ko-KR')}개` : '—'}</span>

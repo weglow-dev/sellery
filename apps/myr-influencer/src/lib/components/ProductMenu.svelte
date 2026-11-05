@@ -36,7 +36,7 @@
 			</div>
 			<button type="button" onclick={onclose} aria-label="닫기" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/6 text-fg"><Icon id="x" size={18} sw={2.2} /></button>
 		</div>
-		{#if product.revision && !confirming}
+		{#if product.revision?.state === 'review' && !confirming}
 			<p class="mt-4 rounded-2xl border border-accent/20 bg-accent/8 px-4 py-3 text-[13px] leading-[1.55] text-white/80" role="status">{REVISION_PENDING_TOAST}</p>
 		{/if}
 		{#if confirming}

@@ -19,6 +19,12 @@ export const joinFormPack = (form: string, pack: string) => [t(form), t(pack)].f
 /** 업로드가 끝난 이미지만(브라우저 미리보기 blob: 은 저장하지 않는다) */
 export const savedImages = (images: string[]) => images.filter((u) => /^https?:\/\//.test(u));
 
+/** 저장 · 미리보기의 비주얼 — 색을 바꾸지 않았으면 DB 의 원래 값(keepVisual), 바꿨으면 콘솔 색 */
+export function draftVisual(ed: ProductDraft): { tile: string | null; icon: string } {
+	const k = ed.keepVisual;
+	return k && k.key === ed.tile ? { tile: k.tile, icon: k.icon } : { tile: TILE_BG[ed.tile], icon: TILE_ICON[ed.tile] };
+}
+
 export function draftToPayload(ed: ProductDraft): SellerProductPayload {
 	const { form, pack } = splitFormPack(ed.formPack);
 	return {
@@ -26,8 +32,7 @@ export function draftToPayload(ed: ProductDraft): SellerProductPayload {
 		price: parsePrice(ed.price),
 		unit: t(ed.unit),
 		category: ed.cat,
-		tile: TILE_BG[ed.tile],
-		icon: TILE_ICON[ed.tile],
+		...draftVisual(ed),
 		image_urls: savedImages(ed.images),
 		chips: ed.chips.map(t),
 		note: t(ed.note),
@@ -52,6 +57,7 @@ const pad = <T>(list: T[], min: number, blank: () => T): T[] => [...list, ...Arr
 
 export function detailToDraft(d: SellerProductDetail): ProductDraft {
 	const b = blankDraft();
+	const tile = tileKeyOf(d.tile, d.icon);
 	return {
 		...b,
 		images: d.image_urls,
@@ -59,7 +65,8 @@ export function detailToDraft(d: SellerProductDetail): ProductDraft {
 		price: d.price ? formatPriceInput(String(d.price)) : '',
 		unit: d.unit,
 		cat: d.category,
-		tile: tileKeyOf(d.tile, d.icon),
+		tile,
+		keepVisual: { key: tile, tile: d.tile, icon: d.icon },
 		chips: pad(d.chips.slice(0, 3), 3, () => ''),
 		note: d.note,
 		storyTitle: d.story_title,
@@ -93,6 +100,9 @@ export function saveFailure(code: string, field?: string | null): { message: str
 	}
 	if (code === 'BAD_IMAGE') return { message: '이미지를 다시 올려주세요', step: 1 };
 	if (code === 'NOT_EDITABLE') return { message: '심사 중이거나 판매 중인 상품은 여기서 고칠 수 없어요' };
+	if (code === 'NO_CHANGE') return { message: '바뀐 내용이 없어요' };
+	if (code === 'REVISION_PENDING') return { message: '이미 수정 심사 중이에요 · 승인되면 바로 반영돼요' };
+	if (code === 'NOT_REVISABLE') return { message: '판매 중이거나 일시중지한 상품만 수정할 수 있어요' };
 	if (code === 'NOT_FOUND') return { message: '상품을 찾을 수 없어요' };
 	return { message: '저장하지 못했어요. 잠시 후 다시 시도해주세요' };
 }
@@ -104,9 +114,9 @@ export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'pa
 
 export type ProductMenuItem = { kind: 'edit' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
-/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠진다 */
-export function productMenu(s: ProductStatus, revisionPending = false): ProductMenuItem[] {
-	const revise: ProductMenuItem[] = revisionPending ? [] : [{ kind: 'edit', label: '내용 수정' }];
+/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고, 수정 반려면 "고쳐서 다시 수정 요청" */
+export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | null = null): ProductMenuItem[] {
+	const revise: ProductMenuItem[] = revision === 'review' ? [] : [{ kind: 'edit', label: revision === 'rejected' ? '고쳐서 다시 수정 요청' : '내용 수정' }];
 	const end: ProductMenuItem = { kind: 'end', label: '판매 종료', danger: true, confirm: '판매를 종료하면 샵에서 내려가고 다시 열 수 없어요. 종료할까요?' };
 	switch (s) {
 		case 'draft':

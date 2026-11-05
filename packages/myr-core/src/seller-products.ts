@@ -29,11 +29,23 @@ export type SellerProductRow = {
 	reviewedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
+	/** 판매 중 상품의 수정 심사(0074) — 가장 최근 수정본이 심사 중 · 반려일 때만(반영 · 취소면 null) */
+	revision: SellerProductRevisionState | null;
 };
+
+/** 수정본 상태(0074) — 목록 · 에디터가 보는 것은 심사 중 · 반려 둘뿐 */
+export type SellerRevisionStatus = 'pending' | 'rejected';
+export type SellerProductRevisionState = { status: SellerRevisionStatus; rejectReason: string | null; submittedAt: string | null; reviewedAt: string | null };
 
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 const int = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
+
+function parseRevisionState(v: unknown): SellerProductRevisionState | null {
+	const r = v as Record<string, unknown> | null;
+	if (!r || typeof r !== 'object' || (r.status !== 'pending' && r.status !== 'rejected')) return null;
+	return { status: r.status, rejectReason: strOrNull(r.reject_reason), submittedAt: strOrNull(r.submitted_at), reviewedAt: strOrNull(r.reviewed_at) };
+}
 
 /** RPC 응답(jsonb 배열) → 행. 모양이 어긋난 행(id · 상태 없음)은 버린다 */
 export function parseSellerProductRows(data: unknown): SellerProductRow[] {
@@ -59,7 +71,8 @@ export function parseSellerProductRows(data: unknown): SellerProductRow[] {
 			submittedAt: strOrNull(r.submitted_at),
 			reviewedAt: strOrNull(r.reviewed_at),
 			createdAt: str(r.created_at),
-			updatedAt: str(r.updated_at)
+			updatedAt: str(r.updated_at),
+			revision: parseRevisionState(r.revision)
 		});
 	}
 	return out;
@@ -95,14 +108,9 @@ export type SellerProductDetail = SellerProductPayload & { id: string; code: str
 const arrOf = <T>(v: unknown, f: (x: Record<string, unknown>) => T): T[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object').map((x) => f(x as Record<string, unknown>)) : []);
 const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
-export function parseSellerProductDetail(v: unknown): SellerProductDetail | null {
-	const r = v as Record<string, unknown> | null;
-	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !isSellerProductStatus(r.status)) return null;
+/** 저장 본문 모양(상품 1건 · 수정본 fields 공통) */
+function parsePayload(r: Record<string, unknown>): SellerProductPayload {
 	return {
-		id: r.id,
-		code: str(r.code),
-		status: r.status,
-		rejectReason: strOrNull(r.reject_reason),
 		name: str(r.name),
 		price: int(r.price),
 		unit: str(r.unit),
@@ -123,6 +131,28 @@ export function parseSellerProductDetail(v: unknown): SellerProductDetail | null
 		storage_method: str(r.storage_method)
 	};
 }
+
+export function parseSellerProductDetail(v: unknown): SellerProductDetail | null {
+	const r = v as Record<string, unknown> | null;
+	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !isSellerProductStatus(r.status)) return null;
+	return { id: r.id, code: str(r.code), status: r.status, rejectReason: strOrNull(r.reject_reason), ...parsePayload(r) };
+}
+
+/* ---------------- 판매 중 상품 수정 심사(0074 · 4-2) ---------------- */
+
+/** 에디터가 이어서 고칠 열린 수정본(0074 myr_app_seller_product 의 revision) — 심사 중이면 에디터를 열지 않고, 반려면 이 내용으로 연다 */
+export type SellerProductRevision = { id: string; status: SellerRevisionStatus; rejectReason: string | null; submittedAt: string | null; fields: SellerProductPayload };
+
+export function parseSellerProductRevision(v: unknown): SellerProductRevision | null {
+	const r = v as Record<string, unknown> | null;
+	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || (r.status !== 'pending' && r.status !== 'rejected')) return null;
+	const f = r.fields;
+	if (!f || typeof f !== 'object') return null;
+	return { id: r.id, status: r.status, rejectReason: strOrNull(r.reject_reason), submittedAt: strOrNull(r.submitted_at), fields: parsePayload(f as Record<string, unknown>) };
+}
+
+/** 수정 심사 요청 거절 코드(0074) */
+export type SubmitRevisionCode = 'NOT_FOUND' | 'NOT_REVISABLE' | 'REVISION_PENDING' | 'NO_CHANGE' | 'INVALID_INPUT' | 'BAD_IMAGE' | 'DB_ERROR';
 
 /** 저장 · 상태 바꾸기 거절 코드(0073) */
 export type SaveProductCode = 'NOT_FOUND' | 'NOT_EDITABLE' | 'INVALID_INPUT' | 'BAD_IMAGE' | 'DB_ERROR';

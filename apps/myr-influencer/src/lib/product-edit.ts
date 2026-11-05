@@ -61,6 +61,8 @@ export const MODE_COPY = {
 		step8Desc: '샵 상세페이지 순서 그대로예요. 비어 있는 섹션은 샵에서 숨겨져요.',
 		step8Notice: '제출하면 MYR 운영팀이 표시·광고 문구를 검토해요. 보통 영업일 1~2일 안에 승인되고, 수정이 필요하면 알림으로 알려드려요.',
 		secondary: '임시저장',
+		rejectLabel: '반려 사유',
+		rejectHint: '고친 뒤 마지막 단계에서 다시 심사 요청해주세요.',
 		doneTitle: '심사 요청했어요',
 		doneDesc: '영업일 1~2일 안에 검토 결과를 알려드려요.',
 		doneSteps: [
@@ -76,6 +78,8 @@ export const MODE_COPY = {
 		step8Desc: '바꾼 섹션에는 ‘변경됨’이 표시돼요. 섹션 옆 수정을 눌러 고칠 수 있어요.',
 		step8Notice: '수정 심사 중에도 지금 상세페이지로 판매는 계속돼요. 승인되면 샵에 바로 반영돼요',
 		secondary: '취소',
+		rejectLabel: '수정 반려 사유',
+		rejectHint: '고친 뒤 수정 심사를 다시 요청해주세요. 그동안 샵은 지금 내용 그대로예요.',
 		doneTitle: '수정 심사 요청했어요',
 		doneDesc: '심사 중에도 지금 상세페이지로 판매는 계속돼요.',
 		doneSteps: [

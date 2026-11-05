@@ -25,18 +25,21 @@
 	 *  저장은 서버(0073 · POST /api/products): 임시저장 = draft · 심사 요청 = pending(운영팀 검수 → 승인되면 MYR Shop · docs/myr.md §6.1).
 	 *  `?id=<상품>` 이면 내 임시저장 · 반려 상품을 이어 쓴다(+page.server.ts). 반려 상품은 사유를 보여주고, 다시 심사 요청하면 사유가 지워진다.
 	 *  **수정 모드(4-2 · 시안의 isEdit)** — 판매 중 · 일시중지 상품: 8단계(수정 내용 확인)에서 시작 · 섹션 [수정] → 그 단계 → "수정 완료" 로 8단계 · 바꾼 섹션 "변경됨" ·
-	 *  바꾼 게 없으면 요청 못 함 · 보조 버튼 "취소" · 뒤로는 8단계로. 수정 심사 저장(서버)은 다음 단계 — 지금은 dev · Preview 에서만 완료 화면까지(UI 확인).
+	 *  바꾼 게 없으면 요청 못 함 · 보조 버튼 "취소" · 뒤로는 8단계로. 요청은 수정본으로 보관(0074 · POST /api/products/[id]/revision) — 운영팀이 승인하면 샵에 반영.
+	 *  수정본이 반려됐으면 그 내용으로 이어서 고치고(비교 기준은 지금 샵 내용) 사유를 위에 보여 준다.
 	 *  모바일: 단계 막대 헤더 · 하단 버튼 줄 · [예시] 바텀시트 / PC(lg~): 화면 높이 고정 — 왼쪽 입력(안에서 스크롤) + 바닥 버튼, 오른쪽 460px 예시 패널이 늘 보이고 쓰는 단계로 스크롤된다. */
 	let { data } = $props();
 	// 첫 값만 서버 데이터에서(이후는 이 화면 안에서 바뀐다)
 	const source = untrack(() => data.product);
+	/** 반려된 수정본(0074) — 수정 모드는 이 내용에서 이어서 고친다 */
+	const revision = untrack(() => data.revision);
 	const mode: EditorMode = untrack(() => data.mode);
 	const copy = MODE_COPY[mode];
 	let productId = $state<string | null>(source?.id ?? null);
-	let ed = $state<ProductDraft>(source ? detailToDraft(source) : blankDraft());
+	let ed = $state<ProductDraft>(source ? detailToDraft(revision ? { ...source, ...revision.fields } : source) : blankDraft());
 	/** 수정 모드의 비교 기준(지금 샵에 보이는 내용) */
 	const orig = mode === 'edit' && source ? detailToDraft(source) : null;
-	const rejectReason = source?.status === 'rejected' ? source.rejectReason : null;
+	const rejectReason = mode === 'edit' ? (revision?.status === 'rejected' ? revision.rejectReason : null) : source?.status === 'rejected' ? source.rejectReason : null;
 	let step = $state(mode === 'edit' ? EDITOR_STEPS : 1);
 	let saving = $state(false);
 	let exOpen = $state(false);
@@ -110,20 +113,31 @@
 		app.lastSubmitMode = 'new';
 		goto('/products/new/done', { replaceState: true });
 	}
-	/** 수정 심사 요청 — 서버 저장(수정본 보관 · 운영팀 승인 시 반영)은 다음 단계. 지금은 dev · Preview 에서만 완료 화면(UI 확인) */
-	function submitRevision() {
+	/** 수정 심사 요청(0074) — 수정본으로 보관 · 샵은 승인 전까지 지금 내용. 실패하면 안내 + 그 칸이 있는 단계로 */
+	async function submitRevision() {
+		if (saving || !productId) return;
 		if (ed.images.some((u) => u.startsWith('blob:'))) {
 			app.showToast('사진을 올리는 중이에요. 잠시 후 다시 눌러주세요');
 			return;
 		}
-		if (!data.revisionPreview) {
-			app.showToast('수정 심사는 곧 열려요. 조금만 기다려주세요');
-			return;
+		saving = true;
+		try {
+			const res = await fetch(`/api/products/${encodeURIComponent(productId)}/revision`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ payload: draftToPayload(ed) }) });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; code?: string; field?: string } | null;
+			if (!r?.ok) {
+				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field);
+				app.showToast(f.message);
+				if (f.step) step = f.step;
+				return;
+			}
+			app.lastSubmitted = ed.name.trim();
+			app.lastSubmitMode = 'edit';
+			goto('/products/new/done', { replaceState: true });
+		} catch {
+			app.showToast('저장하지 못했어요. 인터넷 연결을 확인해주세요');
+		} finally {
+			saving = false;
 		}
-		app.lastSubmitted = ed.name.trim();
-		app.lastSubmitMode = 'edit';
-		if (productId) app.mockRevisions = { ...app.mockRevisions, [productId]: true };
-		goto('/products/new/done', { replaceState: true });
 	}
 	/** 보조 버튼 — 새 상품은 임시저장, 수정 모드는 취소(바꾼 내용은 버린다 · 샵은 그대로) */
 	function secondary() {
@@ -185,7 +199,7 @@
 			<div bind:this={scroller} class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-2 pb-8 lg:-mx-1 lg:-mt-1 lg:px-1 lg:pt-1 lg:pb-2">
 				{#if rejectReason}
 					<p class="mb-4 rounded-2xl border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3 text-[13px] leading-[1.55] text-white/80" role="status">
-						<b class="font-bold text-[#ff8a8a]">반려 사유</b> · {rejectReason}<br /><span class="text-white/55">고친 뒤 마지막 단계에서 다시 심사 요청해주세요.</span>
+						<b class="font-bold text-[#ff8a8a]">{copy.rejectLabel}</b> · {rejectReason}<br /><span class="text-white/55">{copy.rejectHint}</span>
 					</p>
 				{/if}
 				{#key step}

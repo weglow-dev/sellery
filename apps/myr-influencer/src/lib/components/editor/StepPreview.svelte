@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { TILE_BG, TILE_ICON, type Me, type ProductDraft } from '$lib/data';
+	import type { Me, ProductDraft } from '$lib/data';
+	import { draftVisual } from '$lib/product-draft';
 	import { MODE_COPY, type EditorMode } from '$lib/product-edit';
 	import { parsePrice, previewSections, won, type SectionKey } from '$lib/rules';
 	import CheckDot from '../CheckDot.svelte';
@@ -48,11 +49,11 @@
 
 <div class="mt-[18px] lg:mt-6 lg:grid lg:grid-cols-2 lg:items-stretch lg:gap-4">
 	<div class="overflow-hidden rounded-3xl border border-white/8 bg-white/2 lg:flex lg:flex-col lg:rounded-[20px]">
-		<div class="relative flex aspect-[16/10] items-center justify-center text-white/95" style:background={ed.images[0] ? undefined : TILE_BG[ed.tile]}>
+		<div class="relative flex aspect-[16/10] items-center justify-center text-white/95" style:background={ed.images[0] ? undefined : draftVisual(ed).tile}>
 			{#if ed.images[0]}
 				<img src={ed.images[0]} alt="" class="absolute inset-0 h-full w-full object-cover" />
 			{:else}
-				<Icon id={TILE_ICON[ed.tile]} set="tile" size={110} />
+				<Icon id={draftVisual(ed).icon} set="tile" size={110} />
 			{/if}
 			{#if ed.images.length > 1}
 				<span class="absolute top-3 right-3 rounded-full bg-bg/60 px-[9px] py-1 text-[11px] font-bold">1/{ed.images.length}</span>

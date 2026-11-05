@@ -128,6 +128,8 @@ export type ProductDraft = {
 	shelfLife: string;
 	storageMethod: string;
 	faq: Faq[];
+	/** DB 상품의 원래 비주얼(그라데이션 · 아이콘) — 운영팀이 넣은 상품은 콘솔 색 6개 밖의 값일 수 있다. 크리에이터가 색(tile)을 바꾸지 않았으면 이 값을 그대로 저장한다(product-draft draftVisual) */
+	keepVisual?: { key: TileKey; tile: string | null; icon: string };
 };
 
 export type Product = {
@@ -144,8 +146,8 @@ export type Product = {
 	/** 샵 주소 /p/<code> */
 	code?: string;
 	rejectReason?: string | null;
-	/** 판매 중 상품의 수정 심사(4-2) — 있으면 "수정 심사 중" 칩 + meta("방금 수정 요청" · "수정 심사 1일차"). 샵은 승인 전까지 지금 내용 */
-	revision?: { meta: string } | null;
+	/** 판매 중 상품의 수정 심사(0074 · 4-2) — review 면 "수정 심사 중" 칩 + meta("수정 심사 1일차") · rejected 면 "수정 반려" 칩 + 사유. 샵은 승인 전까지 지금 내용 */
+	revision?: { state: 'review' | 'rejected'; meta: string } | null;
 	sold: number;
 	/** 상태 옆 보조 문구("2주 전 승인" · "심사 1일차") */
 	meta: string;

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODE_COPY, anyChanged, changedSections, primaryEnabled, primaryLabel } from '../lib/product-edit';
 import { blankDraft } from '../lib/rules';
+import { detailToDraft } from '../lib/product-draft';
 
 const base = () => ({ ...blankDraft(), name: '포도 젤리', price: '32,000', cat: 'diet', note: '노트', unit: '14포', formPack: '젤리 / 스틱포' });
 
@@ -23,6 +24,17 @@ describe('changedSections', () => {
 	it('사진 순서를 바꿔도(대표 사진 변경) 기본 정보가 바뀐 것', () => {
 		const o = { ...base(), images: ['https://a/1.jpg', 'https://a/2.jpg'] };
 		expect(changedSections({ ...o, images: ['https://a/2.jpg', 'https://a/1.jpg'] }, o).basics).toBe(true);
+	});
+});
+
+describe('운영팀 상품(콘솔 색 밖 비주얼)', () => {
+	it('열자마자는 바뀐 게 없다 · 색을 고르면 basics 만 바뀜', () => {
+		const d = { id: 'p1', code: 'jun', status: 'listed' as const, rejectReason: null, name: '멀티', price: 30000, unit: '30정', category: 'mens', tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill',
+			image_urls: [], chips: [], note: '노트', story_title: '', story: '', ingredient_rows: [], howto_steps: [], faq: [], form: '', pack: '', shelf_life: '', storage_method: '' };
+		const orig = detailToDraft(d);
+		expect(anyChanged(changedSections(detailToDraft(d), orig))).toBe(false);
+		const c = changedSections({ ...detailToDraft(d), tile: 'grape' }, orig);
+		expect(Object.entries(c).filter(([, v]) => v).map(([k]) => k)).toEqual(['basics']);
 	});
 });
 

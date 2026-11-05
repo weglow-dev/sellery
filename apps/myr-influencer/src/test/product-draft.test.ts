@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SellerProductDetail } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON } from '../lib/data';
 import { blankDraft } from '../lib/rules';
-import { detailToDraft, draftToPayload, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
+import { detailToDraft, draftToPayload, draftVisual, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
 
 const IMG = 'https://x.supabase.co/storage/v1/object/public/myr-products/s1/0f8a1c2e.jpg';
 
@@ -51,6 +51,15 @@ describe('detailToDraft · tileKeyOf', () => {
 		expect(tileKeyOf('linear-gradient(1deg,#000,#fff)', 'film')).toBe('peach');
 		expect(tileKeyOf(null, 'liquid')).toBe('lemon');
 	});
+	it('운영팀이 넣은 비주얼(콘솔 색 밖)은 색을 안 바꾸면 그대로 · 바꾸면 콘솔 색(수정 심사가 샵 타일을 몰래 바꾸지 않게)', () => {
+		const ops = { ...d, tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill' };
+		const ed = detailToDraft(ops);
+		expect(draftToPayload(ed)).toMatchObject({ tile: ops.tile, icon: 'pill' });
+		expect(draftVisual(ed)).toEqual({ tile: ops.tile, icon: 'pill' });
+		expect(ed.tile).toBe('teal'); // pill 아이콘 → teal 키
+		expect(draftToPayload({ ...ed, tile: 'grape' })).toMatchObject({ tile: TILE_BG.grape, icon: TILE_ICON.grape });
+		expect(draftToPayload({ ...blankDraft(), tile: 'plum' })).toMatchObject({ tile: TILE_BG.plum, icon: TILE_ICON.plum }); // 새 상품은 콘솔 색
+	});
 });
 
 describe('saveFailure · 메뉴', () => {
@@ -72,8 +81,9 @@ describe('saveFailure · 메뉴', () => {
 		expect(productMenu('live').map((m) => m.kind)).toEqual(['edit', 'pause', 'end']);
 		expect(productMenu('paused').map((m) => m.kind)).toEqual(['edit', 'resume', 'end']);
 		expect(productMenu('live')[0].label).toBe('내용 수정');
-		// 수정 심사 중이면 "내용 수정" 이 빠진다
-		expect(productMenu('live', true).map((m) => m.kind)).toEqual(['pause', 'end']);
+		// 수정 심사 중이면 "내용 수정" 이 빠지고, 수정 반려면 고쳐서 다시 요청
+		expect(productMenu('live', 'review').map((m) => m.kind)).toEqual(['pause', 'end']);
+		expect(productMenu('paused', 'rejected').map((m) => [m.kind, m.label])[0]).toEqual(['edit', '고쳐서 다시 수정 요청']);
 		expect(productMenu('review')).toEqual([]);
 		expect(productMenu('ended')).toEqual([]);
 		expect(productMenu('live').find((m) => m.kind === 'end')?.confirm).toContain('다시 열 수 없어요');

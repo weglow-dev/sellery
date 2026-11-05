@@ -55,6 +55,14 @@ export function productMeta(r: SellerProductRow, now: Date = new Date()): string
 	}
 }
 
+/** 수정 심사(0074) — 심사 중 "수정 심사 N일차" · 반려 "사유 · …" */
+export function revisionFromRow(r: SellerProductRow, now: Date = new Date()): Product['revision'] {
+	const v = r.revision;
+	if (!v) return null;
+	if (v.status === 'pending') return { state: 'review', meta: `수정 심사 ${reviewDay(v.submittedAt, now)}일차` };
+	return { state: 'rejected', meta: v.rejectReason ? `사유 · ${v.rejectReason}` : '수정 반려' };
+}
+
 export function productFromRow(r: SellerProductRow, now: Date = new Date()): Product {
 	return {
 		id: r.id,
@@ -69,6 +77,7 @@ export function productFromRow(r: SellerProductRow, now: Date = new Date()): Pro
 		thumbUrl: r.thumbUrl,
 		sold: r.soldQty,
 		meta: productMeta(r, now),
-		rejectReason: r.rejectReason
+		rejectReason: r.rejectReason,
+		revision: revisionFromRow(r, now)
 	};
 }

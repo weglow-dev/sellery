@@ -12,6 +12,8 @@
 //                                     파일 형식은 myr-products.seed.json 참고.
 //   list [--status pending|listed|paused|rejected] [--creator <@handle>]   상품 표(최신순 · 삭제 제외)
 //   review <code> approve|reject|pause ["<사유>"]   myr_app_admin_review_product — approve → listed · reject → rejected(사유 필수) · pause: listed → paused
+//   revisions                         심사 중인 수정본(판매 중 상품 수정 · 0074) — 상품 · 크리에이터 · 요청 시각 · 바뀐 항목
+//   review-revision <code> approve|reject ["<사유>"]   myr_app_admin_review_revision — approve → 상품에 반영(판매 상태 그대로) · reject → 수정 반려(사유 필수 · 샵은 그대로)
 //   delete <code>                     소프트 삭제(deleted_at) — 주문이 생긴 뒤(M4)에는 상품 행을 지우지 않고 paused 로
 //   creators                          MYR 상품이 있는 크리에이터 표(sellers · 상품 수 · 계정 연결 여부)
 //
@@ -150,6 +152,39 @@ async function cmdReview() {
   console.log(`${code}  ${p.name}  ${p.status} → ${data.status}`);
 }
 
+// 수정본 fields 의 키 = 상품 행 컬럼 이름(0074 myr_product_fields_json)
+const REVISION_KEYS = ["name", "price", "unit", "category", "tile", "icon", "image_urls", "chips", "note", "story_title", "story", "ingredient_rows", "howto_steps", "faq", "form", "pack", "shelf_life", "storage_method"];
+
+async function cmdRevisions() {
+  const { data, error } = await db
+    .from("myr_product_revisions")
+    .select(`fields, submitted_at, myr_products(code, status, ${REVISION_KEYS.join(", ")}), sellers(handle)`)
+    .eq("status", "pending")
+    .order("submitted_at", { ascending: true })
+    .limit(200);
+  if (error) fail(error.message);
+  if (!data?.length) return console.log("(없음)");
+  console.log(["code", "상품(지금)", "크리에이터", "상품 상태", "요청", "바뀐 항목"].join("\t"));
+  for (const r of data) {
+    const p = r.myr_products ?? {};
+    const changed = REVISION_KEYS.filter((k) => JSON.stringify(p[k] ?? null) !== JSON.stringify(r.fields?.[k] ?? null));
+    console.log([p.code, p.name, r.sellers?.handle ?? "-", p.status, r.submitted_at?.slice(0, 16).replace("T", " "), changed.join(",")].join("\t"));
+  }
+  console.log(`\n${data.length}건 — 승인: review-revision <code> approve · 반려: review-revision <code> reject "사유"`);
+}
+
+async function cmdReviewRevision() {
+  const [code, decision, reason] = args;
+  if (!code || !["approve", "reject"].includes(decision)) fail('usage: review-revision <code> approve|reject ["사유"]');
+  const { data: p, error: e1 } = await db.from("myr_products").select("id, name").eq("code", code.toLowerCase()).is("deleted_at", null).maybeSingle();
+  if (e1) fail(e1.message);
+  if (!p) fail(`상품 없음: ${code}`);
+  const { data, error } = await db.rpc("myr_app_admin_review_revision", { p_product_id: p.id, p_decision: decision, p_reason: reason ?? null });
+  if (error) fail(error.message);
+  if (!data?.ok) fail(`거부: ${data?.code === "NOT_FOUND" ? "NOT_FOUND (심사 중인 수정본 없음)" : data?.code}${data?.status ? ` (상품 지금 ${data.status})` : ""}`);
+  console.log(`${code}  ${p.name}  수정본 → ${data.status}`);
+}
+
 async function cmdDelete() {
   const [code] = args;
   if (!code) fail("usage: delete <code>");
@@ -176,9 +211,9 @@ async function cmdCreators() {
   for (const m of map.values()) console.log([m.id.slice(0, 8), m.handle, m.name, `${m.listed}/${m.total}`, m.active, m.user_id ? "연결됨" : "미연결"].join("\t"));
 }
 
-const commands = { import: cmdImport, list: cmdList, review: cmdReview, delete: cmdDelete, creators: cmdCreators };
+const commands = { import: cmdImport, list: cmdList, review: cmdReview, revisions: cmdRevisions, "review-revision": cmdReviewRevision, delete: cmdDelete, creators: cmdCreators };
 if (!cmd || !commands[cmd]) {
-  console.error("usage: node packages/db/scripts/myr-products.mjs import <file.json> [--listed] | list [--status s] [--creator @h] | review <code> approve|reject|pause [사유] | delete <code> | creators");
+  console.error("usage: node packages/db/scripts/myr-products.mjs import <file.json> [--listed] | list [--status s] [--creator @h] | review <code> approve|reject|pause [사유] | revisions | review-revision <code> approve|reject [사유] | delete <code> | creators");
   process.exit(2);
 }
 await commands[cmd]();
