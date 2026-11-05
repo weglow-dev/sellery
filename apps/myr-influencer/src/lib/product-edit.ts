@@ -9,7 +9,10 @@ import type { ProductDraft } from './data';
 import { draftToPayload } from './product-draft';
 import { EDITOR_STEPS, nextLabel, type SectionKey } from './rules';
 
-export type EditorMode = 'new' | 'edit';
+/** new 새 상품 · 임시저장 / edit 판매 중 상품 수정 심사 / fix 반려 고치기(시안 isFix — 상품 반려 · 수정 반려) */
+export type EditorMode = 'new' | 'edit' | 'fix';
+/** 문구 묶음 — 고치기는 상품 반려(fix)와 수정 반려(fixRev)의 안내가 다르다 */
+export type CopyKey = 'new' | 'edit' | 'fix' | 'fixRev';
 
 /** 섹션 → 비교할 저장 본문 키(내용량 unit 은 1단계 구매 패널) */
 const SECTION_KEYS: Record<SectionKey, (keyof SellerProductPayload)[]> = {
@@ -43,16 +46,19 @@ export function changedSections(ed: ProductDraft, orig: ProductDraft): Record<Se
 }
 export const anyChanged = (c: Record<SectionKey, boolean>) => Object.values(c).some(Boolean);
 
-/** 하단 주 버튼 문구 */
-export function primaryLabel(mode: EditorMode, step: number, ed: ProductDraft, changed: boolean): string {
+/** 하단 주 버튼 문구 — 고치기는 "수정 필요 N곳 남았어요" 가 0 이 되면 "다시 심사 요청하기"(시안) */
+export function primaryLabel(mode: EditorMode, step: number, ed: ProductDraft, changed: boolean, remaining = 0): string {
 	if (mode === 'new') return nextLabel(step, ed);
 	if (step < EDITOR_STEPS) return '수정 완료';
-	return changed ? '수정 심사 요청하기' : '변경된 내용이 없어요';
+	if (mode === 'fix' && remaining > 0) return `수정 필요 ${remaining}곳 남았어요`;
+	if (!changed) return '변경된 내용이 없어요';
+	return mode === 'fix' ? '다시 심사 요청하기' : '수정 심사 요청하기';
 }
-/** 주 버튼을 누를 수 있나 — 수정 모드 마지막 단계는 바꾼 게 있어야 */
-export const primaryEnabled = (mode: EditorMode, step: number, valid: boolean, changed: boolean) => valid && !(mode === 'edit' && step >= EDITOR_STEPS && !changed);
+/** 주 버튼을 누를 수 있나 — 수정 · 고치기의 마지막 단계는 바꾼 게 있어야 · 고치기는 "수정 필요" 가 남지 않아야 */
+export const primaryEnabled = (mode: EditorMode, step: number, valid: boolean, changed: boolean, remaining = 0) =>
+	valid && !(mode !== 'new' && step >= EDITOR_STEPS && (!changed || remaining > 0));
 
-/** 8단계 · 예시 패널 · 완료 화면 문구 — 시안의 isEdit 분기 그대로 */
+/** 8단계 · 완료 화면 문구 — 시안의 isEdit · isFix · isFixRev 분기 그대로 */
 export const MODE_COPY = {
 	new: {
 		trailPrefix: '',
@@ -83,8 +89,38 @@ export const MODE_COPY = {
 			{ title: '운영팀 검토', desc: '표시·광고 문구와 성분 표기를 확인해요' },
 			{ title: '샵에 반영', desc: '승인되면 상세페이지가 바로 바뀌어요' }
 		]
+	},
+	fix: {
+		trailPrefix: '반려 수정 중  ·  ',
+		step8Name: '반려 내용 고치기',
+		step8Title: '반려된 부분을 고쳐주세요',
+		step8Desc: '‘수정 필요’ 섹션을 모두 고치면 다시 요청할 수 있어요.',
+		step8Notice: '다시 요청하면 운영팀이 고친 부분을 중심으로 확인해요. 보통 영업일 1일 안에 결과를 알려드려요.',
+		secondary: '취소',
+		doneTitle: '다시 심사 요청했어요',
+		doneDesc: '고친 내용을 운영팀이 다시 확인해요.',
+		doneSteps: [
+			{ title: '제출 완료', desc: '방금 고친 내용이 전달됐어요' },
+			{ title: '운영팀 검토', desc: '표시·광고 문구와 성분 표기를 확인해요' },
+			{ title: 'MYR Shop 오픈', desc: '승인되면 바로 판매가 시작돼요' }
+		]
+	},
+	fixRev: {
+		trailPrefix: '반려 수정 중  ·  ',
+		step8Name: '반려 내용 고치기',
+		step8Title: '반려된 부분을 고쳐주세요',
+		step8Desc: '‘수정 필요’ 섹션을 모두 고치면 다시 요청할 수 있어요.',
+		step8Notice: '다시 요청해도 승인 전까지는 지금 상세페이지로 판매가 계속돼요.',
+		secondary: '취소',
+		doneTitle: '다시 심사 요청했어요',
+		doneDesc: '승인 전까지는 지금 상세페이지로 판매가 계속돼요.',
+		doneSteps: [
+			{ title: '제출 완료', desc: '방금 고친 내용이 전달됐어요' },
+			{ title: '운영팀 검토', desc: '표시·광고 문구와 성분 표기를 확인해요' },
+			{ title: '샵에 반영', desc: '승인되면 상세페이지가 바로 바뀌어요' }
+		]
 	}
-} as const satisfies Record<EditorMode, unknown>;
+} as const satisfies Record<CopyKey, unknown>;
 
 /** 수정 심사 중 안내(목록 · 메뉴) */
 export const REVISION_PENDING_TOAST = '수정 심사 중이에요 · 승인되면 바로 반영돼요';

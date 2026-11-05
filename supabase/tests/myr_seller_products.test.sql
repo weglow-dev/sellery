@@ -35,8 +35,8 @@ select is(public.myr_app_seller_products('00000000-0000-4000-8000-0000000000ff')
 
 -- 행 모양 — 남은 재고 · 옵션 수 · 반려 사유
 select is((select e - 'id' - 'submitted_at' - 'reviewed_at' - 'created_at' - 'updated_at' from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000a81')) e where e ->> 'code' = 'pgtap-sp-live'),
-  '{"code": "pgtap-sp-live", "icon": "grape", "name": "판매 중 상품", "tile": "linear-gradient(145deg,#a,#b)", "price": 32000, "stock": 100, "status": "listed", "category": "diet", "sold_qty": 30, "thumb_url": null, "stock_left": 70, "option_count": 2, "reject_reason": null}'::jsonb,
-  '판매 중 행 — 남은 재고 = 입고 − 판매 · 옵션 수');
+  '{"code": "pgtap-sp-live", "icon": "grape", "name": "판매 중 상품", "tile": "linear-gradient(145deg,#a,#b)", "price": 32000, "stock": 100, "status": "listed", "category": "diet", "sold_qty": 30, "thumb_url": null, "stock_left": 70, "option_count": 2, "reject_reason": null, "reject_items": [], "revision": null}'::jsonb,
+  '판매 중 행 — 남은 재고 = 입고 − 판매 · 옵션 수 · 수정본 없음(0074)');
 select is((select (e ->> 'stock_left')::int from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000a81')) e where e ->> 'code' = 'pgtap-sp-ended'), 0, '판매가 입고보다 많아도 남은 재고는 0');
 select is((select e ->> 'reject_reason' from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000a81')) e where e ->> 'code' = 'pgtap-sp-rejected'), '성분 표기 보완', '반려 사유');
 select ok(not exists (select 1 from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-000000000a81')) e where e ? 'seller_margin_rate' or e ? 'reviewed_by'), '마진율 · 검수자는 싣지 않는다');

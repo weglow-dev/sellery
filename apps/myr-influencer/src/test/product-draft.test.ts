@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SellerProductDetail } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON } from '../lib/data';
 import { blankDraft } from '../lib/rules';
-import { detailToDraft, draftToPayload, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
+import { detailToDraft, draftToPayload, draftVisual, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
 
 const IMG = 'https://x.supabase.co/storage/v1/object/public/myr-products/s1/0f8a1c2e.jpg';
 
@@ -30,7 +30,7 @@ describe('draftToPayload', () => {
 
 describe('detailToDraft · tileKeyOf', () => {
 	const d: SellerProductDetail = {
-		id: 'p1', code: 'm101', status: 'rejected', rejectReason: '보완', name: '포도 젤리', price: 32000, unit: '14포', category: 'diet', tile: TILE_BG.grape, icon: 'grape',
+		id: 'p1', code: 'm101', status: 'rejected', rejectReason: '보완', rejectItems: [], reviewedAt: null, name: '포도 젤리', price: 32000, unit: '14포', category: 'diet', tile: TILE_BG.grape, icon: 'grape',
 		image_urls: [IMG], chips: ['젤리'], note: '노트', story_title: '왜', story: '이야기', ingredient_rows: [{ name: '가르시니아', why: '', amount: '' }], howto_steps: [{ t: '식후', d: '' }],
 		faq: [], form: '젤리', pack: '스틱포', shelf_life: '24개월', storage_method: '서늘한 곳'
 	};
@@ -51,6 +51,15 @@ describe('detailToDraft · tileKeyOf', () => {
 		expect(tileKeyOf('linear-gradient(1deg,#000,#fff)', 'film')).toBe('peach');
 		expect(tileKeyOf(null, 'liquid')).toBe('lemon');
 	});
+	it('운영팀이 넣은 비주얼(콘솔 색 밖)은 색을 안 바꾸면 그대로 · 바꾸면 콘솔 색(수정 심사가 샵 타일을 몰래 바꾸지 않게)', () => {
+		const ops = { ...d, tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill' };
+		const ed = detailToDraft(ops);
+		expect(draftToPayload(ed)).toMatchObject({ tile: ops.tile, icon: 'pill' });
+		expect(draftVisual(ed)).toEqual({ tile: ops.tile, icon: 'pill' });
+		expect(ed.tile).toBe('teal'); // pill 아이콘 → teal 키
+		expect(draftToPayload({ ...ed, tile: 'grape' })).toMatchObject({ tile: TILE_BG.grape, icon: TILE_ICON.grape });
+		expect(draftToPayload({ ...blankDraft(), tile: 'plum' })).toMatchObject({ tile: TILE_BG.plum, icon: TILE_ICON.plum }); // 새 상품은 콘솔 색
+	});
 });
 
 describe('saveFailure · 메뉴', () => {
@@ -68,12 +77,13 @@ describe('saveFailure · 메뉴', () => {
 	});
 	it('상태별 메뉴 — 판매 종료 · 삭제는 확인을 받는다', () => {
 		expect(productMenu('draft').map((m) => m.kind)).toEqual(['edit', 'delete']);
-		expect(productMenu('rejected').map((m) => m.kind)).toEqual(['edit']);
+		expect(productMenu('rejected').map((m) => m.kind)).toEqual(['review']); // 반려는 심사 결과로
 		expect(productMenu('live').map((m) => m.kind)).toEqual(['edit', 'pause', 'end']);
 		expect(productMenu('paused').map((m) => m.kind)).toEqual(['edit', 'resume', 'end']);
 		expect(productMenu('live')[0].label).toBe('내용 수정');
-		// 수정 심사 중이면 "내용 수정" 이 빠진다
-		expect(productMenu('live', true).map((m) => m.kind)).toEqual(['pause', 'end']);
+		// 수정 심사 중이면 "내용 수정" 이 빠지고, 수정 반려면 "심사 결과 보기"(운영팀 의견 → 고치기)
+		expect(productMenu('live', 'review').map((m) => m.kind)).toEqual(['pause', 'end']);
+		expect(productMenu('paused', 'rejected').map((m) => [m.kind, m.label])).toEqual([['review', '심사 결과 보기'], ['resume', '다시 판매'], ['end', '판매 종료']]);
 		expect(productMenu('review')).toEqual([]);
 		expect(productMenu('ended')).toEqual([]);
 		expect(productMenu('live').find((m) => m.kind === 'end')?.confirm).toContain('다시 열 수 없어요');

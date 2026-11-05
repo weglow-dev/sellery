@@ -10,8 +10,8 @@ select table_privs_are('public', 'myr_products', 'anon', '{}'::text[], 'anon 은
 select table_privs_are('public', 'myr_products', 'authenticated', '{}'::text[], 'authenticated 도 직접 권한 없음');
 select function_privs_are('public', 'myr_home_products', '{}'::text[], 'anon', '{EXECUTE}'::text[], 'anon 이 myr_home_products 실행 가능');
 select function_privs_are('public', 'myr_product_card', '{text}'::text[], 'anon', '{EXECUTE}'::text[], 'anon 이 myr_product_card 실행 가능');
-select function_privs_are('public', 'myr_app_admin_review_product', '{uuid,text,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 검수 RPC 실행 불가');
-select function_privs_are('public', 'myr_app_admin_review_product', '{uuid,text,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 검수 RPC 실행 불가');
+select function_privs_are('public', 'myr_app_admin_review_product', '{uuid,text,text,uuid,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 검수 RPC 실행 불가');
+select function_privs_are('public', 'myr_app_admin_review_product', '{uuid,text,text,uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 검수 RPC 실행 불가');
 
 -- ---------- 픽스처 (롤백됨) ----------
 insert into public.sellers (id, name, handle, platform, active)

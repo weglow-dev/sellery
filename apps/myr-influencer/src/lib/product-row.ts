@@ -4,6 +4,7 @@
  */
 import type { SellerProductRow, SellerProductStatus } from '@sellery/myr-core/seller-products';
 import type { Product, ProductStatus } from './data';
+import { rejectMeta } from './product-review';
 
 export const STATUS_FROM_DB: Record<SellerProductStatus, ProductStatus> = {
 	listed: 'live',
@@ -49,10 +50,18 @@ export function productMeta(r: SellerProductRow, now: Date = new Date()): string
 		case 'paused':
 			return `${relativeTime(r.updatedAt, now)} 일시중지`;
 		case 'rejected':
-			return r.rejectReason ? `사유 · ${r.rejectReason}` : '반려됨';
+			return rejectMeta('new', r.reviewedAt, r.rejectItems, r.rejectReason, now);
 		default:
 			return '판매 종료';
 	}
+}
+
+/** 수정 심사(0074) — 심사 중 "수정 심사 N일차" · 반려 "오늘 수정 반려 · N건 수정 필요"(시안) */
+export function revisionFromRow(r: SellerProductRow, now: Date = new Date()): Product['revision'] {
+	const v = r.revision;
+	if (!v) return null;
+	if (v.status === 'pending') return { state: 'review', meta: `수정 심사 ${reviewDay(v.submittedAt, now)}일차` };
+	return { state: 'rejected', meta: rejectMeta('rev', v.reviewedAt, v.rejectItems, v.rejectReason, now) };
 }
 
 export function productFromRow(r: SellerProductRow, now: Date = new Date()): Product {
@@ -69,6 +78,7 @@ export function productFromRow(r: SellerProductRow, now: Date = new Date()): Pro
 		thumbUrl: r.thumbUrl,
 		sold: r.soldQty,
 		meta: productMeta(r, now),
-		rejectReason: r.rejectReason
+		rejectReason: r.rejectReason,
+		revision: revisionFromRow(r, now)
 	};
 }

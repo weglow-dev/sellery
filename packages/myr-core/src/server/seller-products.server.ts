@@ -6,16 +6,19 @@ import { PRODUCT_IMAGE_BUCKET, PRODUCT_IMAGE_MAX_BYTES, productImagePath } from 
 import { sniffImageType } from '../refund-rules';
 import {
 	parseSellerProductDetail,
+	parseSellerProductRevision,
 	parseSellerProductRows,
 	type SaveProductCode,
 	type SellerProductDetail,
 	type SellerProductPayload,
+	type SellerProductRevision,
 	type SellerProductRow,
-	type SetStatusAction
+	type SetStatusAction,
+	type SubmitRevisionCode
 } from '../seller-products';
 import { admin } from './admin.server';
 
-export type { SellerProductDetail, SellerProductPayload, SellerProductRow } from '../seller-products';
+export type { SellerProductDetail, SellerProductPayload, SellerProductRevision, SellerProductRow } from '../seller-products';
 
 export async function listSellerProducts(sellerId: string): Promise<SellerProductRow[]> {
 	const { data, error } = await admin().rpc('myr_app_seller_products', { p_seller: sellerId });
@@ -32,12 +35,13 @@ export async function listSellerProductsOfUser(userId: string): Promise<SellerPr
 
 /* ---------------- 상품 등록 저장(0073 · 4-1) — 판정은 전부 RPC 안에 있다 ---------------- */
 
-/** 에디터로 다시 열 상품 1건 — 내 상품이 아니면 null */
-export async function getSellerProduct(sellerId: string, productId: string): Promise<SellerProductDetail | null> {
+/** 에디터로 다시 열 상품 1건 + 열린 수정본(0074 · 심사 중 · 반려) — 내 상품이 아니면 null */
+export async function getSellerProduct(sellerId: string, productId: string): Promise<{ product: SellerProductDetail; revision: SellerProductRevision | null } | null> {
 	const { data, error } = await admin().rpc('myr_app_seller_product', { p_seller: sellerId, p_id: productId });
 	if (error) throw new Error(`myr_app_seller_product failed: ${error.message}`);
-	const r = data as { ok?: boolean; product?: unknown } | null;
-	return r?.ok ? parseSellerProductDetail(r.product) : null;
+	const r = data as { ok?: boolean; product?: unknown; revision?: unknown } | null;
+	const product = r?.ok ? parseSellerProductDetail(r.product) : null;
+	return product ? { product, revision: parseSellerProductRevision(r?.revision) } : null;
 }
 
 export type SaveProductResult = { ok: true; id: string; code: string; status: string } | { ok: false; code: SaveProductCode; field?: string; status?: string };
@@ -52,6 +56,20 @@ export async function saveSellerProduct(sellerId: string, productId: string | nu
 	const r = (data ?? {}) as Record<string, unknown>;
 	if (r.ok) return { ok: true, id: String(r.id), code: String(r.code), status: String(r.status) };
 	return { ok: false, code: (r.code as SaveProductCode) ?? 'DB_ERROR', ...(r.field ? { field: String(r.field) } : {}), ...(r.status ? { status: String(r.status) } : {}) };
+}
+
+export type SubmitRevisionResult = { ok: true; revisionId: string } | { ok: false; code: SubmitRevisionCode; field?: string; status?: string };
+
+/** 판매 중 · 일시중지 상품의 수정 심사 요청(0074) — 승인되면 샵에 반영. 대상 · 필수 칸 · 바뀐 게 없음 · 이미지 판정은 RPC 가 정답 */
+export async function submitSellerProductRevision(sellerId: string, productId: string, payload: SellerProductPayload): Promise<SubmitRevisionResult> {
+	const { data, error } = await admin().rpc('myr_app_seller_submit_revision', { p_seller: sellerId, p_id: productId, p_payload: payload });
+	if (error) {
+		console.error('[seller-products] submit_revision failed:', error.message);
+		return { ok: false, code: 'DB_ERROR' };
+	}
+	const r = (data ?? {}) as Record<string, unknown>;
+	if (r.ok) return { ok: true, revisionId: String(r.revision_id) };
+	return { ok: false, code: (r.code as SubmitRevisionCode) ?? 'DB_ERROR', ...(r.field ? { field: String(r.field) } : {}), ...(r.status ? { status: String(r.status) } : {}) };
 }
 
 export type SetStatusResult = { ok: true; status: string } | { ok: false; code: 'NOT_FOUND' | 'BAD_ACTION' | 'WRONG_STATUS' | 'DB_ERROR'; status?: string };

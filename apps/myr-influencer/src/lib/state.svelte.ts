@@ -3,6 +3,7 @@
  *  규칙 계산은 전부 lib/rules.ts(순수 · 테스트됨). 상태 변경은 이 모듈의 메서드로만. */
 import { seedCs, seedProducts, type CsRequest, type Product, type Resolution } from './data';
 import { resolveCs as applyResolution, approveLabel } from './rules';
+import type { CopyKey } from './product-edit';
 
 class ConsoleState {
 	cs = $state<CsRequest[]>(seedCs());
@@ -12,9 +13,7 @@ class ConsoleState {
 	/** 방금 심사 요청한 제품명 — 제출 완료 화면이 읽는다 */
 	lastSubmitted = $state<string | null>(null);
 	/** 방금 제출이 새 상품 심사인지 수정 심사인지 — 완료 화면 문구(product-edit MODE_COPY) */
-	lastSubmitMode = $state<'new' | 'edit'>('new');
-	/** UI 단계(4-2 서버 전) — 미리보기(dev · Preview)에서 수정 심사를 요청한 상품 id. 내 제품이 "수정 심사 중 · 방금 수정 요청" 으로 보여준다(새로고침하면 사라짐) */
-	mockRevisions = $state<Record<string, true>>({});
+	lastSubmitMode = $state<CopyKey>('new');
 
 	pending = $derived(this.cs.filter((c) => c.status === 'pending'));
 
