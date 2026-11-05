@@ -6,9 +6,10 @@ import { authErrorMessage, parseNewPassword } from '$lib/console-auth';
  * 새 비밀번호 — 재설정 · 초대 메일 링크(/auth/confirm)가 만든 세션으로 들어온다(세션이 없으면 hooks 게이트가 로그인으로).
  * 바꾼 뒤에는 로그아웃시키고 새 비밀번호로 로그인하게 한다 — 메일 링크 세션을 그대로 쓰지 않는다(다른 기기에서 연 링크면 그 기기에 세션이 남지 않게).
  */
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	const { user } = await locals.safeGetSession();
-	return { email: user?.email ?? null };
+	// link=used — 메일 링크는 이미 쓰였지만 로그인된 상태라 여기로 왔다(/auth/confirm linkFailureTarget)
+	return { email: user?.email ?? null, linkUsed: url.searchParams.get('link') === 'used' };
 };
 
 export const actions: Actions = {
