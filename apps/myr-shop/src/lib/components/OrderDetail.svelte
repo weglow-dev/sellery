@@ -2,17 +2,21 @@
 	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용 · 화면 전체(머리 포함)를 그린다(대표 시안 2026-11-02).
 	 *  PC: 제목 + 오른쪽 상태 칩·주문번호·시각·결제수단 / 왼쪽 상품 카드(크리에이터 · 이름 · 수량·금액 · [문의]) / 오른쪽 결제 정보 + [교환 · 환불 신청] · 배송지(+이메일).
 	 *  모바일: 뒤로 헤더(주문번호) · 칩 줄 · 상품 카드 · 결제 · 배송지 · 하단 바 [교환 · 환불 신청](앱 셸 바닥 — fixed 를 쓰지 않는다, +layout.svelte 주석).
-	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로. */
+	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로.
+	 *  교환 · 환불 요청(0078) — 이 주문의 요청마다 카드: 상품 · 종류/사유 · 상태 · 지금 단계 · 크리에이터 메시지 · 재발송 송장 · 처리 내역(claim-rules claimTimeline). */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
 	import { displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { CLAIM_STATUS_LABEL, claimStepText, claimTimeline, KIND_LABEL, type Claim } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
+	import { trackingUrl } from '@sellery/myr-core/ship-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, inquiries = [], guestNote = false }: { order: OrderView; inquiries?: CsForOrder[]; guestNote?: boolean } = $props();
+	let { order, inquiries = [], claims = [], guestNote = false }: { order: OrderView; inquiries?: CsForOrder[]; claims?: Claim[]; guestNote?: boolean } = $props();
+	const claimTone: Record<string, string> = { pending: 'bg-white/8 text-white/85', progress: 'bg-accent/12 text-accent', done: 'bg-[#4ade80]/12 text-[#4ade80]', rejected: 'bg-white/6 text-white/50' };
 	const label = $derived(statusLabel(order));
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
@@ -105,6 +109,38 @@
 						</button>
 					</div>
 				{/each}
+
+				<!-- 교환 · 환불 요청(0078) — 최근순 -->
+				{#if claims.length}
+					<section aria-label="교환 · 환불 요청" class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
+						<h2 class="text-[15px] font-extrabold lg:text-[16px]">교환 · 환불 요청</h2>
+						<div class="mt-3 flex flex-col gap-3">
+							{#each claims as c (c.id)}
+								<div class="rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-3">
+									<div class="flex items-start justify-between gap-2">
+										<p class="min-w-0 text-[14px] font-bold">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''} × {c.qty}</p>
+										<span class="shrink-0 rounded-[8px] px-2 py-[3px] text-[12px] font-bold {claimTone[c.status]}">{CLAIM_STATUS_LABEL[c.status]}</span>
+									</div>
+									<p class="mt-0.5 text-[12.5px] text-fg-faint">{KIND_LABEL[c.kind]} · {c.reason} · <span class="font-mono">{c.code.toUpperCase()}</span></p>
+									<p class="mt-2 text-[13px] text-white/85">{claimStepText(c)}</p>
+									{#if c.reshipTrackingNo}
+										{@const href = trackingUrl(c.reshipCourier ?? '', c.reshipTrackingNo)}
+										<p class="mt-1 text-[12.5px] text-white/75">교환 발송 {c.reshipCourier ?? '택배'} {#if href}<a {href} target="_blank" rel="noopener" class="font-mono underline">{c.reshipTrackingNo}</a>{:else}<span class="font-mono">{c.reshipTrackingNo}</span>{/if}</p>
+									{/if}
+									{#if c.message}<p class="mt-2 rounded-[10px] bg-white/4 px-3 py-2 text-[12.5px] leading-[1.55] text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
+									<ol class="mt-2.5 flex flex-col gap-1">
+										{#each claimTimeline(c) as t (t.title)}
+											<li class="flex items-center gap-2 text-[12px] {t.done ? 'text-white/70' : 'text-white/35'}">
+												<span aria-hidden="true" class="h-1.5 w-1.5 shrink-0 rounded-full {t.done ? 'bg-accent' : 'border border-white/30'}"></span>
+												<span>{t.title}{t.at ? ` · ${relTime(t.at)}` : ''}</span>
+											</li>
+										{/each}
+									</ol>
+								</div>
+							{/each}
+						</div>
+					</section>
+				{/if}
 
 				<!-- 환불 진행 상태 — 실제 기록만(신청 사유 · 완료 시각). 환불은 신청 즉시 토스 취소까지 끝나서 "판매자 확인" 대기 단계는 없다 -->
 				{#if steps}

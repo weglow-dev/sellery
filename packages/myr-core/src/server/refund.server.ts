@@ -4,8 +4,9 @@
  *   · WAITING_DEPOSIT(입금 전) 은 토스 호출 없이 record 만.
  *   · 토스 취소가 불명(0/5xx)이면 기록하지 않고 CANCEL_UNCERTAIN — payment_events(handled=false) 운영 큐. 같은 줄 묶음으로 재시도하면 같은 Idempotency-Key 라 토스가 같은 결과를 준다.
  *   · 토스 ALREADY_CANCELED_PAYMENT(전액 이미 취소) 는 취소 성공으로 보고 기록한다.
+ *   · 교환·환불 요청(0078)에서 나가는 환불은 deduction(왕복 배송비) · tag(요청 코드)를 준다 — 금액은 여기서 한 번 정해(`deductedAmount`) 토스 · record · 메일이 같은 값을 쓴다.
  */
-import { parsePrecheckResult, parseRecordResult, refundIdempotencyKey, type RefundLine } from '../refund-rules';
+import { deductedAmount, parsePrecheckResult, parseRecordResult, refundIdempotencyKey, type RefundLine } from '../refund-rules';
 import { admin } from './admin.server';
 import { logPaymentEvent } from './payment-events.server';
 import { notifyOrderRefunded } from './mail-events.server';
@@ -23,6 +24,10 @@ export async function refundItems(input: {
 	orderId: string;
 	items: RefundLine[];
 	reason: string;
+	/** 왕복 배송비 차감(원 · 0078 부분 환불) — 고객 셀프 환불은 넘기지 않는다 */
+	deduction?: number;
+	/** 토스 Idempotency-Key 꼬리 — 교환·환불 요청 코드 */
+	tag?: string;
 }): Promise<RefundOutcome> {
 	const db = admin();
 	// 로그(payment_events)를 주문번호(order_code · 0062)와 토스 orderId 로 찾을 수 있게 둘 다 적는다 — 토스 orderId 는 결제 세션(myr_checkouts)에 있다
@@ -45,6 +50,10 @@ export async function refundItems(input: {
 	if (preError) throw new Error(`myr_app_refund_precheck failed: ${preError.message}`);
 	const pre = parsePrecheckResult(preJson);
 	if (!pre.ok) return { ok: false, code: pre.code, items: pre.items };
+	// 실제로 돌려줄 돈 — 차감은 입금 전 취소에는 없다
+	const amount = pre.deposit ? 0 : deductedAmount(pre.amount, input.deduction ?? 0);
+	if (amount === null) return { ok: false, code: 'BAD_ITEMS', message: '차감 금액이 환불 금액보다 커요' };
+	const deduction = pre.deposit ? 0 : pre.amount - amount;
 
 	const reason = (input.reason || (input.actor === 'customer' ? '고객 요청' : `${input.actor} 환불`)).slice(0, 200);
 	// 제품별 상세(0067) — record 가 줄 refund_reason 에 남기고, 셀러 메일에도 싣는다
@@ -54,8 +63,9 @@ export async function refundItems(input: {
 
 	if (!pre.deposit) {
 		if (!pre.paymentKey) return { ok: false, code: 'TOSS_ERROR', message: '결제 정보가 없는 주문이에요' };
-		const key = refundIdempotencyKey(input.orderId, pre.items);
-		const cancel = await tossCancel(pre.paymentKey, reason, { idempotencyKey: key, cancelAmount: pre.full ? undefined : pre.amount });
+		const key = refundIdempotencyKey(input.orderId, pre.items, input.tag);
+		// 전액 취소(cancelAmount 없음)는 차감이 없을 때만 — 차감이 있으면 남은 돈을 남기는 부분 취소
+		const cancel = await tossCancel(pre.paymentKey, reason, { idempotencyKey: key, cancelAmount: pre.full && !deduction ? undefined : amount });
 		const alreadyAll = !cancel.ok && isTossError(cancel.body) && cancel.body.code === 'ALREADY_CANCELED_PAYMENT';
 		if (!cancel.ok && !alreadyAll) {
 			if (isUncertain(cancel)) {
@@ -65,7 +75,7 @@ export async function refundItems(input: {
 					order_code: orderCode,
 					event_type: 'refund',
 					payment_key: pre.paymentKey,
-					payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, cancel: cancel.body, status: cancel.status },
+					payload: { orderId: input.orderId, items: pre.items, amount, deduction, cancel: cancel.body, status: cancel.status },
 					handled: false,
 					result: 'error: cancel uncertain'
 				});
@@ -78,7 +88,7 @@ export async function refundItems(input: {
 				order_code: orderCode,
 				event_type: 'refund',
 				payment_key: pre.paymentKey,
-				payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, cancel: cancel.body, status: cancel.status },
+				payload: { orderId: input.orderId, items: pre.items, amount, deduction, cancel: cancel.body, status: cancel.status },
 				handled: true,
 				result: `failed: ${err.code}`
 			});
@@ -93,7 +103,7 @@ export async function refundItems(input: {
 		p_actor: input.actor,
 		p_actor_id: input.actorId,
 		p_reason: reason,
-		p_amount: pre.deposit ? 0 : pre.amount,
+		p_amount: amount,
 		p_raw: raw
 	});
 	if (recError) {
@@ -104,7 +114,7 @@ export async function refundItems(input: {
 			order_code: orderCode,
 			event_type: 'refund',
 			payment_key: pre.paymentKey,
-			payload: { orderId: input.orderId, items: pre.items, amount: pre.amount, error: recError.message },
+			payload: { orderId: input.orderId, items: pre.items, amount, deduction, error: recError.message },
 			handled: false,
 			result: 'error: refund record'
 		});
@@ -118,7 +128,7 @@ export async function refundItems(input: {
 		order_code: orderCode,
 		event_type: pre.deposit ? 'deposit_cancel' : 'refund',
 		payment_key: pre.paymentKey,
-		payload: { orderId: input.orderId, actor: input.actor, items: pre.items, amount: pre.amount, full: pre.full, raw },
+		payload: { orderId: input.orderId, actor: input.actor, items: pre.items, amount, deduction, full: pre.full, raw },
 		handled: true,
 		result: rec.already ? 'noop' : pre.deposit ? 'deposit_canceled' : pre.full ? 'refunded' : 'refunded_partial'
 	});
@@ -134,11 +144,12 @@ export async function refundItems(input: {
 				note: noteById.get(i.item_id),
 				photoUrls: (photosById.get(i.item_id) ?? []).map((p) => signed.get(p)).filter((u): u is string => !!u)
 			})),
-			amount: pre.amount,
+			amount,
 			full: pre.full,
 			reason,
-			deposit: pre.deposit
+			deposit: pre.deposit,
+			deduction
 		});
 	}
-	return { ok: true, already: rec.already, orderCode: rec.orderCode, status: rec.status, amount: rec.amount, refunded: pre.deposit ? 0 : pre.amount };
+	return { ok: true, already: rec.already, orderCode: rec.orderCode, status: rec.status, amount: rec.amount, refunded: amount };
 }

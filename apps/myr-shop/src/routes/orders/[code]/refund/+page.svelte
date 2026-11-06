@@ -6,8 +6,8 @@
 </script>
 
 <svelte:head>
-	<title>환불 신청 {displayCode(data.order.code)} — MYR Shop</title>
+	<title>교환 · 환불 신청 {displayCode(data.order.code)} — MYR Shop</title>
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<RefundPage order={data.order} backHref={data.backHref} />
+<RefundPage order={data.order} claims={data.claims} returnFee={data.returnFee} backHref={data.backHref} />

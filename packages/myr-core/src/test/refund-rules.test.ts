@@ -4,6 +4,7 @@ import type { OrderItem, OrderView } from '../order-view';
 import {
 	customerCanRefund,
 	customerRefundableItems,
+	deductedAmount,
 	estimateRefund,
 	isRefundPhotoPath,
 	parseCancelBody,
@@ -80,6 +81,9 @@ describe('parseCancelBody', () => {
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '   ' }] })?.items).toEqual([{ item_id: A, qty: 1 }]);
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 5 }] })).toBeNull();
 		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1, note: '메모' }])).toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));
+		// 0078 — 요청에서 나간 환불은 요청 코드가 붙어 셀프 환불 · 다른 요청과 키가 다르다
+		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }], 'rq2001')).toBe(`${refundIdempotencyKey('o', [{ item_id: A, qty: 1 }])}:rq2001`);
+		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }], 'rq2001')).not.toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }], 'rq2002'));
 	});
 	it('items.photos — 경로 형식 3장까지 · 중복 제거 · 비면 키 없음 · 형식 밖이면 null (0068)', () => {
 		const O = '11111111-1111-4111-8111-111111111111';
@@ -113,11 +117,11 @@ describe('parseCancelBody', () => {
 });
 
 describe('customerCanRefund · refundableItems', () => {
-	it('발송 전 PAID → ok · 입금 대기 → deposit · 발송 뒤·환불·취소 → 불가', () => {
+	it('남은 줄 있으면 신청 페이지 ok(배송 상태 무관 · 0078) · 입금 대기 → deposit · 환불·취소 → 불가', () => {
 		expect(customerCanRefund(order())).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT' }))).toEqual({ ok: true, deposit: true });
-		// 0077 — 기준은 줄 배송 상태: 결제완료 줄이 남았으면 가능 · 전부 배송준비중 이후면 불가(주문 송장 칸은 보지 않는다)
-		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: false, reason: '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요' });
+		// 0078 — 전부 배송준비중 이후여도 페이지는 열린다(그 줄은 교환 · 환불 요청). 바로 환불은 결제완료 줄만(customerRefundableItems)
+		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000)] })).ok).toBe(true);
 		expect(customerRefundableItems([item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000), item('c', 1, 1, 1, 'REFUNDED')]).map((i) => i.id)).toEqual([B]);
 		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);
@@ -128,6 +132,18 @@ describe('customerCanRefund · refundableItems', () => {
 		expect(
 			refundableItems([item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000, 1, 'REFUNDED'), item('c', 1, 1, 0, 'CANCELED')]).map((i) => i.id)
 		).toEqual([A]);
+	});
+});
+
+describe('deductedAmount — 요청 환불의 왕복 배송비 차감(0078)', () => {
+	it('차감 없음 = 그대로 · 차감 < 금액이면 뺀다 · 금액 이상 · 음수 · 소수는 null(환불하지 않는다)', () => {
+		expect(deductedAmount(32000)).toBe(32000);
+		expect(deductedAmount(32000, 0)).toBe(32000);
+		expect(deductedAmount(32000, 6000)).toBe(26000);
+		expect(deductedAmount(6000, 6000)).toBeNull();
+		expect(deductedAmount(5000, 6000)).toBeNull();
+		expect(deductedAmount(32000, -1)).toBeNull();
+		expect(deductedAmount(32000, 1.5)).toBeNull();
 	});
 });
 

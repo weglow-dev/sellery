@@ -8,6 +8,9 @@
  * | 새 주문 | orderPaidSellerMail | 줄의 셀러(sellers.email) — **자기 줄만** · 배송지 없음 | (셀러 콘솔 전까지 링크 없음) |
  * | 환불 완료 | orderRefundedMail | 고객 | 주문 화면 |
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
+ * | 교환·환불 요청 접수 | claimOpenedSellerMail | 그 줄의 셀러 — 연락처·배송지 없음 | 콘솔 CS 관리 /cs/<요청> |
+ * | 교환·환불 승인·반려 | claimDecidedMail | 고객 | 주문 화면 |
+ * | 교환 재발송 | claimReshippedMail | 고객 | 배송 조회 |
  * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰>(버튼 "가입하기") |
  * | 비밀번호 재설정 | passwordResetMail | 크리에이터 로그인 이메일 | 콘솔 /auth/confirm?token_hash=…&type=recovery |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
@@ -38,8 +41,8 @@ export type MailOrder = {
 	deposit: MailDeposit;
 };
 /** 환불 1건 — record 가 돌려준 것 */
-/** items[].note = 고객이 제품별로 남긴 상세(0067) · photoUrls = 사진 서명 URL(0068 · 7일) — 둘 다 셀러 메일에만 */
-export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string; photoUrls?: string[] }[]; amount: number; full: boolean; reason: string; deposit: boolean };
+/** items[].note = 고객이 제품별로 남긴 상세(0067) · photoUrls = 사진 서명 URL(0068 · 7일) — 둘 다 셀러 메일에만 · deduction = 왕복 배송비 차감(0078 부분 환불) */
+export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string; photoUrls?: string[] }[]; amount: number; full: boolean; reason: string; deposit: boolean; deduction?: number };
 
 const url = (ctx: MailCtx, path: string): string => `${ctx.siteUrl.replace(/\/+$/, '')}${path}`;
 const upper = (code: string): string => code.toUpperCase();
@@ -159,6 +162,7 @@ export function orderRefundedMail(o: MailOrder, r: MailRefund, ctx: MailCtx): Ma
 		rows.push({ label: '취소된 상품', value: itemsText(o.items) });
 	} else {
 		rows.push({ label: '환불 상품', value: itemsText(lines) }, { label: '환불 금액', value: `${won(r.amount)}${r.full && o.shippingFee ? ' (배송비 포함)' : ''}` });
+		if (r.deduction) rows.push({ label: '왕복 배송비 차감', value: `−${won(r.deduction)} (단순 변심 · 고객 부담)` });
 	}
 	if (r.reason) rows.push({ label: '사유', value: r.reason });
 	const notes = r.deposit
@@ -255,6 +259,100 @@ export function csRepliedMail(cs: MailCs, reply: { messageId: string; body: stri
 		notes
 	};
 	return finish(doc, `[MYR] 문의에 답변이 달렸어요 · ${code}`, mailIdempotencyKey('myr_cs_replied', reply.messageId), 'myr_cs_replied');
+}
+
+/* ---------------- 교환·환불 요청 (0078) ---------------- */
+/** 요청 1건 — mail-events.ts 가 claim JSON + 주문으로 채운다 */
+export type MailClaim = {
+	code: string;
+	kind: 'refund' | 'exchange';
+	reason: string;
+	qty: number;
+	productName: string;
+	option: string;
+	orderId: string;
+	orderCode: string;
+	isMember: boolean;
+	buyerName: string;
+	sellerName: string;
+	note: string | null;
+	status: 'pending' | 'progress' | 'done' | 'rejected';
+	resolutionName: string | null;
+	message: string | null;
+	/** 남은 할 일 안내(회수 · 환불 · 재발송) — claim-rules claimStepText */
+	stepText: string;
+	refundTotal: number | null;
+	deduction: number;
+};
+const claimKind = (c: Pick<MailClaim, 'kind'>): string => (c.kind === 'exchange' ? '교환' : '환불');
+
+/** 새 요청 → 그 줄의 셀러. 고객 연락처·배송지는 싣지 않는다 · 처리는 콘솔에서 */
+export function claimOpenedSellerMail(c: MailClaim, consoleUrl: string | null): MailTemplate {
+	const code = upper(c.code);
+	const rows: MailRow[] = [
+		{ label: '요청번호', value: code },
+		{ label: '종류 · 사유', value: `${claimKind(c)} · ${c.reason}` },
+		{ label: '상품', value: itemLine({ name: c.productName, option: c.option, qty: c.qty }) },
+		{ label: '주문번호', value: upper(c.orderCode) },
+		{ label: '고객', value: c.buyerName }
+	];
+	const doc: MailDoc = {
+		title: `새 ${claimKind(c)} 요청이 들어왔어요`,
+		preheader: `${code} · ${c.productName} · ${c.reason}`,
+		intro: `${c.sellerName}님, 내 상품에 ${claimKind(c)} 요청이 접수되었어요. 콘솔에서 처리 방법을 골라 승인하거나 반려해주세요.`,
+		rows,
+		quote: c.note ? previewOf(c.note, 300) : undefined,
+		button: consoleUrl ? { label: '요청 확인하기', url: `${consoleUrl.replace(/\/+$/, '')}/cs/${encodeURIComponent(c.code)}` } : undefined,
+		notes: ['고객이 올린 사진은 콘솔 요청 상세에서 볼 수 있어요.', '고객의 연락처·배송지는 메일에 싣지 않아요.']
+	};
+	return finish(doc, `[MYR] 새 ${claimKind(c)} 요청 · ${code} · ${c.productName}`, mailIdempotencyKey('myr_claim_opened', c.code), 'myr_claim_opened');
+}
+
+/** 승인 · 반려 → 고객(크리에이터 메시지 + 다음 단계) */
+export function claimDecidedMail(c: MailClaim, ctx: MailCtx): MailTemplate {
+	const code = upper(c.code);
+	const rejected = c.status === 'rejected';
+	const rows: MailRow[] = [
+		{ label: '요청번호', value: code },
+		{ label: '상품', value: itemLine({ name: c.productName, option: c.option, qty: c.qty }) },
+		{ label: '결과', value: rejected ? '반려' : `승인 · ${c.resolutionName ?? claimKind(c)}` }
+	];
+	if (!rejected && c.refundTotal != null) rows.push({ label: '환불 예정 금액', value: `${won(c.refundTotal)}${c.deduction ? ` (왕복 배송비 ${won(c.deduction)} 차감)` : ''}` });
+	if (!rejected && c.stepText) rows.push({ label: '다음 단계', value: c.stepText });
+	const notes: string[] = [];
+	if (rejected) notes.push('반려 사유가 궁금하면 주문 상세의 [문의]로 크리에이터에게 물어볼 수 있어요.');
+	if (!c.isMember) notes.push(guestNote);
+	const doc: MailDoc = {
+		title: rejected ? `${claimKind(c)} 요청이 반려되었어요` : `${claimKind(c)} 요청이 승인되었어요`,
+		preheader: `${code} · ${c.productName}`,
+		intro: `${c.buyerName}님, ${c.sellerName}님이 ${claimKind(c)} 요청(${code})을 ${rejected ? '반려' : '승인'}했어요.`,
+		rows,
+		quote: c.message ? previewOf(c.message, 500) : undefined,
+		button: { label: '주문 확인하기', url: orderPageUrl({ code: c.orderCode, isMember: c.isMember }, ctx) },
+		notes: notes.length ? notes : undefined
+	};
+	return finish(doc, `[MYR] ${claimKind(c)} 요청이 ${rejected ? '반려' : '승인'}되었어요 · ${code}`, mailIdempotencyKey('myr_claim_decided', c.code, c.status), 'myr_claim_decided');
+}
+
+/** 교환 재발송 송장 → 고객 */
+export function claimReshippedMail(c: MailClaim, s: MailShipment, ctx: MailCtx): MailTemplate {
+	const code = upper(c.code);
+	const notes = ['배송 조회는 운송장 등록 뒤 몇 시간 지나야 보일 수 있어요.'];
+	if (!c.isMember) notes.push(guestNote);
+	const doc: MailDoc = {
+		title: '교환 상품이 출발했어요',
+		preheader: `${code} · ${s.courier} ${s.trackingNo}`,
+		intro: `${c.buyerName}님, 요청(${code})하신 상품을 새로 보냈어요.`,
+		rows: [
+			{ label: '요청번호', value: code },
+			{ label: '상품', value: itemLine({ name: c.productName, option: c.option, qty: c.qty }) },
+			{ label: '택배사', value: s.courier },
+			{ label: '운송장', value: s.trackingNo }
+		],
+		button: s.trackingUrl ? { label: '배송 조회', url: s.trackingUrl } : { label: '주문 상세 보기', url: orderPageUrl({ code: c.orderCode, isMember: c.isMember }, ctx) },
+		notes
+	};
+	return finish(doc, `[MYR] 교환 상품이 출발했어요 · ${code}`, mailIdempotencyKey('myr_claim_reshipped', c.code, s.trackingNo), 'myr_claim_reshipped');
 }
 
 /* ---------------- 크리에이터 초대 (0070 · 결정 14) ---------------- */

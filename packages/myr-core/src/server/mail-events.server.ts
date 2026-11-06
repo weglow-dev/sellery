@@ -5,13 +5,18 @@
  *   notifyOrderRefunded(orderId, r) refund.ts `refundItems` — record 가 새로 기록했을 때(already 제외) · 고객 + 환불된 줄의 셀러
  *   notifyOrderShipped(orderId, s)  ship.ts `shipOrder` — 새 운송장 기록 → 고객 배송 시작(0069)
  *   notifyCsOpened(csId, msg)       cs.ts `openCs`(접수) — 셀러에게 · notifyCsReplied(csId, reply) — 콘솔 답변 → 고객(S7 · 0063)
+ *   notifyClaimOpened(claim)        claims.ts `openClaims` — 새 교환·환불 요청 → 그 줄의 셀러(0078)
+ *   notifyClaimDecided(claim)       claims.ts `decideClaim` — 승인 · 반려 → 고객(크리에이터 메시지 + 다음 단계)
+ *   notifyClaimReshipped(claim)     claims.ts `reshipClaim` — 교환 재발송 송장 → 고객
  * 받는 사람: 고객 = buyer_email → customers.email → 회원 auth 계정 이메일(없으면 조용히 건너뜀 · 카카오 계정은 이메일이 없을 수 있다) · 셀러 = sellers.email(없으면 건너뜀 — 시드 크리에이터는 비어 있다).
  * 멱등: 템플릿 idempotencyKey(Resend Idempotency-Key + 프로세스 24시간 가드).
  */
+import { claimRefundTotal, claimStepText, RESOLUTION_NAMES, type Claim } from '../claim-rules';
 import { isEmailAddress } from '../mail/resend';
 import { trackingUrl } from '../ship-rules';
-import { csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '../mail/templates';
+import { claimDecidedMail, claimOpenedSellerMail, claimReshippedMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailClaim, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '../mail/templates';
 import { admin } from './admin.server';
+import { myrConfig } from './config.server';
 import { mailCtx, sendMail, type MailSendResult } from './mail.server';
 
 type Raw = {
@@ -221,6 +226,69 @@ export async function notifyCsReplied(conversationId: string, reply: { messageId
 		return await deliver(loaded.customerEmail, csRepliedMail(loaded.cs, reply, mailCtx()));
 	} catch (e) {
 		console.error('[mail] notifyCsReplied failed:', e instanceof Error ? e.message : e);
+		return null;
+	}
+}
+
+/* ---------------- 교환·환불 요청 (0078) ---------------- */
+function mailClaim(c: Claim, loaded: Loaded): MailClaim {
+	return {
+		code: c.code,
+		kind: c.kind,
+		reason: c.reason,
+		qty: c.qty,
+		productName: c.order.item.name || c.product?.name || '상품',
+		option: c.order.item.option,
+		orderId: c.order.id,
+		orderCode: c.order.code,
+		isMember: c.order.isMember,
+		buyerName: loaded.order.buyerName,
+		sellerName: c.seller?.name ?? '크리에이터',
+		note: c.note,
+		status: c.status,
+		resolutionName: c.resolution ? RESOLUTION_NAMES[c.resolution] : null,
+		message: c.message,
+		stepText: claimStepText(c),
+		refundTotal: c.needsRefund ? claimRefundTotal(c) : null,
+		deduction: c.deduction
+	};
+}
+
+/** 새 요청 → 그 줄의 셀러(sellers.email · 없으면 건너뜀) */
+export async function notifyClaimOpened(c: Claim): Promise<MailSendResult | null> {
+	try {
+		const loaded = await loadOrder(c.order.id);
+		if (!loaded) return null;
+		const seller = c.seller ? loaded.sellers.get(c.seller.id) : undefined;
+		return await deliver(seller?.email ?? null, claimOpenedSellerMail(mailClaim(c, loaded), myrConfig().consoleUrl ?? null));
+	} catch (e) {
+		console.error('[mail] notifyClaimOpened failed:', e instanceof Error ? e.message : e);
+		return null;
+	}
+}
+
+/** 승인 · 반려 → 고객 */
+export async function notifyClaimDecided(c: Claim): Promise<MailSendResult | null> {
+	try {
+		const loaded = await loadOrder(c.order.id);
+		if (!loaded) return null;
+		return await deliver(loaded.customerEmail, claimDecidedMail(mailClaim(c, loaded), mailCtx()));
+	} catch (e) {
+		console.error('[mail] notifyClaimDecided failed:', e instanceof Error ? e.message : e);
+		return null;
+	}
+}
+
+/** 교환 재발송 송장 → 고객 */
+export async function notifyClaimReshipped(c: Claim): Promise<MailSendResult | null> {
+	try {
+		if (!c.reshipTrackingNo) return null;
+		const loaded = await loadOrder(c.order.id);
+		if (!loaded) return null;
+		const courier = c.reshipCourier ?? '택배';
+		return await deliver(loaded.customerEmail, claimReshippedMail(mailClaim(c, loaded), { courier, trackingNo: c.reshipTrackingNo, trackingUrl: trackingUrl(courier, c.reshipTrackingNo) }, mailCtx()));
+	} catch (e) {
+		console.error('[mail] notifyClaimReshipped failed:', e instanceof Error ? e.message : e);
 		return null;
 	}
 }

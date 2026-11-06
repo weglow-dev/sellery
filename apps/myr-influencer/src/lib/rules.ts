@@ -1,132 +1,16 @@
-/** 콘솔 화면 규칙 — 탭 필터 · CS 처리 방법 · 타임라인 · 상품 에디터 검증과 미리보기 요약.
+/** 콘솔 화면 규칙 — 내 제품 탭 필터 · 상품 에디터 검증과 미리보기 요약(교환 · 환불은 7번 · 0078 에서 lib/claims.ts 로).
  *  디자인(Claude Design "MYR Influencer Admin")의 renderVals 계산을 순수 함수로 옮겼다. $app · $env 를 import 하지 않는다 — src/test/rules.test.ts.
  *
- *  ⚠ 돈 숫자 두 개는 **디자인 값**이고 정책이 아니다 — 정산 정책이 정해지면(docs/myr.md §9-6) 서버 값으로 바꾼다.
- *    PLATFORM_FEE_RATE 10%(에디터 "예상 정산") · ROUND_TRIP_SHIPPING ₩6,000(부분 환불 · 단순 변심 왕복 배송비). */
+ *  ⚠ PLATFORM_FEE_RATE 10%(에디터 "예상 정산")는 **디자인 값**이고 정책이 아니다 — 정산 정책이 정해지면(docs/myr.md §9-6) 서버 값으로 바꾼다.
+ *    단순 변심 왕복 배송비는 0078 부터 서버 값(platform_settings 'myr_claim_return_fee' · claim JSON return_fee). */
 import { myrCategoryName } from '@sellery/myr-core/categories';
-import { type CsRequest, type CsStatus, type CsType, type Product, type ProductDraft, type ProductStatus, type Resolution, type TimelineEntry } from './data';
+import { type Product, type ProductDraft, type ProductStatus } from './data';
 
 export const PLATFORM_FEE_RATE = 0.1;
-export const ROUND_TRIP_SHIPPING = 6000;
 export const MAX_IMAGES = 6;
 export const EDITOR_STEPS = 8;
 
 export const won = (n: number) => '₩' + Number(n || 0).toLocaleString('ko-KR');
-
-/* ---------- CS ---------- */
-
-/** 칩 색은 Tailwind 클래스로 (app.css 토큰 accent · lilac · mint) */
-export const CS_TYPE_META: Record<CsType, { label: string; cls: string }> = {
-	refund: { label: '환불', cls: 'bg-accent/16 text-accent' },
-	exchange: { label: '교환', cls: 'bg-lilac/18 text-lilac' }
-};
-
-export const CS_STATUS_META: Record<CsStatus, { label: string; cls: string }> = {
-	pending: { label: '처리 대기', cls: 'bg-white/8 text-white/85' },
-	progress: { label: '진행 중', cls: 'bg-mint/16 text-mint' },
-	done: { label: '완료', cls: 'bg-white/6 text-white/50' },
-	rejected: { label: '반려', cls: 'bg-white/6 text-white/50' }
-};
-
-export type CsTab = 'pending' | 'progress' | 'done' | 'all';
-const CS_TAB_MATCH: Record<CsTab, (c: CsRequest) => boolean> = {
-	pending: (c) => c.status === 'pending',
-	progress: (c) => c.status === 'progress',
-	done: (c) => c.status === 'done' || c.status === 'rejected',
-	all: () => true
-};
-export const CS_TABS: { id: CsTab; name: string }[] = [
-	{ id: 'pending', name: '대기' },
-	{ id: 'progress', name: '진행 중' },
-	{ id: 'done', name: '완료' },
-	{ id: 'all', name: '전체' }
-];
-
-export const filterCs = (list: CsRequest[], tab: CsTab) => list.filter(CS_TAB_MATCH[tab]);
-export const csTabCounts = (list: CsRequest[]) => CS_TABS.map((t) => ({ ...t, count: filterCs(list, t.id).length }));
-
-export const dueText = (c: CsRequest) => (c.due <= 1 ? '오늘 안에 답변해주세요' : `${c.due}일 안에 답변`);
-
-/** 목록 카드의 강조 테두리 — 기한이 급한 처리 대기 요청만 */
-export const isUrgentPending = (c: CsRequest) => c.urgent && c.status === 'pending';
-
-/** 사유별 처리 기준 (상세 화면 "처리 기준") */
-export const POLICY_BY_REASON: Record<string, string[]> = {
-	'단순 변심': ['수령 후 7일 이내 · 미개봉만 가능', `왕복 배송비 ${won(ROUND_TRIP_SHIPPING)} 고객 부담`, '식품 특성상 개봉 제품은 교환·환불 불가'],
-	'파손 · 누액': ['사진 확인 후 즉시 재발송 또는 전액 환불', '배송비 전액 MYR 부담', '회수 없이 처리 가능 (파손 사진 보관)'],
-	오배송: ['배송비 전액 MYR 부담 · 즉시 재발송', '잘못 간 제품은 회수 기사 방문', '고객 귀책 없음']
-};
-export const policyOf = (c: CsRequest) => POLICY_BY_REASON[c.reason] ?? [];
-
-export type ResolutionOption = { id: Exclude<Resolution, 'reject'>; title: string; desc: string };
-
-/** 요청 종류별 처리 방법 — 같은 id 라도 요청 종류에 따라 이름이 다르다(환불 요청의 reship = "교환으로 전환") */
-export function resolutionOptions(c: CsRequest): ResolutionOption[] {
-	if (c.type === 'refund') {
-		return [
-			{ id: 'refund', title: '전액 환불', desc: `${won(c.amount)} · 원결제수단으로 3영업일 내` },
-			{ id: 'partial', title: '부분 환불 (배송비 차감)', desc: `${won(Math.max(0, c.amount - ROUND_TRIP_SHIPPING))} · 단순 변심 시` },
-			{ id: 'reship', title: '교환으로 전환', desc: '새 제품 재발송 후 회수' }
-		];
-	}
-	return [
-		{ id: 'reship', title: '새 제품 재발송', desc: '회수 없이 바로 출고 · 배송비 MYR 부담' },
-		{ id: 'reship_collect', title: '회수 후 재발송', desc: '기사 방문 회수 → 출고' },
-		{ id: 'refund', title: '환불로 전환', desc: `${won(c.amount)} 전액 환불` }
-	];
-}
-
-/** 처리된 요청의 "처리 방법" 표시 이름 — PC 상세의 처리 결과 패널 (디자인 PC resolutionNames).
- *  선택지 이름(resolutionOptions 의 "교환으로 전환" 등)과 달리 결과는 한 가지 이름으로 보여 준다 */
-export const RESOLUTION_NAMES: Record<Resolution, string> = {
-	refund: '전액 환불',
-	partial: '부분 환불 (배송비 차감)',
-	reship: '새 제품 재발송',
-	reship_collect: '회수 후 재발송',
-	reject: '반려'
-};
-export const resolutionName = (c: CsRequest) => (c.resolution ? RESOLUTION_NAMES[c.resolution] : '—');
-
-/** 고객에게 보낼 메시지 템플릿 (상세 화면 칩) */
-export const REPLY_TEMPLATES: Record<Exclude<Resolution, 'reject'>, string> = {
-	refund: '불편을 드려 죄송해요. 환불 승인되었고, 3영업일 안에 결제수단으로 돌려드릴게요.',
-	reship: '사진 확인했어요. 새 제품을 오늘 바로 보내드릴게요. 받으신 제품은 폐기하셔도 괜찮아요.',
-	partial: '미개봉 확인 후 왕복 배송비를 제외한 금액으로 환불 진행할게요.',
-	reship_collect: '회수 기사가 1~2일 내 방문해요. 회수 확인 후 바로 새 제품을 보내드릴게요.'
-};
-export const REPLY_CHIPS: { name: string; text: string }[] = [
-	{ name: '환불 안내', text: REPLY_TEMPLATES.refund },
-	{ name: '재발송 안내', text: REPLY_TEMPLATES.reship },
-	{ name: '회수 안내', text: REPLY_TEMPLATES.reship_collect }
-];
-
-/** 승인 버튼 활성 — 처리 방법을 고르고 메시지를 적어야 한다 */
-export const canApprove = (resolution: Resolution | null, reply: string) => !!resolution && resolution !== 'reject' && reply.trim().length > 0;
-
-export function approveLabel(c: CsRequest, resolution: Resolution | null): string {
-	const opt = resolutionOptions(c).find((o) => o.id === resolution);
-	return opt ? `${opt.title} 승인` : '처리 방법을 선택하세요';
-}
-
-/** 처리 결과를 요청에 반영 — 승인은 progress(진행 중) · 반려는 rejected. 타임라인을 새로 쓴다. actorName = 처리한 크리에이터(로그인한 sellers 행의 활동명) */
-export function resolveCs(c: CsRequest, status: 'progress' | 'rejected', resolution: Resolution, actorName: string): CsRequest {
-	const title = status === 'rejected' ? '반려' : approveLabel(c, resolution);
-	const timeline: TimelineEntry[] = [
-		{ title: '요청 접수', when: c.ago },
-		{ title, when: actorName.trim() ? `방금 · ${actorName.trim()}` : '방금' },
-		...(status === 'progress' ? [{ title: '처리 진행', when: '대기 중' }] : [])
-	];
-	return { ...c, status, resolution, urgent: false, timeline };
-}
-
-/** 처리 내역 점 — 진행 중인 요청의 마지막 줄만 "아직" (빈 점) */
-export function timelineRows(c: CsRequest) {
-	const rows = c.timeline ?? [];
-	return rows.map((r, i) => {
-		const last = i === rows.length - 1;
-		return { ...r, done: !(last && c.status === 'progress'), last };
-	});
-}
 
 /* ---------- 내 제품 ---------- */
 

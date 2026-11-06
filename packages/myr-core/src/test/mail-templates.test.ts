@@ -1,7 +1,7 @@
 // 거래 메일 템플릿·레이아웃 — apps/myr-shop/src/lib/mail/{templates,layout}.ts · 셀러는 자기 줄만 · 비회원 링크 · 이스케이프 · 멱등 키
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, mailIdempotencyKey, renderMailHtml, renderMailText } from '../mail/layout';
-import { creatorInviteMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailOrder, type MailRefund } from '../mail/templates';
+import { claimDecidedMail, claimOpenedSellerMail, claimReshippedMail, creatorInviteMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderPageUrl, orderRefundedMail, orderRefundedSellerMail, orderShippedMail, type MailClaim, type MailOrder, type MailRefund } from '../mail/templates';
 
 const ctx = { siteUrl: 'https://myr-shop.vercel.app/' };
 const order = (over: Partial<MailOrder> = {}): MailOrder => ({
@@ -223,6 +223,69 @@ describe('배송 시작 메일 (0069)', () => {
 		const g = orderShippedMail(order({ isMember: false }), { courier: '한진택배', trackingNo: '1', trackingUrl: null }, ctx);
 		expect(g.text).toContain('비회원 주문은');
 		expect(g.html).toContain('/orders/g/myr1007');
+	});
+});
+
+describe('교환 · 환불 요청 메일 (0078)', () => {
+	const claim = (over: Partial<MailClaim> = {}): MailClaim => ({
+		code: 'rq2001',
+		kind: 'refund',
+		reason: '단순 변심',
+		qty: 1,
+		productName: '지유 레시피 그래놀라',
+		option: '2봉',
+		orderId: '11111111-2222-3333-4444-555555555555',
+		orderCode: 'myr1007',
+		isMember: true,
+		buyerName: '김고객',
+		sellerName: '지유',
+		note: '미개봉이에요',
+		status: 'pending',
+		resolutionName: null,
+		message: null,
+		stepText: '',
+		refundTotal: null,
+		deduction: 0,
+		...over
+	});
+	it('접수(셀러) — 종류 · 사유 · 상품 · 상세 · 콘솔 링크(있을 때만) · 연락처 없음', () => {
+		const m = claimOpenedSellerMail(claim(), 'https://myr-influencer.vercel.app/');
+		expect(m.subject).toBe('[MYR] 새 환불 요청 · RQ2001 · 지유 레시피 그래놀라');
+		expect(m.text).toContain('환불 · 단순 변심');
+		expect(m.text).toContain('미개봉이에요');
+		expect(m.text).toContain('https://myr-influencer.vercel.app/cs/rq2001');
+		expect(m.text).not.toContain('010-');
+		expect(claimOpenedSellerMail(claim(), null).text).not.toContain('/cs/rq2001');
+		expect(m.idempotencyKey).toBe(claimOpenedSellerMail(claim(), null).idempotencyKey);
+	});
+	it('승인(고객) — 처리 방법 · 환불 예정(차감) · 다음 단계 · 크리에이터 메시지 · 주문 링크', () => {
+		const m = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refundTotal: 26000, deduction: 6000 }), ctx);
+		expect(m.subject).toBe('[MYR] 환불 요청이 승인되었어요 · RQ2001');
+		expect(m.text).toContain('승인 · 부분 환불 (왕복 배송비 차감)');
+		expect(m.text).toContain('₩26,000 (왕복 배송비 ₩6,000 차감)');
+		expect(m.text).toContain('회수를 기다리고 있어요');
+		expect(m.text).toContain('회수 뒤 환불해드릴게요');
+		expect(m.text).toContain('https://myr-shop.vercel.app/orders/myr1007');
+	});
+	it('반려(고객) — 결과 반려 · 문의 안내 · 비회원 링크 · 승인과 키가 다르다', () => {
+		const m = claimDecidedMail(claim({ status: 'rejected', kind: 'exchange', isMember: false, message: '개봉 제품이라 어려워요' }), ctx);
+		expect(m.subject).toBe('[MYR] 교환 요청이 반려되었어요 · RQ2001');
+		expect(m.text).toContain('반려');
+		expect(m.text).toContain('[문의]');
+		expect(m.text).toContain('/orders/g/myr1007');
+		expect(m.idempotencyKey).not.toBe(claimDecidedMail(claim({ status: 'progress' }), ctx).idempotencyKey);
+	});
+	it('교환 재발송(고객) — 택배사 · 운송장 · 조회 버튼 · 송장마다 키', () => {
+		const m = claimReshippedMail(claim({ kind: 'exchange', status: 'done' }), { courier: '한진택배', trackingNo: '440011112222', trackingUrl: 'https://www.hanjin.com/x' }, ctx);
+		expect(m.subject).toBe('[MYR] 교환 상품이 출발했어요 · RQ2001');
+		expect(m.text).toContain('440011112222');
+		expect(m.text).toContain('https://www.hanjin.com/x');
+		expect(m.idempotencyKey).not.toBe(claimReshippedMail(claim(), { courier: '한진택배', trackingNo: '9', trackingUrl: null }, ctx).idempotencyKey);
+	});
+	it('환불(고객) 메일 — 왕복 배송비 차감 줄', () => {
+		const r: MailRefund = { items: [{ itemId: 'i-a', qty: 1, amount: 16000 }], amount: 10000, full: false, reason: '교환·환불 요청 RQ2001 · 단순 변심', deposit: false, deduction: 6000 };
+		expect(orderRefundedMail(order(), r, ctx).text).toContain('−₩6,000 (단순 변심 · 고객 부담)');
+		expect(orderRefundedMail(order(), { ...r, deduction: 0 }, ctx).text).not.toContain('왕복 배송비');
 	});
 });
 

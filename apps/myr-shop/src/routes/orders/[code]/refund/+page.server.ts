@@ -3,9 +3,10 @@ import type { PageServerLoad } from './$types';
 import { ORDER_CODE_RE } from '@sellery/myr-core/checkout-rules';
 import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 import { hasAdmin } from '$lib/server/admin';
+import { claimReturnFee, claimsForOrder } from '$lib/server/claims';
 import { myOrder } from '$lib/server/orders';
 
-/** /orders/[code]/refund — 회원 환불 신청 페이지(대표 시안 2026-11-03). 소유·로그인 판정은 주문 상세와 같다. 환불할 수 없는 주문이면 상세로 돌려보낸다(이유는 상세가 보여준다). */
+/** /orders/[code]/refund — 회원 교환 · 환불 신청 페이지(대표 시안 2026-11-03 · 0078 요청). 소유·로그인 판정은 주문 상세와 같다. 환불할 수 없는 주문이면 상세로 돌려보낸다(이유는 상세가 보여준다). */
 export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const code = params.code.toLowerCase();
 	if (!ORDER_CODE_RE.test(code)) error(404, { message: '주문을 찾을 수 없습니다' });
@@ -15,5 +16,6 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 	const order = await myOrder(user.id, code);
 	if (!order) error(404, { message: '주문을 찾을 수 없습니다' });
 	if (!customerCanRefund(order).ok) redirect(303, `/orders/${code}`);
-	return { order, backHref: `/orders/${code}` };
+	const [claims, returnFee] = await Promise.all([claimsForOrder(order.id), claimReturnFee()]);
+	return { order, claims, returnFee, backHref: `/orders/${code}` };
 };

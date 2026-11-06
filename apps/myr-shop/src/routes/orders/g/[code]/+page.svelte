@@ -10,4 +10,4 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<OrderDetail order={data.order} inquiries={data.inquiries} guestNote />
+<OrderDetail order={data.order} inquiries={data.inquiries} claims={data.claims} guestNote />

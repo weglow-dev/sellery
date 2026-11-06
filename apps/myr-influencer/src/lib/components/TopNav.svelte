@@ -14,8 +14,8 @@
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 	/** 로그인한 크리에이터 — 오른쪽 끝 이름 · 로그아웃 */
 	const me = $derived(page.data.me as Me | undefined);
-	/** 처리 대기 CS = 교환·환불(목) + 고객 문의 답변 대기(0075) */
-	const csCount = $derived(app.csBadge(page.data.inqWaiting));
+	/** 처리 대기 CS = 교환·환불 처리 대기(0078) + 고객 문의 답변 대기(0075) */
+	const csCount = $derived(app.csBadge(page.data.inqWaiting, page.data.claimWaiting));
 </script>
 
 <header class="z-10 hidden h-[72px] shrink-0 border-b border-white/7 bg-bg/85 backdrop-blur-md lg:block">

@@ -23,6 +23,8 @@ export type MyrCoreConfig = {
 	mailFrom?: string;
 	/** 샵 주소(메일 링크 오리진) — 샵은 PUBLIC_SITE_URL, 콘솔은 샵 주소 환경변수. 형식이 어긋나면 기본값(`site.ts`) */
 	shopUrl?: string;
+	/** 크리에이터 콘솔 주소(PUBLIC_MYR_CONSOLE_URL · 선택) — 샵에서 나가는 크리에이터 메일(교환·환불 요청 접수)의 [요청 확인하기] 링크. 없으면 버튼 없이 */
+	consoleUrl?: string;
 	/** 이벗(EBUT_*) — 하나라도 비면 연동 꺼짐(`ebut.ts` ebutReady). 샵만 넣는다(이벗 호출은 샵 크론 한 곳 · 결정 12) */
 	ebutId?: string;
 	ebutCustCode?: string;
@@ -46,6 +48,7 @@ const KEYS = [
 	'resendApiUrl',
 	'mailFrom',
 	'shopUrl',
+	'consoleUrl',
 	'ebutId',
 	'ebutCustCode',
 	'ebutApiKey',
