@@ -14,7 +14,6 @@
 import { claimRefundTotal, claimStepText, RESOLUTION_NAMES, type Claim } from '../claim-rules';
 import { isEmailAddress } from '../mail/resend';
 import { trackingUrl } from '../ship-rules';
-import { consoleOrigin } from '../site';
 import { claimDecidedMail, claimOpenedSellerMail, claimReshippedMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailClaim, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '../mail/templates';
 import { admin } from './admin.server';
 import { myrConfig } from './config.server';
@@ -261,7 +260,7 @@ export async function notifyClaimOpened(c: Claim): Promise<MailSendResult | null
 		const loaded = await loadOrder(c.order.id);
 		if (!loaded) return null;
 		const seller = c.seller ? loaded.sellers.get(c.seller.id) : undefined;
-		return await deliver(seller?.email ?? null, claimOpenedSellerMail(mailClaim(c, loaded), consoleOrigin(myrConfig().consoleUrl)));
+		return await deliver(seller?.email ?? null, claimOpenedSellerMail(mailClaim(c, loaded)));
 	} catch (e) {
 		console.error('[mail] notifyClaimOpened failed:', e instanceof Error ? e.message : e);
 		return null;

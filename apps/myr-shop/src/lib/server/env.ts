@@ -17,8 +17,6 @@ configureMyrCore({
 	mailFrom: env.MAIL_FROM,
 	// 메일 링크 = 이 샵 주소(SEO canonical 과 같은 PUBLIC_SITE_URL)
 	shopUrl: pub.PUBLIC_SITE_URL,
-	// 교환·환불 요청 접수 메일(크리에이터)의 [요청 확인하기] 링크 — 없으면 https://myr-influencer.vercel.app(@sellery/myr-core/site consoleOrigin · 0078)
-	consoleUrl: pub.PUBLIC_MYR_CONSOLE_URL,
 	// 이벗(0077 · docs/myr.md §6.8) — 하나라도 비면 발주 · 송장 수집 크론이 꺼져 있다. 이벗 호출은 이 샵 한 곳(결정 12)
 	ebutId: env.EBUT_ID,
 	ebutCustCode: env.EBUT_CUST_CODE,

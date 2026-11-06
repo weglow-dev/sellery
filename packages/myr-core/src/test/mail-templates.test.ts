@@ -248,15 +248,15 @@ describe('교환 · 환불 요청 메일 (0078)', () => {
 		deduction: 0,
 		...over
 	});
-	it('접수(셀러) — 종류 · 사유 · 상품 · 상세 · 콘솔 링크(있을 때만) · 연락처 없음', () => {
-		const m = claimOpenedSellerMail(claim(), 'https://myr-influencer.vercel.app/');
+	it('접수(셀러) — 종류 · 사유 · 상품 · 상세 · 콘솔 버튼 없음 · 연락처 없음', () => {
+		const m = claimOpenedSellerMail(claim());
 		expect(m.subject).toBe('[MYR] 새 환불 요청 · RQ2001 · 지유 레시피 그래놀라');
 		expect(m.text).toContain('환불 · 단순 변심');
 		expect(m.text).toContain('미개봉이에요');
-		expect(m.text).toContain('https://myr-influencer.vercel.app/cs/rq2001');
+		expect(m.text).toContain('CS 관리');
+		expect(m.text).not.toContain('/cs/rq2001');
+		expect(m.html).not.toContain('요청 확인하기');
 		expect(m.text).not.toContain('010-');
-		expect(claimOpenedSellerMail(claim(), null).text).not.toContain('/cs/rq2001');
-		expect(m.idempotencyKey).toBe(claimOpenedSellerMail(claim(), null).idempotencyKey);
 	});
 	it('승인(고객) — 처리 방법 · 환불 예정(차감) · 다음 단계 · 크리에이터 메시지 · 주문 링크', () => {
 		const m = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refundTotal: 26000, deduction: 6000 }), ctx);

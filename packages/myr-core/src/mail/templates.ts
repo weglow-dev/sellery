@@ -8,7 +8,7 @@
  * | 새 주문 | orderPaidSellerMail | 줄의 셀러(sellers.email) — **자기 줄만** · 배송지 없음 | (셀러 콘솔 전까지 링크 없음) |
  * | 환불 완료 | orderRefundedMail | 고객 | 주문 화면 |
  * | 환불(셀러) | orderRefundedSellerMail | 환불된 줄의 셀러 — 자기 줄만 | — |
- * | 교환·환불 요청 접수 | claimOpenedSellerMail | 그 줄의 셀러 — 연락처·배송지 없음 | 콘솔 CS 관리 /cs/<요청> |
+ * | 교환·환불 요청 접수 | claimOpenedSellerMail | 그 줄의 셀러 — 연락처·배송지 없음 | 없음(콘솔 CS 관리 · 뱃지에서 확인) |
  * | 교환·환불 승인·반려 | claimDecidedMail | 고객 | 주문 화면 |
  * | 교환 재발송 | claimReshippedMail | 고객 | 배송 조회 |
  * | 크리에이터 초대 | creatorInviteMail | 초대받은 이메일 | 콘솔 /invite/<토큰>(버튼 "가입하기") |
@@ -286,8 +286,8 @@ export type MailClaim = {
 };
 const claimKind = (c: Pick<MailClaim, 'kind'>): string => (c.kind === 'exchange' ? '교환' : '환불');
 
-/** 새 요청 → 그 줄의 셀러. 고객 연락처·배송지는 싣지 않는다 · 처리는 콘솔에서 */
-export function claimOpenedSellerMail(c: MailClaim, consoleUrl: string | null): MailTemplate {
+/** 새 요청 → 그 줄의 셀러. 고객 연락처·배송지는 싣지 않는다 · 처리는 콘솔에서 — 버튼 없이(콘솔 CS 관리 · 처리 대기 뱃지에서 확인 · 대표 결정 2026-11-06) */
+export function claimOpenedSellerMail(c: MailClaim): MailTemplate {
 	const code = upper(c.code);
 	const rows: MailRow[] = [
 		{ label: '요청번호', value: code },
@@ -299,10 +299,9 @@ export function claimOpenedSellerMail(c: MailClaim, consoleUrl: string | null): 
 	const doc: MailDoc = {
 		title: `새 ${claimKind(c)} 요청이 들어왔어요`,
 		preheader: `${code} · ${c.productName} · ${c.reason}`,
-		intro: `${c.sellerName}님, 내 상품에 ${claimKind(c)} 요청이 접수되었어요. 콘솔에서 처리 방법을 골라 승인하거나 반려해주세요.`,
+		intro: `${c.sellerName}님, 내 상품에 ${claimKind(c)} 요청이 접수되었어요. 크리에이터 콘솔 CS 관리 › 교환 · 환불에서 처리 방법을 골라 승인하거나 반려해주세요.`,
 		rows,
 		quote: c.note ? previewOf(c.note, 300) : undefined,
-		button: consoleUrl ? { label: '요청 확인하기', url: `${consoleUrl.replace(/\/+$/, '')}/cs/${encodeURIComponent(c.code)}` } : undefined,
 		notes: ['고객이 올린 사진은 콘솔 요청 상세에서 볼 수 있어요.', '고객의 연락처·배송지는 메일에 싣지 않아요.']
 	};
 	return finish(doc, `[MYR] 새 ${claimKind(c)} 요청 · ${code} · ${c.productName}`, mailIdempotencyKey('myr_claim_opened', c.code), 'myr_claim_opened');
