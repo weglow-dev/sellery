@@ -4,6 +4,7 @@
 	import { shop } from '$lib/state.svelte';
 	import MyClaims from '$lib/components/MyClaims.svelte';
 	import InquiryAccordion from '$lib/components/InquiryAccordion.svelte';
+	import MoreToggle from '$lib/components/MoreToggle.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문(서버 myr_orders · 0060 · 상태 칩은 열린 교환·환불 요청이 먼저) · 교환 · 환불 요청(MyClaims · 0078) · 내 문의 · 찜한 레시피 · 메뉴.
@@ -21,6 +22,15 @@
 		{ name: '내 제품 만들기 (MYR 제조의뢰)', href: LANDING, external: true }
 	];
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', muted: 'bg-white/8 text-white/55', danger: 'bg-[#ff6b6b]/12 text-[#ff6b6b]', ok: 'bg-[#4ade80]/12 text-[#4ade80]' };
+
+	// 목록은 앞부분만 보이고 "더보기"로 펼친다(MoreToggle) — 찜은 모바일 2열 · PC 3열이라 6개(2·3줄)
+	const PREVIEW = 3;
+	const LIKES_PREVIEW = 6;
+	let more = $state({ orders: false, claims: false, inquiries: false, likes: false });
+	const shownOrders = $derived(more.orders ? orders : orders.slice(0, PREVIEW));
+	const shownClaims = $derived(more.claims ? data.claims : data.claims.slice(0, PREVIEW));
+	const shownInquiries = $derived(more.inquiries ? data.inquiries : data.inquiries.slice(0, PREVIEW));
+	const shownLikes = $derived(more.likes ? shop.likes : shop.likes.slice(0, LIKES_PREVIEW));
 </script>
 
 <svelte:head><title>마이페이지 — MYR Shop</title></svelte:head>
@@ -91,8 +101,8 @@
 		{:else if orders.length === 0}
 			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-fg-faint lg:rounded-[20px] lg:py-10">아직 주문이 없어요</div>
 		{/if}
-		<div class="flex flex-col gap-2.5">
-			{#each orders as o (o.id)}
+		<div id="my-orders" class="flex flex-col gap-2.5">
+			{#each shownOrders as o (o.id)}
 				{@const label = statusLabel(o)}
 				<a href="/orders/{o.code}" class="block rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-fg transition-colors lg:flex lg:items-center lg:gap-4 lg:rounded-[20px] lg:px-5 lg:py-4 lg:hover:border-white/25">
 					<div class="flex items-center justify-between lg:hidden"><span class="font-mono text-[12px] text-fg-faint">{displayCode(o.code)}</span><span class="rounded-full px-2 py-1 text-[11px] font-bold {tone[label.tone]}">{label.text}</span></div>
@@ -109,28 +119,32 @@
 				</a>
 			{/each}
 		</div>
+		<MoreToggle total={orders.length} preview={PREVIEW} bind:expanded={more.orders} controls="my-orders" />
 
 		{#if user && data.claims.length}
 			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">교환 · 환불 요청 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{data.claims.length}</span></h3>
-			<MyClaims items={data.claims} />
+			<div id="my-claims"><MyClaims items={shownClaims} /></div>
+			<MoreToggle total={data.claims.length} preview={PREVIEW} bind:expanded={more.claims} controls="my-claims" />
 		{/if}
 
 		{#if user && data.inquiries.length}
 			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">내 문의 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{data.inquiries.length}</span></h3>
-			<InquiryAccordion items={data.inquiries} />
+			<div id="my-inquiries"><InquiryAccordion items={shownInquiries} /></div>
+			<MoreToggle total={data.inquiries.length} preview={PREVIEW} bind:expanded={more.inquiries} controls="my-inquiries" />
 		{/if}
 
 		<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">찜한 레시피</h3>
 		{#if shop.ready && shop.likes.length === 0}
 			<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-fg-faint lg:rounded-[20px] lg:py-10">하트를 눌러 레시피를 저장해보세요</div>
 		{/if}
-		<div class="grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
-			{#each shop.likes as p (p.code)}
+		<div id="my-likes" class="grid grid-cols-2 gap-2.5 lg:grid-cols-3 lg:gap-3">
+			{#each shownLikes as p (p.code)}
 				<a href="/p/{p.code}" class="flex items-center gap-2.5 rounded-[18px] border border-white/8 bg-white/3 p-3 text-left text-fg transition-colors lg:gap-3 lg:hover:border-white/25">
 					<Tile tile={p.tile} ic={p.ic} thumbUrl={p.thumbUrl} alt={p.name} icon={26} class="h-11 w-11 rounded-xl lg:h-14 lg:w-14 lg:rounded-[14px]" />
 					<span class="flex min-w-0 flex-col gap-0.5"><span class="truncate text-[13px] font-bold lg:text-[14px]">{p.name}</span><span class="text-[12px] text-fg-faint lg:text-[13px]">{won(p.price)}</span></span>
 				</a>
 			{/each}
 		</div>
+		<MoreToggle total={shop.likes.length} preview={LIKES_PREVIEW} bind:expanded={more.likes} controls="my-likes" />
 	</div>
 </div>
