@@ -2,6 +2,7 @@
  *  판정(선택지 · 단계 · 차감)은 DB 가 정한 값(claim JSON)을 그대로 쓰고, 이름 · 문구는 `@sellery/myr-core/claim-rules` 를 쓴다. 여기는 콘솔 화면 모양만.
  *  순수 — $app · $env 를 import 하지 않는다(src/test/claims.test.ts). */
 import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
+import { orderShipping, type OrderShipping } from './order-ship';
 import { relativeTime } from './product-row';
 
 /** 칩 색은 Tailwind 클래스로 (app.css 토큰 accent · lilac · mint) — 시안 그대로 */
@@ -79,6 +80,9 @@ export function consoleTimeline(c: Claim, now?: Date): { title: string; when: st
 		last: i === rows.length - 1
 	}));
 }
+
+/** 주문 · 배송 — 문의 상세와 같은 표(요청이 걸린 줄의 배송 상태 · 송장 · 발송일 · 배송 완료일 · 0080) */
+export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping => orderShipping(c.order);
 
 /** 지금 단계 — 진행 중 요청에서 크리에이터가 볼 한 줄(실행은 운영 · 서버) */
 export const STEP_TEXT: Record<string, string> = {

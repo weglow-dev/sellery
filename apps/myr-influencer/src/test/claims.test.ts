@@ -1,7 +1,7 @@
 // CS 관리 › 교환 · 환불(7번 · 0078) — apps/myr-influencer/src/lib/claims.ts (탭 · 기한 · 승인 버튼 · 메시지 칩 · 처리 내역)
 import { describe, expect, it } from 'vitest';
 import { claimFromJson, type Claim } from '@sellery/myr-core/claim-rules';
-import { approveLabel, claimTabCounts, consoleTimeline, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
+import { approveLabel, claimShipping, claimTabCounts, consoleTimeline, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
 
 const NOW = new Date('2026-11-06T12:00:00Z');
 const claim = (o: Record<string, unknown> = {}) =>
@@ -73,5 +73,27 @@ describe('처리 내역', () => {
 		);
 		expect(rows[1].when).toBe('1시간 전 · 확인했어요');
 		expect(rows[3]).toEqual({ title: '환불 완료', when: '방금 · ₩26,000 (왕복 배송비 ₩6,000 차감)', done: true, last: true });
+	});
+});
+
+describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
+	const ord = (status: string, item: Record<string, unknown>) => ({ id: 'o', code: 'myr1001', status, paid_at: '2026-11-01T00:00:00Z', is_member: true, item: { id: 'i', name: '포도 젤리', option: '', qty: 1, unit_price: 32000, refunded_qty: 0, status: 'PAID', ...item } });
+	it('배송 완료 줄 → 운송장(조회 링크) · 발송일 · 배송 완료', () => {
+		const s = claimShipping(claim({ order: ord('PAID', { ship_status: 'DELIVERED', courier: 'CJ대한통운', tracking_no: '612300000010', shipped_at: '2026-11-02T00:00:00Z', delivered_at: '2026-11-03T00:00:00Z' }) }));
+		expect(s.label).toBe('배송 완료');
+		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '결제일', '운송장', '발송일', '배송 완료']);
+		expect(s.rows.find((r) => r.k === '운송장')).toMatchObject({ v: 'CJ대한통운 612300000010' });
+		expect(s.rows.find((r) => r.k === '운송장')!.href).toBeTruthy();
+	});
+	it('배송 준비중 줄 → 송장 없이 출고 안내 · 부분 환불 주문이어도 줄 배송 상태', () => {
+		const s = claimShipping(claim({ order: ord('PARTIAL_REFUNDED', { ship_status: 'PREPARING' }) }));
+		expect(s.label).toBe('부분 환불');
+		expect(s.rows.find((r) => r.k === '출고')!.v).toBe('MYR 물류센터에서 준비 중');
+		expect(s.rows.some((r) => r.k === '운송장')).toBe(false);
+	});
+	it('옛 응답(주문 상태 · 송장 없음) → 결제 완료 주문 · 줄 배송 상태로', () => {
+		const c = claim();
+		expect([c.order.status, c.order.item.courier, c.order.item.trackingNo]).toEqual(['PAID', null, null]);
+		expect(claimShipping(c).label).toBe('배송 완료');
 	});
 });

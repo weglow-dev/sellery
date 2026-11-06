@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { claimPolicy, claimRefundTotal, CLAIM_MESSAGE_MAX, canDecide, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
-	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
+	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
 	import { won } from '$lib/rules';
@@ -12,11 +12,12 @@
 	import BottomBar from '$lib/components/BottomBar.svelte';
 	import CheckDot from '$lib/components/CheckDot.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import OrderShipCard from '$lib/components/OrderShipCard.svelte';
 	import PcBack from '$lib/components/PcBack.svelte';
 	import SectionTitle from '$lib/components/SectionTitle.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 교환·환불 요청 상세(7번 · 0078) — 제품 · 고객 요청(사유 · 상세 · 사진) · 처리 기준.
+	/** 교환·환불 요청 상세(7번 · 0078) — 제품 · 주문 · 배송(문의 상세와 같은 칸 · 0080) · 고객 요청(사유 · 상세 · 사진) · 처리 기준.
 	 *  처리 대기면 처리 방법 선택 + 고객 메시지 → [반려] / [○○ 승인](POST /api/claims/[code] · 고객 메일). 처리된 요청은 처리 결과 + 처리 내역(지금 단계는 운영 · 서버가 진행).
 	 *  선택지 · 차감 금액 · 단계는 서버(claim JSON)가 정한 값 그대로. 회수 · 재발송 · 환불 실행은 MYR 운영(콘솔 전까지 myr-ops.mjs) · 서버.
 	 *  모바일: 한 줄로 쌓고 하단 버튼 줄 / PC(lg~): 왼쪽 정보 + 오른쪽 420px 고정(sticky) 처리 패널 (디자인 "MYR Influencer Admin PC"). */
@@ -156,6 +157,10 @@
 					</span>
 					<span class="hidden text-[20px] font-extrabold whitespace-nowrap tabular-nums lg:block">{won(c.amount)}</span>
 				</div>
+
+				<!-- 주문 · 배송 — 문의 상세와 같은 칸(요청이 걸린 줄 · 0080) -->
+				<SectionTitle>주문 · 배송</SectionTitle>
+				<OrderShipCard title="주문 {c.order.code.toUpperCase()}" ship={claimShipping(c)} />
 
 				<SectionTitle>고객 요청</SectionTitle>
 				<div class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">

@@ -12,6 +12,7 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import BottomBar from '$lib/components/BottomBar.svelte';
 	import PcBack from '$lib/components/PcBack.svelte';
+	import OrderShipCard from '$lib/components/OrderShipCard.svelte';
 	import SectionTitle from '$lib/components/SectionTitle.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
@@ -72,22 +73,7 @@
 {#snippet shipping()}
 	{#if ship}
 		<SectionTitle>주문 · 배송</SectionTitle>
-		<div class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">
-			<div class="flex items-center justify-between gap-2">
-				<span class="text-[14px] font-bold lg:text-[15px]">{inqOrderText(c)}</span>
-				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap lg:text-[13px] {ship.cls}">{ship.label}</span>
-			</div>
-			<dl class="mt-3 flex flex-col gap-2 border-t border-white/8 pt-3 text-[13px] lg:text-[14px]">
-				{#each ship.rows as r (r.k)}
-					<div class="flex justify-between gap-4">
-						<dt class="shrink-0 text-white/55">{r.k}</dt>
-						<dd class="min-w-0 text-right font-semibold text-fg">
-							{#if r.href}<a href={r.href} target="_blank" rel="noopener noreferrer" class="underline decoration-white/30 underline-offset-2 hover:text-accent">{r.v}</a>{:else}{r.v}{/if}
-						</dd>
-					</div>
-				{/each}
-			</dl>
-		</div>
+		<OrderShipCard title={inqOrderText(c)} {ship} />
 	{:else if c.type === '배송 문의'}
 		<p class="mt-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3 text-[13px] leading-normal text-white/60">주문번호 없이 남긴 문의라 배송 상태를 확인할 수 없어요.</p>
 	{/if}

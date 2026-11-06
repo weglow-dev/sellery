@@ -1,7 +1,7 @@
 -- pgTAP — 0078 교환·환불 요청: 권한 · 요청 남기기(가드 · 사진 · 줄마다 하나) · 크리에이터 목록 · 승인/반려(처리 방법 · 할 일 · 차감) ·
 --         회수 확인 · 환불 기록 · 재발송 송장 · 완료 판정 · 환불 재시도 대상 · 고아 사진 (docs/myr.md §4.2.1 7번)
 begin;
-select plan(83);
+select plan(84);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open 불가');
@@ -97,6 +97,10 @@ select is((select jsonb_build_object('options', j -> 'options', 'phone', j ->> '
              from (select public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', upper((select code from rq where k = 'rc1'))) as j) s),
   '{"options": ["partial", "refund"], "phone": "010-****-5678", "step": "decide", "amount": 32000, "fee": 6000}'::jsonb, '상세 JSON — 단순 변심 선택지 · 연락처 가림 · 단계 · 금액 · 왕복 배송비(코드 대소문자 무관)');
 select is(public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc5')) -> 'options', '["reship", "refund"]'::jsonb, '파손 교환 요청 선택지 — 재발송 먼저');
+update public.myr_order_items set courier = '한진택배', tracking_no = '440000000001', shipped_at = now() where id = '00000000-0000-4000-8000-000000000fc5';
+select is((select jsonb_build_object('status', j #>> '{order,status}', 'courier', j #>> '{order,item,courier}', 'tracking', j #>> '{order,item,tracking_no}')
+             from (select public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc5')) as j) s),
+  '{"status": "PAID", "courier": "한진택배", "tracking": "440000000001"}'::jsonb, '요청 JSON — 주문 상태 · 그 줄의 택배사 · 송장(0080)');
 
 -- ---------- 승인 · 반려 ----------
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f82', 'approve', 'partial', '확인했어요') ->> 'code', 'NOT_FOUND', '다른 크리에이터는 NOT_FOUND');

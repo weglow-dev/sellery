@@ -138,7 +138,9 @@ describe('처리 방법 이름 · 금액', () => {
 	});
 	it('처리 기준 문구 — 사유별 · 배송비 숫자는 설정값', () => {
 		expect(claimPolicy('단순 변심', 7000)[1]).toBe('왕복 배송비 ₩7,000은 고객 부담 — 환불 금액에서 빼요');
-		expect(claimPolicy('파손 · 누액', 6000)).toHaveLength(3);
+		expect(claimPolicy('단순 변심', 6000)).toEqual(['수령 후 7일 이내 · 미개봉만 가능', '왕복 배송비 ₩6,000은 고객 부담 — 환불 금액에서 빼요', '식품 특성상 개봉 제품은 교환·환불이 어려워요']);
+		expect(claimPolicy('파손 · 누액', 6000)).toEqual(['사진 확인 후 새 제품 재발송 또는 전액 환불']);
+		expect(claimPolicy('오배송', 6000)).toEqual(['잘못 간 제품은 택배 기사가 방문해 회수해요']);
 		expect(claimPolicy('???', 6000)).toEqual([]);
 	});
 });
