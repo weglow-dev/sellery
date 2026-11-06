@@ -15,33 +15,46 @@ const supabase: Handle = async ({ event, resolve }) => {
 					cookies: {
 						getAll: () => event.cookies.getAll(),
 						setAll: (cookiesToSet, headers) => {
-							for (const { name, value, options } of cookiesToSet) event.cookies.set(name, value, { ...options, path: '/' });
+							try {
+								for (const { name, value, options } of cookiesToSet) event.cookies.set(name, value, { ...options, path: '/' });
+							} catch (e) {
+								// 응답이 나간 뒤의 쿠키 쓰기는 SvelteKit 이 throw 한다 — 갱신 콜백 안의 처리되지 않은 에러라 dev 서버(Node)가 통째로 죽는다.
+								// 아래에서 resolve 전에 세션을 끝내 두므로 정상 경로에선 오지 않는다. 와도 서버는 살리고 로그만
+								console.warn('[hooks] 응답 뒤 세션 쿠키 쓰기 무시', e);
+							}
 							authHeaders = headers; // Cache-Control: private, no-store … — 쿠키를 쓴 응답을 CDN 이 캐시하지 않게
 						}
 					}
 				})
 			: null;
 	// createServerClient 와 getUser() 사이에 다른 코드를 두지 않는다 — safeGetSession 이 그 자리
-	event.locals.safeGetSession = async () => {
-		const sb = event.locals.supabase;
-		if (!sb) return { session: null, user: null };
-		const {
-			data: { session }
-		} = await sb.auth.getSession();
-		if (!session) return { session: null, user: null };
-		const {
-			data: { user },
-			error
-		} = await sb.auth.getUser(); // JWT 검증 — 쿠키 값만 믿지 않는다
-		if (error || !user) return { session: null, user: null };
-		return { session, user };
-	};
+	// 요청당 한 번만 조회한다(레이아웃 · 페이지 load 가 동시에 불러도 같은 Promise) — 만료 토큰 갱신이 두 번 겹치지 않게
+	let sessionPromise: ReturnType<App.Locals['safeGetSession']> | undefined;
+	event.locals.safeGetSession = () => (sessionPromise ??= loadSession(event.locals.supabase));
+	// 토큰 갱신(=새 쿠키 쓰기)을 응답 생성 전에 끝낸다. load 에서만 부르면 갱신이 응답보다 늦게 끝나는 경우가 있어
+	// cookies.set 이 throw 하고(위) 새 토큰이 브라우저에 안 가 다음 요청에서 이미 쓴 refresh token 으로 로그아웃된다.
+	// 세션 쿠키가 없으면 getSession 은 네트워크 없이 null 이라 웹훅 · 크론 요청엔 비용이 없다
+	if (event.locals.supabase) await event.locals.safeGetSession().catch(() => undefined);
 	const response = await resolve(event, {
 		filterSerializedResponseHeaders: (name) => name === 'content-range' || name === 'x-supabase-api-version'
 	});
 	for (const [k, v] of Object.entries(authHeaders)) response.headers.set(k, v);
 	return response;
 };
+
+async function loadSession(sb: App.Locals['supabase']) {
+	if (!sb) return { session: null, user: null };
+	const {
+		data: { session }
+	} = await sb.auth.getSession();
+	if (!session) return { session: null, user: null };
+	const {
+		data: { user },
+		error
+	} = await sb.auth.getUser(); // JWT 검증 — 쿠키 값만 믿지 않는다
+	if (error || !user) return { session: null, user: null };
+	return { session, user };
+}
 
 /* `/api/*` 응답은 CDN·브라우저가 캐시하지 않는다 */
 const apiNoStore: Handle = async ({ event, resolve }) => {
