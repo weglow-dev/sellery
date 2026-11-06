@@ -47,7 +47,11 @@ const pad = (s, n) => {
 };
 const kst = (iso) => (iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "-");
 
-/** 발송 대기/완료 표 — 주소는 싣지 않는다(수취인 이름까지) */
+/** 줄 배송 상태(0077) → 한국어 */
+export const SHIP_KO = { PAID: "결제완료", PREPARING: "배송준비중", SHIPPING: "배송중", DELIVERED: "배송완료" };
+const shipKo = (o) => SHIP_KO[o.shipStatus] ?? o.status;
+
+/** 발송 대기/완료 표 — 주소는 싣지 않는다(수취인 이름까지) · 상태 칸은 줄 배송 상태(0077 · 없으면 주문 상태) */
 export function formatOrdersTable(orders, shipped = false) {
   if (!orders.length) return "  (없음)";
   const head = shipped
@@ -55,8 +59,27 @@ export function formatOrdersTable(orders, shipped = false) {
     : `  ${pad("주문번호", 10)} ${pad("결제", 12)} ${pad("수취인", 10)} ${pad("줄", 3)} ${pad("금액", 9)} ${pad("상태", 16)} 상품`;
   const body = orders.map((o) =>
     shipped
-      ? `  ${pad(o.code.toUpperCase(), 10)} ${pad(kst(o.shippedAt), 12)} ${pad(o.recipient || o.buyerName, 10)} ${pad(o.courier ?? "-", 10)} ${pad(o.trackingNo ?? "-", 16)} ${pad(o.status, 16)} ${o.orderName}`
-      : `  ${pad(o.code.toUpperCase(), 10)} ${pad(kst(o.paidAt), 12)} ${pad(o.recipient || o.buyerName, 10)} ${pad(o.lines, 3)} ${pad(`₩${Number(o.amount).toLocaleString("ko-KR")}`, 9)} ${pad(o.status, 16)} ${o.orderName}`
+      ? `  ${pad(o.code.toUpperCase(), 10)} ${pad(kst(o.shippedAt), 12)} ${pad(o.recipient || o.buyerName, 10)} ${pad(o.courier ?? "-", 10)} ${pad(o.trackingNo ?? "-", 16)} ${pad(shipKo(o), 16)} ${o.orderName}`
+      : `  ${pad(o.code.toUpperCase(), 10)} ${pad(kst(o.paidAt), 12)} ${pad(o.recipient || o.buyerName, 10)} ${pad(o.lines, 3)} ${pad(`₩${Number(o.amount).toLocaleString("ko-KR")}`, 9)} ${pad(shipKo(o), 16)} ${o.orderName}`
   );
   return [head, ...body].join("\n");
+}
+
+/** 배송준비중 대상(0077 prepare_candidates) 표 — 주문번호 · 결제 · 수취인 · 상품 × 수량 */
+export function formatPrepareTable(lines) {
+  if (!lines.length) return "  (없음)";
+  const head = `  ${pad("주문번호", 10)} ${pad("결제", 12)} ${pad("수취인", 10)} 상품`;
+  const body = lines.map((l) => `  ${pad(String(l.orderCode).toUpperCase(), 10)} ${pad(kst(l.paidAt), 12)} ${pad(l.recipient, 10)} ${l.goodsName}${l.goodsOption ? ` (${l.goodsOption})` : ""} × ${l.qty}`);
+  return [head, ...body].join("\n");
+}
+
+const csvCell = (v) => {
+  const s = String(v ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+/** 물류센터에 넘길 CSV — 줄마다 주문번호 · 수취인 · 연락처 · 우편번호 · 주소 · 상세주소 · 상품코드 · 상품 · 옵션 · 수량 · 배송메모(엑셀이 한글을 깨지 않게 BOM) */
+export function prepareCsv(lines) {
+  const head = ["주문번호", "수취인", "연락처", "우편번호", "주소", "상세주소", "상품코드", "상품", "옵션", "수량", "배송메모"];
+  const rows = lines.map((l) => [String(l.orderCode).toUpperCase(), l.recipient, l.phone, l.postcode, l.address1, l.address2, l.goodsCode, l.goodsName, l.goodsOption, l.qty, l.memo]);
+  return "\uFEFF" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }

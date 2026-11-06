@@ -42,10 +42,10 @@ select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41',
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f43","qty":1}]', 'admin', null) -> 'items' -> 0 ->> 'reason', 'NOT_IN_ORDER', '다른 주문의 줄은 NOT_IN_ORDER');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"x","qty":1}]', 'admin', null) ->> 'code', 'BAD_ITEMS', '형식 오류 BAD_ITEMS');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":0}]', 'admin', null) -> 'items' -> 0 ->> 'reason', 'BAD_QTY', 'qty 0 은 BAD_QTY');
-update public.myr_orders set tracking_no = 'T1' where id = '00000000-0000-4000-8000-000000000d41';
-select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7') ->> 'code', 'SHIPPED', '고객은 발송 뒤 SHIPPED');
+update public.myr_order_items set ship_status = 'PREPARING' where order_id = '00000000-0000-4000-8000-000000000d41'; -- 0077: 줄 배송 상태 기준
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7') ->> 'code', 'SHIPPED', '고객은 발주(배송준비중) 뒤 SHIPPED');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'seller', '00000000-0000-4000-8000-000000000a41') ->> 'ok', 'true', '셀러는 발송 뒤에도 자기 줄 ok');
-update public.myr_orders set tracking_no = null where id = '00000000-0000-4000-8000-000000000d41';
+update public.myr_order_items set ship_status = 'PAID' where order_id = '00000000-0000-4000-8000-000000000d41';
 
 -- ---------- precheck 금액 ----------
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'customer', '00000000-0000-4000-8000-0000000000c7') - 'items',

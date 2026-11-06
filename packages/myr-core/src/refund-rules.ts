@@ -63,18 +63,22 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 	return { orderCode, items, reason };
 }
 
-/** 고객이 이 주문에 환불을 신청할 수 있나 — 발송 전 · PAID/PARTIAL_REFUNDED(남은 수량) · WAITING_DEPOSIT(입금 전 취소) */
-export function customerCanRefund(o: Pick<OrderView, 'status' | 'trackingNo' | 'items'>): { ok: true; deposit: boolean } | { ok: false; reason: string } {
+/** 고객이 이 주문에 환불을 신청할 수 있나 — 발주(배송준비중) 전 줄이 남았을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소).
+ *  기준은 줄 배송 상태(0077 — 서버 `myr_app_refund_precheck` 와 같은 규칙: 고객은 ship_status 'PAID' 줄만) */
+export function customerCanRefund(o: Pick<OrderView, 'status' | 'items'>): { ok: true; deposit: boolean } | { ok: false; reason: string } {
 	if (o.status === 'WAITING_DEPOSIT') return { ok: true, deposit: true };
 	if (o.status === 'REFUNDED') return { ok: false, reason: '이미 환불된 주문이에요' };
 	if (o.status === 'CANCELED') return { ok: false, reason: '취소된 주문이에요' };
-	if (o.trackingNo) return { ok: false, reason: '발송이 시작된 주문은 고객센터로 문의해주세요' };
-	if (refundableItems(o.items).length === 0) return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
-	return { ok: true, deposit: false };
+	if (customerRefundableItems(o.items).length) return { ok: true, deposit: false };
+	if (refundableItems(o.items).length) return { ok: false, reason: SHIPPED_REASON };
+	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
 }
+const SHIPPED_REASON = '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요';
 
-/** 남은 수량이 있는 줄 (취소된 줄 제외) */
+/** 남은 수량이 있는 줄 (취소된 줄 제외) — 셀러 · 관리자 환불과 "전부 환불(배송비)" 판정의 기준 */
 export const refundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
+/** 고객이 직접 환불할 수 있는 줄 — 남은 수량 + 아직 발주 전(결제완료) */
+export const customerRefundableItems = (items: OrderItem[]): OrderItem[] => refundableItems(items).filter((i) => i.shipStatus === 'PAID');
 export const remainingQty = (i: OrderItem): number => Math.max(0, i.qty - i.refundedQty);
 
 /** 화면 추정 금액 — 서버(precheck)가 다시 계산한다. 전부 환불이면 배송비(아직 안 돌려준 만큼) 포함 */
@@ -163,7 +167,7 @@ export function parseRecordResult(json: unknown): RecordResult {
 /** 실패 code → 고객 문구 */
 export const REFUND_MESSAGES: Record<string, string> = {
 	NOT_FOUND: '주문을 찾을 수 없어요',
-	SHIPPED: '발송이 시작된 주문은 고객센터로 문의해주세요',
+	SHIPPED: '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요',
 	WRONG_STATUS: '환불할 수 없는 상태의 주문이에요',
 	BAD_ITEMS: '환불 수량을 확인해주세요',
 	NOTHING_LEFT: '환불할 수 있는 상품이 없어요',

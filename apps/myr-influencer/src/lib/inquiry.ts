@@ -6,7 +6,7 @@
  *   - 자주 쓰는 답변 · 답변 기준 문구는 시안 그대로(크리에이터 이름만 바꿔 넣음) — 단, "상품 상세 Q&A 공개" 는 MYR 에 없는 기능이라 실제 동작(메일 · 내 문의)으로 바꿨다.
  */
 import type { CsConversation, CsMessage, CsThread } from '@sellery/myr-core/cs-rules';
-import { displayCode, shortDate, statusLabel } from '@sellery/myr-core/order-view';
+import { displayCode, isShipStatus, shortDate, statusLabel, type ShipStatus } from '@sellery/myr-core/order-view';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 export type InqTab = 'waiting' | 'answered' | 'all';
@@ -45,14 +45,22 @@ const TONE_CLS = { accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint
 export function inqShipping(c: Pick<CsConversation, 'order'>): InqShipping | null {
 	const o = c.order;
 	if (!o) return null;
-	const st = statusLabel({ status: o.status, trackingNo: o.trackingNo, shippedAt: o.shippedAt, deliveredAt: o.deliveredAt });
+	// 줄 배송(0077)이 있으면 그 줄 값 — 한 주문에 크리에이터가 여럿이면 줄마다 다르다. 옛 응답이면 주문 칸
+	const it = o.item;
+	const line = it?.shipStatus && isShipStatus(it.shipStatus) ? it : null;
+	const ship = line
+		? { shipStatus: line.shipStatus as ShipStatus, courier: line.courier, trackingNo: line.trackingNo, shippedAt: line.shippedAt, deliveredAt: line.deliveredAt }
+		: { shipStatus: null, courier: o.courier, trackingNo: o.trackingNo, shippedAt: o.shippedAt, deliveredAt: o.deliveredAt };
+	const st = statusLabel({ status: o.status, ...ship });
 	const rows: InqShipping['rows'] = [];
-	if (o.item) rows.push({ k: '주문 상품', v: `${o.item.name}${o.item.option ? ` (${o.item.option})` : ''} × ${o.item.qty}` });
+	if (it) rows.push({ k: '주문 상품', v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
 	if (o.paidAt) rows.push({ k: '결제일', v: shortDate(o.paidAt) });
-	if (o.trackingNo) rows.push({ k: '운송장', v: `${o.courier ?? '택배'} ${o.trackingNo}`, href: o.courier ? trackingUrl(o.courier, o.trackingNo) : null });
-	if (o.shippedAt) rows.push({ k: '발송일', v: shortDate(o.shippedAt) });
-	if (o.deliveredAt) rows.push({ k: '배송 완료', v: shortDate(o.deliveredAt) });
-	if (!o.trackingNo && st.text === '배송 준비중') rows.push({ k: '출고', v: 'MYR 물류센터에서 준비 중' });
+	if (ship.trackingNo) rows.push({ k: '운송장', v: `${ship.courier ?? '택배'} ${ship.trackingNo}`, href: ship.courier ? trackingUrl(ship.courier, ship.trackingNo) : null });
+	if (ship.shippedAt) rows.push({ k: '발송일', v: shortDate(ship.shippedAt) });
+	if (ship.deliveredAt) rows.push({ k: '배송 완료', v: shortDate(ship.deliveredAt) });
+	if (!ship.trackingNo && ship.shipStatus === 'PREPARING') rows.push({ k: '출고', v: 'MYR 물류센터에서 준비 중' });
+	if (!ship.trackingNo && ship.shipStatus === 'PAID' && o.status !== 'WAITING_DEPOSIT') rows.push({ k: '출고', v: '발주 전 · 고객이 직접 취소할 수 있어요' });
+	if (!ship.trackingNo && !ship.shipStatus && st.text === '배송 준비중') rows.push({ k: '출고', v: 'MYR 물류센터에서 준비 중' });
 	return { label: st.text, cls: TONE_CLS[st.tone], rows };
 }
 

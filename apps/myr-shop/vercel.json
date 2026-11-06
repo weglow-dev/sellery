@@ -1,10 +1,20 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"regions": ["icn1"],
+	"regions": [
+		"icn1"
+	],
 	"crons": [
 		{
 			"path": "/api/cron/reconcile",
 			"schedule": "*/10 * * * *"
+		},
+		{
+			"path": "/api/cron/ebut-prepare",
+			"schedule": "0 2 * * 1-5"
+		},
+		{
+			"path": "/api/cron/ebut-sync",
+			"schedule": "0 9 * * *"
 		}
 	]
 }
