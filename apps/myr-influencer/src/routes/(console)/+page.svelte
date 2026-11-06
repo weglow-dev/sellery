@@ -4,7 +4,8 @@
 	import type { Me } from '$lib/data';
 	import { inqTypeCls } from '$lib/inquiry';
 	import { relativeTime } from '$lib/product-row';
-	import { CS_TYPE_META, dueText, won } from '$lib/rules';
+	import { CS_TYPE_META, dueText, isUrgentPending } from '$lib/claims';
+	import { won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -14,21 +15,22 @@
 	 *  모바일은 한 줄로 쌓고, PC(lg~)는 지표 3단(1.6 : 1 : 1) + 아래 2단(할 일 · 7일 판매, 합계와 막대 값 표시).
 	 *  서버 값(+page.server.ts): 판매 중 제품 · 이번 달 순매출 · 주문 · 판매 수량 · CS 비율 · 최근 7일 주문(0076) · 고객 문의 답변 대기.
 	 *  큰 숫자는 시안의 "정산 예정" 대신 **이번 달 순매출**(매출 − 환불) — 정산 비율이 정해지면 정산 예정액으로 바꾼다(2026-11-06 대표 결정 · docs/myr.md §9-6).
-	 *  CS 비율 = 환불이 생긴 주문 ÷ 주문(7번 전까지). 오늘 처리할 일 = 답변 대기 문의(오래된 순) + 교환·환불(목) 최대 3건. */
+	 *  CS 비율 = 환불이 생긴 주문 ÷ 주문. 오늘 처리할 일 = 처리 대기 교환 · 환불(0078 · 오래된 순) + 답변 대기 문의(오래된 순) 합쳐 3건. */
 	let { data } = $props();
 	const sales = $derived(data.sales);
 	const bars = $derived(weekBars(sales.week));
 	const weekTotal = $derived(sales.week.reduce((n, d) => n + d.orders, 0));
-	const todayInq = $derived(data.todayInquiries.slice(0, 3));
-	const todayClaims = $derived(app.pending.slice(0, Math.max(0, 3 - todayInq.length)));
+	const todayClaims = $derived(data.todayClaims);
+	const todayInq = $derived(data.todayInquiries);
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
 	const photo = $derived(app.profilePhoto || me.avatarUrl);
-	// 고객 문의 답변 대기(0075) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
+	// 고객 문의 답변 대기(0075) · 교환 · 환불 처리 대기(0078) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
 	$effect(() => {
 		app.inqWaiting = data.inqWaiting;
+		app.claimWaiting = data.claimWaiting;
 	});
-	const csCount = $derived(app.pending.length + data.inqWaiting);
+	const csCount = $derived(data.claimWaiting + data.inqWaiting);
 
 	function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
 		const f = e.currentTarget.files?.[0];
@@ -99,7 +101,7 @@
 			</span>
 			<span>
 				<span class="block text-[15px] font-bold lg:text-[16px]">처리 대기 CS</span>
-				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">교환·환불 {app.pending.length} · 고객 문의 {data.inqWaiting}</span>
+				<span class="mt-0.5 block text-[12px] text-white/55 lg:mt-[3px] lg:text-[13px]">교환·환불 {data.claimWaiting} · 고객 문의 {data.inqWaiting}</span>
 			</span>
 		</a>
 		<a href="/products" class="flex flex-col gap-2.5 rounded-[20px] border border-white/8 bg-white/3 p-4 text-left transition-colors lg:justify-between lg:gap-3.5 lg:rounded-3xl lg:p-[22px] lg:hover:border-white/28">
@@ -121,6 +123,21 @@
 				<a href="/cs" class="text-[13px] font-semibold text-white/50 transition-colors lg:text-[14px] lg:hover:text-fg">전체 보기</a>
 			</div>
 			<div class="mt-3 flex flex-col gap-2 lg:mt-3.5 lg:flex-1 lg:gap-2.5">
+				{#each todayClaims as c (c.code)}
+					{@const tm = CS_TYPE_META[c.kind]}
+					<a href="/cs/{c.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
+						<Tile tile="slate" bg={c.product?.tile} iconId={c.product?.icon} thumbUrl={c.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
+						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
+							<span class="flex items-center gap-1.5"><Badge cls={tm.cls}>{tm.label}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]"><span class="hidden lg:inline">{c.code.toUpperCase()} · </span>{relativeTime(c.createdAt)}</span></span>
+							<span class="truncate text-[14px] font-bold lg:text-[15px]">{c.name} × {c.qty}</span>
+							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{c.buyerName} · {c.reason}</span>
+						</span>
+						{#if isUrgentPending({ status: 'pending', createdAt: c.createdAt })}
+							<span class="hidden shrink-0 items-center gap-1.5 text-[12px] font-bold whitespace-nowrap text-accent lg:flex"><Icon id="clock" size={14} sw={2.2} />{dueText(c)}</span>
+						{/if}
+						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
+					</a>
+				{/each}
 				{#each todayInq as q (q.code)}
 					<a href="/cs/inquiry/{q.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
 						<Tile tile="slate" bg={q.product?.tile} iconId={q.product?.icon} thumbUrl={q.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
@@ -129,21 +146,6 @@
 							<span class="truncate text-[14px] font-bold lg:text-[15px]">{q.product?.name ?? '상품'}</span>
 							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{q.buyerName} · {q.question}</span>
 						</span>
-						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
-					</a>
-				{/each}
-				{#each todayClaims as c (c.id)}
-					{@const tm = CS_TYPE_META[c.type]}
-					<a href="/cs/{c.id}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
-						<Tile tile={c.tile} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
-						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-							<span class="flex items-center gap-1.5"><Badge cls={tm.cls}>{tm.label}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]"><span class="hidden lg:inline">{c.no} · </span>{c.ago}</span></span>
-							<span class="truncate text-[14px] font-bold lg:text-[15px]">{c.product}</span>
-							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{c.customer} · {c.reason}</span>
-						</span>
-						{#if c.urgent}
-							<span class="hidden shrink-0 items-center gap-1.5 text-[12px] font-bold whitespace-nowrap text-accent lg:flex"><Icon id="clock" size={14} sw={2.2} />{dueText(c)}</span>
-						{/if}
 						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
 					</a>
 				{/each}

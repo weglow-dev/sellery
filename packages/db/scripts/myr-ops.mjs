@@ -1,4 +1,4 @@
-// MYR 운영 스크립트(S8) — 운영 콘솔 myr-admin(M6) 이 생기기 전까지 발송 처리를 터미널에서. 콘솔이 생기면 이 파일과 샵의 /api/ops/ship 은 지운다.
+// MYR 운영 스크립트(S8) — 운영 콘솔 myr-admin(M6) 이 생기기 전까지 발송 · 교환/환불 처리를 터미널에서. 콘솔이 생기면 이 파일과 샵의 /api/ops/* 는 지운다.
 //
 //   node packages/db/scripts/myr-ops.mjs <cmd> [args]   (저장소 루트에서 · .env.local 의 CRON_SECRET · 선택 MYR_SHOP_URL)
 //
@@ -13,13 +13,17 @@
 //   prepare [--dry] [--before ISO] [--csv 파일]   배송준비중 수동 전환(0077 · 이벗 연동 전) — 지금(또는 --before 시각) 전에 결제된 결제완료 줄 → 배송준비중.
 //                                           물류센터에 주문을 넘기는 순간에 쓴다. 이때부터 그 줄은 고객 셀프 환불이 막힌다(발주 뒤).
 //                                           --dry 는 바꾸지 않고 대상만 · --csv 는 물류센터에 넘길 CSV(수취인 · 주소 · 상품 · 수량)를 쓴다(개인정보 — 넘긴 뒤 지울 것)
+//   claims [--all]                           교환 · 환불 요청(0078) — 진행 중(처리 대기 · 진행 중) 표 · 할 일 칸(회수 확인 · 재발송 송장 · 환불 재시도) · --all 이면 완료 · 반려까지
+//   collected <요청번호>                       회수 확인 → 환불할 차례면 바로 환불(토스 부분 취소 · 고객 환불 메일). 파손 · 누액 환불처럼 회수가 없는 요청은 NOT_READY
+//   reship-claim <요청번호> <택배사> <운송장>  교환 재발송 송장 → 고객 "교환 상품이 출발했어요" 메일(새 기록일 때). 회수 전이어도 된다(오배송은 먼저 보낼 수 있다)
+//   claim-refund <요청번호>                   환불만 지금(승인 뒤 크론을 기다리지 않을 때 · 회수 직후 실패한 요청 — 샵 크론도 10분마다 한다)
 //
 // 값(시크릿)은 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등).
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatOrdersTable, formatPrepareTable, parseArgs, parseShipCsv, prepareCsv } from "./lib/myr-ops-plan.mjs";
+import { formatClaimsTable, formatOrdersTable, formatPrepareTable, parseArgs, parseShipCsv, prepareCsv } from "./lib/myr-ops-plan.mjs";
 
 function loadEnv() {
   if (process.env.CRON_SECRET) return;
@@ -122,9 +126,57 @@ async function cmdPrepare() {
   }
 }
 
-const commands = { orders: cmdOrders, ship: cmdShip, "ship-csv": cmdShipCsv, prepare: cmdPrepare };
+async function cmdClaims() {
+  const all = !!flags.all;
+  const { status, json } = await call("GET", `/api/ops/claims${all ? "?all=1" : ""}`);
+  if (status === 401) fail("CRON_SECRET 이 샵의 값과 다릅니다");
+  if (!json?.ok) fail(`목록 실패 (${status}): ${json?.message ?? json?.code ?? "?"}`);
+  console.log(`${base} · 교환 · 환불 요청 ${all ? "전부" : "진행 중"} ${json.claims.length}건`);
+  console.log(formatClaimsTable(json.claims));
+}
+
+async function claimOp(body, label) {
+  const { status, json } = await call("POST", "/api/ops/claims", body);
+  if (status === 401) fail("CRON_SECRET 이 샵의 값과 다릅니다");
+  if (!json?.ok) fail(`${label} 실패 (${status}): ${json?.message ?? json?.code ?? "?"}`);
+  const c = json.claim;
+  const refund = json.refund;
+  const tail = refund?.tried ? (refund.ok ? ` · 환불 ₩${Number(refund.amount ?? 0).toLocaleString("ko-KR")}` : ` · 환불 실패(${refund.code}) — claim-refund 로 다시`) : "";
+  console.log(`${json.already ? "이미 기록됨" : label}  ${String(c.code).toUpperCase()}  ${c.status}${c.step ? ` · 다음: ${c.step}` : ""}${tail}${json.mailed ? " · 고객 메일" : ""}`);
+}
+
+async function cmdCollected() {
+  const [code] = args;
+  if (!code) fail("usage: collected <요청번호>");
+  await claimOp({ code, action: "collected" }, "회수 확인");
+}
+
+async function cmdReshipClaim() {
+  const [code, courier, trackingNo] = args;
+  if (!code || !courier || !trackingNo) fail("usage: reship-claim <요청번호> <택배사> <운송장>");
+  await claimOp({ code, action: "reship", courier, trackingNo }, "재발송 기록");
+}
+
+async function cmdClaimRefund() {
+  const [code] = args;
+  if (!code) fail("usage: claim-refund <요청번호>");
+  await claimOp({ code, action: "refund" }, "환불");
+}
+
+const commands = {
+  orders: cmdOrders,
+  ship: cmdShip,
+  "ship-csv": cmdShipCsv,
+  prepare: cmdPrepare,
+  claims: cmdClaims,
+  collected: cmdCollected,
+  "reship-claim": cmdReshipClaim,
+  "claim-refund": cmdClaimRefund,
+};
 if (!commands[cmd]) {
-  console.log("usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv> | prepare [--dry] [--before ISO] [--csv 파일]>");
+  console.log(
+    "usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv> | prepare [--dry] [--before ISO] [--csv 파일] | claims [--all] | collected <요청번호> | reship-claim <요청번호> <택배사> <운송장> | claim-refund <요청번호>>"
+  );
   process.exit(cmd ? 1 : 0);
 }
 commands[cmd]().catch((e) => fail(e instanceof Error ? e.message : String(e)));

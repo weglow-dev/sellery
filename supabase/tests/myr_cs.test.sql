@@ -1,6 +1,6 @@
 -- pgTAP — 0063 MYR 고객 문의: 권한 · 접수(검증 · 주문 소유 증명 · 이 상품 줄만) · actor 별 스레드/목록 · 답변 상태 전이 · 종료 (docs/myr.md §7 S7 · §6.6)
 begin;
-select plan(78);
+select plan(80);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_cs_open', '{uuid,uuid,uuid,text,text,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 cs_open 실행 불가');
@@ -126,6 +126,8 @@ select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-400
 select is(public.myr_app_cs_list('customer', null), '[]'::jsonb, 'actor_id 없는 customer 는 빈 배열');
 select is(public.myr_app_cs_list('hacker'), '[]'::jsonb, '모르는 actor 빈 배열');
 select is(jsonb_array_length(public.myr_app_cs_for_order('00000000-0000-4000-8000-000000000d51')), 2, '주문 m1 에 연결된 문의 2건(A 줄 · B 줄)');
+select ok((select bool_and(e -> 'conversation' ->> 'code' is not null and jsonb_typeof(e -> 'messages') = 'array' and jsonb_array_length(e -> 'messages') >= 1) from jsonb_array_elements(public.myr_app_cs_for_order('00000000-0000-4000-8000-000000000d51')) e), '주문의 문의 = 스레드(대화 + 메시지) — 0079');
+select is(public.myr_app_cs_for_order('00000000-0000-4000-8000-0000000000ff'), '[]'::jsonb, '문의 없는 주문은 빈 배열');
 
 -- ---------- 종료 ----------
 select is(public.myr_app_cs_close((select r ->> 'conversation_code' from t_m), 'customer', '00000000-0000-4000-8000-0000000000c8') ->> 'code', 'BAD_ACTOR', '고객은 종료 못 함');

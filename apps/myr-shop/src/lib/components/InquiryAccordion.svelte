@@ -1,13 +1,17 @@
 <script lang="ts">
-	/** 마이 "내 문의" — 아코디언(대표 시안 2026-11-02). 접힌 줄: 상품 타일 · 상태 칩 · 유형 · 상대 시각 · 첫 질문(0064 first_body) · 크리에이터 · 상품.
-	 *  펼치면 GET /api/cs/<code>(세션 user.id) 로 스레드를 한 번 읽어 말풍선으로 — 내 문의(회색 상자 · 첫 질문엔 주문번호) · 크리에이터 답변(주황 테두리). 답변 대기면 안내 줄.
+	/** 고객 문의 아코디언 — 마이 "내 문의"(대표 시안 2026-11-02) · 주문 상세 "이 주문의 문의"(0079 · 같은 모양으로 통일 2026-11-06).
+	 *  접힌 줄: 상품 타일 · 상태 칩 · 유형 · 상대 시각 · 첫 질문(0064 first_body) · 크리에이터 · 상품.
+	 *  펼치면 말풍선 — 내 문의(회색 상자 · 첫 질문엔 주문번호) · 크리에이터 답변(주황 테두리). 답변 대기면 안내 줄.
+	 *  메시지: 마이는 펼칠 때 GET /api/cs/<code>(세션 user.id)로 한 번 읽고, 주문 상세는 서버가 미리 실어 준다(`messages` — 소유는 주문 라우트가 확인 · 비회원도 된다).
 	 *  이어 묻는 폼은 없다 — 더 궁금하면 상품 페이지·주문 상세의 문의 시트로 새 문의. */
 	import { csSenderLabel, relTime, type CsConversation, type CsMessage, type CsThread } from '@sellery/myr-core/cs-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { items }: { items: CsConversation[] } = $props();
+	let { items, messages = null, showOrder = true }: { items: CsConversation[]; messages?: Record<string, CsMessage[]> | null; showOrder?: boolean } = $props();
 	let open = $state<Record<string, boolean>>({});
-	let threads = $state<Record<string, { state: 'loading' | 'error' } | { state: 'ok'; messages: CsMessage[] }>>({});
+	let fetched = $state<Record<string, { state: 'loading' | 'error' } | { state: 'ok'; messages: CsMessage[] }>>({});
+	// 미리 실린 메시지가 있으면 그것(주문 상세) · 없으면 펼칠 때 읽은 것(마이)
+	const threads = $derived<typeof fetched>(messages ? Object.fromEntries(Object.entries(messages).map(([k, m]) => [k, { state: 'ok' as const, messages: m }])) : fetched);
 
 	const chip: Record<string, { label: string; cls: string }> = {
 		OPEN: { label: '답변 대기', cls: 'bg-white/10 text-white/70' },
@@ -18,16 +22,16 @@
 	async function toggle(code: string) {
 		open = { ...open, [code]: !open[code] };
 		const t = threads[code];
-		if (!open[code] || (t && t.state !== 'error')) return;
-		threads = { ...threads, [code]: { state: 'loading' } };
+		if (messages || !open[code] || (t && t.state !== 'error')) return;
+		fetched = { ...fetched, [code]: { state: 'loading' } };
 		try {
 			const res = await fetch(`/api/cs/${encodeURIComponent(code)}`);
 			// 서버(getCsThread)가 이미 파싱한 CsThread 를 돌려준다 — 여기서 다시 파싱하지 않는다
 			const body = (await res.json().catch(() => null)) as { ok: boolean; thread?: CsThread } | null;
 			const thread = body?.ok && body.thread && Array.isArray(body.thread.messages) ? body.thread : null;
-			threads = { ...threads, [code]: thread ? { state: 'ok', messages: thread.messages } : { state: 'error' } };
+			fetched = { ...fetched, [code]: thread ? { state: 'ok', messages: thread.messages } : { state: 'error' } };
 		} catch {
-			threads = { ...threads, [code]: { state: 'error' } };
+			fetched = { ...fetched, [code]: { state: 'error' } };
 		}
 	}
 	const initial = (name: string) => (name.trim()[0] ?? 'M').toUpperCase();
@@ -59,7 +63,7 @@
 							{#if m.sender === 'customer'}
 								<div class="rounded-[14px] bg-white/5 px-4 py-3">
 									<p class="text-[11.5px] text-fg-faint">내 문의 · {relTime(m.createdAt)}</p>
-									{#if i === 0 && q.orderCode}<p class="mt-1 text-[12px] text-fg-soft">주문번호 <span class="font-mono">{q.orderCode.toUpperCase()}</span></p>{/if}
+									{#if showOrder && i === 0 && q.orderCode}<p class="mt-1 text-[12px] text-fg-soft">주문번호 <span class="font-mono">{q.orderCode.toUpperCase()}</span></p>{/if}
 									<p class="mt-1.5 text-[14px] leading-[1.6] whitespace-pre-wrap break-words">{m.body}</p>
 								</div>
 							{:else}

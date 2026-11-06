@@ -1,15 +1,10 @@
-// 콘솔 화면 규칙 — apps/myr-influencer/src/lib/rules.ts (디자인 "MYR Influencer Admin" renderVals 의 계산을 옮긴 순수 함수)
+// 콘솔 화면 규칙 — apps/myr-influencer/src/lib/rules.ts (디자인 "MYR Influencer Admin" renderVals 의 계산을 옮긴 순수 함수 · 교환 · 환불은 claims.test.ts)
 import { describe, expect, it } from 'vitest';
-import { seedCs, seedProducts, type CsRequest } from '../lib/data';
+import { seedProducts } from '../lib/data';
 import {
-	approveLabel,
 	blankDraft,
-	canApprove,
-	csTabCounts,
-	dueText,
 	editorTrail,
 	filledSections,
-	filterCs,
 	filterProducts,
 	formatPriceInput,
 	marginText,
@@ -17,81 +12,8 @@ import {
 	parsePrice,
 	previewSections,
 	productTabCounts,
-	resolutionName,
-	resolutionOptions,
-	resolveCs,
-	stepValid,
-	timelineRows
+	stepValid
 } from '../lib/rules';
-
-const cs = seedCs();
-const byId = (id: string) => cs.find((c) => c.id === id) as CsRequest;
-
-describe('CS 탭 필터', () => {
-	it('완료 탭은 반려까지 포함 · 전체 = 모든 요청', () => {
-		expect(filterCs(cs, 'pending').map((c) => c.id)).toEqual(['cs1', 'cs2', 'cs3']);
-		expect(filterCs(cs, 'progress').map((c) => c.id)).toEqual(['cs4']);
-		expect(filterCs(cs, 'done').map((c) => c.id)).toEqual(['cs5', 'cs6']);
-		expect(csTabCounts(cs).map((t) => t.count)).toEqual([3, 1, 2, 6]);
-	});
-	it('답변 기한 문구', () => {
-		expect(dueText(byId('cs1'))).toBe('오늘 안에 답변해주세요');
-		expect(dueText(byId('cs2'))).toBe('2일 안에 답변');
-	});
-});
-
-describe('처리 방법', () => {
-	it('환불 요청 — 전액 · 부분(왕복 배송비 차감) · 교환 전환', () => {
-		const opts = resolutionOptions(byId('cs1'));
-		expect(opts.map((o) => o.id)).toEqual(['refund', 'partial', 'reship']);
-		expect(opts[1].desc).toBe('₩26,000 · 단순 변심 시');
-		expect(opts[2].title).toBe('교환으로 전환');
-	});
-	it('교환 요청 — 같은 reship 이라도 이름이 "새 제품 재발송"', () => {
-		const opts = resolutionOptions(byId('cs2'));
-		expect(opts.map((o) => o.id)).toEqual(['reship', 'reship_collect', 'refund']);
-		expect(opts[0].title).toBe('새 제품 재발송');
-		expect(opts[2].desc).toBe('₩72,000 전액 환불');
-	});
-	it('부분 환불 금액은 0 아래로 내려가지 않는다', () => {
-		expect(resolutionOptions({ ...byId('cs1'), amount: 3000 })[1].desc).toBe('₩0 · 단순 변심 시');
-	});
-	it('승인 버튼 — 방법 + 메시지가 있어야 · 공백 메시지는 안 됨', () => {
-		expect(canApprove(null, '안내')).toBe(false);
-		expect(canApprove('refund', '   ')).toBe(false);
-		expect(canApprove('refund', '안내')).toBe(true);
-		expect(approveLabel(byId('cs1'), null)).toBe('처리 방법을 선택하세요');
-		expect(approveLabel(byId('cs1'), 'partial')).toBe('부분 환불 (배송비 차감) 승인');
-	});
-});
-
-describe('처리 결과 반영 · 타임라인', () => {
-	it('승인 → 진행 중 · 긴급 해제 · 마지막 줄 "처리 진행" 은 아직', () => {
-		const r = resolveCs(byId('cs1'), 'progress', 'refund', '하루 웰');
-		expect(r.status).toBe('progress');
-		expect(r.urgent).toBe(false);
-		expect(r.timeline?.map((t) => t.title)).toEqual(['요청 접수', '전액 환불 승인', '처리 진행']);
-		expect(timelineRows(r).map((t) => t.done)).toEqual([true, true, false]);
-		expect(r.timeline?.[1].when).toBe('방금 · 하루 웰');
-	});
-	it('반려 → 두 줄 · 전부 완료 점', () => {
-		const r = resolveCs(byId('cs2'), 'rejected', 'reject', '');
-		expect(r.timeline?.map((t) => t.title)).toEqual(['요청 접수', '반려']);
-		expect(timelineRows(r).every((t) => t.done)).toBe(true);
-		expect(r.timeline?.[1].when).toBe('방금'); // 이름이 비면 시각만
-	});
-	it('처리 결과 이름 — 요청 종류와 무관하게 한 이름 · 처리 전은 "—"', () => {
-		expect(resolutionName(byId('cs4'))).toBe('새 제품 재발송');
-		expect(resolutionName(byId('cs6'))).toBe('반려');
-		expect(resolutionName(resolveCs(byId('cs1'), 'progress', 'reship', '민지 루틴'))).toBe('새 제품 재발송');
-		expect(resolutionName(byId('cs1'))).toBe('—');
-	});
-	it('원본 요청은 바꾸지 않는다', () => {
-		const before = byId('cs3');
-		resolveCs(before, 'progress', 'refund', '민지 루틴');
-		expect(before.status).toBe('pending');
-	});
-});
 
 describe('내 제품 탭', () => {
 	it('전체 · 판매 중 · 심사 중 · 임시저장 · 종료 (2026-11-05 종료 탭 추가 · 상태 대응은 product-row.test)', () => {

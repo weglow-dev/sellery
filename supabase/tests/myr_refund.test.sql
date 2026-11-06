@@ -51,7 +51,9 @@ update public.myr_order_items set ship_status = 'PAID' where order_id = '0000000
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'customer', '00000000-0000-4000-8000-0000000000c7') - 'items',
   '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 10000, "deposit": false, "full": false}'::jsonb, '부분 환불 — 단가 × qty · 배송비 없음');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1},{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'admin', null) ->> 'amount', '20000', '같은 줄 두 번은 합쳐진다');
-select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7'),
+-- 줄 순서는 정해져 있지 않다(전체 = 남은 줄 전부) — items 는 item_id 순으로 다시 묶어 비교
+select is((select (j - 'items') || jsonb_build_object('items', (select jsonb_agg(e order by e ->> 'item_id') from jsonb_array_elements(j -> 'items') e))
+             from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7') as j) s),
   '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 43000, "deposit": false, "full": true, "items": [{"item_id": "00000000-0000-4000-8000-000000000f41", "qty": 2, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a41"}, {"item_id": "00000000-0000-4000-8000-000000000f42", "qty": 1, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a42"}]}'::jsonb,
   '빈 items = 전체 → 모든 줄 남은 수량 · full · 배송비 포함 43,000');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d42', '[]', 'customer', '00000000-0000-4000-8000-0000000000e1') ->> 'amount', '13000', '비회원은 customer_id 로 본인 확인 · 전액 13,000');

@@ -63,17 +63,19 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 	return { orderCode, items, reason };
 }
 
-/** 고객이 이 주문에 환불을 신청할 수 있나 — 발주(배송준비중) 전 줄이 남았을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소).
- *  기준은 줄 배송 상태(0077 — 서버 `myr_app_refund_precheck` 와 같은 규칙: 고객은 ship_status 'PAID' 줄만) */
-export function customerCanRefund(o: Pick<OrderView, 'status' | 'items'>): { ok: true; deposit: boolean } | { ok: false; reason: string } {
+/** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 남은 수량이 있는 줄이 있을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소) · 열린 교환·환불 요청 없음.
+ *  줄마다 길이 갈린다: 결제완료(발주 전) 줄 = 셀프 즉시 환불(`customerRefundableItems` · 서버 `myr_app_refund_precheck`) · 배송준비중 이후 줄 = 교환·환불 요청(0078 · claim-rules `claimableItems`) */
+export function customerCanRefund(
+	o: Pick<OrderView, 'status' | 'items'> & { claimStatus?: OrderView['claimStatus'] }
+): { ok: true; deposit: boolean } | { ok: false; reason: string; claimOpen?: true } {
 	if (o.status === 'WAITING_DEPOSIT') return { ok: true, deposit: true };
 	if (o.status === 'REFUNDED') return { ok: false, reason: '이미 환불된 주문이에요' };
 	if (o.status === 'CANCELED') return { ok: false, reason: '취소된 주문이에요' };
-	if (customerRefundableItems(o.items).length) return { ok: true, deposit: false };
-	if (refundableItems(o.items).length) return { ok: false, reason: SHIPPED_REASON };
+	// 열린 교환·환불 요청(처리 대기 · 진행 중 · 0078 myr_order_claim_status)이 있으면 그 요청이 끝날 때까지 새 신청을 받지 않는다(대표 결정 2026-11-06) — 버튼은 비활성
+	if (o.claimStatus) return { ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true };
+	if (refundableItems(o.items).length) return { ok: true, deposit: false };
 	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
 }
-const SHIPPED_REASON = '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요';
 
 /** 남은 수량이 있는 줄 (취소된 줄 제외) — 셀러 · 관리자 환불과 "전부 환불(배송비)" 판정의 기준 */
 export const refundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
@@ -102,13 +104,21 @@ export function estimateRefund(
 	return { amount, full };
 }
 
-/** 토스 Idempotency-Key — 같은 주문·같은 줄 묶음의 재시도는 같은 키(토스가 같은 응답) · 다른 묶음은 다른 키. ≤ 300자 */
-export function refundIdempotencyKey(orderId: string, items: RefundLine[]): string {
+/** 토스 Idempotency-Key — 같은 주문·같은 줄 묶음의 재시도는 같은 키(토스가 같은 응답) · 다른 묶음은 다른 키. ≤ 300자.
+ *  tag = 교환·환불 요청 코드(0078) — 요청에서 나간 환불은 요청마다 키가 달라야 한다(같은 줄 · 같은 수량이라도 차감 금액이 다를 수 있다) */
+export function refundIdempotencyKey(orderId: string, items: RefundLine[], tag?: string): string {
 	const part = [...items]
 		.map((i) => `${i.item_id.slice(0, 8)}.${i.qty}`)
 		.sort()
 		.join('_');
-	return `${orderId}:${part || 'all'}`.slice(0, 300);
+	return `${orderId}:${part || 'all'}${tag ? `:${tag}` : ''}`.slice(0, 300);
+}
+
+/** 요청에서 나가는 환불의 실제 금액 — precheck 금액(줄 + 마지막이면 배송비)에서 왕복 배송비 차감. 차감이 금액 이상이거나 음수면 null(환불하지 않는다) */
+export function deductedAmount(amount: number, deduction = 0): number | null {
+	if (!Number.isInteger(deduction) || deduction < 0) return null;
+	if (deduction === 0) return amount;
+	return deduction < amount ? amount - deduction : null;
 }
 
 /* ---- RPC 파서 ---- */
@@ -167,7 +177,7 @@ export function parseRecordResult(json: unknown): RecordResult {
 /** 실패 code → 고객 문구 */
 export const REFUND_MESSAGES: Record<string, string> = {
 	NOT_FOUND: '주문을 찾을 수 없어요',
-	SHIPPED: '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요',
+	SHIPPED: '출고 준비가 시작된 상품은 교환·환불 요청으로 신청해주세요',
 	WRONG_STATUS: '환불할 수 없는 상태의 주문이에요',
 	BAD_ITEMS: '환불 수량을 확인해주세요',
 	NOTHING_LEFT: '환불할 수 있는 상품이 없어요',

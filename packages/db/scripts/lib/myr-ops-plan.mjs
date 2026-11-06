@@ -83,3 +83,21 @@ export function prepareCsv(lines) {
   const rows = lines.map((l) => [String(l.orderCode).toUpperCase(), l.recipient, l.phone, l.postcode, l.address1, l.address2, l.goodsCode, l.goodsName, l.goodsOption, l.qty, l.memo]);
   return "\uFEFF" + [head, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }
+
+/* ---------------- 교환 · 환불 요청(0078) ---------------- */
+/** 지금 단계(claim JSON step · 상태) → 운영이 할 일 */
+export const CLAIM_STEP_KO = { decide: "크리에이터 승인 대기", collect: "회수 확인 필요", refund: "환불 재시도 필요", reship: "재발송 송장 필요" };
+const CLAIM_STATUS_KO = { pending: "처리 대기", progress: "진행 중", done: "완료", rejected: "반려" };
+const RESOLUTION_KO = { refund: "전액 환불", partial: "부분 환불", reship: "재발송", reship_collect: "재발송+회수" };
+const claimTodo = (c) => (c.status === "pending" || c.status === "progress" ? (CLAIM_STEP_KO[c.step] ?? CLAIM_STATUS_KO[c.status]) : CLAIM_STATUS_KO[c.status] ?? c.status);
+
+/** 요청 표 — 요청번호 · 접수 · 주문 · 종류/사유 · 처리 · 할 일 · 상품 × 수량(고객 연락처 · 주소는 싣지 않는다) */
+export function formatClaimsTable(claims) {
+  if (!claims.length) return "  (없음)";
+  const head = `  ${pad("요청", 8)} ${pad("접수", 12)} ${pad("주문", 10)} ${pad("종류 · 사유", 16)} ${pad("처리", 12)} ${pad("할 일", 18)} 상품`;
+  const body = claims.map(
+    (c) =>
+      `  ${pad(String(c.code).toUpperCase(), 8)} ${pad(kst(c.createdAt), 12)} ${pad(String(c.order?.code ?? "").toUpperCase(), 10)} ${pad(`${c.kind === "exchange" ? "교환" : "환불"} · ${c.reason}`, 16)} ${pad(c.resolution ? RESOLUTION_KO[c.resolution] : "-", 12)} ${pad(claimTodo(c), 18)} ${c.order?.item?.name ?? "상품"} × ${c.qty}`
+  );
+  return [head, ...body].join("\n");
+}

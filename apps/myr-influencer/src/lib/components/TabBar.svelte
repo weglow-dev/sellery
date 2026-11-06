@@ -9,8 +9,8 @@
 		{ href: '/cs', name: 'CS 관리', ic: 'cs' },
 		{ href: '/products', name: '내 제품', ic: 'box' }
 	];
-	/** 처리 대기 CS = 교환·환불(목) + 고객 문의 답변 대기(0075) */
-	const csCount = $derived(app.csBadge(page.data.inqWaiting));
+	/** 처리 대기 CS = 교환·환불 처리 대기(0078) + 고객 문의 답변 대기(0075) */
+	const csCount = $derived(app.csBadge(page.data.inqWaiting, page.data.claimWaiting));
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 </script>
 

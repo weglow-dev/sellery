@@ -4,21 +4,29 @@
 	 *      / 오른쪽 환불 요약(선택 수 · 사유 · 예상 금액 · [환불 신청] → 인라인 확인) + 안내.
 	 *  모바일: 뒤로 헤더(주문번호) · 같은 순서로 쌓고 하단 바 버튼(앱 셸 바닥 — fixed 아님). 입금 대기 주문은 "주문 취소"(토스 호출 없음 · 확인만).
 	 *  사진(0068): 고르는 즉시 POST /api/refunds/photos 로 올리고(줄당 3장 · 4MB · jpeg/png/webp) 경로만 들고 있다가 신청 본문 items[].photos 로 보낸다 · × 는 DELETE. 미리보기는 브라우저 object URL.
-	 *  금액은 화면 추정(estimateRefund) · 서버 precheck 가 다시 계산. 브라우저 confirm() 은 쓰지 않는다. 보낸 뒤 주문 상세로. */
+	 *  금액은 화면 추정(estimateRefund) · 서버 precheck 가 다시 계산. 브라우저 confirm() 은 쓰지 않는다. 보낸 뒤 주문 상세로.
+	 *  0078: 줄마다 길이 갈린다 — 결제완료(발주 전) 줄 = [바로 환불](이 화면) · 배송준비중 이후 줄 = [교환 · 환불 요청](ClaimForm · 크리에이터 승인).
+	 *  두 가지가 다 있으면 머리 아래 전환 탭 · 하나뿐이면 그쪽만. 하단 고정 바는 바로 환불만(요청은 요약 카드 안 버튼). */
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
 	import { displayCode, type OrderView } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
+	import ClaimForm from '$lib/components/ClaimForm.svelte';
 	import Tile from '$lib/components/Tile.svelte';
+	import { claimableItems } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund, customerRefundableItems, estimateRefund, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
-	let { order, backHref }: { order: OrderView; backHref: string } = $props();
+	let { order, returnFee = 6000, backHref }: { order: OrderView; returnFee?: number; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
-	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 고객센터로
+	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 교환 · 환불 요청(0078)
 	const lines = $derived(customerRefundableItems(order.items));
+	const claimLines = $derived(claimableItems(order.items));
+	// 처음 보이는 쪽 — 바로 환불할 줄이 있으면 그쪽, 없으면 요청
+	let mode = $state<'instant' | 'claim'>(untrack(() => (lines.length || deposit ? 'instant' : 'claim')));
+	const both = $derived(!deposit && lines.length > 0 && claimLines.length > 0);
 
 	// 줄이 하나면 미리 고르고, 여럿이면 고객이 고른다
 	let qtyById = $state<Record<string, number>>(untrack(() => Object.fromEntries(lines.length === 1 ? lines.map((l) => [l.id, remainingQty(l)]) : [])));
@@ -144,7 +152,11 @@
 	const ctaOff = 'bg-white/8 text-white/40';
 	const checkCls =
 		'h-[22px] w-[22px] shrink-0 cursor-pointer appearance-none rounded-[7px] border-[1.5px] border-white/25 bg-transparent transition-colors checked:border-accent checked:bg-accent checked:bg-[url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%230a0b0e%27%20stroke-width=%273%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M5%2012.5l4.5%204.5L19%207.5%27/%3E%3C/svg%3E")] checked:bg-[length:16px_16px] checked:bg-center checked:bg-no-repeat disabled:cursor-not-allowed disabled:opacity-30';
-	const title = $derived(deposit ? '주문 취소' : '환불 신청');
+	const title = $derived(deposit ? '주문 취소' : '교환 · 환불 신청');
+	const modes = [
+		{ id: 'instant' as const, name: '바로 환불', hint: '발주 전 상품' },
+		{ id: 'claim' as const, name: '교환 · 환불 요청', hint: '출고 준비 이후 상품' }
+	];
 </script>
 
 <div class="flex h-full flex-col lg:mx-auto lg:block lg:h-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-20">
@@ -157,8 +169,21 @@
 			<span class="font-mono text-[13px] text-fg-faint">{displayCode(order.code)}</span>
 		</div>
 
+		{#if both}
+			<div class="mx-5 mt-1 grid grid-cols-2 gap-1 rounded-[14px] bg-white/5 p-1 lg:mx-0 lg:mt-6 lg:max-w-[440px]" role="tablist" aria-label="신청 방법">
+				{#each modes as m (m.id)}
+					<button type="button" role="tab" aria-selected={mode === m.id} onclick={() => (mode = m.id)} class="flex flex-col items-center justify-center rounded-[10px] py-2 transition-all {mode === m.id ? 'bg-[#2a2c33] text-fg' : 'text-white/55'}">
+						<span class="text-[14px] font-bold">{m.name}</span>
+						<span class="text-[11.5px] {mode === m.id ? 'text-fg-faint' : 'text-white/40'}">{m.hint}</span>
+					</button>
+				{/each}
+			</div>
+		{/if}
+
 		{#if !can.ok}
 			<p class="mx-5 mt-2 rounded-[14px] border border-white/8 bg-white/3 px-4 py-3 text-[13px] text-white/70 lg:mx-0 lg:mt-6">{can.reason} <a href={backHref} class="font-bold text-accent">주문 상세</a></p>
+		{:else if mode === 'claim'}
+			<ClaimForm {order} lines={claimLines} {returnFee} {backHref} />
 		{:else}
 			<div class="flex flex-col gap-3 px-5 pb-6 lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:px-0 lg:pb-0">
 				<!-- 왼쪽: 제품 · 사유 -->
@@ -319,7 +344,7 @@
 						{:else}
 							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>발송 전 주문은 바로 환불돼요 · 카드는 카드사에 따라 영업일 3일 안에 반영돼요</li>
 							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>상세 내용과 사진은 판매 크리에이터가 직접 확인해요</li>
-							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>교환은 주문 상세의 [문의] → 교환·반품으로 요청해주세요</li>
+							<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>교환이나 출고 준비가 시작된 상품은 [교환 · 환불 요청]으로 신청해주세요</li>
 						{/if}
 					</ul>
 				</div>
@@ -327,8 +352,8 @@
 		{/if}
 	</div>
 
-	<!-- 모바일 하단 바 -->
-	{#if can.ok}
+	<!-- 모바일 하단 바 — 바로 환불만(요청은 요약 카드 안 버튼) -->
+	{#if can.ok && mode === 'instant'}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
 			{#if !confirming}
 				<button type="button" onclick={() => (confirming = true)} disabled={submitting || !ready} class="{cta} {ready ? ctaOn : ctaOff}">{ctaLabel}</button>

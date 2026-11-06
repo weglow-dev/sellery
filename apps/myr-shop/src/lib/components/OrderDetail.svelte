@@ -2,17 +2,22 @@
 	/** 주문 상세 — 회원(/orders/[code]) · 비회원(/orders/g/[code]) 공용 · 화면 전체(머리 포함)를 그린다(대표 시안 2026-11-02).
 	 *  PC: 제목 + 오른쪽 상태 칩·주문번호·시각·결제수단 / 왼쪽 상품 카드(크리에이터 · 이름 · 수량·금액 · [문의]) / 오른쪽 결제 정보 + [교환 · 환불 신청] · 배송지(+이메일).
 	 *  모바일: 뒤로 헤더(주문번호) · 칩 줄 · 상품 카드 · 결제 · 배송지 · 하단 바 [교환 · 환불 신청](앱 셸 바닥 — fixed 를 쓰지 않는다, +layout.svelte 주석).
-	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로. */
+	 *  [문의] = 상품 페이지와 같은 CsSheet(이 주문 고정 · 비회원도 주문 조회 토큰으로). [교환 · 환불 신청] = 환불 신청 페이지(/orders/[code]/refund · 비회원 /orders/g/[code]/refund · RefundPage)로.
+	 *  교환 · 환불 요청(0078) — 이 주문의 요청마다 카드: 상품 · 종류/사유 · 상태 · 지금 단계 · 크리에이터 메시지 · 재발송 송장 · 처리 내역(claim-rules claimTimeline). */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
-	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
-	import { displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { relTime, type CsOrderOption, type CsThread } from '@sellery/myr-core/cs-rules';
+	import { CLAIM_LABELS, displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { CLAIM_STATUS_LABEL, claimStepText, claimTimeline, isOpenClaim, KIND_LABEL, type Claim } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
+	import { trackingUrl } from '@sellery/myr-core/ship-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
+	import InquiryAccordion from '$lib/components/InquiryAccordion.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, inquiries = [], guestNote = false }: { order: OrderView; inquiries?: CsForOrder[]; guestNote?: boolean } = $props();
+	let { order, inquiries = [], claims = [], guestNote = false }: { order: OrderView; inquiries?: CsThread[]; claims?: Claim[]; guestNote?: boolean } = $props();
+	const claimTone: Record<string, string> = { pending: 'bg-white/8 text-white/85', progress: 'bg-accent/12 text-accent', done: 'bg-[#4ade80]/12 text-[#4ade80]', rejected: 'bg-white/6 text-white/50' };
 	const label = $derived(statusLabel(order));
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
@@ -22,6 +27,8 @@
 	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
 	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0));
 	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
+	// 상품이 여럿이면 열린 교환·환불 요청이 걸린 줄 옆에 그 상태(주문 칩은 statusLabel 이 이미 요청 상태)
+	const openClaimOf = $derived(new Map(claims.filter(isOpenClaim).map((c) => [c.order.item.id, c.status as 'pending' | 'progress'])));
 	const ship = $derived(shipBoxes(order.items));
 	const steps = $derived(refundSteps(order));
 	const meta = $derived([relTime(order.paidAt ?? order.createdAt), order.paymentMethod].filter(Boolean).join(' · '));
@@ -38,7 +45,6 @@
 	// 환불 신청은 별도 페이지(대표 시안 2026-11-03) — 비회원은 조회 토큰 경로
 	const refundHref = $derived(guestNote ? `/orders/g/${order.code}/refund` : `/orders/${order.code}/refund`);
 	const actionLabel = $derived(deposit ? '주문 취소' : '교환 · 환불 신청');
-	const chipTone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const askIcon = 'M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z';
 </script>
 
@@ -91,7 +97,8 @@
 					</div>
 				{/if}
 				{#each order.items as it (it.id)}
-					{@const ls = lineStatus(it.status, it.refundedQty, it.qty) || (mixedShip && order.status !== 'WAITING_DEPOSIT' ? SHIP_LABELS[it.shipStatus].text : '')}
+					{@const oc = liveItems.length > 1 ? openClaimOf.get(it.id) : undefined}
+					{@const ls = (oc ? CLAIM_LABELS[oc].text : '') || lineStatus(it.status, it.refundedQty, it.qty) || (mixedShip && order.status !== 'WAITING_DEPOSIT' ? SHIP_LABELS[it.shipStatus].text : '')}
 					<div class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 lg:gap-4 lg:rounded-[20px] lg:p-4">
 						<a href="/p/{it.code}" aria-label={it.name} class="shrink-0"><Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt={it.name} icon={26} class="h-14 w-14 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-2xl" /></a>
 						<div class="min-w-0 flex-1">
@@ -105,6 +112,39 @@
 						</button>
 					</div>
 				{/each}
+
+				<!-- 교환 · 환불 요청(0078) — 최근순 -->
+				{#if claims.length}
+					<section aria-label="교환 · 환불 요청" class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
+						<h2 class="text-[15px] font-extrabold lg:text-[16px]">교환 · 환불 요청</h2>
+						<!-- 요청마다 카드 안 카드 대신 글 묶음 — 여럿이면 구분선(대표 피드백 2026-11-06) -->
+						<div class="mt-3 flex flex-col divide-y divide-white/8">
+							{#each claims as c (c.id)}
+								<div id="claim-{c.code}" class="scroll-mt-20 py-3.5 first:pt-0 last:pb-0">
+									<div class="flex items-start justify-between gap-2">
+										<p class="min-w-0 text-[14px] font-bold">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''} × {c.qty}</p>
+										<span class="shrink-0 rounded-[8px] px-2 py-[3px] text-[12px] font-bold {claimTone[c.status]}">{CLAIM_STATUS_LABEL[c.status]}</span>
+									</div>
+									<p class="mt-0.5 text-[12.5px] text-fg-faint">{KIND_LABEL[c.kind]} · {c.reason} · <span class="font-mono">{c.code.toUpperCase()}</span></p>
+									<p class="mt-2 text-[13px] text-white/85">{claimStepText(c)}</p>
+									{#if c.reshipTrackingNo}
+										{@const href = trackingUrl(c.reshipCourier ?? '', c.reshipTrackingNo)}
+										<p class="mt-1 text-[12.5px] text-white/75">교환 발송 {c.reshipCourier ?? '택배'} {#if href}<a {href} target="_blank" rel="noopener" class="font-mono underline">{c.reshipTrackingNo}</a>{:else}<span class="font-mono">{c.reshipTrackingNo}</span>{/if}</p>
+									{/if}
+									{#if c.message}<p class="mt-2 border-l-2 border-accent/50 pl-2.5 text-[12.5px] leading-[1.55] text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
+									<ol class="mt-2.5 flex flex-col gap-1">
+										{#each claimTimeline(c) as t (t.title)}
+											<li class="flex items-center gap-2 text-[12px] {t.done ? 'text-white/70' : 'text-white/35'}">
+												<span aria-hidden="true" class="h-1.5 w-1.5 shrink-0 rounded-full {t.done ? 'bg-accent' : 'border border-white/30'}"></span>
+												<span>{t.title}{t.at ? ` · ${relTime(t.at)}` : ''}</span>
+											</li>
+										{/each}
+									</ol>
+								</div>
+							{/each}
+						</div>
+					</section>
+				{/if}
 
 				<!-- 환불 진행 상태 — 실제 기록만(신청 사유 · 완료 시각). 환불은 신청 즉시 토스 취소까지 끝나서 "판매자 확인" 대기 단계는 없다 -->
 				{#if steps}
@@ -148,6 +188,8 @@
 					</div>
 					{#if can.ok}
 						<a href={refundHref} class="mt-5 hidden h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:flex">{actionLabel}</a>
+					{:else if can.claimOpen}
+						<span aria-disabled="true" class="mt-5 hidden h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30 lg:flex">교환 · 환불 신청</span>
 					{:else if order.status !== 'REFUNDED' && order.status !== 'CANCELED'}
 						<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">{can.reason}</p>
 					{/if}
@@ -166,18 +208,11 @@
 					</section>
 				{/if}
 
+				<!-- 이 주문의 문의 — 마이 "내 문의" 와 같은 아코디언(0079 · 답변까지 펼쳐 본다 · 메시지는 서버가 미리 싣는다) -->
 				{#if inquiries.length}
-					<section class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-5">
-						<p class="text-[13px] text-fg-faint">이 주문의 문의</p>
-						<div class="mt-2 flex flex-col gap-1.5">
-							{#each inquiries as q (q.code)}
-								{@const chip = csStatusChip(q.status)}
-								<a href="/cs/{q.code}" class="flex items-center justify-between gap-2 rounded-[12px] bg-white/4 px-3 py-2.5 text-fg transition-colors hover:bg-white/7">
-									<span class="min-w-0"><span class="block truncate text-[13px] font-bold">{q.productName}</span><span class="block text-[11.5px] text-fg-faint">{q.type} · {relTime(q.lastMessageAt)}</span></span>
-									<span class="shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold {chipTone[chip.tone]}">{chip.label}</span>
-								</a>
-							{/each}
-						</div>
+					<section aria-label="이 주문의 문의" class="mt-1 lg:mt-2">
+						<h2 class="mb-2.5 text-[15px] font-extrabold lg:text-[16px]">이 주문의 문의 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{inquiries.length}</span></h2>
+						<InquiryAccordion items={inquiries.map((t) => t.conversation)} messages={Object.fromEntries(inquiries.map((t) => [t.conversation.code, t.messages]))} showOrder={false} />
 					</section>
 				{/if}
 			</div>
@@ -188,6 +223,11 @@
 	{#if can.ok}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
 			<a href={refundHref} class="flex h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg">{actionLabel}</a>
+		</div>
+	{:else if can.claimOpen}
+		<!-- 열린 교환·환불 요청이 끝날 때까지 비활성(customerCanRefund) -->
+		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
+			<span aria-disabled="true" class="flex h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30">교환 · 환불 신청</span>
 		</div>
 	{/if}
 </div>

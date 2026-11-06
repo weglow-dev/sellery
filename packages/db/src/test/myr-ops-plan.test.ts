@@ -1,7 +1,7 @@
 // MYR 운영 스크립트 순수 부분 — packages/db/scripts/lib/myr-ops-plan.mjs (S8)
 import { describe, expect, it } from "vitest";
 // @ts-expect-error — .mjs 모듈(타입 선언 없음)
-import { formatOrdersTable, formatPrepareTable, parseArgs, parseShipCsv, prepareCsv } from "../../scripts/lib/myr-ops-plan.mjs";
+import { formatClaimsTable, formatOrdersTable, formatPrepareTable, parseArgs, parseShipCsv, prepareCsv } from "../../scripts/lib/myr-ops-plan.mjs";
 
 describe("parseArgs", () => {
   it("cmd · 위치 인자 · --flag [value]", () => {
@@ -64,4 +64,19 @@ describe("배송준비중 수동 전환(0077 prepare)", () => {
     expect(formatOrdersTable([row])).toContain("배송준비중");
     expect(formatOrdersTable([{ ...row, shipStatus: null }])).toContain("PAID");
   });
+});
+
+describe("교환 · 환불 요청 표(0078)", () => {
+	const c = (o: Record<string, unknown> = {}) => ({ code: "rq2001", createdAt: "2026-11-06T01:00:00Z", kind: "refund", reason: "단순 변심", status: "progress", step: "collect", resolution: "partial", qty: 1, order: { code: "myr1001", item: { name: "포도 젤리" } }, ...o });
+	it("할 일 칸 — 단계 → 운영이 할 일 · 처리 이름 · 연락처 없음", () => {
+		const t = formatClaimsTable([c(), c({ code: "rq2002", kind: "exchange", reason: "파손 · 누액", resolution: "reship", step: "reship" }), c({ code: "rq2003", status: "pending", step: "decide", resolution: null }), c({ code: "rq2004", status: "done", step: null })]);
+		expect(t).toContain("RQ2001");
+		expect(t).toContain("회수 확인 필요");
+		expect(t).toContain("재발송 송장 필요");
+		expect(t).toContain("크리에이터 승인 대기");
+		expect(t).toContain("부분 환불");
+		expect(t).toContain("완료");
+		expect(t).toContain("포도 젤리 × 1");
+		expect(formatClaimsTable([])).toBe("  (없음)");
+	});
 });

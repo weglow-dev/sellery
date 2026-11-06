@@ -3,7 +3,7 @@
  *   openCs(productCode, input, who)            `myr_app_cs_open` — seller 는 상품에서 파생 · 주문 연결은 소유 증명될 때만(§6.6) · 접수 메일(셀러)
  *   getCsThread(code, key)                     `myr_app_cs_thread(actor='customer')` — client_token(비회원 쿠키) 또는 user_id(회원)
  *   listCsForUser(userId)                      `myr_app_cs_list(actor='customer')` — 마이
- *   csForOrder(orderId)                        `myr_app_cs_for_order` — 주문 상세(소유는 라우트가 이미 확인)
+ *   csForOrder(orderId)                        `myr_app_cs_for_order` — 주문 상세의 문의 스레드(0079 · 소유는 라우트가 이미 확인)
  * 크리에이터 콘솔(5번 · 0075) — actor='seller' · 크리에이터 id · 계정 id 는 콘솔 서버가 세션(requireSeller)에서:
  *   listSellerCsOfUser(userId) · sellerCsWaitingOfUser(userId)   계정으로 바로(게이트와 동시에 · 0072 방식)
  *   getSellerCsThread(sellerId, code)                           `myr_app_cs_thread(actor='seller')`
@@ -14,7 +14,7 @@ import {
 	CS_CODE_RE,
 	isCsFailCode,
 	parseCsConversations,
-	parseCsForOrder,
+	parseCsThreads,
 	parseCsMessage,
 	parseCsOpenResult,
 	parseCsThread,
@@ -22,7 +22,6 @@ import {
 	PRODUCT_CODE_RE,
 	type CsConversation,
 	type CsFailCode,
-	type CsForOrder,
 	type CsMessage,
 	type CsOpenResult,
 	type CsThread,
@@ -93,13 +92,13 @@ export async function listCsForUser(userId: string): Promise<CsConversation[]> {
 	return parseCsConversations(data);
 }
 
-export async function csForOrder(orderId: string): Promise<CsForOrder[]> {
+export async function csForOrder(orderId: string): Promise<CsThread[]> {
 	const { data, error } = await admin().rpc('myr_app_cs_for_order', { p_order_id: orderId });
 	if (error) {
 		console.error('[cs] myr_app_cs_for_order failed:', error.message);
 		return [];
 	}
-	return parseCsForOrder(data);
+	return parseCsThreads(data);
 }
 
 /* ---------------- 크리에이터 콘솔(0075) ---------------- */

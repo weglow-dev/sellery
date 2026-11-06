@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { guestTokenCookieName, ORDER_CODE_RE } from '@sellery/myr-core/checkout-rules';
 import { hasAdmin } from '$lib/server/admin';
+import { claimsForOrder } from '$lib/server/claims';
 import { csForOrder } from '$lib/server/cs';
 import { guestOrder } from '$lib/server/orders';
 
@@ -13,5 +14,6 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	if (!hasAdmin()) error(503, { message: '주문 조회가 아직 설정되지 않았어요' });
 	const order = await guestOrder(code, cookies.get(guestTokenCookieName(code)));
 	if (!order) redirect(303, `/orders/lookup?code=${encodeURIComponent(code)}`);
-	return { order, inquiries: await csForOrder(order.id) };
+	const [inquiries, claims] = await Promise.all([csForOrder(order.id), claimsForOrder(order.id)]);
+	return { order, inquiries, claims };
 };
