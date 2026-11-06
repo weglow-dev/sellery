@@ -161,9 +161,6 @@ export const filterProducts = (list: Product[], tab: ProductTab) =>
 export const showsStock = (s: ProductStatus) => s === 'live' || s === 'paused';
 export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
 
-/** 홈 "이번 달 정산 예정"(목) — 디자인 계산 그대로: 판매 중 제품의 누적 매출 × 0.62. 실적 RPC 를 붙이면 서버 값으로 바뀐다 */
-export const mockMonthRevenue = (list: Product[]) => Math.round(list.filter((p) => p.status === 'live').reduce((n, p) => n + p.sold * p.price, 0) * 0.62);
-
 /* ---------- 상품 등록 에디터 ---------- */
 
 export function blankDraft(): ProductDraft {
