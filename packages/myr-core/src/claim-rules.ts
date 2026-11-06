@@ -33,15 +33,15 @@ export const kindAllowed = (kind: ClaimKind, reason: ClaimReason | ''): boolean 
 /** 사진이 필요한 사유 — 파손 · 오배송은 사진으로 확인한다(DB PHOTO_REQUIRED 와 같은 목록) */
 export const photoRequired = (reason: ClaimReason | ''): boolean => reason === '파손 · 누액' || reason === '오배송';
 
-/** 사유별 처리 기준 — 고객 신청 화면 · 콘솔 상세 "처리 기준"(2026-11-06 대표 승인) */
+/** 사유별 처리 기준 — 고객 신청 화면 · 콘솔 상세 "처리 기준"(2026-11-06 대표 승인 · 같은 날 문구 줄임) */
 export function claimPolicy(reason: string, returnFee: number): string[] {
 	switch (reason) {
 		case '단순 변심':
-			return ['수령 후 7일 이내 · 미개봉만 가능', `왕복 배송비 ${won(returnFee)}은 고객 부담 — 환불 금액에서 빼요`, '식품 특성상 개봉 제품은 교환·환불이 어려워요', '교환은 받지 않아요(환불만)'];
+			return ['수령 후 7일 이내 · 미개봉만 가능', `왕복 배송비 ${won(returnFee)}은 고객 부담 — 환불 금액에서 빼요`, '식품 특성상 개봉 제품은 교환·환불이 어려워요'];
 		case '파손 · 누액':
-			return ['사진 확인 후 새 제품 재발송 또는 전액 환불', '배송비는 전액 MYR 부담', '회수 없이 처리해요 (받은 제품은 폐기해도 돼요)'];
+			return ['사진 확인 후 새 제품 재발송 또는 전액 환불'];
 		case '오배송':
-			return ['배송비는 전액 MYR 부담', '잘못 간 제품은 택배 기사가 방문해 회수해요', '재발송 또는 회수 뒤 전액 환불'];
+			return ['잘못 간 제품은 택배 기사가 방문해 회수해요'];
 		default:
 			return [];
 	}
