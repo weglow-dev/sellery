@@ -11,7 +11,7 @@
 --   myr_order_ship_status(order)   주문 배송 상태 = 살아 있는 줄(취소 아님 · 남은 수량 > 0)의 가장 덜 진행된 상태 · 없으면 null — 판정은 이 함수 하나(바인허브 deriveStatus 와 같은 생각)
 --   myr_order_item_json  + ship_status · courier · tracking_no · shipped_at · delivered_at
 --   myr_order_json       + ship_status(위 함수)
---   myr_cs_conversation_json 의 order.item + 같은 배송 칸(콘솔 문의 상세 "주문 · 배송")
+--   myr_cs_conversation_json 의 order.item + 같은 배송 칸(콘솔 문의 상세 "주문 · 배송") · order 의 송장 칸도 그 줄 값(다른 크리에이터 박스 송장이 섞이지 않게)
 --
 --   myr_app_refund_precheck   고객 셀프 환불 = **발주(배송준비중) 전 줄만**(줄 ship_status = 'PAID') — 주문 운송장 기준에서 바뀜. 셀러 · 관리자는 그대로.
 --   myr_app_admin_ship(code, courier, tracking)   0069 와 같은 이름 · 인자 · 반환 — 주문의 남은 줄 전부에 같은 송장(한 박스) + 주문 칸도 같이
@@ -40,12 +40,13 @@ alter table public.myr_order_items drop constraint if exists myr_order_items_shi
 alter table public.myr_order_items add constraint myr_order_items_ship_status_check check (ship_status in ('PAID', 'PREPARING', 'SHIPPING', 'DELIVERED'));
 create index if not exists myr_order_items_ship_open_idx on public.myr_order_items (ship_status) where ship_status in ('PAID', 'PREPARING', 'SHIPPING');
 
--- 기존 주문 운송장 → 그 주문의 줄(아직 줄 운송장이 없는 것만 · 재실행 안전)
+-- 기존 주문 운송장 → 그 주문의 줄. 줄 배송 기록이 하나도 없는 주문만(재실행 안전 — 줄마다 따로 나간 주문을 주문 칸으로 덮어쓰지 않는다)
 update public.myr_order_items i
    set ship_status = case when o.delivered_at is not null then 'DELIVERED' else 'SHIPPING' end,
        courier = o.courier, tracking_no = o.tracking_no, shipped_at = o.shipped_at, delivered_at = o.delivered_at
   from public.myr_orders o
- where o.id = i.order_id and o.tracking_no is not null and i.tracking_no is null;
+ where o.id = i.order_id and o.tracking_no is not null
+   and not exists (select 1 from public.myr_order_items j where j.order_id = o.id and (j.tracking_no is not null or j.ship_status <> 'PAID'));
 
 -- ------------------------------------------------------------
 -- 주문 배송 상태 — 살아 있는 줄의 가장 덜 진행된 상태
@@ -108,7 +109,8 @@ as $$
 $$;
 revoke all on function public.myr_order_json(public.myr_orders, boolean) from public, anon, authenticated;
 
--- 0075 정의 + order.item 배송 칸
+-- 0075 정의 + order.item 배송 칸 · order 의 송장 칸도 **문의가 걸린 줄**의 값(주문 칸 아님) —
+-- 한 주문에 크리에이터 여럿이면 줄마다 박스 · 송장이 다를 수 있다. 크리에이터는 자기 줄의 송장만 받고, 고객 문의 화면도 그 상품의 송장을 본다.
 create or replace function public.myr_cs_conversation_json(x public.myr_cs_conversations)
 returns jsonb
 language sql stable
@@ -117,14 +119,16 @@ as $$
   select jsonb_build_object(
     'id', x.id, 'code', x.code, 'status', x.status, 'type', x.type,
     'buyer_name', x.buyer_name, 'order_code', x.order_code, 'order_id', x.order_id,
-    'order', (select jsonb_build_object('code', o.code, 'status', o.status, 'courier', o.courier, 'tracking_no', o.tracking_no,
-                                        'shipped_at', o.shipped_at, 'delivered_at', o.delivered_at, 'paid_at', o.paid_at,
-                                        'item', (select jsonb_build_object('id', i.id, 'name', i.product_name, 'option', i.option_name, 'qty', i.qty,
-                                                                           'amount', i.amount, 'status', i.status, 'refunded_qty', i.refunded_qty,
-                                                                           'ship_status', i.ship_status, 'courier', i.courier, 'tracking_no', i.tracking_no,
-                                                                           'shipped_at', i.shipped_at, 'delivered_at', i.delivered_at)
-                                                   from public.myr_order_items i where i.id = x.order_item_id))
-                from public.myr_orders o where o.id = x.order_id),
+    'order', (select jsonb_build_object('code', o.code, 'status', o.status, 'courier', i.courier, 'tracking_no', i.tracking_no,
+                                        'shipped_at', i.shipped_at, 'delivered_at', i.delivered_at, 'paid_at', o.paid_at,
+                                        'item', case when i.id is null then null
+                                                     else jsonb_build_object('id', i.id, 'name', i.product_name, 'option', i.option_name, 'qty', i.qty,
+                                                                             'amount', i.amount, 'status', i.status, 'refunded_qty', i.refunded_qty,
+                                                                             'ship_status', i.ship_status, 'courier', i.courier, 'tracking_no', i.tracking_no,
+                                                                             'shipped_at', i.shipped_at, 'delivered_at', i.delivered_at) end)
+                from public.myr_orders o
+                left join public.myr_order_items i on i.id = x.order_item_id and i.order_id = o.id
+               where o.id = x.order_id),
     'is_member', x.user_id is not null,
     'last_preview', x.last_preview, 'last_message_at', x.last_message_at,
     'replied_at', x.replied_at, 'closed_at', x.closed_at, 'created_at', x.created_at,

@@ -73,7 +73,7 @@ export function customerCanRefund(o: Pick<OrderView, 'status' | 'items'>): { ok:
 	if (refundableItems(o.items).length) return { ok: false, reason: SHIPPED_REASON };
 	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
 }
-const SHIPPED_REASON = '출고 준비가 시작된 상품은 고객센터로 문의해주세요';
+const SHIPPED_REASON = '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요';
 
 /** 남은 수량이 있는 줄 (취소된 줄 제외) — 셀러 · 관리자 환불과 "전부 환불(배송비)" 판정의 기준 */
 export const refundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
@@ -167,7 +167,7 @@ export function parseRecordResult(json: unknown): RecordResult {
 /** 실패 code → 고객 문구 */
 export const REFUND_MESSAGES: Record<string, string> = {
 	NOT_FOUND: '주문을 찾을 수 없어요',
-	SHIPPED: '출고 준비가 시작된 상품은 고객센터로 문의해주세요',
+	SHIPPED: '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요',
 	WRONG_STATUS: '환불할 수 없는 상태의 주문이에요',
 	BAD_ITEMS: '환불 수량을 확인해주세요',
 	NOTHING_LEFT: '환불할 수 있는 상품이 없어요',

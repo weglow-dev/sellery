@@ -1,7 +1,7 @@
 -- pgTAP — 0077 줄 단위 배송: 권한 · 주문 배송 상태(가장 덜 진행된 줄) · 발주 대상 · 배송준비중 전환 · 고객 셀프 환불(발주 전 줄만) ·
---         운송장(주문 → 남은 줄 전부) · 줄 송장 · 배송완료 · 송장 수집 대상 · 지연 표시 (docs/myr.md §6.8 E1-b · E2 · E3)
+--         운송장(주문 → 남은 줄 전부) · 줄 송장 · 배송완료 · 송장 수집 대상 · 지연 표시 · 문의 JSON 송장(줄 기준) (docs/myr.md §6.8 E1-b · E2 · E3)
 begin;
-select plan(45);
+select plan(48);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_admin_prepare_candidates', '{timestamptz}'::text[], 'anon', '{}'::text[], 'anon 은 prepare_candidates 불가');
@@ -78,6 +78,18 @@ select ok((select not is_delayed and shipped_at is not null from public.myr_orde
 select is((select tracking_no from public.myr_orders where id = '00000000-0000-4000-8000-000000000c91'), '612345678901', '주문 칸이 비었으면 같이 채운다(옛 화면 · 메일)');
 select is((public.myr_app_admin_ship_line('00000000-0000-4000-8000-000000000ca1', null, '612345678901', false) ->> 'newly_shipped')::boolean, false, '같은 운송장 다시 → newly_shipped false');
 select is(public.myr_order_ship_status('00000000-0000-4000-8000-000000000c91'), 'PAID', '다른 줄(ca2)이 결제완료면 주문은 아직 PAID');
+
+-- ---------- 문의 JSON — 송장 칸은 문의가 걸린 줄의 값(다른 크리에이터 박스 송장이 섞이지 않게) ----------
+insert into public.myr_cs_conversations (id, product_id, seller_id, order_code, order_id, order_item_id, type)
+values ('00000000-0000-4000-8000-000000000cc1', '00000000-0000-4000-8000-000000000c81', '00000000-0000-4000-8000-000000000c71', 'pgtap-ln-1', '00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000ca1', '배송 문의'),
+       ('00000000-0000-4000-8000-000000000cc2', '00000000-0000-4000-8000-000000000c82', '00000000-0000-4000-8000-000000000c72', 'pgtap-ln-1', '00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000ca2', '배송 문의'),
+       ('00000000-0000-4000-8000-000000000cc3', '00000000-0000-4000-8000-000000000c82', '00000000-0000-4000-8000-000000000c72', 'pgtap-ln-1', '00000000-0000-4000-8000-000000000c91', null, '기타');
+select is((select public.myr_cs_conversation_json(x) #>> '{order,tracking_no}' from public.myr_cs_conversations x where x.id = '00000000-0000-4000-8000-000000000cc1'), '612345678901', '출고된 줄의 문의 → 그 줄 송장');
+select is((select jsonb_build_object('tracking_no', public.myr_cs_conversation_json(x) #> '{order,tracking_no}', 'ship', public.myr_cs_conversation_json(x) #>> '{order,item,ship_status}')
+             from public.myr_cs_conversations x where x.id = '00000000-0000-4000-8000-000000000cc2'),
+  '{"tracking_no": null, "ship": "PAID"}'::jsonb, '같은 주문 · 아직 안 나간 다른 크리에이터 줄의 문의 → 주문 칸(먼저 나간 박스) 송장이 보이지 않는다');
+select is((select (public.myr_cs_conversation_json(x) -> 'order') - 'paid_at'::text from public.myr_cs_conversations x where x.id = '00000000-0000-4000-8000-000000000cc3'),
+  '{"code": "pgtap-ln-1", "item": null, "status": "PAID", "courier": null, "shipped_at": null, "tracking_no": null, "delivered_at": null}'::jsonb, '줄이 없는 문의 → 송장 칸 없음 · item null');
 
 -- ---------- 운송장(주문 · 0069 재정의) — 남은 줄 전부 ----------
 select is(public.myr_app_admin_ship('pgtap-ln-1', '한진택배', '998877665544') ->> 'already', 'false', '주문 운송장 기록');

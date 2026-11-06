@@ -117,7 +117,7 @@ describe('customerCanRefund · refundableItems', () => {
 		expect(customerCanRefund(order())).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT' }))).toEqual({ ok: true, deposit: true });
 		// 0077 — 기준은 줄 배송 상태: 결제완료 줄이 남았으면 가능 · 전부 배송준비중 이후면 불가(주문 송장 칸은 보지 않는다)
-		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: false, reason: '출고 준비가 시작된 상품은 고객센터로 문의해주세요' });
+		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: false, reason: '출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요' });
 		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000)] })).ok).toBe(true);
 		expect(customerRefundableItems([item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000), item('c', 1, 1, 1, 'REFUNDED')]).map((i) => i.id)).toEqual([B]);
 		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);

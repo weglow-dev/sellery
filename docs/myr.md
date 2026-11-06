@@ -289,7 +289,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
 - **E1-b. 줄 단위 배송 상태 — 완료(2026-11-06 · 0077 · E2 · E3 코드 함께 · 이벗 키 없이 꺼져 있음)**
     - **0077** `myr_order_items` + `ship_status`(PAID 결제완료 → PREPARING 배송준비중 → SHIPPING 배송중 → DELIVERED 배송완료) · `courier` · `tracking_no` · `ebut_registered_at` · `shipped_at` · `delivered_at` · `is_delayed` · `myr_products.ebut_goods_code`(E1-a 자리 · 비면 상품 code). 기존 주문 운송장은 그 줄들로 옮겨 적었다(주문 칸은 남겨 두고 같이 맞춘다 — 옛 화면 · 메일 호환)
     - 주문 배송 상태 = **살아 있는 줄의 가장 덜 진행된 상태**(`myr_order_ship_status` 하나 · 바인허브 deriveStatus 와 같은 생각) — 주문 JSON `ship_status` · 줄 JSON 배송 칸 · 문의 JSON 줄 배송 칸
-    - **고객 셀프 환불 = 발주(배송준비중) 전 줄만**(`myr_app_refund_precheck` 고객 가드가 주문 운송장 → 줄 ship_status · 셀러 · 관리자는 그대로) · 샵 환불 페이지는 결제완료 줄만 고를 수 있다(`customerRefundableItems`) · 막히면 "출고 준비가 시작된 상품은 고객센터로 문의해주세요"
+    - **고객 셀프 환불 = 발주(배송준비중) 전 줄만**(`myr_app_refund_precheck` 고객 가드가 주문 운송장 → 줄 ship_status · 셀러 · 관리자는 그대로) · 샵 환불 페이지는 결제완료 줄만 고를 수 있다(`customerRefundableItems`) · 막히면 "출고 준비가 시작된 상품의 교환/환불 요청은 고객센터로 문의해주세요"
     - 샵 라벨: 결제 완료 → 배송 준비중 → 배송 중 → 배송 완료(`statusLabel` 이 주문 `shipStatus` 로 · 예전엔 송장 전이면 늘 "배송 준비중"이었다) · 줄마다 상태가 다르면 주문 상세의 줄 옆에 그 줄 상태
     - 운송장(0069 재정의 · 같은 이름 · 인자 · 반환) = 주문의 남은 줄 전부에 같은 송장(한 박스) · 줄 단위 `myr_app_admin_ship_line`(이벗 송장 수집 · 정정) · 발송 대기 목록은 줄 기준 + `ship_status` · `preparing`
     - **배송준비중 전환(이벗 연동 전 · 2026-11-06 대표 결정 "바인허브와 똑같이 · 키는 빼고")**: 운영팀이 물류센터에 주문을 넘길 때 `node packages/db/scripts/myr-ops.mjs prepare [--dry] [--before ISO] [--csv 파일]` → 샵 `/api/ops/prepare`(CRON_SECRET) → 지금 전 결제된 결제완료 줄 → 배송준비중 · CSV(수취인 · 주소 · 상품코드 · 수량 · 메모 · BOM)는 물류센터 전달용(넘긴 뒤 지울 것)
