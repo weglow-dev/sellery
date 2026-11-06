@@ -9,6 +9,7 @@
 	const links = [
 		{ href: '/', name: '홈' },
 		{ href: '/cs', name: 'CS 관리' },
+		{ href: '/orders', name: '주문' },
 		{ href: '/products', name: '내 제품' }
 	];
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));

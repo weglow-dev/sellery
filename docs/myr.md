@@ -295,9 +295,10 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - **배송준비중 전환(이벗 연동 전 · 2026-11-06 대표 결정 "바인허브와 똑같이 · 키는 빼고")**: 운영팀이 물류센터에 주문을 넘길 때 `node packages/db/scripts/myr-ops.mjs prepare [--dry] [--before ISO] [--csv 파일]` → 샵 `/api/ops/prepare`(CRON_SECRET) → 지금 전 결제된 결제완료 줄 → 배송준비중 · CSV(수취인 · 주소 · 상품코드 · 수량 · 메모 · BOM)는 물류센터 전달용(넘긴 뒤 지울 것)
     - **E2 · E3 코드(바인허브 OrderStatusToPreparing · OrderStatusToDeliveringOrDelivered 그대로)**: 샵 크론 `/api/cron/ebut-prepare`(평일 11시 KST · `0 2 * * 1-5`) · `/api/cron/ebut-sync`(매일 18시 · `0 9 * * *`). 이벗 호출은 `@sellery/myr-core/server/ebut`(Bearer · status ok 확인) 한 곳 · 규칙은 순수 `ebut.ts`(orderList 키 · 주소 공백 제거 · success 'true' 줄만 · orderStatus 0|1 + 송장 · exprStatus 91 또는 배송중 10일 → 배송완료) · 주문 단위 3회 재시도 · 새 송장이면 고객 배송 시작 메일(같은 송장 한 통) · 끝난 뒤 배송준비중은 지연 표시. **`EBUT_*` 키가 하나라도 비면 두 크론은 `{ skipped: 'disabled' }`** — 키를 넣으면 켜진다(docs/deploy.md MYR 샵 환경변수). 로컬 목 서버(`EBUT_API_URL`)로 11시 → 18시 흐름 확인
     - 남은 것(이벗 확정 뒤): 이벗 계정 · 상품코드 발급 절차 · 보내는 사람(§9-14) · 실제 API 로 리허설 · 이벗이 주는 택배사(`EBUT_COURIER`) · 실행 기록 표(`myr_ebut_runs` · 선택)
-- **6. 주문 열람(읽기 전용)**
-    - 새 RPC `myr_app_seller_orders(seller)` — 내 줄만 · 수취인 원문 없음 · `김*은` 마스킹 · 줄마다 배송 상태 · 송장
-    - `/orders` 화면(시안 없음) · **셀러 환불 버튼 없음**(7번 승인 흐름으로)
+- **6. 주문 열람(읽기 전용) — 완료(2026-11-06 · 0081)**
+    - **0081** `myr_app_seller_orders(seller, limit)` · `_of_user(user, limit)`(게이트와 동시에) — 결제된 주문(PAID · PARTIAL_REFUNDED · REFUNDED — 0076 실적과 같은 기준)만 · **내 줄만**(섞인 주문의 다른 크리에이터 줄 · 송장 없음) · 고객은 `myr_mask_name`(김*은) · 연락처 · 주소 · 이메일 없음 · 줄마다 배송 상태 · 송장 · 환불 수량/금액 · 진행 중 교환·환불 요청(코드 · 상태)
+    - 공용 순수 `@sellery/myr-core/seller-orders`(파서 · 상태 칩 = 진행 중 요청 → 환불 완료 → 남은 줄의 가장 덜 진행된 배송 상태 · 탭 전체/배송 준비/배송 중/배송 완료/환불 · 내 줄 금액 · 박스) · 서버 `server/seller-orders`
+    - 콘솔 `/orders`(시안 없음 — CS 관리 목록 카드에 맞춤 · 모바일 한 줄 · PC 2단) · 메뉴 "주문"(하단 탭 · 상단 내비) · 카드 = 주문번호 · 상태 칩 · 결제일 · 가린 이름 · 내 줄(상품 × 수량 · 금액 · n개 환불 · 섞이면 줄 상태 · 요청 → CS 상세) · 운송장(조회 링크) 또는 출고 안내 · 내 상품 금액(환불 빼고). **셀러 환불 버튼 없음**(7번 승인 흐름으로)
 - **7. 교환·환불 승인형 CS — 완료(2026-11-06 · 0078)**
     - **DB** `myr_refund_requests`(요청 1건 = 주문 줄 1개 · 수량 · 종류 refund/exchange · 사유 단순 변심/파손 · 누액/오배송 · 상세 · 사진(`myr-refunds` 경로) · 상태 pending → progress → done | rejected · 처리 방법 · 크리에이터 메시지 · 회수/재발송/환불 할 일과 시각 · 줄마다 진행 중 요청 하나). 판정은 DB 한 곳 — 처리 방법 선택지 `myr_refund_request_options` · 지금 단계 `myr_refund_request_step`(decide → collect → refund → reship) · 완료 판정 `myr_refund_request_finish` · 뺄 배송비 `myr_refund_request_fee_due`
     - **고객(샵)**: [교환 · 환불 신청] 페이지가 배송 상태와 무관하게 열린다 — 결제완료 줄 = [바로 환불](지금처럼 토스 즉시 취소) · 배송준비중 이후 줄 = [교환 · 환불 요청](`ClaimForm` · `POST /api/claims` · 사유 칩 · 종류 · 상세 · 사진 · 처리 기준 · 예상 환불). 두 가지가 다 있으면 전환 탭. 주문 상세에 "교환 · 환불 요청" 카드(상태 · 지금 단계 · 크리에이터 메시지 · 교환 송장 · 처리 내역)

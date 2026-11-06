@@ -34,5 +34,6 @@ export const UI_ICONS: Record<string, string> = {
 	x: `<path d="M6 6l12 12M18 6L6 18"/>`,
 	check: `<path d="M5 12.5l4.5 4.5L19 7.5"/>`,
 	clock: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`,
-	frame: `<path d="M4 4h16v16H4z"/><path d="M4 9h16"/>`
+	frame: `<path d="M4 4h16v16H4z"/><path d="M4 9h16"/>`,
+	order: `<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>`
 };

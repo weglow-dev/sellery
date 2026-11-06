@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { replaceState } from '$app/navigation';
-	import { INQ_EMPTY, filterInquiries, inqStatus, inqTabCounts, inqTypeCls, isWaiting, type InqTab } from '$lib/inquiry';
+	import { INQ_EMPTY, INQ_TABS, filterInquiries, inqStatus, inqTabCounts, inqTypeCls, isWaiting, type InqTab } from '$lib/inquiry';
 	import { relativeTime } from '$lib/product-row';
-	import { CS_STATUS_META, CS_TYPE_META, claimTabCounts, dueText, filterClaims, isUrgentPending, type CsTab } from '$lib/claims';
+	import { CS_STATUS_META, CS_TABS, CS_TYPE_META, claimTabCounts, dueText, filterClaims, isUrgentPending, type CsTab } from '$lib/claims';
 	import { won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
+	import { readParam, syncParam } from '$lib/url-state';
 	import Badge from '$lib/components/Badge.svelte';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -12,14 +12,16 @@
 
 	/** CS 관리 — [교환 · 환불 | 고객 문의] (시안 "MYR Influencer Admin" · "… PC" csSeg).
 	 *  교환 · 환불: 대기 · 진행 중 · 완료 · 전체 — 서버(0078 · +page.server.ts). 고객 문의: 답변 대기 · 답변 완료 · 전체 — 서버(0075).
-	 *  보던 쪽은 주소(?view=inquiry)에 남겨 상세에서 뒤로 오면 그대로. 모바일: "CS 관리" 제목 + 전체 폭 전환 / PC(lg~): 왼쪽 360px 전환 + 오른쪽 합계 · 2단 카드 */
+	 *  보던 쪽 · 탭은 주소(?view=inquiry · ?tab= · ?inq=)에 남겨 상세에서 뒤로 오면 그대로(`$lib/url-state`). 모바일: "CS 관리" 제목 + 전체 폭 전환 / PC(lg~): 왼쪽 360px 전환 + 오른쪽 합계 · 2단 카드 */
 	let { data } = $props();
 	type View = 'claim' | 'inquiry';
-	// 보던 쪽은 실제 주소창에서 읽는다 — 전환은 얕은 replaceState 라 page.url 은 처음 들어온 주소(/cs)에 머문다.
-	// page.url 로 읽으면 상세에서 뒤로 왔을 때 주소는 ?view=inquiry 인데 교환 · 환불이 열린다(2026-11-05). 콘솔은 ssr=false 라 location 을 바로 쓸 수 있다.
-	let view = $state<View>(new URLSearchParams(location.search).get('view') === 'inquiry' ? 'inquiry' : 'claim');
-	let claimTab = $state<CsTab>('pending');
-	let inqTab = $state<InqTab>('waiting');
+	// 보던 쪽 · 탭은 실제 주소창에서 읽는다 — 전환은 얕은 replaceState 라 page.url 은 처음 들어온 주소(/cs)에 머문다(2026-11-05).
+	let view = $state<View>(readParam('view', ['claim', 'inquiry'] as const, 'claim'));
+	let claimTab = $state<CsTab>(readParam('tab', CS_TABS.map((t) => t.id), 'pending'));
+	let inqTab = $state<InqTab>(readParam('inq', INQ_TABS.map((t) => t.id), 'waiting'));
+	$effect(() => syncParam('view', view, 'claim'));
+	$effect(() => syncParam('tab', claimTab, 'pending'));
+	$effect(() => syncParam('inq', inqTab, 'waiting'));
 
 	const claims = $derived(filterClaims(data.claims, claimTab));
 	const claimTabs = $derived(claimTabCounts(data.claims));
@@ -39,10 +41,7 @@
 	]);
 	const total = $derived(view === 'inquiry' ? `답변 대기 ${inqWaiting} · 전체 ${data.inquiries.length}` : `대기 ${claimWaiting} · 전체 ${data.claims.length}`);
 
-	function pick(v: View) {
-		view = v;
-		replaceState(v === 'inquiry' ? '/cs?view=inquiry' : '/cs', {});
-	}
+	const pick = (v: View) => (view = v);
 </script>
 
 {#snippet seg(cls: string, btn: string)}
