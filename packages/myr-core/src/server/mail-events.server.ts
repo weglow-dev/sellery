@@ -16,7 +16,6 @@ import { isEmailAddress } from '../mail/resend';
 import { trackingUrl } from '../ship-rules';
 import { claimDecidedMail, claimOpenedSellerMail, claimReshippedMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailClaim, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '../mail/templates';
 import { admin } from './admin.server';
-import { myrConfig } from './config.server';
 import { mailCtx, sendMail, type MailSendResult } from './mail.server';
 
 type Raw = {
