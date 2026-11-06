@@ -22,7 +22,7 @@
 --   크리에이터: myr_app_seller_claims_of_user(user) · myr_app_seller_claim_of_user(user, code) · myr_app_seller_claims_waiting_of_user(user)
 --             myr_app_claim_decide(code, user, decision, resolution, message)
 --   서버:     myr_app_claim_refunded(code, amount)   refundItems 성공 뒤 기록
---             myr_app_claims_refund_due(age, limit)  환불할 차례인데 아직 안 된 요청(승인 직후 환불이 실패했을 때 샵 크론이 다시)
+--             myr_app_claims_refund_due(age, limit)  환불할 차례인데 아직 안 된 요청 — 샵 크론이 환불(콘솔 승인 뒤 · 회수 확인 직후 실패 · 결제 키는 샵에만)
 --   운영:     myr_app_admin_claims(open_only) · myr_app_admin_claim_collected(code) · myr_app_admin_claim_reship(code, courier, tracking)
 --   0068 myr_refund_photo_orphans — 요청에 실린 사진은 고아가 아니다(재정의)
 --

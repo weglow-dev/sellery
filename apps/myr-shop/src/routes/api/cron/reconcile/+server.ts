@@ -27,7 +27,7 @@ import { isTossError, isUncertain, tossGetPayment } from '$lib/server/toss';
  *   3. myr_app_deposit_due(50) — 입금 기한 지난 WAITING_DEPOSIT 주문 → 재조회: DONE → deposit_done · CANCELED/EXPIRED → deposit_expire · 그 외 유지
  *   4. 환불 사진 고아 정리(0068 · 24시간 지난 미참조 · 100개) — ?prune=0 생략
  *   5. 버려진 상품 이미지 정리(0073 · 콘솔 에디터에서 지웠거나 저장 안 한 사진 · 24시간 · 100개) — ?prune=0 생략(4 와 같은 스위치)
- *   6. 교환·환불 요청 환불 재시도(0078) — 승인 · 회수 확인 직후 환불이 실패해 5분 넘게 "환불할 차례" 인 요청 20건(토스 키는 요청 코드로 멱등) — ?claims=0 생략
+ *   6. 교환·환불 요청 환불(0078) — 1분 넘게 "환불할 차례" 인 요청 20건: 콘솔 승인(파손 즉시 환불 — 콘솔은 결제 키가 없다) · 회수 확인 직후 실패한 환불(토스 키는 요청 코드로 멱등) — ?claims=0 생략
  */
 export const config: Config = { maxDuration: 60 };
 const STALE_AGE = '2 minutes';

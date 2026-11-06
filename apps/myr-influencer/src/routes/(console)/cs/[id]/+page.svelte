@@ -43,7 +43,7 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(decision === 'approve' ? { decision, resolution, message: reply } : { decision, message: reply })
 			});
-			const r = (await res.json().catch(() => null)) as { ok: boolean; message?: string; refund?: { tried: boolean; ok: boolean } } | null;
+			const r = (await res.json().catch(() => null)) as { ok: boolean; message?: string } | null;
 			if (!res.ok || !r?.ok) {
 				error = r?.message ?? '처리하지 못했어요 — 잠시 후 다시 시도해주세요';
 				busy = false;
@@ -51,11 +51,7 @@
 			}
 			if (app.claimWaiting) app.claimWaiting -= 1;
 			app.showToast(
-				decision === 'reject'
-					? `${c.code.toUpperCase()} 반려했어요 — 고객에게 메일을 보냈어요`
-					: r.refund?.tried && !r.refund.ok
-						? '승인했어요 — 환불은 잠시 뒤 다시 시도해요'
-						: `${approveLabel(c, resolution)}했어요 — 고객에게 메일을 보냈어요`
+				decision === 'reject' ? `${c.code.toUpperCase()} 반려했어요 — 고객에게 메일을 보냈어요` : `${approveLabel(c, resolution)}했어요 — 고객에게 메일을 보냈어요`
 			);
 			resolution = null;
 			reply = '';

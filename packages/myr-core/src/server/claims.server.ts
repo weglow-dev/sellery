@@ -3,9 +3,9 @@
  *   고객(샵):     openClaims(orderId, actorId, body)          요청 남기기(줄마다 1건) → 셀러 메일
  *                claimsForOrder(orderId)                     주문 상세 · 신청 페이지(소유는 라우트가 이미 확인)
  *   크리에이터:   listSellerClaimsOfUser(userId) · sellerClaimsWaitingOfUser(userId) · getSellerClaimOfUser(userId, code)(사진 서명 URL 포함)
- *                decideClaim(userId, sellerId, code, body)   승인/반려 → 고객 메일 → 회수 없는 환불이면 바로 환불(actor seller)
+ *                decideClaim(userId, code, body)             승인/반려 → 고객 메일(환불은 하지 않는다 — 샵 크론)
  *   운영 · 크론:  adminClaims(openOnly) · collectClaim(code)(회수 확인 → 환불 차례면 바로 환불 · actor admin) · reshipClaim(code, courier, tracking)(→ 고객 메일)
- *                retryClaimRefunds()                         환불 차례인데 5분 넘게 남은 요청(승인 직후 환불 실패) — 샵 크론 reconcile
+ *                retryClaimRefunds()                         환불 차례인 요청(1분 지남) — 샵 크론 reconcile. 승인 뒤 바로 환불(파손)도 여기서 나간다 — 결제 키는 샵에만(2026-11-06 대표 결정)
  * 환불은 `refundItems`(토스 부분 취소 · 줄 기록 · 환불 메일) 뒤 `myr_app_claim_refunded` 로 요청에 기록한다. 토스 키는 요청 코드(tag)로 멱등.
  * actor 와 그 id 는 세션에서만(원칙 6) — 이 모듈은 라우트가 넘긴 값을 그대로 쓴다.
  */
@@ -81,9 +81,9 @@ export async function getSellerClaimOfUser(userId: string, code: string): Promis
 }
 
 export type ClaimRefundOutcome = { tried: boolean; ok: boolean; code?: string; amount?: number };
-export type ClaimDecideResult = { ok: true; claim: Claim; refund: ClaimRefundOutcome } | { ok: false; code: string };
+export type ClaimDecideResult = { ok: true; claim: Claim } | { ok: false; code: string };
 
-export async function decideClaim(userId: string, sellerId: string, code: string, body: ClaimDecideBody): Promise<ClaimDecideResult> {
+export async function decideClaim(userId: string, code: string, body: ClaimDecideBody): Promise<ClaimDecideResult> {
 	const c = code.trim().toLowerCase();
 	if (!CLAIM_CODE_RE.test(c)) return fail('NOT_FOUND');
 	const { data, error } = await admin().rpc('myr_app_claim_decide', { p_code: c, p_user: userId, p_decision: body.decision, p_resolution: body.resolution, p_message: body.message });
@@ -95,9 +95,9 @@ export async function decideClaim(userId: string, sellerId: string, code: string
 	const claim = claimFromJson(r?.request);
 	if (!r || r.ok !== true || !claim) return fail(typeof r?.code === 'string' ? r.code : 'DB_ERROR');
 	await notifyClaimDecided(claim);
-	// 회수 없이 바로 환불(파손 · 누액) — 실패해도 승인은 그대로 · 샵 크론이 5분 뒤 다시(retryClaimRefunds)
-	const refund = r.refund_now === true ? await refundClaim(claim, 'seller', sellerId) : { tried: false, ok: false };
-	return { ok: true, claim, refund };
+	// 회수 없이 바로 환불(파손 · 누액)이어도 여기서는 돈을 움직이지 않는다 — 요청은 "환불할 차례"(step refund)로 남고
+	// 샵 크론(reconcile · 10분마다 · retryClaimRefunds)이 환불한다. 토스 시크릿 키를 샵 한 곳에만 두기 위해서(2026-11-06 대표 결정)
+	return { ok: true, claim };
 }
 
 /* ---------------- 환불 실행 — 요청에서 나가는 돈은 여기 한 곳 ---------------- */
@@ -178,9 +178,10 @@ export async function retryClaimRefund(code: string): Promise<ClaimOpsResult> {
 	return { ok: true, already: false, claim: (refund.ok ? await adminClaimByCode(claim.code) : null) ?? claim, refund };
 }
 
-/** 크론 — 환불할 차례인데 5분 넘게 남은 요청을 다시(오래된 순 · 20건) */
+/** 크론 — 환불할 차례인 요청(오래된 순 · 20건). 콘솔 승인(파손 즉시 환불)은 여기서 처음 환불되고, 회수 확인 직후 실패한 환불은 다시.
+ *  1분 = 운영 회수 확인(collectClaim)이 바로 부르는 환불과 겹치지 않을 여유(겹쳐도 토스 키 · claim_refunded 가 멱등) */
 export async function retryClaimRefunds(): Promise<{ found: number; refunded: number; failed: string[] }> {
-	const { data, error } = await admin().rpc('myr_app_claims_refund_due', { p_age: '5 minutes', p_limit: 20 });
+	const { data, error } = await admin().rpc('myr_app_claims_refund_due', { p_age: '1 minute', p_limit: 20 });
 	if (error) {
 		console.error('[claims] refund_due failed:', error.message);
 		return { found: 0, refunded: 0, failed: [] };
