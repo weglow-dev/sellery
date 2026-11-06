@@ -6,7 +6,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
-	import { displayCode, refundSteps, SHIP_LABELS, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
@@ -22,6 +22,7 @@
 	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
 	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0));
 	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
+	const ship = $derived(shipBoxes(order.items));
 	const steps = $derived(refundSteps(order));
 	const meta = $derived([relTime(order.paidAt ?? order.createdAt), order.paymentMethod].filter(Boolean).join(' · '));
 
@@ -74,9 +75,19 @@
 						<p class="mt-1 text-[13px] text-white/70">입금 금액 <b class="text-fg">{won(order.amount)}</b>{#if order.deposit.due} · 기한 {dueText(order.deposit.due)}{/if}</p>
 					</div>
 				{/if}
-				{#if order.trackingNo}
+				{#if ship.boxes.length}
+					<!-- 송장 — 한 박스면 한 줄, 박스가 나뉘었거나 아직 안 나간 상품이 있으면 박스마다 담긴 상품 -->
+					<div class="flex flex-col gap-2.5 rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-[13px] text-white/80 lg:rounded-[20px] lg:px-5">
+						{#each ship.boxes as b (b.courier + b.trackingNo)}
+							<div>
+								<p>{b.courier ?? '택배'} <span class="font-mono">{b.trackingNo}</span>{b.shippedAt ? ` · ${shortDate(b.shippedAt)} 발송` : ''}</p>
+								{#if !ship.single}<p class="mt-0.5 truncate text-[12px] text-fg-faint">{b.names.join(' · ')}</p>{/if}
+							</div>
+						{/each}
+					</div>
+				{:else if order.trackingNo}
 					<div class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-[13px] text-white/80 lg:rounded-[20px] lg:px-5">
-						{order.courier ?? '택배'} <span class="font-mono">{order.trackingNo}</span>{#if order.shippedAt} · {shortDate(order.shippedAt)} 발송{/if}
+						{order.courier ?? '택배'} <span class="font-mono">{order.trackingNo}</span>{order.shippedAt ? ` · ${shortDate(order.shippedAt)} 발송` : ''}
 					</div>
 				{/if}
 				{#each order.items as it (it.id)}
@@ -86,7 +97,7 @@
 						<div class="min-w-0 flex-1">
 							{#if it.creator}<p class="hidden text-[12px] font-bold text-accent lg:block">{it.creator}</p>{/if}
 							<p class="truncate text-[14.5px] font-bold lg:mt-0.5 lg:text-[16px]">{it.name}{#if it.option} · {it.option}{/if}</p>
-							<p class="mt-0.5 text-[12.5px] text-fg-faint lg:mt-1 lg:text-[13px]">{it.qty}개 · {won(it.amount)}{#if ls}<span class="text-white/55 lg:hidden"> · {ls}</span>{/if}</p>
+							<p class="mt-0.5 text-[12.5px] text-fg-faint lg:mt-1 lg:text-[13px]">{it.qty}개 · {won(it.amount)}{#if ls}<span class="text-white/55 lg:hidden">{` · ${ls}`}</span>{/if}</p>
 						</div>
 						{#if ls}<span class="hidden shrink-0 rounded-[8px] bg-[#6b7bd6]/18 px-2.5 py-[5px] text-[12.5px] font-bold text-[#aab4f5] lg:inline-block">{ls}</span>{/if}
 						<button type="button" onclick={() => ask(it)} class="flex h-9 shrink-0 items-center gap-1.5 rounded-[12px] border border-white/16 px-3 text-[13px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4">

@@ -167,6 +167,25 @@ export function statusLabel(o: Pick<OrderView, 'status' | 'trackingNo' | 'shippe
 	}
 }
 
+/** 송장(박스)별 묶음 — 줄 송장 기준(0077 · 한 주문에 크리에이터 여럿이면 박스가 나뉠 수 있다). 취소 줄 제외 · 같은 택배사+송장이면 한 박스.
+ *  single = 남은 줄(수량 남음)이 전부 같은 송장 하나 → 화면은 지금처럼 한 줄. 아니면 박스마다 담긴 상품 이름을 같이 보여 준다 */
+export type ShipBox = { courier: string | null; trackingNo: string; shippedAt: string | null; names: string[] };
+export function shipBoxes(items: OrderItem[]): { boxes: ShipBox[]; single: boolean } {
+	const boxes: ShipBox[] = [];
+	for (const it of items) {
+		if (it.status === 'CANCELED' || !it.trackingNo) continue;
+		const name = it.option ? `${it.name} · ${it.option}` : it.name;
+		const box = boxes.find((b) => b.trackingNo === it.trackingNo && b.courier === it.courier);
+		if (box) {
+			box.names.push(name);
+			if (it.shippedAt && (!box.shippedAt || it.shippedAt < box.shippedAt)) box.shippedAt = it.shippedAt;
+		} else boxes.push({ courier: it.courier, trackingNo: it.trackingNo, shippedAt: it.shippedAt, names: [name] });
+	}
+	const live = items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
+	const single = boxes.length === 1 && live.every((i) => i.trackingNo === boxes[0].trackingNo && i.courier === boxes[0].courier);
+	return { boxes, single };
+}
+
 /** 주문 상세 "환불 진행 상태" — 실제 기록만(신청 사유 · 환불 시각 · 금액). 환불은 신청 즉시 토스 취소까지 끝나므로 "판매자 확인" 대기 단계는 없다 → 환불이 없으면 null.
  *  단계는 모두 done(진행 중인 환불이 없다) — 화면이 체크 표시로 그린다. */
 export type RefundStep = { title: string; detail: string; at: string | null; done: boolean };

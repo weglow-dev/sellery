@@ -1,6 +1,6 @@
 // 주문 조회 순수 규칙 — apps/myr-shop/src/lib/order-view.ts
 import { describe, expect, it } from 'vitest';
-import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, refundSteps, shortDate, statusLabel } from '../order-view';
+import { displayCode, orderFromJson, ordersFromJson, parseLookupInput, parseLookupResult, refundSteps, shipBoxes, shortDate, statusLabel, type OrderItem } from '../order-view';
 
 const json = {
 	id: 'o1',
@@ -143,5 +143,23 @@ describe('줄 단위 배송(0077)', () => {
 		expect(o.shipStatus).toBe('PREPARING');
 		expect(o.items.map((i) => [i.shipStatus, i.trackingNo])).toEqual([['SHIPPING', '1'], ['PAID', null]]);
 		expect(orderFromJson({ id: 'o', code: 'myr1', ship_status: 'WHAT' })!.shipStatus).toBeNull();
+	});
+	describe('송장(박스)별 묶음', () => {
+		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
+		it('한 박스 — 남은 줄이 전부 같은 송장 → single', () => {
+			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-05T00:00:00Z' }), it_({ name: '스틱', option: '레몬', courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-04T00:00:00Z' })]);
+			expect(r.single).toBe(true);
+			expect(r.boxes).toEqual([{ courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-04T00:00:00Z', names: ['젤리', '스틱 · 레몬'] }]);
+		});
+		it('박스 여럿 · 아직 안 나간 줄이 있으면 single 아님 · 송장 없는 줄은 박스에 없음', () => {
+			expect(shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '구미', courier: '한진택배', trackingNo: '2' })]).boxes.map((b) => b.names)).toEqual([['젤리'], ['구미']]);
+			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '캡슐' })]);
+			expect([r.single, r.boxes.length]).toEqual([false, 1]);
+		});
+		it('취소 줄 제외 · 전액 환불 줄은 박스엔 남지만 single 판정에서 빠진다 · 송장이 없으면 빈 목록', () => {
+			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '환불', refundedQty: 1, status: 'REFUNDED' }), it_({ name: '취소', status: 'CANCELED', courier: 'CJ대한통운', trackingNo: '9' })]);
+			expect([r.single, r.boxes.map((b) => b.trackingNo)]).toEqual([true, ['1']]);
+			expect(shipBoxes([it_({})])).toEqual({ boxes: [], single: false });
+		});
 	});
 });
