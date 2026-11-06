@@ -6,8 +6,8 @@
  *   - 자주 쓰는 답변 · 답변 기준 문구는 시안 그대로(크리에이터 이름만 바꿔 넣음) — 단, "상품 상세 Q&A 공개" 는 MYR 에 없는 기능이라 실제 동작(메일 · 내 문의)으로 바꿨다.
  */
 import type { CsConversation, CsMessage, CsThread } from '@sellery/myr-core/cs-rules';
-import { displayCode, isShipStatus, shortDate, statusLabel, type ShipStatus } from '@sellery/myr-core/order-view';
-import { trackingUrl } from '@sellery/myr-core/ship-rules';
+import { displayCode } from '@sellery/myr-core/order-view';
+import { orderShipping, type OrderShipping } from './order-ship';
 
 export type InqTab = 'waiting' | 'answered' | 'all';
 export const INQ_TABS: { id: InqTab; name: string }[] = [
@@ -38,31 +38,9 @@ export const inqTypeCls = (type: string) => TYPE_CLS[type] ?? TYPE_CLS['기타']
 /** 상품 카드 아래 줄 — 소유가 확인된 주문만 주문번호(§6.6 · 화면은 대문자) · 아니면 "주문 전 문의" */
 export const inqOrderText = (c: Pick<CsConversation, 'order'>) => (c.order ? `주문 ${displayCode(c.order.code)}` : '주문 전 문의');
 
-/** 주문 · 배송(문의 상세) — 소유가 확인된 주문만. 상태 판정은 샵 주문 상세와 같은 함수(`statusLabel` · 원칙 1).
- *  크리에이터는 출고 일정을 정하지 않는다(MYR 물류 발송) — 이 표는 지금 기록만 보여 준다. 주문이 없으면 null */
-export type InqShipping = { label: string; cls: string; rows: { k: string; v: string; href?: string | null }[] };
-const TONE_CLS = { accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint', muted: 'bg-white/6 text-white/60', danger: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' } as const;
-export function inqShipping(c: Pick<CsConversation, 'order'>): InqShipping | null {
-	const o = c.order;
-	if (!o) return null;
-	// 줄 배송(0077)이 있으면 그 줄 값 — 한 주문에 크리에이터가 여럿이면 줄마다 다르다. 옛 응답이면 주문 칸
-	const it = o.item;
-	const line = it?.shipStatus && isShipStatus(it.shipStatus) ? it : null;
-	const ship = line
-		? { shipStatus: line.shipStatus as ShipStatus, courier: line.courier, trackingNo: line.trackingNo, shippedAt: line.shippedAt, deliveredAt: line.deliveredAt }
-		: { shipStatus: null, courier: o.courier, trackingNo: o.trackingNo, shippedAt: o.shippedAt, deliveredAt: o.deliveredAt };
-	const st = statusLabel({ status: o.status, ...ship });
-	const rows: InqShipping['rows'] = [];
-	if (it) rows.push({ k: '주문 상품', v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
-	if (o.paidAt) rows.push({ k: '결제일', v: shortDate(o.paidAt) });
-	if (ship.trackingNo) rows.push({ k: '운송장', v: `${ship.courier ?? '택배'} ${ship.trackingNo}`, href: ship.courier ? trackingUrl(ship.courier, ship.trackingNo) : null });
-	if (ship.shippedAt) rows.push({ k: '발송일', v: shortDate(ship.shippedAt) });
-	if (ship.deliveredAt) rows.push({ k: '배송 완료', v: shortDate(ship.deliveredAt) });
-	if (!ship.trackingNo && ship.shipStatus === 'PREPARING') rows.push({ k: '출고', v: 'MYR 물류센터에서 준비 중' });
-	if (!ship.trackingNo && ship.shipStatus === 'PAID' && o.status !== 'WAITING_DEPOSIT') rows.push({ k: '출고', v: '발주 전 · 고객이 직접 취소할 수 있어요' });
-	if (!ship.trackingNo && !ship.shipStatus && st.text === '배송 준비중') rows.push({ k: '출고', v: 'MYR 물류센터에서 준비 중' });
-	return { label: st.text, cls: TONE_CLS[st.tone], rows };
-}
+/** 주문 · 배송(문의 상세) — 소유가 확인된 주문만 · 주문이 없으면 null. 표는 교환·환불 요청 상세와 같은 함수(`orderShipping`) */
+export type InqShipping = OrderShipping;
+export const inqShipping = (c: Pick<CsConversation, 'order'>): InqShipping | null => (c.order ? orderShipping(c.order) : null);
 
 /** 고객 질문 — 첫 고객 메시지 · 없으면 목록의 first_body */
 export const questionOf = (t: CsThread): string => t.messages.find((m) => m.sender === 'customer')?.body ?? t.conversation.firstBody ?? '';

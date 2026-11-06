@@ -75,7 +75,7 @@ values ('myr-refunds', '00000000-0000-4000-8000-000000000d41/00000000-0000-4000-
        ('myr-refunds', '00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ff.jpg', now() - interval '3 days'),
        ('myr-refunds', '00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000fe.jpg', now() - interval '1 hour');
 select is((select array_agg(p) from public.myr_refund_photo_orphans() p), array['00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ff.jpg'], '0068 고아 = 줄에 없고 24시간 지난 것만');
-select is((select count(*) from public.myr_refund_photo_orphans(interval '0', 100)), 2::bigint, '0068 age 0 이면 최근 것도 고아');
+select is((select count(*) from public.myr_refund_photo_orphans(interval '0', 1000) p where p like '00000000-0000-4000-8000-000000000d41/%'), 2::bigint, '0068 age 0 이면 최근 것도 고아(이 테스트의 경로만 — 로컬 DB 에 다른 사진이 있어도)');
 select is((select count(*) from public.myr_refund_photo_orphans(interval '0', 1)), 1::bigint, '0068 limit');
 select is((select status || '/' || refunded_qty || '/' || refund_amount || '/' || refund_actor from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), 'PARTIAL_REFUNDED/1/10000/customer', '줄 — 1개 환불 · PARTIAL_REFUNDED');
 select is((select sold_qty from public.myr_products where code = 'pgtap-rf-a'), 2, 'sold_qty 반환 (3 → 2)');

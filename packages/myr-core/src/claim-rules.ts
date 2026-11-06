@@ -146,7 +146,15 @@ export type Claim = {
 	buyerName: string;
 	/** 가린 연락처(010-****-1234) · 없으면 null */
 	buyerPhone: string | null;
-	order: { id: string; code: string; paidAt: string | null; isMember: boolean; item: { id: string; name: string; option: string; qty: number; unitPrice: number; refundedQty: number; status: string; shipStatus: string; shippedAt: string | null; deliveredAt: string | null } };
+	/** 주문 · 요청이 걸린 줄(배송 칸은 그 줄 값 — 0077 · 송장은 0080) */
+	order: {
+		id: string;
+		code: string;
+		status: string;
+		paidAt: string | null;
+		isMember: boolean;
+		item: { id: string; name: string; option: string; qty: number; unitPrice: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
+	};
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
 	seller: { id: string; name: string; handle: string } | null;
 };
@@ -196,6 +204,7 @@ export function claimFromJson(v: unknown): Claim | null {
 		order: {
 			id: s(ord.id),
 			code: s(ord.code),
+			status: s(ord.status, 'PAID'),
 			paidAt: sn(ord.paid_at),
 			isMember: ord.is_member === true,
 			item: {
@@ -207,6 +216,8 @@ export function claimFromJson(v: unknown): Claim | null {
 				refundedQty: n(it.refunded_qty),
 				status: s(it.status),
 				shipStatus: s(it.ship_status, 'PAID'),
+				courier: sn(it.courier),
+				trackingNo: sn(it.tracking_no),
 				shippedAt: sn(it.shipped_at),
 				deliveredAt: sn(it.delivered_at)
 			}
