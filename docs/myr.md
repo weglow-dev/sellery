@@ -300,7 +300,11 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 승인 뒤: 발주 전 = 즉시 `refundItems` · 발주 후 환불 = 회수 접수 → 회수 확인 → `refundItems` · 교환 = 회수(필요 시) → 재발송
     - 회수·재발송 실행은 어드민 몫 — 이벗 회수 API(E4) 전에는 운영자가 "회수 완료 · 재발송 송장" 을 수동 처리
     - 환불 사진 서명 URL · 단순 변심 왕복 배송비(UI 의 ₩6,000)는 정책 결정 필요
-- **8. 홈 지표 · 실적** — `myr_app_seller_sales(seller)`(이번 달 매출·주문·수량 · CS 비율 · 7일 막대) → `MOCK_STATS` `mockMonthRevenue` 치환 · 정산율은 `platform_settings`(§9-6 전까지 UI 의 10% 는 자리값) · `/sales`(시안 없음)
+- **8. 홈 지표 — 완료(2026-11-06 · 0076)** — 홈의 목(`MOCK_STATS` · `mockMonthRevenue`)을 서버 값으로
+    - **0076** `myr_app_seller_sales(seller, now)` · `_of_user(user, now)`(게이트와 동시에) — 내 줄만 · 결제된 주문(PAID · PARTIAL_REFUNDED · REFUNDED)만 · 달은 결제 시각(KST) · gross · refunds · net(순매출) · orders · units(수량 − 환불 수량) · refunded_orders · payout(줄 마진율이 하나라도 비면 null) · 최근 7일 날짜별 주문 수. 순매출 · 주문 · 수량 판정은 이 함수 하나(운영 콘솔 실적도 이것을 부른다). pgTAP `myr_seller_sales.test.sql` 17
+    - **결정(2026-11-06 대표)**: ① 큰 숫자는 시안의 "이번 달 정산 예정" 대신 **"이번 달 순매출"**(매출 − 환불) + "정산 비율이 정해지면 정산 예정액으로 바뀌어요" — 운영 상품 · 주문 줄의 마진율이 모두 비어 있다(§9-6). 비율이 정해지면 `payout` 으로 바꾼다 ② **CS 비율 = 환불이 생긴 주문 ÷ 주문**(교환·환불 요청(7번) 전까지) · 주문이 없으면 "—" ③ **오늘 처리할 일 = 답변 대기 고객 문의(오래된 순) + 교환·환불(목) 최대 3건**
+    - 공용: `@sellery/myr-core/seller-sales`(파서 · `csRateText` · `weekBars`) · `server/seller-sales`. 홈 load 는 게이트 · 상품 · 실적 · 문의를 동시에
+    - 남은 것: 실적 상세 화면(`/sales` · 상품별 · 시안 없음)은 필요해지면 · 정산 예정액은 정산 비율 결정 뒤
 - **9. 프로필** — 사진 업로드(Storage) → `sellers.avatar_url` · `/my` 알림 이메일 · 정산 계좌(시안 없음)
 - **10. 초대 가입 기능 — 완료(2026-11-04 · 0070 · 결정 14)**
     - **0070** `myr_invites`(이메일 · 토큰 sha256 해시만 · 기본 30일(1~90 · `INVITE_DAYS`) · 사용 시각 · 취소(reissued · canceled) · 초대한 운영자 메모 · 새 초대 요청 시각·횟수 · 이메일당 대기 중 초대 1개 부분 유니크) + `sellers.contact_phone`(숫자만 · 공개 grant 없음). Supabase 초대(OTP) 링크는 수명이 짧아(최대 24시간 · 대시보드 Email OTP Expiration) 30일을 못 버티므로 자체 토큰 + Resend 메일 — 그래서 Supabase 메일 링크 만료 설정과 상관없다

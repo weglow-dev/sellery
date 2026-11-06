@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { MOCK_STATS, type Me } from '$lib/data';
-	import { CS_TYPE_META, dueText, mockMonthRevenue, won } from '$lib/rules';
+	import { csRateText, weekBars } from '@sellery/myr-core/seller-sales';
+	import type { Me } from '$lib/data';
+	import { inqTypeCls } from '$lib/inquiry';
+	import { relativeTime } from '$lib/product-row';
+	import { CS_TYPE_META, dueText, won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -9,13 +12,15 @@
 
 	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 최근 7일 판매 막대.
 	 *  모바일은 한 줄로 쌓고, PC(lg~)는 지표 3단(1.6 : 1 : 1) + 아래 2단(할 일 · 7일 판매, 합계와 막대 값 표시).
-	 *  "판매 중 제품" 카드는 서버 값(+page.server.ts · 0071). 나머지 지표는 목(MOCK_STATS · mockMonthRevenue) — 실적 RPC(8번)를 붙이면 서버 값으로 바뀐다. */
+	 *  서버 값(+page.server.ts): 판매 중 제품 · 이번 달 순매출 · 주문 · 판매 수량 · CS 비율 · 최근 7일 주문(0076) · 고객 문의 답변 대기.
+	 *  큰 숫자는 시안의 "정산 예정" 대신 **이번 달 순매출**(매출 − 환불) — 정산 비율이 정해지면 정산 예정액으로 바꾼다(2026-11-06 대표 결정 · docs/myr.md §9-6).
+	 *  CS 비율 = 환불이 생긴 주문 ÷ 주문(7번 전까지). 오늘 처리할 일 = 답변 대기 문의(오래된 순) + 교환·환불(목) 최대 3건. */
 	let { data } = $props();
-	const live = $derived(app.products.filter((p) => p.status === 'live'));
-	const monthUnits = $derived(live.reduce((n, p) => n + p.sold, 0));
-	const today = $derived(app.pending.slice(0, 3));
-	const maxDay = Math.max(...MOCK_STATS.week);
-	const weekTotal = MOCK_STATS.week.reduce((a, b) => a + b, 0);
+	const sales = $derived(data.sales);
+	const bars = $derived(weekBars(sales.week));
+	const weekTotal = $derived(sales.week.reduce((n, d) => n + d.orders, 0));
+	const todayInq = $derived(data.todayInquiries.slice(0, 3));
+	const todayClaims = $derived(app.pending.slice(0, Math.max(0, 3 - todayInq.length)));
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
 	const photo = $derived(app.profilePhoto || me.avatarUrl);
@@ -78,12 +83,13 @@
 	<div class="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-3.5">
 		<div class="relative col-span-2 overflow-hidden rounded-3xl bg-panel p-5 lg:col-span-1 lg:px-7 lg:py-[26px]">
 			<div class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))] lg:-top-20 lg:h-[280px] lg:w-[280px]"></div>
-			<p class="relative text-[12px] font-bold text-white/55 lg:text-[13px]">이번 달 정산 예정</p>
-			<p class="relative mt-1.5 text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:mt-2 lg:text-[40px]">{won(mockMonthRevenue(app.products))}</p>
+			<p class="relative text-[12px] font-bold text-white/55 lg:text-[13px]">이번 달 순매출</p>
+			<p class="relative mt-1.5 text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:mt-2 lg:text-[40px]">{won(sales.net)}</p>
+			<p class="relative mt-1 text-[11px] text-white/40 lg:text-[12px]">매출 − 환불 · 정산 비율이 정해지면 정산 예정액으로 바뀌어요</p>
 			<div class="relative mt-3.5 flex gap-4 lg:mt-[18px] lg:gap-7">
-				<div><p class="text-[11px] text-white/50 lg:text-[12px]">주문</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{MOCK_STATS.monthOrders.toLocaleString('ko-KR')}건</p></div>
-				<div><p class="text-[11px] text-white/50 lg:text-[12px]">판매 수량</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{monthUnits.toLocaleString('ko-KR')}개</p></div>
-				<div><p class="text-[11px] text-white/50 lg:text-[12px]">CS 비율</p><p class="mt-0.5 text-[15px] font-bold text-accent lg:mt-[3px] lg:text-[17px]">{MOCK_STATS.csRate}</p></div>
+				<div><p class="text-[11px] text-white/50 lg:text-[12px]">주문</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{sales.orders.toLocaleString('ko-KR')}건</p></div>
+				<div><p class="text-[11px] text-white/50 lg:text-[12px]">판매 수량</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{sales.units.toLocaleString('ko-KR')}개</p></div>
+				<div><p class="text-[11px] text-white/50 lg:text-[12px]">CS 비율</p><p class="mt-0.5 text-[15px] font-bold text-accent tabular-nums lg:mt-[3px] lg:text-[17px]">{csRateText(sales)}</p></div>
 			</div>
 		</div>
 		<a href="/cs" class="flex flex-col gap-2.5 rounded-[20px] border border-accent/25 bg-accent/8 p-4 text-left transition-colors lg:justify-between lg:gap-3.5 lg:rounded-3xl lg:p-[22px] lg:hover:border-accent/55">
@@ -115,7 +121,18 @@
 				<a href="/cs" class="text-[13px] font-semibold text-white/50 transition-colors lg:text-[14px] lg:hover:text-fg">전체 보기</a>
 			</div>
 			<div class="mt-3 flex flex-col gap-2 lg:mt-3.5 lg:flex-1 lg:gap-2.5">
-				{#each today as c (c.id)}
+				{#each todayInq as q (q.code)}
+					<a href="/cs/inquiry/{q.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
+						<Tile tile="slate" bg={q.product?.tile} iconId={q.product?.icon} thumbUrl={q.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
+						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
+							<span class="flex items-center gap-1.5"><Badge cls={inqTypeCls(q.type)}>{q.type}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]">{relativeTime(q.createdAt)}</span></span>
+							<span class="truncate text-[14px] font-bold lg:text-[15px]">{q.product?.name ?? '상품'}</span>
+							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{q.buyerName} · {q.question}</span>
+						</span>
+						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
+					</a>
+				{/each}
+				{#each todayClaims as c (c.id)}
 					{@const tm = CS_TYPE_META[c.type]}
 					<a href="/cs/{c.id}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
 						<Tile tile={c.tile} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
@@ -129,9 +146,10 @@
 						{/if}
 						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
 					</a>
-				{:else}
-					<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-white/50 lg:flex lg:flex-1 lg:items-center lg:justify-center lg:rounded-[20px] lg:py-9">대기 중인 CS가 없어요. 수고했어요!</div>
 				{/each}
+				{#if !todayInq.length && !todayClaims.length}
+					<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-white/50 lg:flex lg:flex-1 lg:items-center lg:justify-center lg:rounded-[20px] lg:py-9">대기 중인 CS가 없어요. 수고했어요!</div>
+				{/if}
 			</div>
 		</section>
 
@@ -141,13 +159,13 @@
 				<span class="hidden text-[14px] text-white/50 lg:inline">합계 <b class="font-bold text-fg tabular-nums">{weekTotal}건</b></span>
 			</div>
 			<div class="rounded-[20px] border border-white/8 bg-white/3 px-4 pt-[18px] pb-3.5 lg:mt-3.5 lg:flex lg:flex-1 lg:flex-col lg:rounded-3xl lg:px-5 lg:pt-[22px] lg:pb-[18px]">
-				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="최근 7일 판매 수량 {MOCK_STATS.week.map((v, i) => `${MOCK_STATS.weekDays[i]} ${v}개`).join(', ')}">
-					{#each MOCK_STATS.week as v, i (i)}
-						{@const top = v === maxDay}
+				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="최근 7일 주문 {bars.map((b) => `${b.day} ${b.value}건`).join(', ')}">
+					{#each bars as b (b.date)}
+						{@const top = b.top}
 						<div class="flex h-full flex-1 flex-col items-center justify-end gap-1.5 lg:gap-2">
-							<span class="hidden text-[12px] font-bold tabular-nums lg:block {top ? 'text-accent' : 'text-white/45'}">{v}</span>
-							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {top ? 'bg-accent' : 'bg-white/12'}" style:height="{Math.round((v / maxDay) * 100)}%"></span>
-							<span class="text-[11px] font-semibold lg:text-[12px] {top ? 'text-accent' : 'text-white/45'}">{MOCK_STATS.weekDays[i]}</span>
+							<span class="hidden text-[12px] font-bold tabular-nums lg:block {top ? 'text-accent' : 'text-white/45'}">{b.value}</span>
+							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {top ? 'bg-accent' : 'bg-white/12'}" style:height="{Math.max(b.height, 2)}%"></span>
+							<span class="text-[11px] font-semibold lg:text-[12px] {top ? 'text-accent' : 'text-white/45'}">{b.day}</span>
 						</div>
 					{/each}
 				</div>

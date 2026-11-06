@@ -168,11 +168,3 @@ export function seedProducts(): Product[] {
 /** 제품 정보 표(에디터 6단계 · 샵 "04 · 제품 정보") — 제조만 고정, 나머지는 크리에이터 입력(2026-11-05 대표 결정) */
 export const INFO_MAKER = 'MYR 파트너 제조시설';
 export const INFO_PH = { formPack: '액상 / 스틱포', unit: '14포 / 2주분', shelfLife: '제조일로부터 24개월', storageMethod: '직사광선을 피해 서늘한 곳' } as const;
-
-/** 홈 지표(목) — 주문 수 · CS 비율 · 최근 7일 판매 막대. 실적 RPC(myr_app_seller_sales)를 붙이면 바뀐다 */
-export const MOCK_STATS = {
-	monthOrders: 587,
-	csRate: '1.2%',
-	week: [12, 18, 9, 22, 27, 31, 19],
-	weekDays: ['월', '화', '수', '목', '금', '토', '일']
-};
