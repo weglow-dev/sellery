@@ -6,16 +6,17 @@
 	 *  교환 · 환불 요청(0078) — 이 주문의 요청마다 카드: 상품 · 종류/사유 · 상태 · 지금 단계 · 크리에이터 메시지 · 재발송 송장 · 처리 내역(claim-rules claimTimeline). */
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
-	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
+	import { relTime, type CsOrderOption, type CsThread } from '@sellery/myr-core/cs-rules';
 	import { CLAIM_LABELS, displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
 	import { CLAIM_STATUS_LABEL, claimStepText, claimTimeline, isOpenClaim, KIND_LABEL, type Claim } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 	import { trackingUrl } from '@sellery/myr-core/ship-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
+	import InquiryAccordion from '$lib/components/InquiryAccordion.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, inquiries = [], claims = [], guestNote = false }: { order: OrderView; inquiries?: CsForOrder[]; claims?: Claim[]; guestNote?: boolean } = $props();
+	let { order, inquiries = [], claims = [], guestNote = false }: { order: OrderView; inquiries?: CsThread[]; claims?: Claim[]; guestNote?: boolean } = $props();
 	const claimTone: Record<string, string> = { pending: 'bg-white/8 text-white/85', progress: 'bg-accent/12 text-accent', done: 'bg-[#4ade80]/12 text-[#4ade80]', rejected: 'bg-white/6 text-white/50' };
 	const label = $derived(statusLabel(order));
 	const can = $derived(customerCanRefund(order));
@@ -44,7 +45,6 @@
 	// 환불 신청은 별도 페이지(대표 시안 2026-11-03) — 비회원은 조회 토큰 경로
 	const refundHref = $derived(guestNote ? `/orders/g/${order.code}/refund` : `/orders/${order.code}/refund`);
 	const actionLabel = $derived(deposit ? '주문 취소' : '교환 · 환불 신청');
-	const chipTone: Record<string, string> = { accent: 'bg-accent/12 text-accent', ok: 'bg-[#4ade80]/12 text-[#4ade80]', muted: 'bg-white/8 text-white/55' };
 	const askIcon = 'M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20.5l1.6-4.6A8.3 8.3 0 0 1 3.5 11.5 8.5 8.5 0 0 1 12 3a8.5 8.5 0 0 1 9 8.5z';
 </script>
 
@@ -208,18 +208,11 @@
 					</section>
 				{/if}
 
+				<!-- 이 주문의 문의 — 마이 "내 문의" 와 같은 아코디언(0079 · 답변까지 펼쳐 본다 · 메시지는 서버가 미리 싣는다) -->
 				{#if inquiries.length}
-					<section class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-5">
-						<p class="text-[13px] text-fg-faint">이 주문의 문의</p>
-						<div class="mt-2 flex flex-col gap-1.5">
-							{#each inquiries as q (q.code)}
-								{@const chip = csStatusChip(q.status)}
-								<a href="/cs/{q.code}" class="flex items-center justify-between gap-2 rounded-[12px] bg-white/4 px-3 py-2.5 text-fg transition-colors hover:bg-white/7">
-									<span class="min-w-0"><span class="block truncate text-[13px] font-bold">{q.productName}</span><span class="block text-[11.5px] text-fg-faint">{q.type} · {relTime(q.lastMessageAt)}</span></span>
-									<span class="shrink-0 rounded-full px-2 py-[3px] text-[11px] font-bold {chipTone[chip.tone]}">{chip.label}</span>
-								</a>
-							{/each}
-						</div>
+					<section aria-label="이 주문의 문의" class="mt-1 lg:mt-2">
+						<h2 class="mb-2.5 text-[15px] font-extrabold lg:text-[16px]">이 주문의 문의 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{inquiries.length}</span></h2>
+						<InquiryAccordion items={inquiries.map((t) => t.conversation)} messages={Object.fromEntries(inquiries.map((t) => [t.conversation.code, t.messages]))} showOrder={false} />
 					</section>
 				{/if}
 			</div>

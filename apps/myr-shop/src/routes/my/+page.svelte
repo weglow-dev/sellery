@@ -3,7 +3,7 @@
 	import { displayCode, shortDate, statusLabel } from '@sellery/myr-core/order-view';
 	import { shop } from '$lib/state.svelte';
 	import MyClaims from '$lib/components/MyClaims.svelte';
-	import MyInquiries from '$lib/components/MyInquiries.svelte';
+	import InquiryAccordion from '$lib/components/InquiryAccordion.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문(서버 myr_orders · 0060 · 상태 칩은 열린 교환·환불 요청이 먼저) · 교환 · 환불 요청(MyClaims · 0078) · 내 문의 · 찜한 레시피 · 메뉴.
@@ -117,7 +117,7 @@
 
 		{#if user && data.inquiries.length}
 			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">내 문의 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{data.inquiries.length}</span></h3>
-			<MyInquiries items={data.inquiries} />
+			<InquiryAccordion items={data.inquiries} />
 		{/if}
 
 		<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">찜한 레시피</h3>

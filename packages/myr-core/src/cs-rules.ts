@@ -189,15 +189,8 @@ export function parseCsThread(json: unknown): CsThread | null {
 	return { conversation, messages };
 }
 
-/** 주문 상세의 "이 주문의 문의" 행(myr_app_cs_for_order) */
-export type CsForOrder = { code: string; type: string; status: CsStatus; lastMessageAt: string; productName: string };
-export function parseCsForOrder(json: unknown): CsForOrder[] {
-	if (!Array.isArray(json)) return [];
-	return json
-		.map(obj)
-		.filter((o): o is Obj => !!o && typeof o.code === 'string' && isCsStatus(o.status))
-		.map((o) => ({ code: str(o.code), type: str(o.type, '기타'), status: o.status as CsStatus, lastMessageAt: str(o.last_message_at), productName: str(o.product_name, '상품') }));
-}
+/** 주문 상세의 "이 주문의 문의" — 문의마다 스레드(대화 + 메시지 · 0079 myr_app_cs_for_order). 마이 "내 문의" 와 같은 아코디언이 그린다 */
+export const parseCsThreads = (json: unknown): CsThread[] => (Array.isArray(json) ? json.map(parseCsThread).filter((t): t is CsThread => t !== null) : []);
 
 /* ---------------- RPC 결과 ---------------- */
 export type CsFailCode = 'NOT_FOUND' | 'BAD_TYPE' | 'BAD_BODY' | 'BAD_ACTOR' | 'CLOSED' | 'RATE_LIMITED' | 'DB_ERROR';

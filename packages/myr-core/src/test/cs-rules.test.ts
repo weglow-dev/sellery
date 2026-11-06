@@ -14,10 +14,10 @@ import {
 	parseClientToken,
 	relTime,
 	parseCsConversation,
-	parseCsForOrder,
 	parseCsOpenInput,
 	parseCsOpenResult,
-	parseCsThread
+	parseCsThread,
+	parseCsThreads
 } from '../cs-rules';
 
 describe('normalizeCsBody', () => {
@@ -97,9 +97,11 @@ describe('파서', () => {
 		expect(t.messages[0]).toEqual({ id: 'm1', sender: 'customer', actorRole: 'customer', body: '안녕', createdAt: '2026-11-01T00:00:00Z' });
 		expect(parseCsThread({ conversation: null, messages: [] })).toBeNull();
 	});
-	it('parseCsForOrder', () => {
-		expect(parseCsForOrder([{ code: 'cs1001', type: '배송 문의', status: 'OPEN', last_message_at: 'x', product_name: '상품 A' }, { code: 'bad', status: 'NOPE' }])).toEqual([{ code: 'cs1001', type: '배송 문의', status: 'OPEN', lastMessageAt: 'x', productName: '상품 A' }]);
-		expect(parseCsForOrder(null)).toEqual([]);
+	it('parseCsThreads — 주문 상세 문의(0079) · 틀린 항목은 버림', () => {
+		const ts = parseCsThreads([{ conversation: convJson, messages: [{ id: 'm1', sender: 'seller', actor_role: 'seller', body: '답변', created_at: 'x' }] }, { conversation: null, messages: [] }]);
+		expect(ts).toHaveLength(1);
+		expect(ts[0].messages.map((m) => m.sender)).toEqual(['seller']);
+		expect(parseCsThreads(null)).toEqual([]);
 	});
 	it('parseCsOpenResult', () => {
 		expect(parseCsOpenResult({ ok: true, conversation_id: 'c1', conversation_code: 'cs1001', client_token: 't', seller_id: 's1', seller_name: '민지 루틴', order_id: null, order_item_id: null, order_matched: false })).toEqual({ ok: true, conversationId: 'c1', conversationCode: 'cs1001', clientToken: 't', sellerId: 's1', sellerName: '민지 루틴', orderId: null, orderItemId: null, orderMatched: false });
