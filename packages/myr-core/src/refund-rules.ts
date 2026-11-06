@@ -63,12 +63,16 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 	return { orderCode, items, reason };
 }
 
-/** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 남은 수량이 있는 줄이 있을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소).
+/** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 남은 수량이 있는 줄이 있을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소) · 열린 교환·환불 요청 없음.
  *  줄마다 길이 갈린다: 결제완료(발주 전) 줄 = 셀프 즉시 환불(`customerRefundableItems` · 서버 `myr_app_refund_precheck`) · 배송준비중 이후 줄 = 교환·환불 요청(0078 · claim-rules `claimableItems`) */
-export function customerCanRefund(o: Pick<OrderView, 'status' | 'items'>): { ok: true; deposit: boolean } | { ok: false; reason: string } {
+export function customerCanRefund(
+	o: Pick<OrderView, 'status' | 'items'> & { claimStatus?: OrderView['claimStatus'] }
+): { ok: true; deposit: boolean } | { ok: false; reason: string; claimOpen?: true } {
 	if (o.status === 'WAITING_DEPOSIT') return { ok: true, deposit: true };
 	if (o.status === 'REFUNDED') return { ok: false, reason: '이미 환불된 주문이에요' };
 	if (o.status === 'CANCELED') return { ok: false, reason: '취소된 주문이에요' };
+	// 열린 교환·환불 요청(처리 대기 · 진행 중 · 0078 myr_order_claim_status)이 있으면 그 요청이 끝날 때까지 새 신청을 받지 않는다(대표 결정 2026-11-06) — 버튼은 비활성
+	if (o.claimStatus) return { ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true };
 	if (refundableItems(o.items).length) return { ok: true, deposit: false };
 	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
 }

@@ -188,6 +188,9 @@
 					</div>
 					{#if can.ok}
 						<a href={refundHref} class="mt-5 hidden h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:flex">{actionLabel}</a>
+					{:else if can.claimOpen}
+						<span aria-disabled="true" class="mt-5 hidden h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30 lg:flex">교환 · 환불 신청</span>
+						<p class="mt-2.5 hidden text-center text-[12px] leading-[1.55] text-fg-faint lg:block">{can.reason}</p>
 					{:else if order.status !== 'REFUNDED' && order.status !== 'CANCELED'}
 						<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">{can.reason}</p>
 					{/if}
@@ -228,6 +231,12 @@
 	{#if can.ok}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
 			<a href={refundHref} class="flex h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg">{actionLabel}</a>
+		</div>
+	{:else if can.claimOpen}
+		<!-- 열린 교환·환불 요청이 끝날 때까지 비활성(customerCanRefund) -->
+		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
+			<span aria-disabled="true" class="flex h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30">교환 · 환불 신청</span>
+			<p class="mt-2 text-center text-[12px] text-fg-faint">{can.reason}</p>
 		</div>
 	{/if}
 </div>

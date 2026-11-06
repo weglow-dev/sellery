@@ -128,6 +128,12 @@ describe('customerCanRefund · refundableItems', () => {
 		expect(customerCanRefund(order({ status: 'CANCELED' })).ok).toBe(false);
 		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED')] })).ok).toBe(false);
 	});
+	it('열린 교환·환불 요청이 있으면 신청 불가(claimOpen) — 끝나면 다시', () => {
+		expect(customerCanRefund({ ...order(), claimStatus: 'pending' })).toEqual({ ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true });
+		expect(customerCanRefund({ ...order(), claimStatus: 'progress' }).ok).toBe(false);
+		expect(customerCanRefund({ ...order(), claimStatus: null })).toEqual({ ok: true, deposit: false });
+		expect(customerCanRefund({ ...order({ status: 'REFUNDED' }), claimStatus: 'pending' })).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
+	});
 	it('남은 수량이 있는 줄만', () => {
 		expect(
 			refundableItems([item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000, 1, 'REFUNDED'), item('c', 1, 1, 0, 'CANCELED')]).map((i) => i.id)
