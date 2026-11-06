@@ -10,13 +10,16 @@
 //   ship <주문번호> <택배사> <운송장>          운송장 기록 + 고객 배송 시작 메일 · 택배사는 CJ대한통운 · 우체국택배 · 한진택배 · 롯데택배 · 로젠택배(별칭 cj · 우체국 · 한진 · 롯데 · 로젠)
 //                                           같은 운송장을 다시 넣으면 "이미 기록됨"(메일 없음) · 다른 운송장이면 정정 + 메일 다시
 //   ship-csv <file.csv>                      여러 건 — 줄마다 `주문번호,택배사,운송장`(머리줄 있으면 건너뜀). 한 줄씩 ship 과 같다 · 실패한 줄은 표로 모아 보여준다
+//   prepare [--dry] [--before ISO] [--csv 파일]   배송준비중 수동 전환(0077 · 이벗 연동 전) — 지금(또는 --before 시각) 전에 결제된 결제완료 줄 → 배송준비중.
+//                                           물류센터에 주문을 넘기는 순간에 쓴다. 이때부터 그 줄은 고객 셀프 환불이 막힌다(발주 뒤).
+//                                           --dry 는 바꾸지 않고 대상만 · --csv 는 물류센터에 넘길 CSV(수취인 · 주소 · 상품 · 수량)를 쓴다(개인정보 — 넘긴 뒤 지울 것)
 //
 // 값(시크릿)은 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등).
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatOrdersTable, parseArgs, parseShipCsv } from "./lib/myr-ops-plan.mjs";
+import { formatOrdersTable, formatPrepareTable, parseArgs, parseShipCsv, prepareCsv } from "./lib/myr-ops-plan.mjs";
 
 function loadEnv() {
   if (process.env.CRON_SECRET) return;
@@ -102,9 +105,26 @@ async function cmdShipCsv() {
   }
 }
 
-const commands = { orders: cmdOrders, ship: cmdShip, "ship-csv": cmdShipCsv };
+async function cmdPrepare() {
+  const before = typeof flags.before === "string" ? flags.before : "";
+  if (before && !Number.isFinite(new Date(before).getTime())) fail("--before 는 ISO 시각(예: 2026-11-07T11:00:00+09:00)");
+  const dry = !!flags.dry;
+  const { status, json } = dry
+    ? await call("GET", `/api/ops/prepare${before ? `?before=${encodeURIComponent(before)}` : ""}`)
+    : await call("POST", "/api/ops/prepare", before ? { before } : {});
+  if (status === 401) fail("CRON_SECRET 이 샵의 값과 다릅니다");
+  if (!json?.ok) fail(`배송준비중 전환 실패 (${status}): ${json?.message ?? json?.code ?? "?"}`);
+  console.log(`${base} · ${dry ? "대상(바꾸지 않음)" : `배송준비중 ${json.count}줄 · 주문 ${json.orders.length}건`}`);
+  console.log(formatPrepareTable(json.lines));
+  if (typeof flags.csv === "string" && json.lines.length) {
+    writeFileSync(resolve(flags.csv), prepareCsv(json.lines));
+    console.log(`CSV → ${resolve(flags.csv)} (수취인 개인정보 — 물류센터에 넘긴 뒤 지울 것)`);
+  }
+}
+
+const commands = { orders: cmdOrders, ship: cmdShip, "ship-csv": cmdShipCsv, prepare: cmdPrepare };
 if (!commands[cmd]) {
-  console.log("usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv>>");
+  console.log("usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv> | prepare [--dry] [--before ISO] [--csv 파일]>");
   process.exit(cmd ? 1 : 0);
 }
 commands[cmd]().catch((e) => fail(e instanceof Error ? e.message : String(e)));

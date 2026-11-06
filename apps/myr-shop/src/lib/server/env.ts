@@ -16,5 +16,16 @@ configureMyrCore({
 	resendApiUrl: env.RESEND_API_URL,
 	mailFrom: env.MAIL_FROM,
 	// 메일 링크 = 이 샵 주소(SEO canonical 과 같은 PUBLIC_SITE_URL)
-	shopUrl: pub.PUBLIC_SITE_URL
+	shopUrl: pub.PUBLIC_SITE_URL,
+	// 이벗(0077 · docs/myr.md §6.8) — 하나라도 비면 발주 · 송장 수집 크론이 꺼져 있다. 이벗 호출은 이 샵 한 곳(결정 12)
+	ebutId: env.EBUT_ID,
+	ebutCustCode: env.EBUT_CUST_CODE,
+	ebutApiKey: env.EBUT_API_KEY,
+	ebutOrdShop: env.EBUT_ORD_SHOP,
+	ebutSenderName: env.EBUT_SENDER_NAME,
+	ebutSenderPhone: env.EBUT_SENDER_PHONE,
+	ebutSenderZipcode: env.EBUT_SENDER_ZIPCODE,
+	ebutSenderAddress: env.EBUT_SENDER_ADDRESS,
+	ebutCourier: env.EBUT_COURIER,
+	ebutApiUrl: env.EBUT_API_URL
 });

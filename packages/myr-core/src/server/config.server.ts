@@ -23,9 +23,40 @@ export type MyrCoreConfig = {
 	mailFrom?: string;
 	/** 샵 주소(메일 링크 오리진) — 샵은 PUBLIC_SITE_URL, 콘솔은 샵 주소 환경변수. 형식이 어긋나면 기본값(`site.ts`) */
 	shopUrl?: string;
+	/** 이벗(EBUT_*) — 하나라도 비면 연동 꺼짐(`ebut.ts` ebutReady). 샵만 넣는다(이벗 호출은 샵 크론 한 곳 · 결정 12) */
+	ebutId?: string;
+	ebutCustCode?: string;
+	ebutApiKey?: string;
+	ebutOrdShop?: string;
+	ebutSenderName?: string;
+	ebutSenderPhone?: string;
+	ebutSenderZipcode?: string;
+	ebutSenderAddress?: string;
+	/** 이벗이 쓰는 택배사 이름(선택 · 조회 링크용) */
+	ebutCourier?: string;
+	/** EBUT_API_URL — 로컬 목 서버 검증용(기본 이벗 OrderSheet v2 주소 · resendApiUrl 과 같은 용도) */
+	ebutApiUrl?: string;
 };
 
-const KEYS = ['supabaseUrl', 'serviceKey', 'tossSecretKey', 'resendApiKey', 'resendApiUrl', 'mailFrom', 'shopUrl'] as const;
+const KEYS = [
+	'supabaseUrl',
+	'serviceKey',
+	'tossSecretKey',
+	'resendApiKey',
+	'resendApiUrl',
+	'mailFrom',
+	'shopUrl',
+	'ebutId',
+	'ebutCustCode',
+	'ebutApiKey',
+	'ebutOrdShop',
+	'ebutSenderName',
+	'ebutSenderPhone',
+	'ebutSenderZipcode',
+	'ebutSenderAddress',
+	'ebutCourier',
+	'ebutApiUrl'
+] as const;
 let config: MyrCoreConfig = {};
 
 /** 부분 갱신 — 빈 문자열은 "없음" 으로 정규화한다 */

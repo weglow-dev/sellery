@@ -62,8 +62,8 @@ export const SHIP_MESSAGES: Record<string, string> = {
 };
 export const shipMessage = (code: string): string => SHIP_MESSAGES[code] ?? SHIP_MESSAGES.DB_ERROR;
 
-/** 발송 대기/완료 목록 행(0069 ship_pending) */
-export type ShipRow = { id: string; code: string; status: string; buyerName: string; recipient: string; orderName: string; amount: number; lines: number; paidAt: string | null; createdAt: string; courier: string | null; trackingNo: string | null; shippedAt: string | null };
+/** 발송 대기/완료 목록 행(0069 ship_pending · 0077 + shipStatus · preparing) */
+export type ShipRow = { id: string; code: string; status: string; buyerName: string; recipient: string; orderName: string; amount: number; lines: number; paidAt: string | null; createdAt: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; shipStatus: string | null; preparing: number };
 export function parseShipRows(json: unknown): ShipRow[] {
 	if (!Array.isArray(json)) return [];
 	const out: ShipRow[] = [];
@@ -72,7 +72,7 @@ export function parseShipRows(json: unknown): ShipRow[] {
 		if (!o || typeof o.id !== 'string' || typeof o.code !== 'string') continue;
 		const s = (k: string): string | null => (typeof o[k] === 'string' ? (o[k] as string) : null);
 		const n = (k: string): number => (typeof o[k] === 'number' ? (o[k] as number) : 0);
-		out.push({ id: o.id, code: o.code, status: s('status') ?? '', buyerName: s('buyer_name') ?? '', recipient: s('recipient') ?? '', orderName: s('order_name') ?? '', amount: n('amount'), lines: n('lines'), paidAt: s('paid_at'), createdAt: s('created_at') ?? '', courier: s('courier'), trackingNo: s('tracking_no'), shippedAt: s('shipped_at') });
+		out.push({ id: o.id, code: o.code, status: s('status') ?? '', buyerName: s('buyer_name') ?? '', recipient: s('recipient') ?? '', orderName: s('order_name') ?? '', amount: n('amount'), lines: n('lines'), paidAt: s('paid_at'), createdAt: s('created_at') ?? '', courier: s('courier'), trackingNo: s('tracking_no'), shippedAt: s('shipped_at'), shipStatus: s('ship_status'), preparing: n('preparing') });
 	}
 	return out;
 }

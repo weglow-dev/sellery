@@ -63,7 +63,21 @@ export function parseCsOpenInput(raw: unknown): ParsedCsOpenInput {
 }
 
 /* ---------------- 행 · 스레드 (myr_cs_conversation_json · myr_cs_thread_json) ---------------- */
-export type CsOrderItem = { id: string; name: string; option: string; qty: number; amount: number; status: string; refundedQty: number };
+/** 문의에 붙은 주문 줄 — 배송 칸은 0077(줄 단위 배송) · 옛 응답이면 null */
+export type CsOrderItem = {
+	id: string;
+	name: string;
+	option: string;
+	qty: number;
+	amount: number;
+	status: string;
+	refundedQty: number;
+	shipStatus: string | null;
+	courier: string | null;
+	trackingNo: string | null;
+	shippedAt: string | null;
+	deliveredAt: string | null;
+};
 export type CsOrderSummary = { code: string; status: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null; paidAt: string | null; item: CsOrderItem | null };
 export type CsConversation = {
 	id: string;
@@ -122,7 +136,23 @@ export function parseCsConversation(json: unknown): CsConversation | null {
 						shippedAt: strOrNull(ord.shipped_at),
 						deliveredAt: strOrNull(ord.delivered_at),
 						paidAt: strOrNull(ord.paid_at),
-						item: it && strOrNull(it.id) ? { id: str(it.id), name: str(it.name), option: str(it.option), qty: intOr(it.qty, 1), amount: intOr(it.amount), status: str(it.status), refundedQty: intOr(it.refunded_qty) } : null
+						item:
+							it && strOrNull(it.id)
+								? {
+										id: str(it.id),
+										name: str(it.name),
+										option: str(it.option),
+										qty: intOr(it.qty, 1),
+										amount: intOr(it.amount),
+										status: str(it.status),
+										refundedQty: intOr(it.refunded_qty),
+										shipStatus: strOrNull(it.ship_status),
+										courier: strOrNull(it.courier),
+										trackingNo: strOrNull(it.tracking_no),
+										shippedAt: strOrNull(it.shipped_at),
+										deliveredAt: strOrNull(it.delivered_at)
+									}
+								: null
 					}
 				: null,
 		isMember: o.is_member === true,

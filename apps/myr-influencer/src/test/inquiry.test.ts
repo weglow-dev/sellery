@@ -86,3 +86,24 @@ describe('주문 · 배송(소유 확인된 주문만)', () => {
 		expect(inqShipping({ order: order({ status: 'WAITING_DEPOSIT', paidAt: null }) })!.rows.some((r) => r.k === '출고')).toBe(false);
 	});
 });
+
+describe('주문 · 배송 — 줄 단위(0077)', () => {
+	const base = { code: 'myr1001', status: 'PAID', courier: 'CJ대한통운', trackingNo: '9999', shippedAt: '2026-11-04T00:00:00Z', deliveredAt: null, paidAt: '2026-11-03T01:00:00Z' };
+	const item = (o: Record<string, unknown>) => ({ id: 'i1', name: '포도 젤리', option: '', qty: 1, amount: 1, status: 'PAID', refundedQty: 0, courier: null, trackingNo: null, shippedAt: null, deliveredAt: null, ...o });
+	it('줄 배송 상태가 있으면 주문 칸 대신 그 줄 — 다른 크리에이터 줄의 송장을 보여 주지 않는다', () => {
+		const s = inqShipping({ order: { ...base, item: item({ shipStatus: 'PREPARING' }) } as never })!;
+		expect(s.label).toBe('배송 준비중');
+		expect(s.rows.some((r) => r.k === '운송장')).toBe(false);
+		expect(s.rows.find((r) => r.k === '출고')!.v).toBe('MYR 물류센터에서 준비 중');
+	});
+	it('결제완료(발주 전) 줄 → "고객이 직접 취소할 수 있어요"', () => {
+		const s = inqShipping({ order: { ...base, courier: null, trackingNo: null, shippedAt: null, item: item({ shipStatus: 'PAID' }) } as never })!;
+		expect(s.label).toBe('결제 완료');
+		expect(s.rows.find((r) => r.k === '출고')!.v).toContain('직접 취소');
+	});
+	it('줄 송장 · 배송완료', () => {
+		const s = inqShipping({ order: { ...base, item: item({ shipStatus: 'DELIVERED', courier: '한진택배', trackingNo: '1111', shippedAt: '2026-11-04T00:00:00Z', deliveredAt: '2026-11-06T00:00:00Z' }) } as never })!;
+		expect(s.label).toBe('배송 완료');
+		expect(s.rows.find((r) => r.k === '운송장')!.v).toBe('한진택배 1111');
+	});
+});

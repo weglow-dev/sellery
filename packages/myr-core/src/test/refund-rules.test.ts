@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { OrderItem, OrderView } from '../order-view';
 import {
 	customerCanRefund,
+	customerRefundableItems,
 	estimateRefund,
 	isRefundPhotoPath,
 	parseCancelBody,
@@ -15,7 +16,7 @@ import {
 	sniffImageType
 } from '../refund-rules';
 
-const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID'): OrderItem => ({
+const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID', shipStatus: OrderItem['shipStatus'] = 'PAID'): OrderItem => ({
 	id,
 	code: id,
 	name: id,
@@ -29,7 +30,12 @@ const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, statu
 	ic: 'pill',
 	thumbUrl: null,
 	creator: '',
-	creatorHandle: ''
+	creatorHandle: '',
+	shipStatus,
+	courier: null,
+	trackingNo: null,
+	shippedAt: null,
+	deliveredAt: null
 });
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -110,7 +116,10 @@ describe('customerCanRefund · refundableItems', () => {
 	it('발송 전 PAID → ok · 입금 대기 → deposit · 발송 뒤·환불·취소 → 불가', () => {
 		expect(customerCanRefund(order())).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT' }))).toEqual({ ok: true, deposit: true });
-		expect(customerCanRefund(order({ trackingNo: 'T' })).ok).toBe(false);
+		// 0077 — 기준은 줄 배송 상태: 결제완료 줄이 남았으면 가능 · 전부 배송준비중 이후면 불가(주문 송장 칸은 보지 않는다)
+		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: false, reason: '출고 준비가 시작된 상품은 고객센터로 문의해주세요' });
+		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000)] })).ok).toBe(true);
+		expect(customerRefundableItems([item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000), item('c', 1, 1, 1, 'REFUNDED')]).map((i) => i.id)).toEqual([B]);
 		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);
 		expect(customerCanRefund(order({ status: 'CANCELED' })).ok).toBe(false);
 		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED')] })).ok).toBe(false);
@@ -192,7 +201,7 @@ describe('RPC 파서 · 문구', () => {
 			status: 'PARTIAL_REFUNDED',
 			amount: 10000
 		});
-		expect(refundMessage('SHIPPED')).toContain('발송');
+		expect(refundMessage('SHIPPED')).toContain('출고 준비');
 		expect(refundMessage('ZZZ', '토스 메시지')).toBe('토스 메시지');
 	});
 });

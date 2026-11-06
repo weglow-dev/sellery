@@ -6,7 +6,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
-	import { displayCode, refundSteps, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { displayCode, refundSteps, SHIP_LABELS, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
@@ -19,6 +19,9 @@
 	const tone: Record<string, string> = { accent: 'bg-accent/12 text-accent', muted: 'bg-white/8 text-white/55', danger: 'bg-[#ff6b6b]/12 text-[#ff6b6b]', ok: 'bg-[#4ade80]/12 text-[#4ade80]' };
 	const dueText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 	const lineStatus = (s: string, refunded: number, qty: number) => (s === 'REFUNDED' ? '환불 완료' : s === 'PARTIAL_REFUNDED' ? `${refunded}/${qty} 환불` : s === 'CANCELED' ? '취소' : '');
+	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
+	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0));
+	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
 	const steps = $derived(refundSteps(order));
 	const meta = $derived([relTime(order.paidAt ?? order.createdAt), order.paymentMethod].filter(Boolean).join(' · '));
 
@@ -77,7 +80,7 @@
 					</div>
 				{/if}
 				{#each order.items as it (it.id)}
-					{@const ls = lineStatus(it.status, it.refundedQty, it.qty)}
+					{@const ls = lineStatus(it.status, it.refundedQty, it.qty) || (mixedShip && order.status !== 'WAITING_DEPOSIT' ? SHIP_LABELS[it.shipStatus].text : '')}
 					<div class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 lg:gap-4 lg:rounded-[20px] lg:p-4">
 						<a href="/p/{it.code}" aria-label={it.name} class="shrink-0"><Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt={it.name} icon={26} class="h-14 w-14 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-2xl" /></a>
 						<div class="min-w-0 flex-1">

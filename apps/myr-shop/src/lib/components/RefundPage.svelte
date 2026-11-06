@@ -12,12 +12,13 @@
 	import { displayCode, type OrderView } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { customerCanRefund, estimateRefund, refundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
+	import { customerCanRefund, customerRefundableItems, estimateRefund, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
 	let { order, backHref }: { order: OrderView; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
-	const lines = $derived(refundableItems(order.items));
+	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 고객센터로
+	const lines = $derived(customerRefundableItems(order.items));
 
 	// 줄이 하나면 미리 고르고, 여럿이면 고객이 고른다
 	let qtyById = $state<Record<string, number>>(untrack(() => Object.fromEntries(lines.length === 1 ? lines.map((l) => [l.id, remainingQty(l)]) : [])));

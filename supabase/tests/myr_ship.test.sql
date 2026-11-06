@@ -21,6 +21,8 @@ values ('00000000-0000-4000-8000-000000000d61', '00000000-0000-4000-8000-0000000
        ('00000000-0000-4000-8000-000000000d62', '00000000-0000-4000-8000-000000000b61', '00000000-0000-4000-8000-000000000a61', '상품 A', '', 1, 20000),
        ('00000000-0000-4000-8000-000000000d63', '00000000-0000-4000-8000-000000000b61', '00000000-0000-4000-8000-000000000a61', '상품 A', '', 1, 20000),
        ('00000000-0000-4000-8000-000000000d64', '00000000-0000-4000-8000-000000000b61', '00000000-0000-4000-8000-000000000a61', '상품 A', '', 1, 20000);
+-- 0077: 발송된 주문의 줄도 배송중(마이그레이션이 옮겨 적는 것과 같게)
+update public.myr_order_items set ship_status = 'SHIPPING', courier = 'CJ대한통운', tracking_no = '111122223333', shipped_at = now() - interval '12 hours' where order_id = '00000000-0000-4000-8000-000000000d62';
 
 -- 거부 코드
 select is(public.myr_app_admin_ship('pgtap-sh-1', '택배', '123456789') ->> 'code', 'BAD_COURIER', '택배사 목록 밖 BAD_COURIER');
@@ -41,9 +43,10 @@ select is((select courier || '/' || tracking_no || '/' || shipped_at::text from 
 -- 발송 대기 목록 — PAID 이고 운송장 없는 것만 · shipped=true 면 발송된 것
 select is((select coalesce(jsonb_agg(e ->> 'code'), '[]'::jsonb) from jsonb_array_elements(public.myr_app_admin_ship_pending(10, false)) e where e ->> 'code' like 'pgtap-sh-%'), '[]'::jsonb, '전부 발송됐으면 대기 목록에 없음');
 update public.myr_orders set courier = null, tracking_no = null, shipped_at = null where code = 'pgtap-sh-1';
+update public.myr_order_items set ship_status = 'PAID', courier = null, tracking_no = null, shipped_at = null where order_id = '00000000-0000-4000-8000-000000000d61';
 select is((select jsonb_agg(e ->> 'code') from jsonb_array_elements(public.myr_app_admin_ship_pending(10, false)) e where e ->> 'code' like 'pgtap-sh-%'), '["pgtap-sh-1"]'::jsonb, '대기 목록 = PAID · 운송장 없음(입금 대기·환불 제외)');
 select is((select e - 'id' - 'paid_at' - 'created_at' - 'shipped_at' from jsonb_array_elements(public.myr_app_admin_ship_pending(10, true)) e where e ->> 'code' = 'pgtap-sh-2'),
-  '{"code": "pgtap-sh-2", "lines": 1, "amount": 20000, "status": "PAID", "courier": "CJ대한통운", "recipient": "김영희", "buyer_name": "김영희", "order_name": "상품 A", "tracking_no": "111122223333"}'::jsonb, '발송된 목록 행 모양(수취인 이름만 · 주소 없음)');
+  '{"code": "pgtap-sh-2", "lines": 1, "amount": 20000, "status": "PAID", "courier": "CJ대한통운", "recipient": "김영희", "buyer_name": "김영희", "order_name": "상품 A", "tracking_no": "111122223333", "ship_status": "SHIPPING", "preparing": 0}'::jsonb, '발송된 목록 행 모양(수취인 이름만 · 주소 없음)');
 
 select * from finish();
 rollback;

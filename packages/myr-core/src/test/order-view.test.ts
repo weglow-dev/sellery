@@ -129,3 +129,19 @@ describe('0066 — 환불 진행 상태', () => {
 		expect(refundSteps({ refundAmount: 1, refundReason: '', refundedAt: null })![0].detail).toBe('사유 없음');
 	});
 });
+
+describe('줄 단위 배송(0077)', () => {
+	it('배송 상태가 있으면 그것으로 라벨 — 결제 완료 · 배송 준비중 · 배송 중 · 배송 완료 · 입금 대기 · 환불은 그대로', () => {
+		const b = { status: 'PAID', trackingNo: null, shippedAt: null, deliveredAt: null };
+		expect((['PAID', 'PREPARING', 'SHIPPING', 'DELIVERED'] as const).map((s) => statusLabel({ ...b, shipStatus: s }).text)).toEqual(['결제 완료', '배송 준비중', '배송 중', '배송 완료']);
+		expect(statusLabel({ ...b, shipStatus: null }).text).toBe('배송 준비중'); // 옛 응답(배송 상태 없음)
+		expect(statusLabel({ ...b, status: 'WAITING_DEPOSIT', shipStatus: 'PAID' }).text).toBe('입금 대기');
+		expect(statusLabel({ ...b, status: 'REFUNDED', shipStatus: 'SHIPPING' }).text).toBe('환불 완료');
+	});
+	it('파서 — 주문 ship_status · 줄 배송 칸 · 옛 응답이면 PAID/null', () => {
+		const o = orderFromJson({ id: 'o', code: 'myr1', ship_status: 'PREPARING', items: [{ id: 'i', ship_status: 'SHIPPING', courier: 'CJ대한통운', tracking_no: '1', shipped_at: 'x' }, { id: 'j' }] })!;
+		expect(o.shipStatus).toBe('PREPARING');
+		expect(o.items.map((i) => [i.shipStatus, i.trackingNo])).toEqual([['SHIPPING', '1'], ['PAID', null]]);
+		expect(orderFromJson({ id: 'o', code: 'myr1', ship_status: 'WHAT' })!.shipStatus).toBeNull();
+	});
+});

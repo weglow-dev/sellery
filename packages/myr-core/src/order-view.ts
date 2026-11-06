@@ -2,6 +2,11 @@
 import { ORDER_CODE_RE } from './checkout-rules';
 import { cleanText, normalizePhone } from './text';
 
+/** 줄 배송 상태(0077 · docs/myr.md §6.8) — 결제완료 → 배송준비중(발주 · 이벗 등록) → 배송중(송장) → 배송완료 */
+export const SHIP_STATUSES = ['PAID', 'PREPARING', 'SHIPPING', 'DELIVERED'] as const;
+export type ShipStatus = (typeof SHIP_STATUSES)[number];
+export const isShipStatus = (v: unknown): v is ShipStatus => SHIP_STATUSES.includes(v as ShipStatus);
+
 export type OrderItem = {
 	id: string;
 	code: string;
@@ -18,6 +23,12 @@ export type OrderItem = {
 	creator: string;
 	/** '@minji.routine' — 0065 · 문의 시트 머리 */
 	creatorHandle: string;
+	/** 줄 배송(0077) — 옛 응답(배송 칸 없음)이면 PAID · 송장 없음 */
+	shipStatus: ShipStatus;
+	courier: string | null;
+	trackingNo: string | null;
+	shippedAt: string | null;
+	deliveredAt: string | null;
 };
 export type OrderShipping = { recipient: string; phone: string; address1: string; address2: string; postcode: string; memo: string };
 export type OrderDeposit = { bank: string; account: string; holder: string; due: string | null };
@@ -39,6 +50,8 @@ export type OrderView = {
 	trackingNo: string | null;
 	shippedAt: string | null;
 	deliveredAt: string | null;
+	/** 주문 배송 상태 = 살아 있는 줄의 가장 덜 진행된 상태(0077 `myr_order_ship_status`) · 옛 응답이거나 살아 있는 줄이 없으면 null */
+	shipStatus: ShipStatus | null;
 	guest: boolean;
 	buyerName: string;
 	/** 상세(본인 확인 뒤)에만 실린다 */
@@ -73,7 +86,12 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
 		creator: str(o, 'creator'),
-		creatorHandle: str(o, 'creator_handle')
+		creatorHandle: str(o, 'creator_handle'),
+		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
+		courier: strOrNull(o, 'courier'),
+		trackingNo: strOrNull(o, 'tracking_no'),
+		shippedAt: strOrNull(o, 'shipped_at'),
+		deliveredAt: strOrNull(o, 'delivered_at')
 	};
 }
 
@@ -100,6 +118,7 @@ export function orderFromJson(v: unknown): OrderView | null {
 		trackingNo: strOrNull(o, 'tracking_no'),
 		shippedAt: strOrNull(o, 'shipped_at'),
 		deliveredAt: strOrNull(o, 'delivered_at'),
+		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : null,
 		guest: o.guest === true,
 		buyerName: str(o, 'buyer_name'),
 		shipping: ship
@@ -121,9 +140,16 @@ export function orderFromJson(v: unknown): OrderView | null {
 
 export const ordersFromJson = (v: unknown): OrderView[] => (Array.isArray(v) ? v.map(orderFromJson).filter((o): o is OrderView => o !== null) : []);
 
-/** 상태 라벨 — 주문 status + 배송 컬럼으로 고객이 볼 한 단어. tone 은 색 */
+/** 상태 라벨 — 주문 status + 배송 상태로 고객이 볼 한 단어. tone 은 색.
+ *  배송 상태(shipStatus · 0077 줄 기준)가 있으면 그것으로: 결제 완료 → 배송 준비중(발주) → 배송 중 → 배송 완료. 없으면(옛 응답) 주문 송장 칸으로 */
 export type StatusLabel = { text: string; tone: 'accent' | 'muted' | 'danger' | 'ok' };
-export function statusLabel(o: Pick<OrderView, 'status' | 'trackingNo' | 'shippedAt' | 'deliveredAt'>): StatusLabel {
+export const SHIP_LABELS: Record<ShipStatus, StatusLabel> = {
+	PAID: { text: '결제 완료', tone: 'accent' },
+	PREPARING: { text: '배송 준비중', tone: 'accent' },
+	SHIPPING: { text: '배송 중', tone: 'accent' },
+	DELIVERED: { text: '배송 완료', tone: 'ok' }
+};
+export function statusLabel(o: Pick<OrderView, 'status' | 'trackingNo' | 'shippedAt' | 'deliveredAt'> & { shipStatus?: ShipStatus | null }): StatusLabel {
 	switch (o.status) {
 		case 'WAITING_DEPOSIT':
 			return { text: '입금 대기', tone: 'accent' };
@@ -134,6 +160,7 @@ export function statusLabel(o: Pick<OrderView, 'status' | 'trackingNo' | 'shippe
 		case 'PARTIAL_REFUNDED':
 			return { text: '부분 환불', tone: 'danger' };
 		default:
+			if (o.shipStatus) return SHIP_LABELS[o.shipStatus];
 			if (o.deliveredAt) return { text: '배송 완료', tone: 'ok' };
 			if (o.shippedAt || o.trackingNo) return { text: '배송 중', tone: 'accent' };
 			return { text: '배송 준비중', tone: 'accent' };
