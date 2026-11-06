@@ -1,6 +1,6 @@
 <script lang="ts">
 	/** 교환 · 환불 요청(0078) — 배송준비중 이후 줄. RefundPage 가 [바로 환불 | 교환 · 환불 요청] 중 요청 쪽으로 그린다(머리는 RefundPage).
-	 *  PC: 왼쪽 진행 중인 요청 · 제품 체크 카드(수량 · 상세 · 사진) · 요청 종류(환불/교환) · 사유 칩 · 처리 기준 / 오른쪽 요약 · [요청 보내기] → 인라인 확인.
+	 *  PC: 왼쪽 제품 체크 카드(수량 · 상세 · 사진) · 요청 종류(환불/교환) · 사유 칩 · 처리 기준 / 오른쪽 요약 · [요청 보내기] → 인라인 확인.
 	 *  모바일: 같은 순서로 쌓고, 버튼은 요약 카드 안(요청은 즉시 결제 취소가 아니라 하단 고정 바를 두지 않는다).
 	 *  규칙은 claim-rules(순수): 단순 변심은 환불만 · 파손 · 오배송은 사진 필수 · 처리 기준 문구. 서버(myr_app_claim_open)가 같은 규칙으로 다시 막는다.
 	 *  사진은 환불 신청과 같은 API(/api/refunds/photos · 버킷 myr-refunds · 줄당 3장)로 올리고 경로만 보낸다. 보낸 뒤 주문 상세로. */
@@ -10,23 +10,18 @@
 	import type { OrderItem, OrderView } from '@sellery/myr-core/order-view';
 	import {
 		CLAIM_REASONS,
-		CLAIM_STATUS_LABEL,
 		claimMessage,
 		claimPolicy,
-		claimStepText,
-		isOpenClaim,
 		KIND_LABEL,
 		kindAllowed,
 		photoRequired,
-		type Claim,
 		type ClaimKind,
 		type ClaimReason
 	} from '@sellery/myr-core/claim-rules';
 	import { REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, remainingQty } from '@sellery/myr-core/refund-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, claims, lines, returnFee, backHref }: { order: OrderView; claims: Claim[]; lines: OrderItem[]; returnFee: number; backHref: string } = $props();
-	const openClaims = $derived(claims.filter(isOpenClaim));
+	let { order, lines, returnFee, backHref }: { order: OrderView; lines: OrderItem[]; returnFee: number; backHref: string } = $props();
 
 	let qtyById = $state<Record<string, number>>({});
 	let noteById = $state<Record<string, string>>({});
@@ -151,147 +146,125 @@
 </script>
 
 <div class="flex flex-col gap-3 px-5 pb-6 lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:px-0 lg:pb-0">
-	<!-- 왼쪽: 진행 중 · 제품 · 종류 · 사유 · 기준 -->
+	<!-- 왼쪽: 제품 · 종류 · 사유 · 기준 -->
 	<div class="flex flex-col gap-3">
-		{#if openClaims.length}
-			<section aria-label="진행 중인 요청" class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 lg:rounded-[20px] lg:px-5">
-				<p class="text-[12.5px] font-bold text-fg-faint">진행 중인 요청</p>
-				<ul class="mt-2 flex flex-col gap-2">
-					{#each openClaims as c (c.id)}
-						<li class="text-[13px] leading-[1.5]">
-							<span class="font-bold">{c.order.item.name}</span> · {KIND_LABEL[c.kind]} · <span class="text-accent">{CLAIM_STATUS_LABEL[c.status]}</span>
-							<span class="block text-[12px] text-fg-faint">{claimStepText(c)}</span>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/if}
-
-		{#if !lines.length}
-			<p class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 text-[13.5px] text-white/75 lg:rounded-[20px] lg:px-5">
-				새로 요청할 수 있는 제품이 없어요. 진행 중인 요청은 <a href={backHref} class="font-bold text-accent">주문 상세</a>에서 볼 수 있어요.
-			</p>
-		{:else}
-			{#each lines as it (it.id)}
-				{@const max = remainingQty(it)}
-				{@const q = qtyById[it.id] ?? 0}
-				{@const on = q > 0}
-				{@const photos = photosById[it.id] ?? []}
-				{@const up = uploading[it.id] ?? 0}
-				<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
-					<label class="flex min-w-0 cursor-pointer items-center gap-3 lg:gap-4">
-						<input type="checkbox" class={checkCls} checked={on} disabled={submitting} onchange={(e) => toggle(it, e.currentTarget.checked)} aria-label="{it.name} 선택" />
-						<Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt="" icon={24} class="h-14 w-14 shrink-0 rounded-[14px] lg:h-[60px] lg:w-[60px] lg:rounded-2xl" />
-						<span class="min-w-0 flex-1">
-							{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
-							<span class="block truncate text-[14.5px] font-bold">{it.name}{it.option ? ` · ${it.option}` : ''}</span>
-							<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
-						</span>
-					</label>
-					{#if on}
-						{#if max > 1}
-							<div class="mt-3 flex items-center justify-between border-t border-white/8 pt-3">
-								<span class="text-[12.5px] text-fg-faint">요청 수량</span>
-								<div class="flex items-center gap-1 rounded-[10px] border border-white/12" role="group" aria-label="{it.name} 요청 수량">
-									<button type="button" aria-label="수량 줄이기" onclick={() => setQty(it, q - 1)} disabled={submitting || q <= 1} class="h-8 w-8 text-[16px] text-fg disabled:opacity-30">−</button>
-									<span class="w-6 text-center text-[13px] font-bold tabular-nums">{q}</span>
-									<button type="button" aria-label="수량 늘리기" onclick={() => setQty(it, q + 1)} disabled={submitting || q >= max} class="h-8 w-8 text-[16px] text-fg disabled:opacity-30">+</button>
-								</div>
+		{#each lines as it (it.id)}
+			{@const max = remainingQty(it)}
+			{@const q = qtyById[it.id] ?? 0}
+			{@const on = q > 0}
+			{@const photos = photosById[it.id] ?? []}
+			{@const up = uploading[it.id] ?? 0}
+			<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
+				<label class="flex min-w-0 cursor-pointer items-center gap-3 lg:gap-4">
+					<input type="checkbox" class={checkCls} checked={on} disabled={submitting} onchange={(e) => toggle(it, e.currentTarget.checked)} aria-label="{it.name} 선택" />
+					<Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt="" icon={24} class="h-14 w-14 shrink-0 rounded-[14px] lg:h-[60px] lg:w-[60px] lg:rounded-2xl" />
+					<span class="min-w-0 flex-1">
+						{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
+						<span class="block truncate text-[14.5px] font-bold">{it.name}{it.option ? ` · ${it.option}` : ''}</span>
+						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
+					</span>
+				</label>
+				{#if on}
+					{#if max > 1}
+						<div class="mt-3 flex items-center justify-between border-t border-white/8 pt-3">
+							<span class="text-[12.5px] text-fg-faint">요청 수량</span>
+							<div class="flex items-center gap-1 rounded-[10px] border border-white/12" role="group" aria-label="{it.name} 요청 수량">
+								<button type="button" aria-label="수량 줄이기" onclick={() => setQty(it, q - 1)} disabled={submitting || q <= 1} class="h-8 w-8 text-[16px] text-fg disabled:opacity-30">−</button>
+								<span class="w-6 text-center text-[13px] font-bold tabular-nums">{q}</span>
+								<button type="button" aria-label="수량 늘리기" onclick={() => setQty(it, q + 1)} disabled={submitting || q >= max} class="h-8 w-8 text-[16px] text-fg disabled:opacity-30">+</button>
 							</div>
-						{/if}
-						<textarea
-							value={noteById[it.id] ?? ''}
-							oninput={(e) => (noteById = { ...noteById, [it.id]: e.currentTarget.value })}
-							rows="3"
-							maxlength={REFUND_NOTE_MAX}
-							disabled={submitting}
-							placeholder="{it.creator || '크리에이터'}에게 전달할 상황 (선택) — 예: 상자가 눌려 2포가 터져 있었어요"
-							aria-label="{it.name} 상세 내용"
-							class="mt-3 w-full resize-none rounded-[12px] border-[1.5px] border-white/10 bg-white/4 px-4 py-3 text-[13.5px] leading-[1.55] text-fg outline-none placeholder:text-fg-faint focus:border-accent disabled:opacity-50"
-						></textarea>
-						<div class="mt-2.5 flex items-center gap-2.5">
-							{#each photos as ph (ph.path)}
-								<div class="relative h-14 w-14 shrink-0">
-									<img src={ph.url} alt="" class="h-14 w-14 rounded-[12px] object-cover" />
-									<button type="button" onclick={() => removePhoto(it.id, ph)} disabled={submitting} aria-label="사진 삭제" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-fg ring-1 ring-white/25"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
-								</div>
-							{/each}
-							{#if photos.length + up < REFUND_PHOTO_MAX}
-								<label class="flex h-14 w-14 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[12px] border border-dashed text-[11px] transition-colors hover:border-white/40 hover:text-fg {needPhoto && !photos.length ? 'border-accent/60 text-accent' : 'border-white/20 text-fg-faint'} {submitting || up ? 'pointer-events-none opacity-50' : ''}">
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></svg>
-									{up ? '올리는 중' : '사진'}
-									<input type="file" accept={REFUND_PHOTO_ACCEPT} multiple class="sr-only" disabled={submitting || !!up} onchange={(e) => { addPhotos(it.id, e.currentTarget.files); e.currentTarget.value = ''; }} />
-								</label>
-							{/if}
-							<span class="text-[12px] {needPhoto && !photos.length ? 'text-accent' : 'text-fg-faint'}">{photos.length}/{REFUND_PHOTO_MAX}{needPhoto ? ' · 사진 필수' : ''}</span>
 						</div>
 					{/if}
-				</div>
+					<textarea
+						value={noteById[it.id] ?? ''}
+						oninput={(e) => (noteById = { ...noteById, [it.id]: e.currentTarget.value })}
+						rows="3"
+						maxlength={REFUND_NOTE_MAX}
+						disabled={submitting}
+						placeholder="{it.creator || '크리에이터'}에게 전달할 상황 (선택) — 예: 상자가 눌려 2포가 터져 있었어요"
+						aria-label="{it.name} 상세 내용"
+						class="mt-3 w-full resize-none rounded-[12px] border-[1.5px] border-white/10 bg-white/4 px-4 py-3 text-[13.5px] leading-[1.55] text-fg outline-none placeholder:text-fg-faint focus:border-accent disabled:opacity-50"
+					></textarea>
+					<div class="mt-2.5 flex items-center gap-2.5">
+						{#each photos as ph (ph.path)}
+							<div class="relative h-14 w-14 shrink-0">
+								<img src={ph.url} alt="" class="h-14 w-14 rounded-[12px] object-cover" />
+								<button type="button" onclick={() => removePhoto(it.id, ph)} disabled={submitting} aria-label="사진 삭제" class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-fg ring-1 ring-white/25"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+							</div>
+						{/each}
+						{#if photos.length + up < REFUND_PHOTO_MAX}
+							<label class="flex h-14 w-14 shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[12px] border border-dashed text-[11px] transition-colors hover:border-white/40 hover:text-fg {needPhoto && !photos.length ? 'border-accent/60 text-accent' : 'border-white/20 text-fg-faint'} {submitting || up ? 'pointer-events-none opacity-50' : ''}">
+								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" /><circle cx="12" cy="13" r="3.5" /></svg>
+								{up ? '올리는 중' : '사진'}
+								<input type="file" accept={REFUND_PHOTO_ACCEPT} multiple class="sr-only" disabled={submitting || !!up} onchange={(e) => { addPhotos(it.id, e.currentTarget.files); e.currentTarget.value = ''; }} />
+							</label>
+						{/if}
+						<span class="text-[12px] {needPhoto && !photos.length ? 'text-accent' : 'text-fg-faint'}">{photos.length}/{REFUND_PHOTO_MAX}{needPhoto ? ' · 사진 필수' : ''}</span>
+					</div>
+				{/if}
+			</div>
+		{/each}
+
+		<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">사유</p>
+		<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="사유">
+			{#each CLAIM_REASONS as r (r)}
+				<button type="button" role="radio" aria-checked={reason === r} disabled={submitting} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
 			{/each}
+		</div>
 
-			<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">사유</p>
-			<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="사유">
-				{#each CLAIM_REASONS as r (r)}
-					<button type="button" role="radio" aria-checked={reason === r} disabled={submitting} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
+		<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">요청 종류</p>
+		<div class="grid max-w-[360px] grid-cols-2 gap-2" role="radiogroup" aria-label="요청 종류">
+			{#each ['refund', 'exchange'] as const as k (k)}
+				{@const allowed = !reason || kindAllowed(k, reason)}
+				<button type="button" role="radio" aria-checked={kind === k} disabled={submitting || !allowed} onclick={() => pickKind(k)} class="{chip} {kind === k ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{KIND_LABEL[k]}</button>
+			{/each}
+		</div>
+		{#if reason === '단순 변심'}<p class="text-[12.5px] text-fg-faint">단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요</p>{/if}
+
+		{#if reason}
+			<ul class="mt-1 flex flex-col gap-2 rounded-[18px] border border-accent/25 bg-accent/6 px-4 py-4 text-[13px] leading-[1.55] text-white/80 lg:rounded-[22px] lg:px-5" aria-label="처리 기준">
+				{#each claimPolicy(reason, returnFee) as pl (pl)}
+					<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>{pl}</li>
 				{/each}
-			</div>
-
-			<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">요청 종류</p>
-			<div class="grid max-w-[360px] grid-cols-2 gap-2" role="radiogroup" aria-label="요청 종류">
-				{#each ['refund', 'exchange'] as const as k (k)}
-					{@const allowed = !reason || kindAllowed(k, reason)}
-					<button type="button" role="radio" aria-checked={kind === k} disabled={submitting || !allowed} onclick={() => pickKind(k)} class="{chip} {kind === k ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{KIND_LABEL[k]}</button>
-				{/each}
-			</div>
-			{#if reason === '단순 변심'}<p class="text-[12.5px] text-fg-faint">단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요</p>{/if}
-
-			{#if reason}
-				<ul class="mt-1 flex flex-col gap-2 rounded-[18px] border border-accent/25 bg-accent/6 px-4 py-4 text-[13px] leading-[1.55] text-white/80 lg:rounded-[22px] lg:px-5" aria-label="처리 기준">
-					{#each claimPolicy(reason, returnFee) as pl (pl)}
-						<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>{pl}</li>
-					{/each}
-				</ul>
-			{/if}
+			</ul>
 		{/if}
 	</div>
 
 	<!-- 오른쪽: 요약 · 보내기 -->
-	{#if lines.length}
-		<div class="flex flex-col gap-3 lg:sticky lg:top-[104px]">
-			<section class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
-				<h2 class="text-[15px] font-extrabold lg:text-[16px]">요청 요약</h2>
-				<div class="mt-3.5 flex flex-col gap-2 text-[14px]">
-					<div class="flex justify-between text-fg-soft"><span>선택 제품</span><span class="text-fg">{count}개</span></div>
-					<div class="flex justify-between text-fg-soft"><span>종류</span><span class="text-fg">{KIND_LABEL[kind]}</span></div>
-					<div class="flex justify-between text-fg-soft"><span>사유</span><span class={reason ? 'text-fg' : 'text-fg-faint'}>{reason || '—'}</span></div>
-				</div>
-				<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
-					<span class="text-[14px] font-bold">{estimate === null ? '처리' : '예상 환불 금액'}</span>
-					{#if estimate === null}
-						<span class="text-[15px] font-extrabold text-accent">새 제품 재발송</span>
-					{:else}
-						<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{won(estimate)}</span>
-					{/if}
-				</div>
-				{#if estimate !== null && reason === '단순 변심' && goods > 0}<p class="mt-1.5 text-right text-[12px] text-fg-faint">왕복 배송비 {won(returnFee)} 차감</p>{/if}
-				{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
-				<div class="mt-5">
-					{#if !confirming}
-						<button type="button" onclick={() => (confirming = true)} disabled={submitting || !ready} class="{cta} {ready ? ctaOn : ctaOff}">{ctaLabel}</button>
-					{:else}
-						<p class="text-[13.5px] leading-[1.55] text-white/85">{KIND_LABEL[kind]} 요청을 보낼까요? 크리에이터가 확인한 뒤 처리 결과를 메일과 주문 상세로 알려드려요.</p>
-						<div class="mt-3 flex gap-2">
-							<button type="button" onclick={() => (confirming = false)} disabled={submitting} class="{cta} flex-1 border border-white/14 text-fg">아니요</button>
-							<button type="button" onclick={submit} disabled={submitting} class="{cta} flex-1 {ctaOn} disabled:opacity-60">{submitting ? '보내는 중…' : '네, 보낼게요'}</button>
-						</div>
-					{/if}
-				</div>
-			</section>
-			<ul class="flex flex-col gap-2 rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 text-[13px] leading-[1.55] text-white/75 lg:rounded-[22px] lg:px-5">
-				<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>출고 준비가 시작된 상품은 바로 취소되지 않아요 — 크리에이터가 확인한 뒤 처리해요</li>
-				<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>회수가 필요하면 택배 기사가 방문해요 · 환불은 회수 확인 뒤 결제수단으로 돌아가요</li>
-				<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>상세 내용과 사진은 판매 크리에이터가 직접 확인해요</li>
-			</ul>
-		</div>
-	{/if}
+	<div class="flex flex-col gap-3 lg:sticky lg:top-[104px]">
+		<section class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
+			<h2 class="text-[15px] font-extrabold lg:text-[16px]">요청 요약</h2>
+			<div class="mt-3.5 flex flex-col gap-2 text-[14px]">
+				<div class="flex justify-between text-fg-soft"><span>선택 제품</span><span class="text-fg">{count}개</span></div>
+				<div class="flex justify-between text-fg-soft"><span>종류</span><span class="text-fg">{KIND_LABEL[kind]}</span></div>
+				<div class="flex justify-between text-fg-soft"><span>사유</span><span class={reason ? 'text-fg' : 'text-fg-faint'}>{reason || '—'}</span></div>
+			</div>
+			<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
+				<span class="text-[14px] font-bold">{estimate === null ? '처리' : '예상 환불 금액'}</span>
+				{#if estimate === null}
+					<span class="text-[15px] font-extrabold text-accent">새 제품 재발송</span>
+				{:else}
+					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{won(estimate)}</span>
+				{/if}
+			</div>
+			{#if estimate !== null && reason === '단순 변심' && goods > 0}<p class="mt-1.5 text-right text-[12px] text-fg-faint">왕복 배송비 {won(returnFee)} 차감</p>{/if}
+			{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
+			<div class="mt-5">
+				{#if !confirming}
+					<button type="button" onclick={() => (confirming = true)} disabled={submitting || !ready} class="{cta} {ready ? ctaOn : ctaOff}">{ctaLabel}</button>
+				{:else}
+					<p class="text-[13.5px] leading-[1.55] text-white/85">{KIND_LABEL[kind]} 요청을 보낼까요? 크리에이터가 확인한 뒤 처리 결과를 메일과 주문 상세로 알려드려요.</p>
+					<div class="mt-3 flex gap-2">
+						<button type="button" onclick={() => (confirming = false)} disabled={submitting} class="{cta} flex-1 border border-white/14 text-fg">아니요</button>
+						<button type="button" onclick={submit} disabled={submitting} class="{cta} flex-1 {ctaOn} disabled:opacity-60">{submitting ? '보내는 중…' : '네, 보낼게요'}</button>
+					</div>
+				{/if}
+			</div>
+		</section>
+		<ul class="flex flex-col gap-2 rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 text-[13px] leading-[1.55] text-white/75 lg:rounded-[22px] lg:px-5">
+			<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>출고 준비가 시작된 상품은 바로 취소되지 않아요 — 크리에이터가 확인한 뒤 처리해요</li>
+			<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>회수가 필요하면 택배 기사가 방문해요 · 환불은 회수 확인 뒤 결제수단으로 돌아가요</li>
+			<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-white/40"></span>상세 내용과 사진은 판매 크리에이터가 직접 확인해요</li>
+		</ul>
+	</div>
 </div>

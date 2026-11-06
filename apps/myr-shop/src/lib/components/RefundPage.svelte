@@ -15,18 +15,18 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import ClaimForm from '$lib/components/ClaimForm.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { claimableItems, isOpenClaim, type Claim } from '@sellery/myr-core/claim-rules';
+	import { claimableItems } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund, customerRefundableItems, estimateRefund, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
-	let { order, claims = [], returnFee = 6000, backHref }: { order: OrderView; claims?: Claim[]; returnFee?: number; backHref: string } = $props();
+	let { order, returnFee = 6000, backHref }: { order: OrderView; returnFee?: number; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
 	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 교환 · 환불 요청(0078)
 	const lines = $derived(customerRefundableItems(order.items));
-	const claimLines = $derived(claimableItems(order.items, claims));
+	const claimLines = $derived(claimableItems(order.items));
 	// 처음 보이는 쪽 — 바로 환불할 줄이 있으면 그쪽, 없으면 요청
 	let mode = $state<'instant' | 'claim'>(untrack(() => (lines.length || deposit ? 'instant' : 'claim')));
-	const both = $derived(!deposit && lines.length > 0 && (claimLines.length > 0 || claims.some(isOpenClaim)));
+	const both = $derived(!deposit && lines.length > 0 && claimLines.length > 0);
 
 	// 줄이 하나면 미리 고르고, 여럿이면 고객이 고른다
 	let qtyById = $state<Record<string, number>>(untrack(() => Object.fromEntries(lines.length === 1 ? lines.map((l) => [l.id, remainingQty(l)]) : [])));
@@ -183,7 +183,7 @@
 		{#if !can.ok}
 			<p class="mx-5 mt-2 rounded-[14px] border border-white/8 bg-white/3 px-4 py-3 text-[13px] text-white/70 lg:mx-0 lg:mt-6">{can.reason} <a href={backHref} class="font-bold text-accent">주문 상세</a></p>
 		{:else if mode === 'claim'}
-			<ClaimForm {order} {claims} lines={claimLines} {returnFee} {backHref} />
+			<ClaimForm {order} lines={claimLines} {returnFee} {backHref} />
 		{:else}
 			<div class="flex flex-col gap-3 px-5 pb-6 lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:px-0 lg:pb-0">
 				<!-- 왼쪽: 제품 · 사유 -->

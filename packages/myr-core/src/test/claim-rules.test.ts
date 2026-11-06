@@ -145,10 +145,9 @@ describe('처리 방법 이름 · 금액', () => {
 
 describe('요청할 수 있는 줄', () => {
 	const it_ = (o: Partial<OrderItem>) => ({ id: 'i', status: 'PAID', qty: 1, refundedQty: 0, shipStatus: 'SHIPPING', ...o }) as OrderItem;
-	it('발주 이후 · 남은 수량 · 진행 중 요청 없음 — 결제완료(바로 환불) · 취소 · 전부 환불 · 진행 중 요청 줄은 뺀다', () => {
+	it('발주 이후 · 남은 수량 — 결제완료(바로 환불) · 취소 · 전부 환불 줄은 뺀다', () => {
 		const items = [it_({ id: 'a' }), it_({ id: 'b', shipStatus: 'PAID' }), it_({ id: 'c', status: 'CANCELED' }), it_({ id: 'd', refundedQty: 1, status: 'REFUNDED' }), it_({ id: 'e', shipStatus: 'DELIVERED' }), it_({ id: 'f', shipStatus: 'PREPARING' })];
-		const open = [{ status: 'progress', order: { item: { id: 'e' } } }, { status: 'done', order: { item: { id: 'f' } } }] as Claim[];
-		expect(claimableItems(items, open).map((i) => i.id)).toEqual(['a', 'f']);
+		expect(claimableItems(items).map((i) => i.id)).toEqual(['a', 'e', 'f']);
 	});
 });
 

@@ -304,7 +304,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - **크리에이터(콘솔)**: CS 관리 › 교환 · 환불이 목 → 서버(`myr_app_seller_claims_of_user` · 상세 `/cs/[요청번호]` · 사진 서명 URL) · 처리 방법 고르고 고객 메시지 → [승인]/[반려](`POST /api/claims/[code]` · `myr_app_claim_decide`) · 뱃지 · 홈 "오늘 처리할 일" 도 서버 값. 답변 기한 = 접수 뒤 2일(`ANSWER_DAYS` · 표시만)
     - **승인 뒤**: 파손 · 누액 환불 = 회수 없이 승인 즉시 `refundItems`(actor seller) · 단순 변심(부분 환불)/오배송 환불 = 운영 회수 확인 → `refundItems`(actor admin) · 재발송 = 운영이 송장 입력 → 고객 "교환 상품이 출발했어요" 메일. 환불이 실패하면 요청은 "환불할 차례" 로 남고 샵 크론 `/api/cron/reconcile` 이 5분 뒤부터 다시(토스 Idempotency-Key = 줄 묶음 + 요청 코드)
     - **운영(콘솔 전까지)**: `myr-ops.mjs claims [--all]` · `collected <요청번호>` · `reship-claim <요청번호> <택배사> <운송장>` · `claim-refund <요청번호>` → 샵 `/api/ops/claims`(CRON_SECRET)
-    - **메일**: 새 요청 → 그 줄의 크리에이터(콘솔 링크 `PUBLIC_MYR_CONSOLE_URL` · 없으면 버튼 없이) · 승인/반려 → 고객(메시지 · 다음 단계 · 환불 예정액) · 교환 재발송 → 고객 · 환불 완료 메일에 "왕복 배송비 차감" 줄
+    - **메일**: 새 요청 → 그 줄의 크리에이터(콘솔 링크 `PUBLIC_MYR_CONSOLE_URL` · 없으면 `https://myr-influencer.vercel.app`) · 승인/반려 → 고객(메시지 · 다음 단계 · 환불 예정액) · 교환 재발송 → 고객 · 환불 완료 메일에 "왕복 배송비 차감" 줄
     - 이벗 회수 API(E4 · `exprtakeback`) · 교환 재등록(`ordGbn=2`)은 이벗 확정 뒤 — 지금은 운영 수동
 - **8. 홈 지표 — 완료(2026-11-06 · 0076)** — 홈의 목(`MOCK_STATS` · `mockMonthRevenue`)을 서버 값으로
     - **0076** `myr_app_seller_sales(seller, now)` · `_of_user(user, now)`(게이트와 동시에) — 내 줄만 · 결제된 주문(PAID · PARTIAL_REFUNDED · REFUNDED)만 · 달은 결제 시각(KST) · gross · refunds · net(순매출) · orders · units(수량 − 환불 수량) · refunded_orders · payout(줄 마진율이 하나라도 비면 null) · 최근 7일 날짜별 주문 수. 순매출 · 주문 · 수량 판정은 이 함수 하나(운영 콘솔 실적도 이것을 부른다). pgTAP `myr_seller_sales.test.sql` 17

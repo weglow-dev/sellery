@@ -222,11 +222,9 @@ export const isOpenClaim = (c: Pick<Claim, 'status'>): boolean => c.status === '
 /** 환불이 나가면 받을 돈 — 차감 반영(부분 환불) */
 export const claimRefundTotal = (c: Pick<Claim, 'amount' | 'deduction'>): number => Math.max(0, c.amount - c.deduction);
 
-/** 요청할 수 있는 줄 — 남은 수량 · 발주(배송준비중) 이후 · 진행 중인 요청 없음. 결제완료 줄은 셀프 즉시 환불(refund-rules customerRefundableItems) */
-export function claimableItems(items: OrderItem[], claims: Pick<Claim, 'status' | 'order'>[]): OrderItem[] {
-	const open = new Set(claims.filter(isOpenClaim).map((c) => c.order.item.id));
-	return items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0 && i.shipStatus !== 'PAID' && !open.has(i.id));
-}
+/** 요청할 수 있는 줄 — 남은 수량 · 발주(배송준비중) 이후. 결제완료 줄은 셀프 즉시 환불(refund-rules customerRefundableItems).
+ *  열린 요청이 있는 주문은 신청 페이지 자체가 닫힌다(customerCanRefund · claimStatus) — 같은 줄 중복은 서버(OPEN_EXISTS)가 다시 막는다 */
+export const claimableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0 && i.shipStatus !== 'PAID');
 
 /* ---------------- 문구 — 상태 · 단계 · 타임라인 ---------------- */
 export type ClaimTone = 'accent' | 'muted' | 'ok' | 'danger';

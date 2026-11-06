@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { guestTokenCookieName, ORDER_CODE_RE } from '@sellery/myr-core/checkout-rules';
 import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 import { hasAdmin } from '$lib/server/admin';
-import { claimReturnFee, claimsForOrder } from '$lib/server/claims';
+import { claimReturnFee } from '$lib/server/claims';
 import { guestOrder } from '$lib/server/orders';
 
 /** /orders/g/[code]/refund — 비회원 교환 · 환불 신청 페이지(0078 요청 포함). 조회 토큰 쿠키 `myr_guest_<code>` 가 맞을 때만(주문 상세와 같다). 환불할 수 없으면 상세로. */
@@ -14,6 +14,6 @@ export const load: PageServerLoad = async ({ params, cookies }) => {
 	const order = await guestOrder(code, cookies.get(guestTokenCookieName(code)));
 	if (!order) redirect(303, `/orders/lookup?code=${encodeURIComponent(code)}`);
 	if (!customerCanRefund(order).ok) redirect(303, `/orders/g/${code}`);
-	const [claims, returnFee] = await Promise.all([claimsForOrder(order.id), claimReturnFee()]);
-	return { order, claims, returnFee, backHref: `/orders/g/${code}` };
+	const returnFee = await claimReturnFee();
+	return { order, returnFee, backHref: `/orders/g/${code}` };
 };

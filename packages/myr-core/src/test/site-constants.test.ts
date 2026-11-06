@@ -1,7 +1,7 @@
 // 샵 주소 · 공용 상수 — packages/myr-core/src/{site,constants}.ts
 import { describe, expect, it } from 'vitest';
 import { MAX_QTY, won } from '../constants';
-import { SITE_URL_FALLBACK, siteOrigin } from '../site';
+import { CONSOLE_URL_FALLBACK, consoleOrigin, SITE_URL_FALLBACK, siteOrigin } from '../site';
 
 describe('siteOrigin — 메일 링크 · canonical 이 같은 오리진', () => {
 	it('주소 값에서 오리진만 · 끝 슬래시 없이', () => {
@@ -19,5 +19,14 @@ describe('constants', () => {
 	it('won — 원화 표시', () => {
 		expect(won(32000)).toBe('₩32,000');
 		expect(won(0)).toBe('₩0');
+	});
+});
+
+describe('consoleOrigin — 크리에이터 메일의 [요청 확인하기] 링크(0078)', () => {
+	it('값이 있으면 그 오리진 · 없거나 틀리면 myr-influencer.vercel.app', () => {
+		expect(consoleOrigin('https://console.example.com/cs/')).toBe('https://console.example.com');
+		expect(consoleOrigin(undefined)).toBe(CONSOLE_URL_FALLBACK);
+		expect(consoleOrigin('  ')).toBe('https://myr-influencer.vercel.app');
+		expect(consoleOrigin('ftp://x')).toBe(CONSOLE_URL_FALLBACK);
 	});
 });
