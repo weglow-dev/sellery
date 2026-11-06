@@ -2,10 +2,11 @@
 	import { won } from '$lib/data';
 	import { displayCode, shortDate, statusLabel } from '@sellery/myr-core/order-view';
 	import { shop } from '$lib/state.svelte';
+	import MyClaims from '$lib/components/MyClaims.svelte';
 	import MyInquiries from '$lib/components/MyInquiries.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문(서버 myr_orders · 0060) · 찜한 레시피 · 메뉴.
+	/** 마이 — 프로필 카드(세션 · 로그아웃) · 주문/찜 수 · 최근 주문(서버 myr_orders · 0060 · 상태 칩은 열린 교환·환불 요청이 먼저) · 교환 · 환불 요청(MyClaims · 0078) · 내 문의 · 찜한 레시피 · 메뉴.
 	 *  로그인은 레이아웃 data.user(카카오 · S3). 비로그인이면 로그인 CTA + 비회원 주문 조회 링크. 포인트는 1차 범위 밖(docs/myr.md §9-12)이라 칸을 두지 않는다.
 	 *  PC(lg): 왼쪽 sticky 프로필+메뉴 · 오른쪽 주문/찜 */
 	let { data } = $props();
@@ -108,6 +109,11 @@
 				</a>
 			{/each}
 		</div>
+
+		{#if user && data.claims.length}
+			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">교환 · 환불 요청 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{data.claims.length}</span></h3>
+			<MyClaims items={data.claims} />
+		{/if}
 
 		{#if user && data.inquiries.length}
 			<h3 class="mt-[26px] mb-2.5 text-[15px] font-extrabold lg:mt-8 lg:mb-3 lg:text-[17px]">내 문의 <span class="ml-0.5 text-[13px] font-semibold text-fg-faint">{data.inquiries.length}</span></h3>

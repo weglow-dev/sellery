@@ -163,3 +163,25 @@ describe('줄 단위 배송(0077)', () => {
 		});
 	});
 });
+
+describe('교환 · 환불 요청 상태(0078)', () => {
+	const b = { status: 'PAID', trackingNo: null, shippedAt: null, deliveredAt: null, shipStatus: 'SHIPPING' as const };
+	it('열린 요청이 있으면 배송 상태보다 먼저 — 처리 대기 · 진행 중', () => {
+		expect(statusLabel({ ...b, claimStatus: 'pending' }).text).toBe('교환 · 환불 요청');
+		expect(statusLabel({ ...b, claimStatus: 'progress' }).text).toBe('교환 · 환불 진행 중');
+		expect(statusLabel({ ...b, status: 'PARTIAL_REFUNDED', claimStatus: 'progress' }).text).toBe('교환 · 환불 진행 중');
+	});
+	it('요청이 없거나 끝나면 원래 판정 · 입금 대기 · 취소 · 전액 환불은 주문 상태 그대로', () => {
+		expect(statusLabel({ ...b, claimStatus: null }).text).toBe('배송 중');
+		expect(statusLabel(b).text).toBe('배송 중');
+		expect(statusLabel({ ...b, status: 'REFUNDED', claimStatus: 'progress' }).text).toBe('환불 완료');
+		expect(statusLabel({ ...b, status: 'CANCELED', claimStatus: 'pending' }).text).toBe('취소됨');
+		expect(statusLabel({ ...b, status: 'WAITING_DEPOSIT', claimStatus: 'pending' }).text).toBe('입금 대기');
+	});
+	it('파서 — claim_status 는 pending · progress 만, 나머지는 null', () => {
+		expect(orderFromJson({ id: 'o', code: 'myr1', claim_status: 'pending' })!.claimStatus).toBe('pending');
+		expect(orderFromJson({ id: 'o', code: 'myr1', claim_status: 'progress' })!.claimStatus).toBe('progress');
+		expect(orderFromJson({ id: 'o', code: 'myr1', claim_status: 'done' })!.claimStatus).toBeNull();
+		expect(orderFromJson({ id: 'o', code: 'myr1' })!.claimStatus).toBeNull();
+	});
+});

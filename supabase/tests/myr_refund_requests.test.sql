@@ -1,7 +1,7 @@
 -- pgTAP — 0078 교환·환불 요청: 권한 · 요청 남기기(가드 · 사진 · 줄마다 하나) · 크리에이터 목록 · 승인/반려(처리 방법 · 할 일 · 차감) ·
 --         회수 확인 · 환불 기록 · 재발송 송장 · 완료 판정 · 환불 재시도 대상 · 고아 사진 (docs/myr.md §4.2.1 7번)
 begin;
-select plan(73);
+select plan(83);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open 불가');
@@ -19,6 +19,8 @@ select function_privs_are('public', 'myr_app_admin_claim_collected', '{text}'::t
 select function_privs_are('public', 'myr_app_admin_claim_collected', '{text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 claim_collected 불가');
 select function_privs_are('public', 'myr_app_admin_claim_reship', '{text,text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 claim_reship 불가');
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 claim_open 가능');
+select function_privs_are('public', 'myr_app_claims_of_user', '{uuid,integer}'::text[], 'anon', '{}'::text[], 'anon 은 claims_of_user 불가');
+select function_privs_are('public', 'myr_app_claims_of_user', '{uuid,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 claims_of_user 불가');
 
 -- ---------- 픽스처 ----------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -78,6 +80,15 @@ insert into rq select 'rc3', public.myr_app_claim_open('00000000-0000-4000-8000-
 select is((select count(*)::int from rq where code is not null), 4, '파손 교환 · 오배송 환불 · 다른 크리에이터 줄 요청도 생성');
 select is(jsonb_array_length(public.myr_app_claims_for_order('00000000-0000-4000-8000-000000000fb1')), 4, '주문의 요청 목록');
 
+-- ---------- 고객 — 마이 목록 · 주문 상태 칩 ----------
+select is(jsonb_array_length(public.myr_app_claims_of_user('00000000-0000-4000-8000-000000000f83', 50)), 4, '마이 — 내 주문의 요청 전부');
+select is(jsonb_array_length(public.myr_app_claims_of_user('00000000-0000-4000-8000-000000000f81', 50)), 0, '마이 — 내 주문이 아니면 없음(크리에이터 계정이어도)');
+select is(jsonb_array_length(public.myr_app_claims_of_user(null, 50)), 0, '마이 — user 없으면 빈 목록');
+select is(jsonb_array_length(public.myr_app_claims_of_user('00000000-0000-4000-8000-000000000f83', 2)), 2, '마이 — 개수 제한');
+select is(public.myr_order_claim_status('00000000-0000-4000-8000-000000000fb1'), 'pending', '처리 대기 요청이 있으면 pending');
+select is(public.myr_order_claim_status('00000000-0000-4000-8000-000000000fb2'), null, '요청 없는 주문 null');
+select is((select e ->> 'claim_status' from jsonb_array_elements(public.myr_app_my_orders('00000000-0000-4000-8000-000000000f83', 20)) e where e ->> 'code' = 'pgtap-rq-1'), 'pending', '회원 주문 목록 JSON 에 claim_status');
+
 -- ---------- 크리에이터 목록 ----------
 select is(jsonb_array_length(public.myr_app_seller_claims_of_user('00000000-0000-4000-8000-000000000f81')), 3, '내 상품 요청만(3건)');
 select is(public.myr_app_seller_claims_waiting_of_user('00000000-0000-4000-8000-000000000f81'), 3, '처리 대기 수');
@@ -106,6 +117,7 @@ select is((select jsonb_build_object('status', j #>> '{request,status}', 'messag
              from (select public.myr_app_claim_decide((select code from rq where k = 'rc3'), '00000000-0000-4000-8000-000000000f82', 'reject', null, '개봉 제품이라 어려워요') as j) s),
   '{"status": "rejected", "message": "개봉 제품이라 어려워요", "step": null}'::jsonb, '반려 — 메시지 남김 · 단계 없음');
 select is(public.myr_app_seller_claims_waiting_of_user('00000000-0000-4000-8000-000000000f81'), 0, '처리 대기 0');
+select is(public.myr_order_claim_status('00000000-0000-4000-8000-000000000fb1'), 'progress', '처리 대기가 없고 진행 중이 있으면 progress(반려는 끝난 요청)');
 
 -- ---------- 회수 · 환불 ----------
 select is(public.myr_app_claim_refunded((select code from rq where k = 'rc1'), 26000) ->> 'code', 'NOT_READY', '회수 전 환불 기록 NOT_READY');

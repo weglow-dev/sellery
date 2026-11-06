@@ -17,7 +17,8 @@
 --   myr_refund_request_options(kind, reason)   처리 방법 선택지 — **판정은 여기 하나**(콘솔은 JSON 의 options 로 그린다 · 승인 RPC 가 같은 함수로 검사)
 --   myr_refund_request_step(r)                 지금 단계 decide | collect | refund | reship | null — 화면 · 운영 목록 · 크론이 같은 값을 본다
 --
---   고객(샵):  myr_app_claim_open(order, actor, kind, reason, lines)  · myr_app_claims_for_order(order)
+--   고객(샵):  myr_app_claim_open(order, actor, kind, reason, lines)  · myr_app_claims_for_order(order) · myr_app_claims_of_user(user, limit)(마이 목록)
+--             myr_order_claim_status(order) — 주문의 열린 요청 상태 pending | progress | null · myr_order_json + claim_status(주문 상태 칩 · 0077 정의 재정의)
 --   크리에이터: myr_app_seller_claims_of_user(user) · myr_app_seller_claim_of_user(user, code) · myr_app_seller_claims_waiting_of_user(user)
 --             myr_app_claim_decide(code, user, decision, resolution, message)
 --   서버:     myr_app_claim_refunded(code, amount)   refundItems 성공 뒤 기록
@@ -292,6 +293,65 @@ as $$
 $$;
 revoke all on function public.myr_app_claims_for_order(uuid) from public, anon, authenticated;
 grant execute on function public.myr_app_claims_for_order(uuid) to service_role;
+
+-- 회원의 요청(최근순) — 마이 "교환 · 환불 요청". 상세는 주문 상세 카드(myr_app_claims_for_order)로 간다
+create or replace function public.myr_app_claims_of_user(p_user uuid, p_limit integer default 50)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select coalesce((
+    select jsonb_agg(public.myr_refund_request_json(r) order by r.created_at desc)
+      from (select r.* from public.myr_refund_requests r join public.myr_orders o on o.id = r.order_id
+             where o.user_id = p_user and p_user is not null
+             order by r.created_at desc limit least(greatest(coalesce(p_limit, 50), 1), 200)) r
+  ), '[]'::jsonb)
+$$;
+revoke all on function public.myr_app_claims_of_user(uuid, integer) from public, anon, authenticated;
+grant execute on function public.myr_app_claims_of_user(uuid, integer) to service_role;
+
+-- 주문의 열린 요청 상태 — 처리 대기가 하나라도 있으면 pending, 아니면 진행 중이 있으면 progress, 없으면 null.
+-- 고객 주문 상태 칩(statusLabel)이 배송 상태보다 먼저 본다 — 판정은 이 함수 하나
+create or replace function public.myr_order_claim_status(p_order_id uuid)
+returns text
+language sql
+stable
+set search_path = public
+as $$
+  select case when bool_or(r.status = 'pending') then 'pending' when bool_or(r.status = 'progress') then 'progress' end
+    from public.myr_refund_requests r
+   where r.order_id = p_order_id and r.status in ('pending', 'progress')
+$$;
+revoke all on function public.myr_order_claim_status(uuid) from public, anon, authenticated;
+
+-- 0077 정의 + claim_status
+create or replace function public.myr_order_json(o public.myr_orders, p_full boolean)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', o.id, 'code', o.code, 'status', o.status,
+    'amount', o.amount, 'items_amount', o.items_amount, 'shipping_fee', o.shipping_fee, 'refund_amount', o.refund_amount,
+    'order_name', o.order_name, 'payment_method', o.payment_method, 'paid_at', o.paid_at, 'created_at', o.created_at,
+    'deposit_due_at', o.deposit_due_at,
+    'deposit', case when o.status = 'WAITING_DEPOSIT' and jsonb_typeof(o.raw_payment -> 'virtualAccount') = 'object'
+                 then jsonb_build_object('bank', o.raw_payment -> 'virtualAccount' ->> 'bankCode', 'account', o.raw_payment -> 'virtualAccount' ->> 'accountNumber',
+                                         'holder', o.raw_payment -> 'virtualAccount' ->> 'customerName', 'due', o.raw_payment -> 'virtualAccount' ->> 'dueDate')
+                 else null end,
+    'courier', o.courier, 'tracking_no', o.tracking_no, 'shipped_at', o.shipped_at, 'delivered_at', o.delivered_at,
+    'ship_status', public.myr_order_ship_status(o.id),
+    'claim_status', public.myr_order_claim_status(o.id),
+    'guest', o.user_id is null, 'buyer_name', o.buyer_name,
+    'shipping', case when p_full then o.shipping else null end,
+    'buyer_email', case when p_full then o.buyer_email else null end,
+    'refund_reason', case when p_full and o.refund_amount > 0 then o.refund_reason else null end,
+    'refunded_at', case when p_full and o.refund_amount > 0 then o.refunded_at else null end,
+    'items', coalesce((select jsonb_agg(public.myr_order_item_json(i) order by i.created_at, i.id) from public.myr_order_items i where i.order_id = o.id), '[]'::jsonb))
+$$;
+revoke all on function public.myr_order_json(public.myr_orders, boolean) from public, anon, authenticated;
 
 -- ------------------------------------------------------------
 -- 크리에이터 — 계정으로 바로(0072 · 0075 와 같은 방식 · 게이트와 동시에 보낸다)

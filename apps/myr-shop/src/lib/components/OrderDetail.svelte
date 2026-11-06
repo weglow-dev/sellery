@@ -7,8 +7,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import { won } from '$lib/data';
 	import { csStatusChip, relTime, type CsForOrder, type CsOrderOption } from '@sellery/myr-core/cs-rules';
-	import { displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
-	import { CLAIM_STATUS_LABEL, claimStepText, claimTimeline, KIND_LABEL, type Claim } from '@sellery/myr-core/claim-rules';
+	import { CLAIM_LABELS, displayCode, refundSteps, SHIP_LABELS, shipBoxes, shortDate, statusLabel, type OrderItem, type OrderView } from '@sellery/myr-core/order-view';
+	import { CLAIM_STATUS_LABEL, claimStepText, claimTimeline, isOpenClaim, KIND_LABEL, type Claim } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund } from '@sellery/myr-core/refund-rules';
 	import { trackingUrl } from '@sellery/myr-core/ship-rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
@@ -26,6 +26,8 @@
 	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
 	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0));
 	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
+	// 상품이 여럿이면 열린 교환·환불 요청이 걸린 줄 옆에 그 상태(주문 칩은 statusLabel 이 이미 요청 상태)
+	const openClaimOf = $derived(new Map(claims.filter(isOpenClaim).map((c) => [c.order.item.id, c.status as 'pending' | 'progress'])));
 	const ship = $derived(shipBoxes(order.items));
 	const steps = $derived(refundSteps(order));
 	const meta = $derived([relTime(order.paidAt ?? order.createdAt), order.paymentMethod].filter(Boolean).join(' · '));
@@ -95,7 +97,8 @@
 					</div>
 				{/if}
 				{#each order.items as it (it.id)}
-					{@const ls = lineStatus(it.status, it.refundedQty, it.qty) || (mixedShip && order.status !== 'WAITING_DEPOSIT' ? SHIP_LABELS[it.shipStatus].text : '')}
+					{@const oc = liveItems.length > 1 ? openClaimOf.get(it.id) : undefined}
+					{@const ls = (oc ? CLAIM_LABELS[oc].text : '') || lineStatus(it.status, it.refundedQty, it.qty) || (mixedShip && order.status !== 'WAITING_DEPOSIT' ? SHIP_LABELS[it.shipStatus].text : '')}
 					<div class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 lg:gap-4 lg:rounded-[20px] lg:p-4">
 						<a href="/p/{it.code}" aria-label={it.name} class="shrink-0"><Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt={it.name} icon={26} class="h-14 w-14 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-2xl" /></a>
 						<div class="min-w-0 flex-1">
@@ -116,7 +119,7 @@
 						<h2 class="text-[15px] font-extrabold lg:text-[16px]">교환 · 환불 요청</h2>
 						<div class="mt-3 flex flex-col gap-3">
 							{#each claims as c (c.id)}
-								<div class="rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-3">
+								<div id="claim-{c.code}" class="scroll-mt-20 rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-3">
 									<div class="flex items-start justify-between gap-2">
 										<p class="min-w-0 text-[14px] font-bold">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''} × {c.qty}</p>
 										<span class="shrink-0 rounded-[8px] px-2 py-[3px] text-[12px] font-bold {claimTone[c.status]}">{CLAIM_STATUS_LABEL[c.status]}</span>

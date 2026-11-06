@@ -45,6 +45,13 @@ export async function claimsForOrder(orderId: string): Promise<Claim[]> {
 	return claimsFromJson(data);
 }
 
+/** 마이 "교환 · 환불 요청" — 회원 주문의 요청(최근순 50건) */
+export async function claimsOfUser(userId: string): Promise<Claim[]> {
+	const { data, error } = await admin().rpc('myr_app_claims_of_user', { p_user: userId, p_limit: 50 });
+	if (error) throw new Error(`myr_app_claims_of_user failed: ${error.message}`);
+	return claimsFromJson(data);
+}
+
 /* ---------------- 크리에이터 ---------------- */
 export async function listSellerClaimsOfUser(userId: string): Promise<Claim[]> {
 	const { data, error } = await admin().rpc('myr_app_seller_claims_of_user', { p_user: userId });
