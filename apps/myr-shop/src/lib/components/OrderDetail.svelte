@@ -117,9 +117,10 @@
 				{#if claims.length}
 					<section aria-label="교환 · 환불 요청" class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-4 lg:rounded-[22px] lg:px-6 lg:py-6">
 						<h2 class="text-[15px] font-extrabold lg:text-[16px]">교환 · 환불 요청</h2>
-						<div class="mt-3 flex flex-col gap-3">
+						<!-- 요청마다 카드 안 카드 대신 글 묶음 — 여럿이면 구분선(대표 피드백 2026-11-06) -->
+						<div class="mt-3 flex flex-col divide-y divide-white/8">
 							{#each claims as c (c.id)}
-								<div id="claim-{c.code}" class="scroll-mt-20 rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-3">
+								<div id="claim-{c.code}" class="scroll-mt-20 py-3.5 first:pt-0 last:pb-0">
 									<div class="flex items-start justify-between gap-2">
 										<p class="min-w-0 text-[14px] font-bold">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''} × {c.qty}</p>
 										<span class="shrink-0 rounded-[8px] px-2 py-[3px] text-[12px] font-bold {claimTone[c.status]}">{CLAIM_STATUS_LABEL[c.status]}</span>
@@ -130,7 +131,7 @@
 										{@const href = trackingUrl(c.reshipCourier ?? '', c.reshipTrackingNo)}
 										<p class="mt-1 text-[12.5px] text-white/75">교환 발송 {c.reshipCourier ?? '택배'} {#if href}<a {href} target="_blank" rel="noopener" class="font-mono underline">{c.reshipTrackingNo}</a>{:else}<span class="font-mono">{c.reshipTrackingNo}</span>{/if}</p>
 									{/if}
-									{#if c.message}<p class="mt-2 rounded-[10px] bg-white/4 px-3 py-2 text-[12.5px] leading-[1.55] text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
+									{#if c.message}<p class="mt-2 border-l-2 border-accent/50 pl-2.5 text-[12.5px] leading-[1.55] text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
 									<ol class="mt-2.5 flex flex-col gap-1">
 										{#each claimTimeline(c) as t (t.title)}
 											<li class="flex items-center gap-2 text-[12px] {t.done ? 'text-white/70' : 'text-white/35'}">
