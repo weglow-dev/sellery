@@ -2,7 +2,8 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { Product } from '$lib/data';
 	import { STATUS_ACTION_DONE, productMenu, type ProductMenuItem } from '$lib/product-draft';
-	import { PRODUCT_STATUS_META, filterProducts, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
+	import { PRODUCT_STATUS_META, PRODUCT_TABS, filterProducts, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
+	import { readParam, syncParam } from '$lib/url-state';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
@@ -17,7 +18,9 @@
 	 *  판매 중 · 일시중지 상품은 "내용 수정" → 수정 심사(0074) — 심사 중이면 "수정 심사 중" 칩(메뉴에서 안내) · 반려면 "수정 반려" 칩 + "오늘 수정 반려 · N건 수정 필요" · 메뉴 "심사 결과 보기".
 	 *  반려 상품(상품 심사)은 누르면 바로 "심사 결과"([id]/review) → 반려 내용 고치기. */
 	let { data } = $props();
-	let tab = $state<ProductTab>('all');
+	// 보던 탭은 주소(?tab=)에 — 상품 상세 · 에디터에 갔다가 뒤로 오면 그대로
+	let tab = $state<ProductTab>(readParam('tab', PRODUCT_TABS.map((t) => t.id), 'all'));
+	$effect(() => syncParam('tab', tab, 'all'));
 	const products = $derived(data.products);
 	const tabs = $derived(productTabCounts(products));
 	const list = $derived(filterProducts(products, tab));

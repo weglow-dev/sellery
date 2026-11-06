@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { CLAIM_LABELS, SHIP_LABELS } from '@sellery/myr-core/order-view';
-	import { filterSellerOrders, liveLines, sellerOrderAmounts, sellerOrderLabel, sellerOrderTabCounts, type SellerOrderTab } from '@sellery/myr-core/seller-orders';
+	import { filterSellerOrders, liveLines, SELLER_ORDER_TABS, sellerOrderAmounts, sellerOrderLabel, sellerOrderTabCounts, type SellerOrderTab } from '@sellery/myr-core/seller-orders';
 	import { ORDER_EMPTY, ORDER_TONE_CLS, orderMeta, orderShipNote, orderTracking } from '$lib/orders';
 	import { won } from '$lib/rules';
+	import { readParam, syncParam } from '$lib/url-state';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Tile from '$lib/components/Tile.svelte';
@@ -11,7 +12,9 @@
 	 *  탭: 전체 · 배송 준비(결제 완료 · 배송 준비중) · 배송 중 · 배송 완료 · 환불. 카드: 주문번호 · 상태 칩 · 결제일 · 고객 · 내 줄(상품 × 수량 · 금액 · 줄 상태) · 송장 · 진행 중 요청(→ CS 상세).
 	 *  환불 버튼은 없다 — 환불은 고객 요청 → 승인(7번). 발송은 MYR 물류. 모바일: 제목 + 칩 + 한 줄 카드 / PC(lg~): 1240px · 2단 카드 */
 	let { data } = $props();
-	let tab = $state<SellerOrderTab>('all');
+	// 보던 탭은 주소(?tab=)에 — 요청 상세에 갔다가 뒤로 오면 그대로
+	let tab = $state<SellerOrderTab>(readParam('tab', SELLER_ORDER_TABS.map((t) => t.id), 'all'));
+	$effect(() => syncParam('tab', tab, 'all'));
 	const orders = $derived(filterSellerOrders(data.orders, tab));
 	const tabs = $derived(sellerOrderTabCounts(data.orders));
 </script>
