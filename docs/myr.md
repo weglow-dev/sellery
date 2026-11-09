@@ -319,7 +319,9 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
         - **초대 가입 2단계**(가입 직후 · [나중에 입력할게요]로 건너뜀) · **내 정보 `/my`**(입력 · 수정 · 상태) · 콘솔 홈 배너(미입력 · 다시 입력 필요) · 상단 이름 → `/my`.
         - **운영 확인** `myr_settle_status` none · pending(확인 중) · verified · rejected(사유) — 계좌 · 사업자번호 · 대표자를 바꾸면 다시 확인 · 상호만 바꾸면 그대로. 정산은 계산되고 지급만 확인 완료 뒤. 운영은 어드민 전까지 `myr-creators.mjs settle-info` · `settle-verify <@h>` · `settle-reject <@h> "사유"`(홈택스 사업자 상태 · 은행 예금주 조회로 확인).
         - 크리에이터 화면은 가린 값만(`***-**-12345` · 계좌 뒤 4자리) · 비워 두면 저장된 값 그대로. 국세청 휴 · 폐업 자동 확인(공공데이터 API)은 나중.
-        - 남은 것: 프로필 사진 · 소개 수정(9번 나머지).
+        - **내 정보 화면**: 왼쪽 프로필(사진 · 가입 때 받은 활동명 · 핸들 · 대표 채널 · 연락처 · 로그인 이메일 · 가입일) · 상태 / 오른쪽 사업자 · 정산 정보 읽기 전용 + [수정하기].
+        - **프로필 사진 — 내 정보에서만**(홈의 사진 변경은 뺐다 · 홈은 보기만 · 누르면 내 정보): 공개 버킷 `myr-avatars`(`<seller id>/<uuid>.<ext>` · jpg/png/webp · 4MB · 매직 바이트) → `myr_app_seller_avatar_set`(내 폴더만) · 바꾸거나 지우면 이전 파일 삭제 · `POST/DELETE /api/my/avatar`.
+        - 남은 것: 소개 수정(9번 나머지).
 - **10. 초대 가입 기능 — 완료(2026-11-04 · 0070 · 결정 14)**
     - **0070** `myr_invites`(이메일 · 토큰 sha256 해시만 · 기본 30일(1~90 · `INVITE_DAYS`) · 사용 시각 · 취소(reissued · canceled) · 초대한 운영자 메모 · 새 초대 요청 시각·횟수 · 이메일당 대기 중 초대 1개 부분 유니크) + `sellers.contact_phone`(숫자만 · 공개 grant 없음). Supabase 초대(OTP) 링크는 수명이 짧아(최대 24시간 · 대시보드 Email OTP Expiration) 30일을 못 버티므로 자체 토큰 + Resend 메일 — 그래서 Supabase 메일 링크 만료 설정과 상관없다
     - RPC(전부 service role 만 · anon·authenticated EXECUTE 회수): 운영 `myr_app_admin_invite_create`(이전 링크 취소 → 새 토큰 · 이미 크리에이터 ALREADY_CREATOR · 같은 이메일 로그인 계정이 있으면 EMAIL_HAS_ACCOUNT) · `_revoke` · `_list(state)` / 링크 `myr_app_invite_view` · `myr_app_invite_handle_check`(유효한 토큰이 있어야 답한다) · `myr_app_invite_accept` · `myr_app_invite_request`. **핸들 형식 · 예약어(admin · official · myr · sellery … · `myr.` `sellery_` 로 시작)의 정답은 SQL `myr_handle_problem` 하나** — 화면은 코드(TAKEN · RESERVED · BAD_HANDLE)로 문구만 고른다

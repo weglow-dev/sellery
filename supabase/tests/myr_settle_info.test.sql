@@ -1,6 +1,6 @@
 -- pgTAP — 0085 크리에이터 사업자 · 정산 정보: 권한 · 사업자번호 체크섬 · 저장 거부 코드 전부 · 가린 값 · 예금주 규칙 · 다시 확인 규칙 · 운영 확인/요청
 begin;
-select plan(38);
+select plan(45);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_of_user 불가');
@@ -67,6 +67,16 @@ select is((select jsonb_build_object('recheck', (j ->> 'recheck')::boolean, 'sta
   '{"recheck": false, "status": "verified"}'::jsonb, '상호만 바꾸면 확인 완료 그대로(계좌 · 번호는 null = 그대로)');
 select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'reject', '예금주 확인이 안 돼요') ->> 'status', 'rejected', '다시 입력 요청');
 select is(public.myr_app_seller_settle_info_of_user((select id from u)) ->> 'note', '예금주 확인이 안 돼요', '크리에이터가 다시 입력 요청 사유를 본다');
+
+-- ---------- 프로필 사진 ----------
+select function_privs_are('public', 'myr_app_seller_avatar_set', '{uuid,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 avatar_set 불가');
+select is(public.myr_app_seller_avatar_set('00000000-0000-4000-8000-0000000000ff', null) ->> 'code', 'NOT_FOUND', '크리에이터가 아니면 NOT_FOUND');
+select is(public.myr_app_seller_avatar_set((select id from u), 'https://x.supabase.co/storage/v1/object/public/myr-avatars/00000000-0000-4000-8000-000000000e99/abcdef12.jpg') ->> 'code', 'BAD_URL', '남의 폴더 BAD_URL');
+select is(public.myr_app_seller_avatar_set((select id from u), 'https://x.supabase.co/storage/v1/object/public/myr-products/00000000-0000-4000-8000-000000000e11/abcdef12.jpg') ->> 'code', 'BAD_URL', '다른 버킷 BAD_URL');
+select is(public.myr_app_seller_avatar_set((select id from u), 'https://x.supabase.co/storage/v1/object/public/myr-avatars/00000000-0000-4000-8000-000000000e11/abcdef12.jpg') ->> 'previous', null, '사진 저장 — 이전 사진 없음');
+select is(public.myr_app_seller_avatar_set((select id from u), 'https://x.supabase.co/storage/v1/object/public/myr-avatars/00000000-0000-4000-8000-000000000e11/abcdef34.png') ->> 'previous',
+  'https://x.supabase.co/storage/v1/object/public/myr-avatars/00000000-0000-4000-8000-000000000e11/abcdef12.jpg', '바꾸면 이전 사진 주소를 돌려준다(서버가 지운다)');
+select is((select avatar_url from public.sellers where id = '00000000-0000-4000-8000-000000000e11'), 'https://x.supabase.co/storage/v1/object/public/myr-avatars/00000000-0000-4000-8000-000000000e11/abcdef34.png', 'avatar_url 저장');
 
 select * from finish();
 rollback;

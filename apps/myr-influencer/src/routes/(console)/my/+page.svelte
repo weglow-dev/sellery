@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
+	import { AVATAR_ACCEPT, AVATAR_MAX_BYTES, AVATAR_MESSAGES } from '@sellery/myr-core/avatar';
 	import { formatPhone } from '@sellery/myr-core/phone';
 	import { shortDate } from '@sellery/myr-core/order-view';
 	import { platformName } from '$lib/signup-rules';
@@ -8,6 +9,7 @@
 	import { SETTLE_STATUS_META, type SettleInfo } from '@sellery/myr-core/settle-info';
 	import { app } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import SettleInfoForm from '$lib/components/SettleInfoForm.svelte';
 
 	/** 내 정보(9번 · 0085 · 시안 없음 — 콘솔 카드 톤). 프로필(읽기) · 사업자 · 정산 정보 상태(미입력 · 확인 중 · 확인 완료 · 다시 입력 필요).
@@ -19,9 +21,49 @@
 	let info = $state<SettleInfo | null>(untrack(() => data.info));
 	let editing = $state(untrack(() => !data.info || data.info.status === 'none'));
 	const st = $derived(SETTLE_STATUS_META[info?.status ?? 'none']);
-	// 사진 — 홈과 같은 값(지금은 홈에서 고른 사진 미리보기 · 저장된 사진) · 없으면 이니셜
+	// 프로필 사진 — 여기서만 바꾼다(0085 · 홈은 보기만). 올리는 동안 미리보기 · 저장되면 서버 주소(레이아웃 me 를 다시 읽는다)
 	const me = $derived(page.data.me as { initial: string; avatarBg: string; avatarUrl: string | null });
-	const photo = $derived(app.profilePhoto || me?.avatarUrl || '');
+	let preview = $state('');
+	let photoBusy = $state(false);
+	const photo = $derived(preview || me?.avatarUrl || '');
+	async function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
+		const f = e.currentTarget.files?.[0];
+		e.currentTarget.value = '';
+		if (!f || photoBusy) return;
+		if (f.size > AVATAR_MAX_BYTES) return app.showToast(AVATAR_MESSAGES.TOO_LARGE);
+		photoBusy = true;
+		const local = URL.createObjectURL(f);
+		preview = local;
+		try {
+			const fd = new FormData();
+			fd.set('file', f);
+			const res = await fetch('/api/my/avatar', { method: 'POST', body: fd });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; code?: string } | null;
+			if (r?.ok) {
+				await invalidateAll();
+				app.showToast('프로필 사진을 바꿨어요');
+			} else app.showToast(AVATAR_MESSAGES[r?.code ?? ''] ?? AVATAR_MESSAGES.DB_ERROR);
+		} catch {
+			app.showToast(AVATAR_MESSAGES.DB_ERROR);
+		} finally {
+			preview = '';
+			URL.revokeObjectURL(local);
+			photoBusy = false;
+		}
+	}
+	async function removePhoto() {
+		if (photoBusy) return;
+		photoBusy = true;
+		try {
+			const r = (await (await fetch('/api/my/avatar', { method: 'DELETE' })).json().catch(() => null)) as { ok?: boolean } | null;
+			if (r?.ok) {
+				await invalidateAll();
+				app.showToast('프로필 사진을 지웠어요');
+			} else app.showToast(AVATAR_MESSAGES.DB_ERROR);
+		} finally {
+			photoBusy = false;
+		}
+	}
 	const TONE: Record<string, string> = { muted: 'bg-white/8 text-white/70', accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint', danger: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' };
 
 	async function saved(next: SettleInfo, recheck: boolean) {
@@ -42,12 +84,20 @@
 		<div class="flex flex-col gap-3 lg:sticky lg:top-6">
 			<section aria-label="프로필" class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">
 				<div class="flex items-center gap-3.5">
-					<span class="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-[22px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)]" style:background={me?.avatarBg}>
-						{#if photo}<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />{:else}{me?.initial}{/if}
-					</span>
+					<label class="relative h-16 w-16 shrink-0 cursor-pointer" aria-label="프로필 사진 바꾸기">
+						<span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[22px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)] {photoBusy ? 'opacity-60' : ''}" style:background={me?.avatarBg}>
+							{#if photo}<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />{:else}{me?.initial}{/if}
+						</span>
+						<input type="file" accept={AVATAR_ACCEPT} onchange={pickPhoto} disabled={photoBusy} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+						<span class="absolute -right-[3px] -bottom-[3px] flex h-6 w-6 items-center justify-center rounded-full border-2 border-bg bg-accent text-bg" aria-hidden="true"><Icon id="cam" size={12} sw={2.4} /></span>
+					</label>
 					<span class="min-w-0">
 						<span class="block truncate text-[18px] font-extrabold">{data.seller.name}</span>
 						<span class="mt-0.5 block truncate text-[13px] text-white/55">{data.seller.handle}</span>
+						<span class="mt-1.5 flex items-center gap-3 text-[12px] font-bold">
+							<label class="relative cursor-pointer text-accent">{photoBusy ? '올리는 중…' : me?.avatarUrl ? '사진 변경' : '사진 등록'}<input type="file" accept={AVATAR_ACCEPT} onchange={pickPhoto} disabled={photoBusy} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" /></label>
+							{#if me?.avatarUrl && !photoBusy}<button type="button" onclick={removePhoto} class="text-white/45 hover:text-fg">삭제</button>{/if}
+						</span>
 					</span>
 				</div>
 				<dl class="mt-4 flex flex-col gap-2.5 border-t border-white/8 pt-3.5 text-[13px]">

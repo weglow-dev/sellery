@@ -6,7 +6,6 @@ import type { CopyKey } from './product-edit';
 
 class ConsoleState {
 	products = $state<Product[]>(seedProducts());
-	profilePhoto = $state('');
 	toast = $state<string | null>(null);
 	/** 방금 심사 요청한 제품명 — 제출 완료 화면이 읽는다 */
 	lastSubmitted = $state<string | null>(null);
@@ -30,12 +29,6 @@ class ConsoleState {
 		clearTimeout(this.toastTimer);
 		this.toast = msg;
 		this.toastTimer = setTimeout(() => (this.toast = null), 2400);
-	}
-
-	setProfilePhoto(file: File) {
-		if (this.profilePhoto) URL.revokeObjectURL(this.profilePhoto);
-		this.profilePhoto = URL.createObjectURL(file);
-		this.showToast('프로필 사진을 바꿨어요');
 	}
 }
 

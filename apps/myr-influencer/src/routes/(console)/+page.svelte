@@ -24,7 +24,7 @@
 	const todayInq = $derived(data.todayInquiries);
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
-	const photo = $derived(app.profilePhoto || me.avatarUrl);
+	const photo = $derived(me.avatarUrl);
 	// 고객 문의 답변 대기(0075) · 교환 · 환불 처리 대기(0078) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
 	$effect(() => {
 		app.inqWaiting = data.inqWaiting;
@@ -32,11 +32,6 @@
 	});
 	const csCount = $derived(data.claimWaiting + data.inqWaiting);
 
-	function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
-		const f = e.currentTarget.files?.[0];
-		e.currentTarget.value = '';
-		if (f) app.setProfilePhoto(f);
-	}
 </script>
 
 <!-- PC: 최소 높이 = <main>(화면 − 상단 내비) — 아래 2단이 남은 높이를 채운다. 내용이 더 길면 그대로 스크롤 -->
@@ -54,7 +49,8 @@
 	</div>
 
 	<div class="mt-1.5 flex items-center gap-3 lg:mt-0 lg:gap-3.5">
-		<label class="relative h-14 w-14 shrink-0 cursor-pointer" aria-label="프로필 사진 등록">
+		<!-- 프로필 사진 — 보기만(바꾸기는 내 정보 · 0085). 누르면 내 정보로 -->
+		<a href="/my" class="relative h-14 w-14 shrink-0" aria-label="내 정보 · 프로필 사진">
 			<span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[19px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)] lg:text-[20px]" style:background={me.avatarBg}>
 				{#if photo}
 					<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />
@@ -62,19 +58,10 @@
 					{me.initial}
 				{/if}
 			</span>
-			<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-			{#if !photo}
-				<span class="absolute -right-[3px] -bottom-[3px] flex h-6 w-6 items-center justify-center rounded-full border-2 border-bg bg-accent text-bg"><Icon id="cam" size={12} sw={2.4} /></span>
-			{/if}
-		</label>
+		</a>
 		<div class="min-w-0 flex-1">
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
 			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · <a href="/my" class="font-bold text-white/70 underline-offset-2 hover:text-fg hover:underline">내 정보</a></p>
-			{#if photo}
-				<label class="relative mt-1.5 block w-fit cursor-pointer text-[12px] font-bold text-accent lg:hidden">
-					사진 변경<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-				</label>
-			{/if}
 		</div>
 		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
 		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">

@@ -21,6 +21,11 @@
 --   myr_app_admin_settle_info_check(seller, decision, note, admin)   verify(확인 중만) · reject(사유 필수)
 --       거부: NOT_FOUND · BAD_DECISION · NOT_PENDING · NOTE_REQUIRED
 --
+--   프로필 사진(9번 · 내 정보에서만 바꾼다 — 홈의 사진 변경은 뺐다 · 2026-11-09):
+--   Storage 공개 버킷 myr-avatars — <seller id>/<uuid>.<ext> · jpg/png/webp · 4MB · 올리기는 콘솔 서버(service role)만
+--   myr_app_seller_avatar_set(user, url)   sellers.avatar_url — 내 폴더의 공개 URL 만(BAD_URL) · null 이면 지운다 · 이전 값(previous)을 돌려준다(서버가 그 파일을 지운다)
+--       거부: NOT_FOUND · BAD_URL
+--
 --   권한: 전부 service role 만(anon · authenticated EXECUTE 회수). 크리에이터 · 운영자 id 는 서버 세션에서. 테스트: supabase/tests/myr_settle_info.test.sql. 재실행 가능.
 -- ============================================================
 
@@ -210,3 +215,37 @@ end;
 $$;
 revoke all on function public.myr_app_admin_settle_info_check(uuid, text, text, uuid) from public, anon, authenticated;
 grant execute on function public.myr_app_admin_settle_info_check(uuid, text, text, uuid) to service_role;
+
+-- ------------------------------------------------------------
+-- 프로필 사진(9번) — 내 정보에서만 바꾼다
+-- ------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('myr-avatars', 'myr-avatars', true, 4194304, array['image/jpeg','image/png','image/webp'])
+  on conflict (id) do update
+    set public = excluded.public,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+
+create or replace function public.myr_app_seller_avatar_set(p_user uuid, p_url text)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  s      public.sellers%rowtype;
+  v_prev text;
+  v_url  text := nullif(btrim(coalesce(p_url, '')), '');
+begin
+  select * into s from public.sellers where user_id = p_user and p_user is not null for update;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if v_url is not null and v_url !~ ('^https?://[^/]+/storage/v1/object/public/myr-avatars/' || s.id::text || '/[A-Za-z0-9-]{8,64}\.(jpg|png|webp)$') then
+    return jsonb_build_object('ok', false, 'code', 'BAD_URL');
+  end if;
+  v_prev := s.avatar_url;
+  update public.sellers set avatar_url = v_url where id = s.id;
+  return jsonb_build_object('ok', true, 'avatar_url', v_url, 'previous', v_prev);
+end;
+$$;
+revoke all on function public.myr_app_seller_avatar_set(uuid, text) from public, anon, authenticated;
+grant execute on function public.myr_app_seller_avatar_set(uuid, text) to service_role;
