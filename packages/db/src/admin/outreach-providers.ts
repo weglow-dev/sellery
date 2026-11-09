@@ -134,22 +134,32 @@ export function pickKoreaLocationId(json: unknown): number | string | null {
  * ============================================================ */
 
 export const META_GRAPH_VERSION = "v25.0";
+/** breakdown 은 metric 당 하나(대문자) — 실호출 확인 2026-10-22: "Param breakdown must be one of {AGE, FOLLOW_TYPE, GENDER, MEDIA_TYPE, TOP_CITIES, TOP_COUNTRIES}". 그래서 별칭(.as) 으로 세 번 요청 */
+export const META_CREATOR_FIELDS_BASE = "id,username,biography,category,profile_picture_url,insights.metric(total_followers,reels_interaction_rate,creator_engaged_accounts)";
 export const META_CREATOR_FIELDS =
-  "id,username,biography,category,profile_picture_url,is_account_verified,insights.metric(total_followers,reels_interaction_rate,creator_engaged_accounts).breakdown(gender,age,top_countries)";
+  META_CREATOR_FIELDS_BASE +
+  ",insights.metric(creator_engaged_accounts).breakdown(GENDER).as(ins_gender),insights.metric(creator_engaged_accounts).breakdown(AGE).as(ins_age),insights.metric(creator_engaged_accounts).breakdown(TOP_COUNTRIES).as(ins_geo)";
+/** Standard Access(모의 데이터)에서는 breakdown 이 거부된다 — 그때 이 메시지면 breakdown 없이 재시도 */
+export const isMetaBreakdownError = (msg: string | null | undefined): boolean => /breakdown/i.test(msg ?? "");
 
-export type MetaCreatorSearchOptions = { after?: string | null; limit?: number };
+/** Standard Access(앱 검수 전)에서 메타가 돌려주는 모의 크리에이터 — username 이 mocked_username_N · 팔로워 수백 */
+export const isMetaMockHandle = (handle: string | null | undefined): boolean => /^mocked_username_[0-9]+$/i.test(handle ?? "");
+/** 모의 행을 큐에 넣을 때 카테고리에 남기는 표시 */
+export const META_MOCK_CATEGORY = "모의 데이터(앱 검수 전)";
+
+export type MetaCreatorSearchOptions = { after?: string | null; limit?: number; breakdown?: boolean };
 
 /** 대표 조건 → 쿼리 파라미터. 모의/실데이터 모두 같은 모양 */
 export function metaCreatorSearchParams(o: MetaCreatorSearchOptions = {}): URLSearchParams {
   const q = new URLSearchParams();
+  // 실호출 확인(2026-10-22): 배열형 파라미터는 JSON 배열 문자열, 값은 소문자 — 아니면 #100 "must be an array" / "must be one of female, male, custom, unknown"
   q.set("creator_min_followers", String(OUTREACH_FILTER.minFollowers));
-  q.set("major_audience_gender", "female");
-  q.set("major_audience_countries", "KR");
-  q.set("creator_countries", "KR");
-  q.set("creator_latest_post_activity", "L90");
+  q.set("major_audience_gender", JSON.stringify(["female"]));
+  q.set("major_audience_countries", JSON.stringify(["KR"]));
+  q.set("creator_countries", JSON.stringify(["KR"]));
   q.set("exclude_messaged_creators", "true");
   q.set("limit", String(o.limit ?? 25));
-  q.set("fields", META_CREATOR_FIELDS);
+  q.set("fields", o.breakdown === false ? META_CREATOR_FIELDS_BASE : META_CREATOR_FIELDS);
   if (o.after) q.set("after", o.after);
   return q;
 }
@@ -163,9 +173,18 @@ function metricOf(insights: unknown, name: string): Obj | null {
   }
   return null;
 }
+/** 크리에이터 행의 insights · ins_gender · ins_age · ins_geo(별칭) 전부에서 metric 찾기 — 실데이터 모양: {name, period, time_range, total_value:{value, breakdowns?}} */
+function metricIn(creator: Obj, name: string, preferKey?: string): Obj | null {
+  const keys = [preferKey, "insights", ...Object.keys(creator).filter((k) => k.startsWith("ins_") && k !== preferKey)].filter((k): k is string => Boolean(k));
+  for (const k of keys) {
+    const m = metricOf(creator[k], name);
+    if (m && (!preferKey || k === preferKey || obj(m.total_value)?.breakdowns)) return m;
+  }
+  return null;
+}
 function metricValue(m: Obj | null): number | null {
   if (!m) return null;
-  const direct = num(m.value) ?? num(m.total_value);
+  const direct = num(m.value) ?? num(m.total_value) ?? num(obj(m.total_value)?.value);
   if (direct !== null) return direct;
   const vals = Array.isArray(m.values) ? m.values : [];
   const first = obj(vals[0]);
@@ -182,7 +201,7 @@ function breakdownPct(m: Obj | null, dimension: string): Record<string, number> 
   for (const b of breakdowns) {
     const bo = obj(b);
     const keys = Array.isArray(bo?.dimension_keys) ? bo!.dimension_keys : [];
-    if (keys.map(String).includes(dimension)) found = bo?.results;
+    if (keys.map((k) => String(k).toLowerCase()).includes(dimension)) found = bo?.results;
   }
   if (!found) {
     // 단순 모양: m.<dimension> = { FEMALE: 0.7 } 또는 m.breakdown[dimension]
@@ -223,13 +242,11 @@ export function parseMetaCreators(json: unknown): { rows: ProviderRow[]; after: 
     if (!c) continue;
     const handle = normalizeHandle(str(c.username) ?? "");
     if (!handle) continue;
-    const ins = c.insights;
-    const followers = metricValue(metricOf(ins, "total_followers"));
-    const er = metricValue(metricOf(ins, "reels_interaction_rate"));
-    const engaged = metricOf(ins, "creator_engaged_accounts");
-    const g = breakdownPct(engaged, "gender");
-    const ages = breakdownPct(engaged, "age");
-    const geo = breakdownPct(engaged, "top_countries");
+    const followers = metricValue(metricIn(c, "total_followers"));
+    const er = metricValue(metricIn(c, "reels_interaction_rate"));
+    const g = breakdownPct(metricIn(c, "creator_engaged_accounts", "ins_gender"), "gender");
+    const ages = breakdownPct(metricIn(c, "creator_engaged_accounts", "ins_age"), "age");
+    const geo = breakdownPct(metricIn(c, "creator_engaged_accounts", "ins_geo"), "top_countries");
     const female = g.FEMALE ?? g.F ?? null;
     const bands = ["18-24", "25-34", "35-44"].map((b) => ages[b] ?? 0);
     const age2040 = bands.some((b) => b > 0) ? Math.round(bands.reduce((x, y) => x + y, 0) * 10) / 10 : null;

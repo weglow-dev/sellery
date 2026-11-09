@@ -98,7 +98,7 @@ export const actions: Actions = {
       const key = r.code === 'NOT_CONFIGURED' ? 'not_configured' : 'provider_error';
       redirect(303, self(event.url, key, r.error ?? undefined));
     }
-    const url = new URL(self(event.url, 'collected', `${r.provider === 'meta' ? '메타 공식' : 'Modash'} · 받음 ${r.found} · 조건 통과 ${r.kept} · 새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}${r.provider === 'meta' && !r.after ? ' · 마지막 페이지' : ''}`), 'http://x');
+    const url = new URL(self(event.url, 'collected', `${r.provider === 'meta' ? '메타 공식' : 'Modash'} · 받음 ${r.found} · 조건 통과 ${r.kept} · 새 ${r.inserted} · 갱신 ${r.updated}${r.failed ? ` · 실패 ${r.failed}` : ''}${r.provider === 'meta' && !r.after ? ' · 마지막 페이지' : ''}${r.mock ? ' · 모의 데이터(앱 검수 전 · 연결 확인용)' : ''}`), 'http://x');
     url.searchParams.set('cpage', String(r.page + 1));
     if (r.after) url.searchParams.set('cafter', r.after);
     else url.searchParams.delete('cafter');
