@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
+	import { formatPhone } from '@sellery/myr-core/phone';
+	import { shortDate } from '@sellery/myr-core/order-view';
+	import { platformName } from '$lib/signup-rules';
 	import { untrack } from 'svelte';
 	import { SETTLE_STATUS_META, type SettleInfo } from '@sellery/myr-core/settle-info';
 	import { app } from '$lib/state.svelte';
@@ -15,6 +19,9 @@
 	let info = $state<SettleInfo | null>(untrack(() => data.info));
 	let editing = $state(untrack(() => !data.info || data.info.status === 'none'));
 	const st = $derived(SETTLE_STATUS_META[info?.status ?? 'none']);
+	// 사진 — 홈과 같은 값(지금은 홈에서 고른 사진 미리보기 · 저장된 사진) · 없으면 이니셜
+	const me = $derived(page.data.me as { initial: string; avatarBg: string; avatarUrl: string | null });
+	const photo = $derived(app.profilePhoto || me?.avatarUrl || '');
 	const TONE: Record<string, string> = { muted: 'bg-white/8 text-white/70', accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint', danger: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' };
 
 	async function saved(next: SettleInfo, recheck: boolean) {
@@ -34,10 +41,22 @@
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-10 lg:mt-6 lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:overflow-visible lg:px-0 lg:pb-0">
 		<div class="flex flex-col gap-3 lg:sticky lg:top-6">
 			<section aria-label="프로필" class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">
-				<p class="text-[17px] font-extrabold">{data.seller.name}</p>
-				<p class="mt-0.5 text-[13px] text-white/55">{data.seller.handle}</p>
-				<dl class="mt-3 flex flex-col gap-2 border-t border-white/8 pt-3 text-[13px]">
-					<div class="flex justify-between gap-3"><dt class="text-white/55">로그인 이메일</dt><dd class="min-w-0 truncate font-semibold">{data.seller.email ?? '—'}</dd></div>
+				<div class="flex items-center gap-3.5">
+					<span class="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-[22px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)]" style:background={me?.avatarBg}>
+						{#if photo}<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />{:else}{me?.initial}{/if}
+					</span>
+					<span class="min-w-0">
+						<span class="block truncate text-[18px] font-extrabold">{data.seller.name}</span>
+						<span class="mt-0.5 block truncate text-[13px] text-white/55">{data.seller.handle}</span>
+					</span>
+				</div>
+				<dl class="mt-4 flex flex-col gap-2.5 border-t border-white/8 pt-3.5 text-[13px]">
+					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">활동명</dt><dd class="min-w-0 truncate font-semibold">{data.seller.name}</dd></div>
+					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">핸들</dt><dd class="min-w-0 truncate font-semibold">{data.seller.handle}</dd></div>
+					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">대표 채널</dt><dd class="font-semibold">{platformName(data.seller.platform) || '—'}</dd></div>
+					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">연락처</dt><dd class="font-semibold tabular-nums">{data.seller.phone ? formatPhone(data.seller.phone) : '—'}</dd></div>
+					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">로그인 이메일</dt><dd class="min-w-0 truncate font-semibold">{data.seller.email ?? '—'}</dd></div>
+					{#if data.seller.joinedAt}<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">가입일</dt><dd class="font-semibold">{shortDate(data.seller.joinedAt)}</dd></div>{/if}
 				</dl>
 			</section>
 
