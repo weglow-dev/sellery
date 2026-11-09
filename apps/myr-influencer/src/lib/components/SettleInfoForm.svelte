@@ -18,6 +18,17 @@
 	let serverErr = $state<Partial<Record<SettleField, string>>>({});
 	let formError = $state<string | null>(null);
 	const saved = $derived({ hasBizNo: !!info?.hasBizNo, hasAccount: !!info?.hasAccount });
+	// 이미 넣은 정보를 고칠 때는 바뀐 것이 있어야 저장(2026-11-09) — 사업자번호 · 계좌는 새로 입력했으면 바뀐 것. 처음 넣을 때(미입력)는 늘 켜 둔다
+	const editing = $derived(!!info && info.status !== 'none');
+	const changed = $derived(
+		!editing ||
+			values.company.trim() !== (info?.company ?? '') ||
+			values.ceo.trim() !== (info?.ceo ?? '') ||
+			values.bank !== (info?.bank ?? '') ||
+			values.holder.trim() !== (info?.holder ?? '') ||
+			values.bizNo.trim() !== '' ||
+			values.account.trim() !== ''
+	);
 	const errs = $derived({ ...settleErrors(values, saved), ...serverErr });
 	const show = (k: SettleField) => (attempted || serverErr[k] ? errs[k] : undefined);
 	const clear = (k: SettleField) => {
@@ -26,6 +37,7 @@
 	};
 
 	async function save() {
+		if (!changed) return;
 		attempted = true;
 		const bad = SETTLE_FIELDS.find((k) => !!errs[k]);
 		if (bad) {
@@ -62,6 +74,6 @@
 	<SettleFields bind:values {info} {show} {clear} />
 
 	{#if formError}<p class="text-center text-[13px] font-semibold text-accent" role="alert">{formError}</p>{/if}
-	<button type="submit" disabled={busy} class={authButton(!busy)}>{busy ? '저장하는 중…' : submitLabel}</button>
+	<button type="submit" disabled={busy || !changed} class="{authButton(!busy && changed)} disabled:cursor-not-allowed">{busy ? '저장하는 중…' : changed ? submitLabel : '바뀐 내용이 없어요'}</button>
 	{#if footer}{@render footer()}{/if}
 </form>
