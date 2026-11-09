@@ -3,6 +3,7 @@
 	import { MYR_CATEGORIES } from '@sellery/myr-core/categories';
 	import { PRODUCT_IMAGE_ACCEPT, PRODUCT_IMAGE_MAX_BYTES } from '@sellery/myr-core/product-images';
 	import { TILE_BG, TILE_KEYS, type ProductDraft } from '$lib/data';
+	import { SETTLEMENT_PCT } from '@sellery/myr-core/settlement-rules';
 	import { MAX_IMAGES, formatPriceInput, imageHelp, marginText, parsePrice } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import { INPUT_LG, INPUT_SM, LABEL } from '$lib/ui';
@@ -165,6 +166,6 @@
 
 <div class="mt-4 flex items-center gap-3 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 lg:mt-[18px]">
 	<span class="shrink-0 text-[12px] text-white/50">예상 정산</span>
-	<span class="flex-1 text-[13px] text-white/75">판매가 − 플랫폼 수수료 10%</span>
+	<span class="flex-1 text-[13px] text-white/75">판매가의 {SETTLEMENT_PCT}% · 제조금액 상계 전</span>
 	<span class="text-[15px] font-extrabold whitespace-nowrap text-accent">{marginText(parsePrice(ed.price))}</span>
 </div>

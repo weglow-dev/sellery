@@ -1,12 +1,12 @@
 /** 콘솔 화면 규칙 — 내 제품 탭 필터 · 상품 에디터 검증과 미리보기 요약(교환 · 환불은 7번 · 0078 에서 lib/claims.ts 로).
  *  디자인(Claude Design "MYR Influencer Admin")의 renderVals 계산을 순수 함수로 옮겼다. $app · $env 를 import 하지 않는다 — src/test/rules.test.ts.
  *
- *  ⚠ PLATFORM_FEE_RATE 10%(에디터 "예상 정산")는 **디자인 값**이고 정책이 아니다 — 정산 정책이 정해지면(docs/myr.md §9-6) 서버 값으로 바꾼다.
+ *  에디터 "예상 정산" 은 정산 정책(docs/myr.md §9-6 · 판매가의 60%)을 `@sellery/myr-core/settlement-rules` 에서 읽는다(2026-11-09 · 디자인 값 10% 폐기).
  *    단순 변심 왕복 배송비는 0078 부터 서버 값(platform_settings 'myr_claim_return_fee' · claim JSON return_fee). */
 import { myrCategoryName } from '@sellery/myr-core/categories';
+import { settlementOf } from '@sellery/myr-core/settlement-rules';
 import { type Product, type ProductDraft, type ProductStatus } from './data';
 
-export const PLATFORM_FEE_RATE = 0.1;
 export const MAX_IMAGES = 6;
 export const EDITOR_STEPS = 8;
 
@@ -90,7 +90,8 @@ export const formatPriceInput = (v: string) => {
 	const n = parsePrice(v);
 	return n ? n.toLocaleString('ko-KR') : '';
 };
-export const marginText = (price: number) => (price ? `${won(price - Math.round(price * PLATFORM_FEE_RATE))} / 개` : '—');
+/** 예상 정산(개당) — 판매가의 60%(§9-6 · 제조금액 상계 전) */
+export const marginText = (price: number) => (price ? `${won(settlementOf(price))} / 개` : '—');
 
 export type SectionKey = 'basics' | 'note' | 'story' | 'ingredients' | 'howto' | 'info' | 'faq';
 
