@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { Product } from '$lib/data';
-	import { STATUS_ACTION_DONE, productMenu, type ProductMenuItem } from '$lib/product-draft';
+	import { STATUS_ACTION_DONE, opensReview, productMenu, type ProductMenuItem } from '$lib/product-draft';
 	import { PRODUCT_STATUS_META, PRODUCT_TABS, filterProducts, isSoldOut, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import { app } from '$lib/state.svelte';
@@ -29,9 +29,9 @@
 	let busy = $state(false);
 	const menuItems = $derived(menuFor ? productMenu(menuFor.status, menuFor.revision?.state ?? null) : []);
 
-	/** 반려 상품은 바로 "심사 결과"(시안) · 그 밖은 메뉴(수정 반려면 "심사 결과 보기" 가 맨 위) */
+	/** 반려 · 수정 반려는 바로 "심사 결과"(시안 · 수정 반려도 같게 2026-11-09) · 그 밖은 메뉴 */
 	function open(p: Product) {
-		if (p.status === 'rejected') goto(`/products/${encodeURIComponent(p.id)}/review`);
+		if (opensReview(p.status, p.revision?.state ?? null)) goto(`/products/${encodeURIComponent(p.id)}/review`);
 		else if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
 		else if (p.revision?.state === 'review') app.showToast('수정 내용을 운영팀이 심사하고 있어요. 승인 전까지 샵은 지금 내용으로 판매해요');

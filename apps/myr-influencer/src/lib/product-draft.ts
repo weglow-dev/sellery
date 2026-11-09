@@ -112,6 +112,9 @@ export const isEditableStatus = (s: ProductStatus) => s === 'draft' || s === 're
 /** 수정 심사로 고치는 상태(4-2) — 판매 중 · 일시중지(샵은 승인 전까지 지금 내용) */
 export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'paused';
 
+/** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 수정 반려(2026-11-09 수정 반려도 반려와 같게) */
+export const opensReview = (s: ProductStatus, revision: 'review' | 'rejected' | null = null): boolean => s === 'rejected' || revision === 'rejected';
+
 export type ProductMenuItem = { kind: 'edit' | 'review' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
 /** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 일시중지 · 다시 판매 · 판매 종료는 메뉴에 없다(운영만 · 0082 · 0083 · §9-6). 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고,

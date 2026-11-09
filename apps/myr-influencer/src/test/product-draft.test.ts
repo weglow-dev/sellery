@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SellerProductDetail } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON } from '../lib/data';
 import { blankDraft } from '../lib/rules';
-import { detailToDraft, draftToPayload, draftVisual, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf } from '../lib/product-draft';
+import { detailToDraft, draftToPayload, draftVisual, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf, opensReview } from '../lib/product-draft';
 
 const IMG = 'https://x.supabase.co/storage/v1/object/public/myr-products/s1/0f8a1c2e.jpg';
 
@@ -88,5 +88,15 @@ describe('saveFailure · 메뉴', () => {
 		expect(productMenu('ended')).toEqual([]);
 		expect(productMenu('live').some((m) => (m.kind as string) === 'end')).toBe(false);
 		expect(productMenu('draft').find((m) => m.kind === 'delete')?.confirm).toBeTruthy();
+	});
+});
+
+describe('목록에서 바로 심사 결과로', () => {
+	it('반려 · 수정 반려는 메뉴 없이 심사 결과 — 수정 심사 중 · 판매 중은 아님', () => {
+		expect(opensReview('rejected')).toBe(true);
+		expect(opensReview('live', 'rejected')).toBe(true);
+		expect(opensReview('paused', 'rejected')).toBe(true);
+		expect(opensReview('live', 'review')).toBe(false);
+		expect(opensReview('live')).toBe(false);
 	});
 });
