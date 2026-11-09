@@ -7,11 +7,20 @@ import { acceptInvite, handleStatusOnly, requestReinvite, viewInvite } from '$li
 import { previewTokenOf } from '$lib/server/invite-preview';
 import { previewInvite } from '$lib/invite-preview';
 import { HANDLE_STATUS_MESSAGE } from '$lib/signup-rules';
+import { parseSettleBody, SETTLE_FIELDS, settleErrors, type SettleValues } from '@sellery/myr-core/settle-info';
+import { saveSettleInfoOfUser } from '$lib/server/settle-info';
+
+/** 가입 폼 04 사업자 · 정산 정보(선택 · 0085) — 비었으면 null · 하나라도 썼으면 칸 검사(화면과 같은 규칙) */
+function parseSettleForm(fd: FormData): { values: SettleValues; used: boolean } {
+	const g = (k: string) => (typeof fd.get(`settle_${k}`) === 'string' ? String(fd.get(`settle_${k}`)) : '');
+	const values: SettleValues = { company: g('company'), ceo: g('ceo'), bizNo: g('bizNo'), bank: g('bank'), account: g('account'), holder: g('holder') };
+	return { values, used: SETTLE_FIELDS.some((k) => values[k].trim() !== '') };
+}
 
 /**
  * 초대 가입 `/invite/<토큰>` — 시안 "MYR Influencer Signup"(모바일 · PC)의 네 화면(초대장 · 가입 폼 · 환영 · 만료) · docs/myr.md 결정 14 · §4.2.1 10번.
  *   load     토큰 → 초대(0070 myr_app_invite_view). 열리지 않으면(없음 · 만료 · 사용됨 · 취소) 만료 화면
- *   signup   가입 — 칸 검증(signup-rules · 화면과 같은 함수) → 계정 생성 + 크리에이터 연결(myr-core acceptInvite) → 바로 로그인
+ *   signup   가입 — 칸 검증(signup-rules · 화면과 같은 함수) → 계정 생성 + 크리에이터 연결(myr-core acceptInvite) → (04 사업자 · 정산 정보를 썼으면 저장 · 0085) → 바로 로그인
  *   request  만료 화면 "새 초대 요청하기" → 그 초대에 요청 기록(운영 목록 requested)
  * 토큰은 이 경로에만 실린다(로그 · 응답에 다시 싣지 않는다). 레이트리밋은 IP 기준(함수 인스턴스 메모리 — 느슨한 상한).
  * 미리보기 주소(dev · Vercel Preview 만 — lib/invite-preview.ts): /invite/preview · preview-used · preview-expired — 저장하지 않는다.
@@ -33,13 +42,22 @@ export const actions: Actions = {
 	signup: async ({ params, request, locals, getClientAddress }) => {
 		if (!rateLimit(`invite-signup:${getClientAddress()}`, 10)) return fail(429, { action: 'signup' as const, message: '시도가 너무 많아요. 잠시 후 다시 시도해주세요' });
 		if (!hasAdmin()) return fail(503, { action: 'signup' as const, message: '가입 서버 설정이 아직 끝나지 않았어요' });
-		const values = parseSignupForm(await request.formData());
+		const fd = await request.formData();
+		const values = parseSignupForm(fd);
+		const settle = parseSettleForm(fd);
 
 		// 1. 칸 검증 — 화면과 같은 규칙(브라우저 검사를 건너뛴 요청도 여기서 막힌다)
 		const errs = signupErrors(values);
 		const bad = SIGNUP_FIELDS.find((k) => !!errs[k]);
 		if (bad) return fail(400, { action: 'signup' as const, field: bad, message: errs[bad] });
 		if (!allAgreed(values.agreed)) return fail(400, { action: 'signup' as const, field: 'terms' as const, message: '약관과 개인정보 수집 · 이용에 동의해주세요' });
+		// 04 사업자 · 정산 정보 — 썼으면 계정을 만들기 전에 칸 검사(가입은 됐는데 정보만 거부되는 일을 줄인다)
+		const settleBody = settle.used ? parseSettleBody(settle.values) : null;
+		if (settle.used) {
+			const se = settleErrors(settle.values);
+			const bad = SETTLE_FIELDS.find((k) => !!se[k]);
+			if (bad || !settleBody) return fail(400, { action: 'signup' as const, settleField: bad ?? ('company' as const), message: (bad && se[bad]) || '사업자 · 정산 정보를 확인해 주세요' });
+		}
 
 		// 미리보기 — 핸들은 실제 DB 규칙으로 보고, 저장 없이 환영 화면으로
 		if (previewTokenOf(params.token)) {
@@ -64,14 +82,22 @@ export const actions: Actions = {
 			return fail('screen' in f ? 410 : 400, { action: 'signup' as const, code: r.code, ...f });
 		}
 
-		// 3. 바로 로그인(실패해도 가입은 끝났다 — 환영 화면의 버튼이 로그인으로 보낸다)
+		// 3. 사업자 · 정산 정보(썼으면) — 실패해도 가입은 끝났다(환영 화면이 내 정보에서 다시 넣으라고 알린다)
+		let settleSaved: boolean | null = null;
+		if (settleBody) {
+			const sr = await saveSettleInfoOfUser(r.userId, settleBody);
+			settleSaved = sr.ok;
+			if (!sr.ok) console.warn('[invite] settle info save failed:', sr.code);
+		}
+
+		// 4. 바로 로그인(실패해도 가입은 끝났다 — 환영 화면의 버튼이 로그인으로 보낸다)
 		let signedIn = false;
 		if (locals.supabase) {
 			const { error } = await locals.supabase.auth.signInWithPassword({ email: r.email, password: values.password });
 			if (error) console.warn('[invite] signIn after signup:', error.message);
 			signedIn = !error;
 		}
-		return { action: 'signup' as const, ok: true as const, signedIn, handle: r.handle };
+		return { action: 'signup' as const, ok: true as const, signedIn, handle: r.handle, settleSaved };
 	},
 
 	request: async ({ params, getClientAddress }) => {
