@@ -457,7 +457,7 @@
 					<!-- 04 사업자 · 정산 정보(선택 · 0085) -->
 					<p class="mt-8 mb-1.5 lg:mt-9 {sectionLabel}">04 · 사업자 · 정산 정보 <span class="font-semibold text-white/45">(선택)</span></p>
 					<p class="mb-4 {AUTH_HINT}">MYR 은 사업자 크리에이터와 함께해요. 지금 비워 두고 가입한 뒤 <b class="font-bold text-white/70">내 정보</b>에서 넣어도 돼요 — 정보가 확인돼야 정산금이 지급돼요.</p>
-					<div class="flex flex-col gap-6 lg:max-w-[440px]">
+					<div class="flex flex-col gap-6">
 						<SettleFields bind:values={settle} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
 					</div>
 
