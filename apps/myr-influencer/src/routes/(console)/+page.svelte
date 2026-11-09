@@ -9,6 +9,7 @@
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import UserMenu from '$lib/components/UserMenu.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 최근 7일 판매 막대.
@@ -24,37 +25,44 @@
 	const todayInq = $derived(data.todayInquiries);
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
-	const photo = $derived(app.profilePhoto || me.avatarUrl);
+	const photo = $derived(me.avatarUrl);
 	// 고객 문의 답변 대기(0075) · 교환 · 환불 처리 대기(0078) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
 	$effect(() => {
 		app.inqWaiting = data.inqWaiting;
 		app.claimWaiting = data.claimWaiting;
 	});
 	const csCount = $derived(data.claimWaiting + data.inqWaiting);
+	const needsSettle = $derived(data.settleStatus === 'none' || data.settleStatus === 'rejected');
 
-	function pickPhoto(e: Event & { currentTarget: HTMLInputElement }) {
-		const f = e.currentTarget.files?.[0];
-		e.currentTarget.value = '';
-		if (f) app.setProfilePhoto(f);
-	}
 </script>
+
+{#snippet settleBanner()}
+	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-[#ff6b6b]/35 bg-[#ff6b6b]/10 px-4 py-3 text-[13px] lg:gap-4 lg:px-5 lg:text-[14px]">
+		<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-[#ff8a8a]">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65">정보가 확인돼야 정산금이 지급돼요</span></span>
+		<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-[#ff8a8a]" />
+	</a>
+{/snippet}
 
 <!-- PC: 최소 높이 = <main>(화면 − 상단 내비) — 아래 2단이 남은 높이를 채운다. 내용이 더 길면 그대로 스크롤 -->
 <div class="no-bar min-h-0 flex-1 animate-up-in overflow-y-auto px-5 pb-6 lg:mx-auto lg:flex lg:min-h-full lg:w-full lg:max-w-[1240px] lg:flex-col lg:overflow-visible lg:px-10 lg:pt-7 lg:pb-10">
-	<!-- 모바일 상단(로고 · 알림) — PC 는 상단 내비가 대신 -->
+	<!-- 모바일 상단(로고 · 알림 · 내 계정 메뉴) — PC 는 상단 내비가 대신 -->
 	<div class="flex h-[60px] items-center justify-between lg:hidden">
 		<div class="flex items-center gap-2.5">
 			<img src="/myr-logo.svg" alt="MYR" class="block h-7 w-auto" />
 			<span class="rounded-md bg-accent/14 px-2 py-1 text-[11px] font-extrabold tracking-[0.06em] text-accent">CREATOR</span>
 		</div>
-		<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
-			<Icon id="bell" size={20} />
-			{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
-		</a>
+		<div class="flex items-center gap-2.5">
+			<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
+				<Icon id="bell" size={20} />
+				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<UserMenu />
+		</div>
 	</div>
 
 	<div class="mt-1.5 flex items-center gap-3 lg:mt-0 lg:gap-3.5">
-		<label class="relative h-14 w-14 shrink-0 cursor-pointer" aria-label="프로필 사진 등록">
+		<!-- 프로필 사진 — 보기만(바꾸기는 내 정보 · 0085). 누르면 내 정보로 -->
+		<a href="/my" class="relative h-14 w-14 shrink-0" aria-label="내 정보 · 프로필 사진">
 			<span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-full text-[19px] font-extrabold text-bg shadow-[0_0_0_2px_#0a0b0e,0_0_0_3.5px_rgba(255,255,255,.12)] lg:text-[20px]" style:background={me.avatarBg}>
 				{#if photo}
 					<img src={photo} alt="" class="absolute inset-0 h-full w-full object-cover" />
@@ -62,25 +70,17 @@
 					{me.initial}
 				{/if}
 			</span>
-			<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-			{#if !photo}
-				<span class="absolute -right-[3px] -bottom-[3px] flex h-6 w-6 items-center justify-center rounded-full border-2 border-bg bg-accent text-bg"><Icon id="cam" size={12} sw={2.4} /></span>
-			{/if}
-		</label>
-		<div class="min-w-0 flex-1">
+		</a>
+		<div class="min-w-0 flex-1 {needsSettle ? 'lg:flex-none' : ''}">
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
 			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · 오늘도 좋은 하루예요</p>
-			{#if photo}
-				<label class="relative mt-1.5 block w-fit cursor-pointer text-[12px] font-bold text-accent lg:hidden">
-					사진 변경<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-				</label>
-			{/if}
 		</div>
-		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
-		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">
-			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
-		</form>
+		<!-- PC — 정산 정보 배너는 프로필 오른쪽 남는 자리에(아래 카드들을 밀어내지 않게 · 2026-11-09) -->
+		{#if needsSettle}<div class="hidden min-w-0 flex-1 lg:ml-6 lg:flex">{@render settleBanner()}</div>{/if}
 	</div>
+
+	<!-- 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 배너(정산은 계산되고 지급만 보류). 모바일은 프로필 아래 한 줄 · PC 는 프로필 오른쪽(위 줄 snippet) -->
+	{#if needsSettle}<div class="mt-4 lg:hidden">{@render settleBanner()}</div>{/if}
 
 	<div class="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-3.5">
 		<div class="relative col-span-2 overflow-hidden rounded-3xl bg-panel p-5 lg:col-span-1 lg:px-7 lg:py-[26px]">

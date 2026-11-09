@@ -92,7 +92,7 @@ export async function checkHandle(token: string, handle: string): Promise<Handle
 }
 
 export type AcceptInput = { token: string; password: string; name: string; handle: string; platform: string; phone: string; termsAgreedAt: string };
-export type AcceptResult = { ok: true; email: string; sellerId: string; handle: string } | { ok: false; code: AcceptCode; field?: string };
+export type AcceptResult = { ok: true; email: string; userId: string; sellerId: string; handle: string } | { ok: false; code: AcceptCode; field?: string };
 
 /** Supabase Auth 의 "이미 있는 이메일" 오류 */
 const isEmailExists = (e: { code?: string; message?: string }): boolean => e.code === 'email_exists' || /already (been )?registered|already exists/i.test(e.message ?? '');
@@ -130,7 +130,7 @@ export async function acceptInvite(input: AcceptInput): Promise<AcceptResult> {
 		if (dErr) console.error('[invite] rollback deleteUser failed:', dErr.message);
 		return { ok: false, code: (r?.code as AcceptCode) ?? 'DB_ERROR', ...(r?.field ? { field: String(r.field) } : {}) };
 	}
-	return { ok: true, email: view.email, sellerId: String(r.seller_id), handle: String(r.handle) };
+	return { ok: true, email: view.email, userId, sellerId: String(r.seller_id), handle: String(r.handle) };
 }
 
 export async function requestReinvite(token: string): Promise<{ ok: true; email: string } | { ok: false; code: 'NOT_FOUND' | 'USED' | 'DB_ERROR' }> {

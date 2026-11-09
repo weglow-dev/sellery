@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import type { Me } from '$lib/data';
-	import { app } from '$lib/state.svelte';
+		import { app } from '$lib/state.svelte';
 	import Icon from './Icon.svelte';
+	import UserMenu from './UserMenu.svelte';
 
-	/** PC(lg~) 상단 내비 72px — 로고 · 홈 · CS 관리(처리 대기 뱃지) · 내 제품 · 알림. 모바일은 하단 탭바(TabBar)가 대신한다.
+	/** PC(lg~) 상단 내비 72px — 로고 · 홈 · CS 관리(처리 대기 뱃지) · 주문 · 내 제품 · 알림 · 내 계정 메뉴(내 정보 · 로그아웃 — UserMenu). 모바일은 하단 탭바(TabBar)가 대신한다.
 	 *  활성 판정: 홈은 정확히 '/', CS 는 목록·상세, 내 제품은 목록·에디터·완료 화면까지 (디자인 "MYR Influencer Admin PC" navLinks) */
 	const links = [
 		{ href: '/', name: '홈' },
@@ -13,8 +13,6 @@
 		{ href: '/products', name: '내 제품' }
 	];
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
-	/** 로그인한 크리에이터 — 오른쪽 끝 이름 · 로그아웃 */
-	const me = $derived(page.data.me as Me | undefined);
 	/** 처리 대기 CS = 교환·환불 처리 대기(0078) + 고객 문의 답변 대기(0075) */
 	const csCount = $derived(app.csBadge(page.data.inqWaiting, page.data.claimWaiting));
 </script>
@@ -37,17 +35,12 @@
 				</a>
 			{/each}
 		</nav>
-		<a href="/cs" aria-label="알림 · 처리 대기 CS {csCount}건" class="relative ml-auto flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
-			<Icon id="bell" size={20} />
-			{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
-		</a>
-		{#if me}
-			<div class="flex items-center gap-3">
-				<span class="max-w-[160px] truncate text-[14px] font-bold text-white/80" title={me.handle}>{me.name}</span>
-				<form method="POST" action="/auth/signout">
-					<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[13px] font-bold text-white/70 transition-colors hover:border-white/25 hover:text-fg">로그아웃</button>
-				</form>
-			</div>
-		{/if}
+		<div class="ml-auto flex items-center gap-2.5">
+			<a href="/cs" aria-label="알림 · 처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
+				<Icon id="bell" size={20} />
+				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<UserMenu />
+		</div>
 	</div>
 </header>

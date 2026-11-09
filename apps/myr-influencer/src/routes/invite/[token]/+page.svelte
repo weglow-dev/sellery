@@ -30,9 +30,13 @@
 	import CheckBox from '$lib/components/auth/CheckBox.svelte';
 	import ErrorText from '$lib/components/auth/ErrorText.svelte';
 	import PasswordToggle from '$lib/components/auth/PasswordToggle.svelte';
+	import SettleFields from '$lib/components/SettleFields.svelte';
+	import { SETTLE_FIELDS, settleErrors, type SettleField, type SettleValues } from '@sellery/myr-core/settle-info';
 
 	/**
 	 * 크리에이터 초대 가입 — 시안 "MYR Influencer Signup"(모바일) · "… PC". 화면 넷: 초대장 → 가입 폼 → 환영 / 만료.
+	 * 가입 폼 04 = **사업자 · 정산 정보(선택 · 한 폼 · 0085 · 2026-11-09)** — 비워 두면 가입만, 하나라도 쓰면 전부 맞아야 가입 버튼이 보낸다(서버가 같은 규칙으로 다시 본다).
+	 *   비워 두면 콘솔 홈 배너 · 내 정보 `/my` 에서 넣는다.
 	 * 가입은 form action `?/signup`(+page.server.ts — 계정 생성 · 크리에이터 연결 · 바로 로그인). 칸 규칙 · 문구는 lib/signup-rules.ts(서버 검증도 같은 함수).
 	 * 핸들 중복 · 예약어는 칸을 **벗어날 때** 한 번 서버에 묻는다(`./handle` · 같은 핸들은 기억) — 가입 때 서버가 다시 본다(경합).
 	 * 시안과 다른 점(정한 가입 방식에 맞춤 · docs/myr.md §4.2.1):
@@ -60,6 +64,16 @@
 	});
 	let touched = $state<Partial<Record<SignupField, boolean>>>({});
 	let attempted = $state(false);
+	// 04 사업자 · 정산 정보(선택) — 하나라도 쓰면 전부 검사
+	let settle = $state<SettleValues>({ company: '', ceo: '', bizNo: '', bank: '', account: '', holder: '' });
+	let settleServerErr = $state<Partial<Record<SettleField, string>>>({});
+	const settleUsed = $derived(SETTLE_FIELDS.some((k) => settle[k].trim() !== ''));
+	const settleErrs = $derived(settleUsed ? { ...settleErrors(settle), ...settleServerErr } : settleServerErr);
+	const settleBad = $derived(SETTLE_FIELDS.find((k) => !!settleErrs[k]));
+	const settleShow = (k: SettleField) => (attempted || settleServerErr[k] ? settleErrs[k] : undefined);
+	const settleClear = (k: SettleField) => {
+		if (settleServerErr[k]) settleServerErr = { ...settleServerErr, [k]: undefined };
+	};
 	let showPw = $state(false);
 	let toast = $state<string | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -171,6 +185,13 @@
 			goToField(SIGNUP_FIELDS.find((k) => !!errs[k]));
 			return;
 		}
+		if (settleBad) {
+			cancel();
+			attempted = true;
+			document.getElementById(`s-${settleBad}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			document.getElementById(`s-${settleBad}`)?.focus({ preventScroll: true });
+			return;
+		}
 		busy = true;
 		formError = null;
 		return async ({ result }) => {
@@ -178,10 +199,16 @@
 			if (result.type === 'success' && result.data?.ok) {
 				signedIn = result.data.signedIn === true;
 				screen = 'done';
+				if (result.data.settleSaved === false) showToast('정산 정보는 저장하지 못했어요 · 내 정보에서 다시 넣어주세요');
 				window.scrollTo(0, 0);
 				return;
 			}
-			const d = (result.type === 'failure' ? result.data : null) as { screen?: string; code?: string; field?: SignupField | 'terms'; message?: string } | null;
+			const d = (result.type === 'failure' ? result.data : null) as { screen?: string; code?: string; field?: SignupField | 'terms'; settleField?: SettleField; message?: string } | null;
+			if (d?.settleField && d.message) {
+				settleServerErr = { ...settleServerErr, [d.settleField]: d.message };
+				document.getElementById(`s-${d.settleField}`)?.focus();
+				return;
+			}
 			if (d?.screen === 'expired') {
 				closedReason = d.code ?? null;
 				screen = 'expired';
@@ -426,6 +453,13 @@
 						{#if shown('phone')}<ErrorText id="e-phone" text={errText('phone')} />{/if}
 					</div>
 					{#if !shown('phone')}<p id="h-phone" class="mt-2 {AUTH_HINT}">제조 미팅 · 발주 연락에만 쓰고 샵에는 보이지 않아요.</p>{/if}
+
+					<!-- 04 사업자 · 정산 정보(선택 · 0085) -->
+					<p class="mt-8 mb-1.5 lg:mt-9 {sectionLabel}">04 · 사업자 · 정산 정보 <span class="font-semibold text-white/45">(선택)</span></p>
+					<p class="mb-4 {AUTH_HINT}">MYR 은 사업자 크리에이터와 함께해요. 지금 비워 두고 가입한 뒤 <b class="font-bold text-white/70">내 정보</b>에서 넣어도 돼요 — 정보가 확인돼야 정산금이 지급돼요.</p>
+					<div class="flex flex-col gap-6">
+						<SettleFields bind:values={settle} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
+					</div>
 
 					<!-- 약관 -->
 					<div id="f-terms" class="mt-7 rounded-2xl border bg-white/3 px-4 py-1 lg:mt-8 {termsErr ? 'border-accent' : 'border-white/8'}">
