@@ -12,6 +12,7 @@ export const ORDER_EMPTY: Record<string, string> = {
 	prep: '출고를 기다리는 주문이 없어요',
 	shipping: '배송 중인 주문이 없어요',
 	delivered: '배송 완료된 주문이 없어요',
+	claim: '진행 중인 교환·환불 요청이 없어요',
 	refunded: '환불된 주문이 없어요'
 };
 

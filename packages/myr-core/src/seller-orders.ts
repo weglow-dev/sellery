@@ -3,6 +3,7 @@
  *   - 주문 1건 = 결제된 주문 중 **내 줄**만(다른 크리에이터 줄 · 금액 · 송장은 DB 가 싣지 않는다). 고객은 가린 이름만.
  *   - 상태 칩 판정: 내 줄에 진행 중인 교환·환불 요청 → 요청 상태(샵 주문 칩과 같은 CLAIM_LABELS) · 남은 줄이 없으면 환불 완료 ·
  *     그 밖엔 남은 줄의 가장 덜 진행된 배송 상태(SHIP_LABELS · 0077 myr_order_ship_status 와 같은 생각).
+ *   - 탭: 교환·환불(진행 중 요청) → 환불(부분 포함) → 배송 상태 — 한 주문은 한 탭에만(sellerOrderTab).
  */
 import { CLAIM_LABELS, isShipStatus, SHIP_LABELS, type OpenClaimStatus, type ShipStatus, type StatusLabel } from './order-view';
 
@@ -88,16 +89,23 @@ export function sellerOrderLabel(o: Pick<SellerOrder, 'items'>): StatusLabel {
 	return ship ? SHIP_LABELS[ship] : { text: '환불 완료', tone: 'muted' };
 }
 
-/** 목록 탭 — 배송 준비(결제 완료 · 배송 준비중) · 배송 중 · 배송 완료 · 환불(내 줄이 모두 환불 · 취소) */
-export type SellerOrderTab = 'all' | 'prep' | 'shipping' | 'delivered' | 'refunded';
+/** 환불이 하나라도 있었나 — 내 줄 중 환불 수량이 있거나 취소된 줄(부분 환불 포함) */
+export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some((i) => i.refundedQty > 0 || i.status === 'CANCELED');
+
+/** 목록 탭 — 한 주문은 한 탭에만(2026-11-09 대표 결정). 우선순위 교환·환불(진행 중 요청) → 환불(부분 포함) → 배송 상태.
+ *  요청이 끝나면(완료 · 반려) 다시 환불 또는 배송 상태 탭으로 돌아간다. 배송 완료 = 요청 · 환불 없이 끝난 주문 */
+export type SellerOrderTab = 'all' | 'prep' | 'shipping' | 'delivered' | 'claim' | 'refunded';
 export const SELLER_ORDER_TABS: { id: SellerOrderTab; name: string }[] = [
 	{ id: 'all', name: '전체' },
 	{ id: 'prep', name: '배송 준비' },
 	{ id: 'shipping', name: '배송 중' },
 	{ id: 'delivered', name: '배송 완료' },
+	{ id: 'claim', name: '교환·환불' },
 	{ id: 'refunded', name: '환불' }
 ];
 export function sellerOrderTab(o: Pick<SellerOrder, 'items'>): Exclude<SellerOrderTab, 'all'> {
+	if (sellerClaimStatus(o)) return 'claim';
+	if (hasSellerRefund(o)) return 'refunded';
 	const ship = sellerShipStatus(o);
 	if (!ship) return 'refunded';
 	return ship === 'SHIPPING' ? 'shipping' : ship === 'DELIVERED' ? 'delivered' : 'prep';

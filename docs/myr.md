@@ -297,7 +297,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 남은 것(이벗 확정 뒤): 이벗 계정 · 상품코드 발급 절차 · 보내는 사람(§9-14) · 실제 API 로 리허설 · 이벗이 주는 택배사(`EBUT_COURIER`) · 실행 기록 표(`myr_ebut_runs` · 선택)
 - **6. 주문 열람(읽기 전용) — 완료(2026-11-06 · 0081)**
     - **0081** `myr_app_seller_orders(seller, limit)` · `_of_user(user, limit)`(게이트와 동시에) — 결제된 주문(PAID · PARTIAL_REFUNDED · REFUNDED — 0076 실적과 같은 기준)만 · **내 줄만**(섞인 주문의 다른 크리에이터 줄 · 송장 없음) · 고객은 `myr_mask_name`(김*은) · 연락처 · 주소 · 이메일 없음 · 줄마다 배송 상태 · 송장 · 환불 수량/금액 · 진행 중 교환·환불 요청(코드 · 상태)
-    - 공용 순수 `@sellery/myr-core/seller-orders`(파서 · 상태 칩 = 진행 중 요청 → 환불 완료 → 남은 줄의 가장 덜 진행된 배송 상태 · 탭 전체/배송 준비/배송 중/배송 완료/환불 · 내 줄 금액 · 박스) · 서버 `server/seller-orders`
+    - 공용 순수 `@sellery/myr-core/seller-orders`(파서 · 상태 칩 = 진행 중 요청 → 환불 완료 → 남은 줄의 가장 덜 진행된 배송 상태 · 탭 전체/배송 준비/배송 중/배송 완료/교환·환불/환불 — 한 주문은 한 탭에만 · 우선순위 진행 중 요청 → 환불(부분 포함) → 배송 상태(2026-11-09) · 내 줄 금액 · 박스) · 서버 `server/seller-orders`
     - 콘솔 `/orders`(시안 없음 — CS 관리 목록 카드에 맞춤 · 모바일 한 줄 · PC 2단) · 메뉴 "주문"(하단 탭 · 상단 내비) · 카드 = 주문번호 · 상태 칩 · 결제일 · 가린 이름 · 내 줄(상품 × 수량 · 금액 · n개 환불 · 섞이면 줄 상태 · 요청 → CS 상세) · 운송장(조회 링크) 또는 출고 안내 · 내 상품 금액(환불 빼고). **셀러 환불 버튼 없음**(7번 승인 흐름으로)
 - **7. 교환·환불 승인형 CS — 완료(2026-11-06 · 0078)**
     - **DB** `myr_refund_requests`(요청 1건 = 주문 줄 1개 · 수량 · 종류 refund/exchange · 사유 단순 변심/파손 · 누액/오배송 · 상세 · 사진(`myr-refunds` 경로) · 상태 pending → progress → done | rejected · 처리 방법 · 크리에이터 메시지 · 회수/재발송/환불 할 일과 시각 · 줄마다 진행 중 요청 하나). 판정은 DB 한 곳 — 처리 방법 선택지 `myr_refund_request_options` · 지금 단계 `myr_refund_request_step`(decide → collect → refund → reship) · 완료 판정 `myr_refund_request_finish` · 뺄 배송비 `myr_refund_request_fee_due`
