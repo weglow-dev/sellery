@@ -13,7 +13,7 @@
 	<a href="/p/{p.code}" class="flex flex-col text-fg">
 		<Tile tile={p.tile} ic={p.ic} thumbUrl={p.thumbUrl} alt={p.name} icon={72} class="relative w-full {wide ? 'aspect-square lg:aspect-[4/3]' : 'aspect-square'} lg:[&>svg]:h-24 lg:[&>svg]:w-24" />
 		{#if p.soldOut}
-			<span class="absolute top-2.5 left-2.5 rounded-full bg-bg/70 px-2 py-1 text-[11px] font-bold text-fg-faint backdrop-blur-sm lg:top-3 lg:left-3">품절</span>
+			<span class="absolute top-2.5 left-2.5 rounded-full bg-[#ff5c8a] px-2 py-1 text-[11px] font-bold text-white lg:top-3 lg:left-3">품절</span>
 		{:else if p.tag}
 			<span class="absolute top-2.5 left-2.5 rounded-full bg-bg/60 px-2 py-1 text-[11px] font-bold backdrop-blur-sm lg:top-3 lg:left-3">{p.tag}</span>
 		{/if}
