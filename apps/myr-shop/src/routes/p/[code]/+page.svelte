@@ -241,7 +241,7 @@
 			{/each}
 		</div>
 		<div class="flex items-center gap-2.5">
-			<QtyStepper {qty} onchange={(q) => (qty = q)} />
+			<QtyStepper {qty} onchange={(q) => (qty = q)} disabled={p.soldOut} />
 			<button
 				type="button"
 				onclick={() => shop.toggleLike(p)}
@@ -256,7 +256,7 @@
 			type="button"
 			onclick={add}
 			disabled={p.soldOut}
-			class="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold whitespace-nowrap transition-colors duration-250 {added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg hover:bg-[#ff8f5c]'}"
+			class="flex h-[58px] w-full items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold whitespace-nowrap transition-colors duration-250 {p.soldOut ? 'cursor-not-allowed bg-white/8 text-white/40' : added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg hover:bg-[#ff8f5c]'}"
 		>
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
@@ -273,12 +273,12 @@
 
 	<!-- 모바일 하단 담기 바 -->
 	<div class="flex w-full shrink-0 items-center gap-2.5 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
-		<QtyStepper {qty} onchange={(q) => (qty = q)} />
+		<QtyStepper {qty} onchange={(q) => (qty = q)} disabled={p.soldOut} />
 		<button
 			type="button"
 			onclick={add}
 			disabled={p.soldOut}
-			class="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg'}"
+			class="flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl text-[16px] font-extrabold transition-colors duration-250 {p.soldOut ? 'cursor-not-allowed bg-white/8 text-white/40' : added ? 'bg-panel-2 text-fg' : 'bg-accent text-bg'}"
 		>
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>

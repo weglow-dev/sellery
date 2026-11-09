@@ -1,7 +1,7 @@
 -- pgTAP — 0057 장바구니 · 찜: 권한 · 담기/수량/삭제 · 합치기 · 비우기 · 찜 (docs/myr.md §6.2 · docs/testing.md §2)
 -- 실행: npm run test:db — 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(52);
+select plan(54);
 
 -- ---------- 표 · 권한 ----------
 select has_table('public', 'myr_cart_items', 'myr_cart_items 표');
@@ -108,6 +108,9 @@ select is(
 select is(public.myr_like_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', false) ->> 'liked', 'false', '찜 끄기');
 select is((select count(*) from public.myr_likes where user_id = '00000000-0000-4000-8000-0000000000c1'), 2::bigint, '끈 뒤 찜 2개(b · pending)');
 select is(public.myr_likes_get('00000000-0000-4000-8000-0000000000c2'), '[]'::jsonb, '다른 사용자 찜은 비어 있다');
+select is(public.myr_like_set('00000000-0000-4000-8000-0000000000c2', 'pgtap-cart-soldout', true) ->> 'liked', 'true', '품절 상품도 찜 켜기');
+select is((select jsonb_build_object('code', e ->> 'code', 'sold_out', (e ->> 'sold_out')::boolean) from jsonb_array_elements(public.myr_likes_get('00000000-0000-4000-8000-0000000000c2')) e),
+  '{"code": "pgtap-cart-soldout", "sold_out": true}'::jsonb, '품절 상품도 찜 목록에 남는다(sold_out 표시 · 0084)');
 
 select * from finish();
 rollback;
