@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { outreachFit } from "../admin/outreach-rules";
-import { metaCreatorSearchParams, modashAudience, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId } from "../admin/outreach-providers";
+import { isMetaMockHandle, metaCreatorSearchParams, modashAudience, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId } from "../admin/outreach-providers";
 
 describe("modashSearchBody — 대표 조건을 검색 필터로", () => {
   it("팔로워 5만 · 한국 80% · 여성 60% · 20~40대 밴드 · 성장률 ≥ 0", () => {
@@ -103,6 +103,14 @@ describe("Meta Instagram Creator Marketplace — 파라미터 · 응답 파서",
     expect(r.rows[0].audience).toEqual({ source: "meta:engaged", female_pct: 72, age_20_40_pct: 85, kr_pct: 91, filtered_by: null });
     expect(r.after).toBe("CURSOR2");
   });
+  it("모의 크리에이터 핸들 판별 — mocked_username_N 만", () => {
+    expect(isMetaMockHandle("mocked_username_1")).toBe(true);
+    expect(isMetaMockHandle("Mocked_Username_27")).toBe(true);
+    expect(isMetaMockHandle("mocked_username")).toBe(false);
+    expect(isMetaMockHandle("jiyu_beauty")).toBe(false);
+    expect(isMetaMockHandle(null)).toBe(false);
+  });
+
   it("Graph 오류 · 분포 없는 행은 filtered_by 로", () => {
     expect(parseMetaCreators({ error: { message: "Invalid OAuth access token", code: 190 } }).error).toContain("code 190");
     const r = parseMetaCreators({ data: [{ id: "3", username: "somin", insights: [{ name: "total_followers", values: [{ value: 60000 }] }] }] });

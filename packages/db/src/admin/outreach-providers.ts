@@ -142,6 +142,11 @@ export const META_CREATOR_FIELDS =
 /** Standard Access(모의 데이터)에서는 breakdown 이 거부된다 — 그때 이 메시지면 breakdown 없이 재시도 */
 export const isMetaBreakdownError = (msg: string | null | undefined): boolean => /breakdown/i.test(msg ?? "");
 
+/** Standard Access(앱 검수 전)에서 메타가 돌려주는 모의 크리에이터 — username 이 mocked_username_N · 팔로워 수백 */
+export const isMetaMockHandle = (handle: string | null | undefined): boolean => /^mocked_username_[0-9]+$/i.test(handle ?? "");
+/** 모의 행을 큐에 넣을 때 카테고리에 남기는 표시 */
+export const META_MOCK_CATEGORY = "모의 데이터(앱 검수 전)";
+
 export type MetaCreatorSearchOptions = { after?: string | null; limit?: number; breakdown?: boolean };
 
 /** 대표 조건 → 쿼리 파라미터. 모의/실데이터 모두 같은 모양 */

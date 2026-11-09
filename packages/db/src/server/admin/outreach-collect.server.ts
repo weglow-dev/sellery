@@ -6,7 +6,7 @@
  *   한국 location id 는 한 번 조회(`/v1/instagram/locations?query=Korea`)해 캐시. 조회 실패 시 env 값.
  *   비용: 검색 0.01 크레딧/건(페이지당 ~0.15) — 버튼 1회 = 1페이지. 보고서(상세 인구통계) 호출은 2단계(선택).
  */
-import { META_GRAPH_VERSION, isMetaBreakdownError, metaCreatorSearchParams, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId, type OutreachProvider } from "../../admin/outreach-providers";
+import { META_GRAPH_VERSION, META_MOCK_CATEGORY, isMetaBreakdownError, isMetaMockHandle, metaCreatorSearchParams, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId, type OutreachProvider } from "../../admin/outreach-providers";
 import { outreachFit } from "../../admin/outreach-rules";
 import { createAdminClient, type Admin } from "../admin.server";
 import { upsertOutreachCreators } from "./outreach.server";
@@ -70,6 +70,8 @@ export type CollectResult = {
   page: number;
   /** 메타: 다음 페이지 커서 */
   after?: string | null;
+  /** 메타: 앱 검수 전 모의 데이터를 받아 임계 없이 그대로 넣었다 */
+  mock?: boolean;
   error?: string | null;
 };
 
@@ -109,9 +111,12 @@ export async function collectOutreachCandidates(
       return { ok: false, code: "PROVIDER_ERROR", provider, ...base, error: parsed.error ?? "Graph API 오류" };
     }
     // major_* 필터는 '최대 버킷' 조건이라 우리 임계로 다시 거른다 — 숫자가 없는 행(filtered_by)은 통과
-    const kept = parsed.rows.filter((r) => outreachFit(r).missing.length === 0);
+    // 모의 데이터(앱 검수 전 · mocked_username_N)는 팔로워가 수백이라 우리 임계에 전부 걸린다 — 연결 확인용으로 그대로 큐에 넣고
+    // 카테고리에 표시를 남긴다. 고급 액세스가 열리면 모의 행은 오지 않으므로 이 분기는 저절로 쓰이지 않는다
+    const mock = parsed.rows.length > 0 && parsed.rows.every((r) => isMetaMockHandle(r.handle));
+    const kept = mock ? parsed.rows.map((r) => ({ ...r, category: META_MOCK_CATEGORY })) : parsed.rows.filter((r) => outreachFit(r).missing.length === 0);
     const up = await upsertOutreachCreators(kept, "discovery", opts.actor, admin);
-    return { ok: true, provider, ...base, ...up, found: parsed.rows.length, kept: kept.length, total: parsed.rows.length, after: parsed.after };
+    return { ok: true, provider, ...base, ...up, found: parsed.rows.length, kept: kept.length, total: parsed.rows.length, after: parsed.after, mock };
   }
 
   if (!cfg.modashApiKey) return { ok: false, code: "NOT_CONFIGURED", provider, ...base };
