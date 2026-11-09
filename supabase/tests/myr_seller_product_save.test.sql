@@ -1,6 +1,6 @@
 -- pgTAP — 0073 상품 등록 저장: 권한 · 임시저장 · 심사 요청 · 반려 재제출 · 수정 가능 상태 · 입력 검사 · 이미지 폴더 · 상태 바꾸기 · 에디터 1건 · 샵 응답 (docs/myr.md §4.2.1 4-1)
 begin;
-select plan(55);
+select plan(57);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_save_product', '{uuid,uuid,jsonb,boolean}'::text[], 'anon', '{}'::text[], 'anon 은 save_product 불가');
@@ -81,15 +81,17 @@ select ok(not (public.myr_app_seller_product('00000000-0000-4000-8000-000000000a
 -- ---------- 상태 바꾸기 ----------
 select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'fly') ->> 'code', 'BAD_ACTION', '모르는 동작 BAD_ACTION');
 select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b94', 'delete') ->> 'code', 'NOT_FOUND', '남의 상품 NOT_FOUND');
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'resume'), '{"ok": false, "code": "WRONG_STATUS", "status": "listed"}'::jsonb, '판매 중을 다시 판매 WRONG_STATUS');
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'pause') ->> 'status', 'paused', '판매 중 → 일시중지');
-select ok(not exists (select 1 from jsonb_array_elements(public.myr_home_products()) e where e ->> 'code' = 'pgtap-save-listed'), '일시중지는 샵에서 내려감');
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'resume') ->> 'status', 'listed', '일시중지 → 다시 판매');
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'end') ->> 'code', 'BAD_ACTION', '크리에이터는 판매 종료 못 함 BAD_ACTION(0082 · 운영만)');
+select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'resume') ->> 'code', 'BAD_ACTION', '크리에이터는 다시 판매 못 함 BAD_ACTION(0083 · 운영만)');
+select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'pause') ->> 'code', 'BAD_ACTION', '크리에이터는 일시중지 못 함 BAD_ACTION(0083 · 운영만)');
 select is((select status from public.myr_products where id = '00000000-0000-4000-8000-000000000b91'), 'listed', '거부되면 판매 중 그대로');
+select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000b91', 'pause') ->> 'status', 'paused', '운영이 판매 중 → 일시중지');
+select ok(not exists (select 1 from jsonb_array_elements(public.myr_home_products()) e where e ->> 'code' = 'pgtap-save-listed'), '일시중지는 샵에서 내려감');
+select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000b91', 'approve') ->> 'status', 'listed', '운영이 다시 판매(approve)');
+select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'end') ->> 'code', 'BAD_ACTION', '크리에이터는 판매 종료 못 함 BAD_ACTION(0082 · 운영만)');
+select is((select status from public.myr_products where id = '00000000-0000-4000-8000-000000000b91'), 'listed', '판매 종료 거부 뒤에도 판매 중 그대로');
 select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000b91', 'end') ->> 'status', 'ended', '운영이 판매 중 → 판매 종료(0082)');
 select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000b91', 'end') ->> 'code', 'WRONG_STATUS', '이미 종료면 WRONG_STATUS');
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b91', 'resume') ->> 'code', 'WRONG_STATUS', '판매 종료는 되돌릴 수 없다');
+select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000b91', 'pause') ->> 'code', 'WRONG_STATUS', '종료된 상품은 일시중지 WRONG_STATUS');
 select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', '00000000-0000-4000-8000-000000000b93', 'delete') ->> 'code', 'WRONG_STATUS', '심사 중은 삭제 불가(임시저장만)');
 create temp table t_draft as select public.myr_app_seller_save_product('00000000-0000-4000-8000-000000000a91', null, '{"name":"지울 초안"}', false) as r;
 select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000a91', (select (r ->> 'id')::uuid from t_draft), 'delete') ->> 'status', 'deleted', '임시저장 삭제');

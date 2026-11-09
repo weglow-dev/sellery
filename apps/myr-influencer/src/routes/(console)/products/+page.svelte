@@ -34,6 +34,7 @@
 		if (p.status === 'rejected') goto(`/products/${encodeURIComponent(p.id)}/review`);
 		else if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
+		else if (p.revision?.state === 'review') app.showToast('수정 내용을 운영팀이 심사하고 있어요. 승인 전까지 샵은 지금 내용으로 판매해요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
 	}
 

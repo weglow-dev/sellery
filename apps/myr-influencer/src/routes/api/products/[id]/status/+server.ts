@@ -5,7 +5,7 @@ import { apiSeller } from '$lib/server/seller';
 import { setSellerProductStatus } from '$lib/server/seller-products';
 
 /**
- * 판매 상태 바꾸기(0073) — 내 제품 메뉴: pause 일시중지 · resume 다시 판매 · delete 임시저장 삭제. 판매 종료(end)는 운영만(0082 · BAD_ACTION).
+ * 상태 바꾸기(0073) — 내 제품 메뉴: delete 임시저장 삭제만. 일시중지 · 다시 판매 · 판매 종료는 운영만(0082 · 0083 · BAD_ACTION).
  *   POST { action } → { ok, status } · { ok:false, code: NOT_FOUND | BAD_ACTION | WRONG_STATUS, status? }
  */
 export const POST: RequestHandler = async (event) => {

@@ -72,9 +72,9 @@ describe('반려 의견(0074 · 섹션별)', () => {
 	});
 });
 
-describe('상태 바꾸기 동작(0082)', () => {
-	it('판매 종료(end)는 크리에이터 동작이 아니다', () => {
-		expect(['pause', 'resume', 'delete'].every(isSetStatusAction)).toBe(true);
-		expect(isSetStatusAction('end')).toBe(false);
+describe('상태 바꾸기 동작(0082 · 0083)', () => {
+	it('크리에이터는 임시저장 삭제만 — 일시중지 · 다시 판매 · 판매 종료는 운영', () => {
+		expect(isSetStatusAction('delete')).toBe(true);
+		expect(['pause', 'resume', 'end'].some(isSetStatusAction)).toBe(false);
 	});
 });
