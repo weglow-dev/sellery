@@ -36,7 +36,7 @@
 </script>
 
 {#snippet settleBanner()}
-	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:w-auto lg:max-w-[560px] lg:gap-4 lg:px-5 lg:text-[14px]">
+	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:gap-4 lg:px-5 lg:text-[14px]">
 		<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-accent">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65">정보가 확인돼야 정산금이 지급돼요</span></span>
 		<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-accent" />
 	</a>
@@ -67,12 +67,12 @@
 				{/if}
 			</span>
 		</a>
-		<div class="min-w-0 flex-1">
+		<div class="min-w-0 flex-1 {needsSettle ? 'lg:flex-none' : ''}">
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
 			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · <a href="/my" class="font-bold text-white/70 underline-offset-2 hover:text-fg hover:underline">내 정보</a></p>
 		</div>
 		<!-- PC — 정산 정보 배너는 프로필 오른쪽 남는 자리에(아래 카드들을 밀어내지 않게 · 2026-11-09) -->
-		{#if needsSettle}<div class="hidden min-w-0 flex-1 justify-end lg:flex">{@render settleBanner()}</div>{/if}
+		{#if needsSettle}<div class="hidden min-w-0 flex-1 lg:ml-6 lg:flex">{@render settleBanner()}</div>{/if}
 		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
 		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">
 			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
