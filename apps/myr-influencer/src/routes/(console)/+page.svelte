@@ -9,6 +9,7 @@
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import UserMenu from '$lib/components/UserMenu.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 최근 7일 판매 막대.
@@ -44,16 +45,19 @@
 
 <!-- PC: 최소 높이 = <main>(화면 − 상단 내비) — 아래 2단이 남은 높이를 채운다. 내용이 더 길면 그대로 스크롤 -->
 <div class="no-bar min-h-0 flex-1 animate-up-in overflow-y-auto px-5 pb-6 lg:mx-auto lg:flex lg:min-h-full lg:w-full lg:max-w-[1240px] lg:flex-col lg:overflow-visible lg:px-10 lg:pt-7 lg:pb-10">
-	<!-- 모바일 상단(로고 · 알림) — PC 는 상단 내비가 대신 -->
+	<!-- 모바일 상단(로고 · 알림 · 내 계정 메뉴) — PC 는 상단 내비가 대신 -->
 	<div class="flex h-[60px] items-center justify-between lg:hidden">
 		<div class="flex items-center gap-2.5">
 			<img src="/myr-logo.svg" alt="MYR" class="block h-7 w-auto" />
 			<span class="rounded-md bg-accent/14 px-2 py-1 text-[11px] font-extrabold tracking-[0.06em] text-accent">CREATOR</span>
 		</div>
-		<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
-			<Icon id="bell" size={20} />
-			{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
-		</a>
+		<div class="flex items-center gap-2.5">
+			<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
+				<Icon id="bell" size={20} />
+				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<UserMenu />
+		</div>
 	</div>
 
 	<div class="mt-1.5 flex items-center gap-3 lg:mt-0 lg:gap-3.5">
@@ -69,14 +73,10 @@
 		</a>
 		<div class="min-w-0 flex-1 {needsSettle ? 'lg:flex-none' : ''}">
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
-			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · <a href="/my" class="font-bold text-white/70 underline-offset-2 hover:text-fg hover:underline">내 정보</a></p>
+			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · 오늘도 좋은 하루예요</p>
 		</div>
 		<!-- PC — 정산 정보 배너는 프로필 오른쪽 남는 자리에(아래 카드들을 밀어내지 않게 · 2026-11-09) -->
 		{#if needsSettle}<div class="hidden min-w-0 flex-1 lg:ml-6 lg:flex">{@render settleBanner()}</div>{/if}
-		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
-		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">
-			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
-		</form>
 	</div>
 
 	<!-- 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 배너(정산은 계산되고 지급만 보류). 모바일은 프로필 아래 한 줄 · PC 는 프로필 오른쪽(위 줄 snippet) -->
