@@ -37,9 +37,9 @@
 </script>
 
 {#snippet settleBanner()}
-	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:gap-4 lg:px-5 lg:text-[14px]">
-		<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-accent">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65">정보가 확인돼야 정산금이 지급돼요</span></span>
-		<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-accent" />
+	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-[#ff6b6b]/35 bg-[#ff6b6b]/10 px-4 py-3 text-[13px] lg:gap-4 lg:px-5 lg:text-[14px]">
+		<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-[#ff8a8a]">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65">정보가 확인돼야 정산금이 지급돼요</span></span>
+		<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-[#ff8a8a]" />
 	</a>
 {/snippet}
 
