@@ -12,7 +12,8 @@ import {
 	parsePrice,
 	previewSections,
 	productTabCounts,
-	stepValid
+	stepValid,
+	isSoldOut
 } from '../lib/rules';
 
 describe('내 제품 탭', () => {
@@ -84,5 +85,14 @@ describe('상품 에디터', () => {
 		expect(filledSections(ed).info).toBe(false);
 		ed.shelfLife = '24개월';
 		expect(filledSections(ed).info).toBe(true);
+	});
+});
+
+describe('품절 — 판매 중 · 남은 재고 0(§9-6 · 판매 종료는 운영만)', () => {
+	it('판매 중이고 재고 0 이면 품절 · 일시중지 · 재고 있음은 아님', () => {
+		expect(isSoldOut({ status: 'live', stock: 0 })).toBe(true);
+		expect(isSoldOut({ status: 'live', stock: 3 })).toBe(false);
+		expect(isSoldOut({ status: 'paused', stock: 0 })).toBe(false);
+		expect(isSoldOut({ status: 'ended', stock: 0 })).toBe(false);
 	});
 });

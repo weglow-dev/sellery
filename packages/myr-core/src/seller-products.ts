@@ -198,6 +198,7 @@ export type SubmitRevisionCode = 'NOT_FOUND' | 'NOT_REVISABLE' | 'REVISION_PENDI
 
 /** 저장 · 상태 바꾸기 거절 코드(0073) */
 export type SaveProductCode = 'NOT_FOUND' | 'NOT_EDITABLE' | 'INVALID_INPUT' | 'BAD_IMAGE' | 'DB_ERROR';
-export type SetStatusAction = 'pause' | 'resume' | 'end' | 'delete';
-export const SET_STATUS_ACTIONS: readonly SetStatusAction[] = ['pause', 'resume', 'end', 'delete'];
+/** 크리에이터 상태 바꾸기 — 임시저장 삭제만. 판매 상태(일시중지 · 다시 판매 · 판매 종료)는 운영만(0082 · 0083 · §9-6 · 재고 0 이면 샵이 품절로 보여 준다) */
+export type SetStatusAction = 'delete';
+export const SET_STATUS_ACTIONS: readonly SetStatusAction[] = ['delete'];
 export const isSetStatusAction = (v: unknown): v is SetStatusAction => SET_STATUS_ACTIONS.includes(v as SetStatusAction);

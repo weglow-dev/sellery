@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { Product } from '$lib/data';
-	import { STATUS_ACTION_DONE, productMenu, type ProductMenuItem } from '$lib/product-draft';
-	import { PRODUCT_STATUS_META, PRODUCT_TABS, filterProducts, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
+	import { STATUS_ACTION_DONE, opensReview, productMenu, type ProductMenuItem } from '$lib/product-draft';
+	import { PRODUCT_STATUS_META, PRODUCT_TABS, filterProducts, isSoldOut, productTabCounts, showsStock, won, type ProductTab } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import { app } from '$lib/state.svelte';
 	import Badge from '$lib/components/Badge.svelte';
@@ -29,11 +29,12 @@
 	let busy = $state(false);
 	const menuItems = $derived(menuFor ? productMenu(menuFor.status, menuFor.revision?.state ?? null) : []);
 
-	/** 반려 상품은 바로 "심사 결과"(시안) · 그 밖은 메뉴(수정 반려면 "심사 결과 보기" 가 맨 위) */
+	/** 반려 · 수정 반려는 바로 "심사 결과"(시안 · 수정 반려도 같게 2026-11-09) · 그 밖은 메뉴 */
 	function open(p: Product) {
-		if (p.status === 'rejected') goto(`/products/${encodeURIComponent(p.id)}/review`);
+		if (opensReview(p.status, p.revision?.state ?? null)) goto(`/products/${encodeURIComponent(p.id)}/review`);
 		else if (productMenu(p.status, p.revision?.state ?? null).length) menuFor = p;
 		else if (p.status === 'review') app.showToast('운영팀이 심사하고 있어요. 승인되면 MYR Shop 에 열려요');
+		else if (p.revision?.state === 'review') app.showToast('수정 내용을 운영팀이 심사하고 있어요. 승인 전까지 샵은 지금 내용으로 판매해요');
 		else app.showToast(`${p.name} · ${PRODUCT_STATUS_META[p.status].label}`);
 	}
 
@@ -78,7 +79,7 @@
 				<button type="button" onclick={() => open(p)} class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3 text-left transition-colors lg:gap-4 lg:rounded-[20px] lg:p-4 lg:hover:border-white/30">
 					<Tile tile={p.tile} thumbUrl={p.thumbUrl} bg={p.bg} iconId={p.iconId} icon={36} iconCls="lg:h-11 lg:w-11" class="h-16 w-16 rounded-[14px] lg:h-20 lg:w-20 lg:rounded-[18px] {p.status === 'ended' || p.status === 'paused' ? 'opacity-50' : ''}" />
 					<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if p.revision}<Badge cls={PRODUCT_STATUS_META[p.revision.state].cls}>{p.revision.state === 'review' ? '수정 심사 중' : '수정 반려'}</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
+						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if isSoldOut(p)}<Badge cls="bg-[#ff6b6b]/16 text-[#ff8a8a]">품절</Badge>{/if}{#if p.revision}<Badge cls={PRODUCT_STATUS_META[p.revision.state].cls}>{p.revision.state === 'review' ? '수정 심사 중' : '수정 반려'}</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
 						<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{p.name}</span>
 						<span class="text-[12px] text-white/55 lg:text-[13px]">
 							{p.price ? won(p.price) : '가격 미정'} · 재고 {showsStock(p.status) ? `${p.stock.toLocaleString('ko-KR')}개` : '—'}<span class="hidden lg:inline">{' · '}누적 판매 {p.sold ? `${p.sold.toLocaleString('ko-KR')}개` : '—'}</span>
