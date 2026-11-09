@@ -132,7 +132,7 @@
     - 문의 응답률 · 최근 주문
     - **[정지 · 복구]**(`sellers.active` — 정지하면 콘솔 `/suspended` · 새 상품 저장 불가)
     - **[계정 연결]**(이미 있는 시드 크리에이터에 로그인 계정 — `myr-creators.mjs account` 대체)
-    - **사업자 · 정산 정보**(0085 · 크리에이터가 가입 폼(선택 칸) · 내 정보에서 입력): 상호 · 사업자등록번호 · 대표자 · 세금계산서 이메일(초대 이메일) · 정산 계좌 — 원문 열람(열람 기록) · **[확인 완료]** / **[다시 입력 요청](사유)** — `myr_app_admin_settle_infos` · `myr_app_admin_settle_info_check`(지금은 `myr-creators.mjs settle-info · settle-verify · settle-reject`). 홈 카드 "정산 정보 확인 대기 N"
+    - **사업자 · 정산 정보**(0085 · 크리에이터가 가입 폼(선택 칸) · 내 정보에서 입력): 상호 · 사업자등록번호 · 대표자 · 세금계산서 이메일(초대 이메일) · 정산 계좌 — 원문 열람(열람 기록) · **[확인 완료]** / **[다시 입력 요청](사유)** — 화면에 띄운 값의 제출 시각을 같이 보낸다(그사이 바뀌면 STALE → 새 값으로 다시 그림) — `myr_app_admin_settle_infos` · `myr_app_admin_settle_info_check`(지금은 `myr-creators.mjs settle-info · settle-verify · settle-reject`). 홈 카드 "정산 정보 확인 대기 N"
     - **정산 요약**(→ 8): 상품별 남은 제조금액 · 보증금 상태 · 최근 정산 회차
 - 새로 만들 것: 크리에이터 목록 · 상세 · 정지 RPC(셀러리 0022~ 파트너 관리 패턴).
 

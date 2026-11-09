@@ -1,6 +1,6 @@
 -- pgTAP — 0085 크리에이터 사업자 · 정산 정보: 권한 · 사업자번호 체크섬 · 저장 거부 코드 전부 · 가린 값 · 예금주 규칙 · 다시 확인 규칙 · 운영 확인/요청
 begin;
-select plan(45);
+select plan(47);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_of_user 불가');
@@ -8,7 +8,7 @@ select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid
 select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_save 불가');
 select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settle_info_save 불가');
 select function_privs_are('public', 'myr_app_admin_settle_infos', '{text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 admin_settle_infos 불가');
-select function_privs_are('public', 'myr_app_admin_settle_info_check', '{uuid,text,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 admin_settle_info_check 불가');
+select function_privs_are('public', 'myr_app_admin_settle_info_check', '{uuid,text,timestamptz,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 admin_settle_info_check 불가');
 select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settle_info_save 가능');
 
 -- ---------- 사업자번호 체크섬 ----------
@@ -21,6 +21,9 @@ values ('00000000-0000-4000-8000-000000000e01', '00000000-0000-0000-0000-0000000
 insert into public.sellers (id, name, handle, email, platform, active, user_id)
 values ('00000000-0000-4000-8000-000000000e11', '민지 루틴', '@pgtap.settle', 'pgtap-settle@myr.test', 'instagram', true, '00000000-0000-4000-8000-000000000e01');
 create temp table u as select '00000000-0000-4000-8000-000000000e01'::uuid as id;
+-- 운영 확인 — 지금 제출 시각을 같이(운영이 목록에서 본 값)
+create function pg_temp.chk(d text, note text default null) returns jsonb language sql as
+  $$ select public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', d, (select myr_settle_submitted_at from public.sellers where id = '00000000-0000-4000-8000-000000000e11'), note) $$;
 create function pg_temp.save(c text, ceo text, biz text, bank text, acc text, holder text) returns jsonb language sql as
   $$ select public.myr_app_seller_settle_info_save((select id from u), c, ceo, biz, bank, acc, holder) $$;
 
@@ -50,22 +53,24 @@ select ok(not (public.myr_app_seller_settle_info_of_user((select id from u))::te
 select is(pg_temp.save('(주) 민지 랩', '김민지', '124-81-00998', '국민', '987654321012', '민지랩') #>> '{info,holder}', '민지랩', '사업자 계좌(예금주 = 상호 · (주) · 공백 무시)');
 
 -- ---------- 운영 확인 ----------
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'ok') ->> 'code', 'BAD_DECISION', 'BAD_DECISION');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-0000000000ff', 'verify') ->> 'code', 'NOT_FOUND', '없는 크리에이터 NOT_FOUND');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'reject', '  ') ->> 'code', 'NOTE_REQUIRED', '다시 입력 요청은 사유 필수');
+select is(pg_temp.chk('ok') ->> 'code', 'BAD_DECISION', 'BAD_DECISION');
+select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-0000000000ff', 'verify', now()) ->> 'code', 'NOT_FOUND', '없는 크리에이터 NOT_FOUND');
+select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify', now() - interval '1 hour') ->> 'code', 'STALE', '운영이 본 뒤 다시 저장됐으면 STALE(보지 않은 값을 확인하지 않게)');
+select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify', null) ->> 'code', 'STALE', '제출 시각 없이 확인하면 STALE');
+select is(pg_temp.chk('reject', '  ') ->> 'code', 'NOTE_REQUIRED', '다시 입력 요청은 사유 필수');
 select is((select e ->> 'biz_no' from jsonb_array_elements(public.myr_app_admin_settle_infos('pending')) e where e ->> 'handle' = '@pgtap.settle'), '1248100998', '운영 목록은 원문(확인용)');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify', null, '00000000-0000-4000-8000-000000000e01') ->> 'status', 'verified', '확인 완료');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify') ->> 'code', 'NOT_PENDING', '확인 중이 아니면 NOT_PENDING');
+select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify', (select myr_settle_submitted_at from public.sellers where id = '00000000-0000-4000-8000-000000000e11'), null, '00000000-0000-4000-8000-000000000e01') ->> 'status', 'verified', '확인 완료(본 값 그대로)');
+select is(pg_temp.chk('verify') ->> 'code', 'NOT_PENDING', '확인 중이 아니면 NOT_PENDING');
 
 -- ---------- 다시 확인 규칙 ----------
 select is((pg_temp.save('민지 랩 스튜디오', '김민지', null, '국민', null, '민지 랩 스튜디오') ->> 'recheck')::boolean, true, '예금주가 바뀌면 다시 확인');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify') ->> 'status', 'verified', '(다시) 확인 완료');
+select is(pg_temp.chk('verify') ->> 'status', 'verified', '(다시) 확인 완료');
 select is((select jsonb_build_object('recheck', (j ->> 'recheck')::boolean, 'status', j #>> '{info,status}') from (select pg_temp.save('민지 랩 스튜디오2', '김민지', null, '국민', null, '김민지') as j) x),
   '{"recheck": true, "status": "pending"}'::jsonb, '상호 · 예금주가 같이 바뀌면 다시 확인');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'verify') ->> 'status', 'verified', '확인 완료(예금주 = 대표자)');
+select is(pg_temp.chk('verify') ->> 'status', 'verified', '확인 완료(예금주 = 대표자)');
 select is((select jsonb_build_object('recheck', (j ->> 'recheck')::boolean, 'status', j #>> '{info,status}') from (select pg_temp.save('민지 랩 3', '김민지', null, '국민', null, '김민지') as j) x),
   '{"recheck": false, "status": "verified"}'::jsonb, '상호만 바꾸면 확인 완료 그대로(계좌 · 번호는 null = 그대로)');
-select is(public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', 'reject', '예금주 확인이 안 돼요') ->> 'status', 'rejected', '다시 입력 요청');
+select is(pg_temp.chk('reject', '예금주 확인이 안 돼요') ->> 'status', 'rejected', '다시 입력 요청');
 select is(public.myr_app_seller_settle_info_of_user((select id from u)) ->> 'note', '예금주 확인이 안 돼요', '크리에이터가 다시 입력 요청 사유를 본다');
 
 -- ---------- 프로필 사진 ----------

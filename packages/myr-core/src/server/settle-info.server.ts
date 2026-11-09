@@ -71,8 +71,9 @@ export async function adminSettleInfos(status: string | null = 'pending'): Promi
 		checkedAt: (r.checked_at as string) ?? null
 	}));
 }
-export async function adminCheckSettleInfo(sellerId: string, decision: 'verify' | 'reject', note: string | null, adminId: string | null): Promise<{ ok: boolean; code?: string; status?: string }> {
-	const { data, error } = await admin().rpc('myr_app_admin_settle_info_check', { p_seller: sellerId, p_decision: decision, p_note: note, p_admin: adminId });
+/** 운영 확인 · 다시 입력 요청 — submittedAt = 운영이 본 목록의 제출 시각(그사이 다시 저장됐으면 STALE) */
+export async function adminCheckSettleInfo(sellerId: string, decision: 'verify' | 'reject', submittedAt: string, note: string | null, adminId: string | null): Promise<{ ok: boolean; code?: string; status?: string }> {
+	const { data, error } = await admin().rpc('myr_app_admin_settle_info_check', { p_seller: sellerId, p_decision: decision, p_submitted_at: submittedAt, p_note: note, p_admin: adminId });
 	if (error) return { ok: false, code: 'DB_ERROR' };
 	return data as { ok: boolean; code?: string; status?: string };
 }

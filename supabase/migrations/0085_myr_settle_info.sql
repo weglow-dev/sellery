@@ -18,8 +18,9 @@
 --       biz_no · account 가 null 이면 저장된 값 그대로(화면은 가린 값만 가져서 다시 입력하지 않아도 된다 · 없으면 필수)
 --       거부: NOT_FOUND · BAD_COMPANY · BAD_CEO · BAD_BIZ_NO · BAD_BANK · BAD_ACCOUNT · BAD_HOLDER · HOLDER_MISMATCH
 --   myr_app_admin_settle_infos(status)                  운영 — 원문(확인용) · 상태별(null 이면 미입력 빼고 전부)
---   myr_app_admin_settle_info_check(seller, decision, note, admin)   verify(확인 중만) · reject(사유 필수)
---       거부: NOT_FOUND · BAD_DECISION · NOT_PENDING · NOTE_REQUIRED
+--   myr_app_admin_settle_info_check(seller, decision, submitted_at, note, admin)   verify(확인 중만) · reject(사유 필수)
+--       submitted_at = 운영이 본 목록의 제출 시각 — 그사이 크리에이터가 다시 저장했으면 STALE(보지 않은 값을 확인 완료하지 않게)
+--       거부: NOT_FOUND · BAD_DECISION · STALE · NOT_PENDING · NOTE_REQUIRED
 --
 --   프로필 사진(9번 · 내 정보에서만 바꾼다 — 홈의 사진 변경은 뺐다 · 2026-11-09):
 --   Storage 공개 버킷 myr-avatars — <seller id>/<uuid>.<ext> · jpg/png/webp · 4MB · 올리기는 콘솔 서버(service role)만
@@ -187,7 +188,8 @@ $$;
 revoke all on function public.myr_app_admin_settle_infos(text) from public, anon, authenticated;
 grant execute on function public.myr_app_admin_settle_infos(text) to service_role;
 
-create or replace function public.myr_app_admin_settle_info_check(p_seller uuid, p_decision text, p_note text default null, p_admin uuid default null)
+drop function if exists public.myr_app_admin_settle_info_check(uuid, text, text, uuid);
+create or replace function public.myr_app_admin_settle_info_check(p_seller uuid, p_decision text, p_submitted_at timestamptz, p_note text default null, p_admin uuid default null)
 returns jsonb
 language plpgsql
 volatile
@@ -201,6 +203,10 @@ begin
   if v_decision not in ('verify', 'reject') then return jsonb_build_object('ok', false, 'code', 'BAD_DECISION'); end if;
   select * into s from public.sellers where id = p_seller for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  -- 운영이 본 값 그대로인지 — 그사이 다시 저장했으면 거절(다시 목록을 보고 확인)
+  if p_submitted_at is null or p_submitted_at is distinct from s.myr_settle_submitted_at then
+    return jsonb_build_object('ok', false, 'code', 'STALE', 'submitted_at', s.myr_settle_submitted_at);
+  end if;
   if v_decision = 'verify' and s.myr_settle_status <> 'pending' then return jsonb_build_object('ok', false, 'code', 'NOT_PENDING', 'status', s.myr_settle_status); end if;
   if v_decision = 'reject' and s.myr_settle_status not in ('pending', 'verified') then return jsonb_build_object('ok', false, 'code', 'NOT_PENDING', 'status', s.myr_settle_status); end if;
   if v_decision = 'reject' and (v_note is null or char_length(v_note) > 300) then return jsonb_build_object('ok', false, 'code', 'NOTE_REQUIRED'); end if;
@@ -213,8 +219,8 @@ begin
   return jsonb_build_object('ok', true, 'status', case v_decision when 'verify' then 'verified' else 'rejected' end);
 end;
 $$;
-revoke all on function public.myr_app_admin_settle_info_check(uuid, text, text, uuid) from public, anon, authenticated;
-grant execute on function public.myr_app_admin_settle_info_check(uuid, text, text, uuid) to service_role;
+revoke all on function public.myr_app_admin_settle_info_check(uuid, text, timestamptz, text, uuid) from public, anon, authenticated;
+grant execute on function public.myr_app_admin_settle_info_check(uuid, text, timestamptz, text, uuid) to service_role;
 
 -- ------------------------------------------------------------
 -- 프로필 사진(9번) — 내 정보에서만 바꾼다
