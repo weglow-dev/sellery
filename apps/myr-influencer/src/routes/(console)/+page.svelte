@@ -31,8 +31,16 @@
 		app.claimWaiting = data.claimWaiting;
 	});
 	const csCount = $derived(data.claimWaiting + data.inqWaiting);
+	const needsSettle = $derived(data.settleStatus === 'none' || data.settleStatus === 'rejected');
 
 </script>
+
+{#snippet settleBanner()}
+	<a href="/my" class="flex w-full items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:w-auto lg:max-w-[560px] lg:gap-4 lg:px-5 lg:text-[14px]">
+		<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-accent">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65">정보가 확인돼야 정산금이 지급돼요</span></span>
+		<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-accent" />
+	</a>
+{/snippet}
 
 <!-- PC: 최소 높이 = <main>(화면 − 상단 내비) — 아래 2단이 남은 높이를 채운다. 내용이 더 길면 그대로 스크롤 -->
 <div class="no-bar min-h-0 flex-1 animate-up-in overflow-y-auto px-5 pb-6 lg:mx-auto lg:flex lg:min-h-full lg:w-full lg:max-w-[1240px] lg:flex-col lg:overflow-visible lg:px-10 lg:pt-7 lg:pb-10">
@@ -63,19 +71,16 @@
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
 			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · <a href="/my" class="font-bold text-white/70 underline-offset-2 hover:text-fg hover:underline">내 정보</a></p>
 		</div>
+		<!-- PC — 정산 정보 배너는 프로필 오른쪽 남는 자리에(아래 카드들을 밀어내지 않게 · 2026-11-09) -->
+		{#if needsSettle}<div class="hidden min-w-0 flex-1 justify-end lg:flex">{@render settleBanner()}</div>{/if}
 		<!-- 로그아웃 — 모바일은 여기, PC 는 상단 내비 오른쪽 -->
 		<form method="POST" action="/auth/signout" class="shrink-0 lg:hidden">
 			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
 		</form>
 	</div>
 
-	<!-- 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 배너(정산은 계산되고 지급만 보류) -->
-	{#if data.settleStatus === 'none' || data.settleStatus === 'rejected'}
-		<a href="/my" class="mt-4 flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:mt-5 lg:text-[14px]">
-			<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-accent">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65 lg:inline lg:pl-2">정보가 확인돼야 정산금이 지급돼요</span></span>
-			<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-accent" />
-		</a>
-	{/if}
+	<!-- 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 배너(정산은 계산되고 지급만 보류). 모바일은 프로필 아래 한 줄 · PC 는 프로필 오른쪽(위 줄 snippet) -->
+	{#if needsSettle}<div class="mt-4 lg:hidden">{@render settleBanner()}</div>{/if}
 
 	<div class="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-3.5">
 		<div class="relative col-span-2 overflow-hidden rounded-3xl bg-panel p-5 lg:col-span-1 lg:px-7 lg:py-[26px]">
