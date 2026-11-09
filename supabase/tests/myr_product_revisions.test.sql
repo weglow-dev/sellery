@@ -95,7 +95,7 @@ select is(public.myr_app_seller_submit_revision('00000000-0000-4000-8000-0000000
   '상품에 이미 붙은 이미지(다른 주소)는 그대로 둘 수 있다');
 
 -- ---------- 판매 종료 · 상품 상태가 바뀐 뒤 승인 ----------
-select is(public.myr_app_seller_set_status('00000000-0000-4000-8000-000000000c91', '00000000-0000-4000-8000-000000000d95', 'end') ->> 'status', 'ended', '수정 심사 중에 판매 종료');
+select is(public.myr_app_admin_review_product('00000000-0000-4000-8000-000000000d95', 'end') ->> 'status', 'ended', '수정 심사 중에 운영이 판매 종료(0082)');
 select is((select status from public.myr_product_revisions where product_id = '00000000-0000-4000-8000-000000000d95'), 'canceled', '판매 종료 — 대기 중 수정본은 canceled');
 select is(public.myr_app_admin_review_revision('00000000-0000-4000-8000-000000000d95', 'approve') ->> 'code', 'NOT_FOUND', '접힌 수정본은 승인할 수 없다');
 select is(public.myr_app_seller_submit_revision('00000000-0000-4000-8000-000000000c92', '00000000-0000-4000-8000-000000000d94', '{"name":"남의 것 고침","price":30000,"category":"diet","note":"노트"}') ->> 'status', 'pending', '(다른 크리에이터) 수정 심사 요청');

@@ -11,7 +11,7 @@
 //                                     상세(story_title · story · ingredient_rows · howto_steps · faq)가 없으면 기본 템플릿을 채운다(샵 lib/data.ts genericDetail 과 같은 문구).
 //                                     파일 형식은 myr-products.seed.json 참고.
 //   list [--status pending|listed|paused|rejected] [--creator <@handle>]   상품 표(최신순 · 삭제 제외)
-//   review <code> approve|reject|pause ["<사유>"] ["<단계>:<의견>" …]   myr_app_admin_review_product — approve → listed · reject → rejected(사유 또는 의견 필수) · pause: listed → paused
+//   review <code> approve|reject|pause|end ["<사유>"] ["<단계>:<의견>" …]   myr_app_admin_review_product — approve → listed · reject → rejected(사유 또는 의견 필수) · pause: listed → paused · end: 판매 중 · 일시중지 → 판매 종료(운영만 · 0082 · 대기 중 수정본 취소)
 //                                     반려 의견은 섹션별(0074) — "2:효능 표현을 바꿔주세요" "4:함량을 mg 로" (단계 1 기본 정보 · 2 레시피 노트 · 3 왜 만들었나요 · 4 성분 · 5 섭취법 · 6 제품 정보 · 7 FAQ · 0 전체)
 //                                     사유를 안 주면 의견을 이어 붙여 요약으로 쓴다. 크리에이터 콘솔 "심사 결과" 에 의견이 섹션별로 보이고, 고치기 화면이 그 섹션을 "수정 필요" 로 표시한다.
 //   revisions                         심사 중인 수정본(판매 중 상품 수정 · 0074) — 상품 · 크리에이터 · 요청 시각 · 바뀐 항목
@@ -156,7 +156,7 @@ function rejectArgs(rest) {
 
 async function cmdReview() {
   const [code, decision, ...rest] = args;
-  if (!code || !["approve", "reject", "pause"].includes(decision)) fail('usage: review <code> approve|reject|pause ["사유"] ["2:의견" …]');
+  if (!code || !["approve", "reject", "pause", "end"].includes(decision)) fail('usage: review <code> approve|reject|pause|end ["사유"] ["2:의견" …]');
   const { reason, items } = rejectArgs(rest);
   const { data: p, error: e1 } = await db.from("myr_products").select("id, name, status").eq("code", code.toLowerCase()).is("deleted_at", null).maybeSingle();
   if (e1) fail(e1.message);
@@ -229,7 +229,7 @@ async function cmdCreators() {
 
 const commands = { import: cmdImport, list: cmdList, review: cmdReview, revisions: cmdRevisions, "review-revision": cmdReviewRevision, delete: cmdDelete, creators: cmdCreators };
 if (!cmd || !commands[cmd]) {
-  console.error("usage: node packages/db/scripts/myr-products.mjs import <file.json> [--listed] | list [--status s] [--creator @h] | review <code> approve|reject|pause [사유] [2:의견 …] | revisions | review-revision <code> approve|reject [사유] [2:의견 …] | delete <code> | creators");
+  console.error("usage: node packages/db/scripts/myr-products.mjs import <file.json> [--listed] | list [--status s] [--creator @h] | review <code> approve|reject|pause|end [사유] [2:의견 …] | revisions | review-revision <code> approve|reject [사유] [2:의견 …] | delete <code> | creators");
   process.exit(2);
 }
 await commands[cmd]();

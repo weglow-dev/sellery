@@ -1,6 +1,6 @@
 // 내 제품 행 파서 — 0071 myr_app_seller_products 응답
 import { describe, expect, it } from 'vitest';
-import { SELLER_PRODUCT_STATUSES, parseRejectItems, parseSellerProductRevision, parseSellerProductRows } from '../seller-products';
+import { isSetStatusAction, SELLER_PRODUCT_STATUSES, parseRejectItems, parseSellerProductRevision, parseSellerProductRows } from '../seller-products';
 
 const row = (o: Record<string, unknown> = {}) => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', reject_reason: null, category: 'diet', price: 32000, option_count: 2,
@@ -69,5 +69,12 @@ describe('반려 의견(0074 · 섹션별)', () => {
 		const [r] = parseSellerProductRows([row({ status: 'rejected', reject_reason: '요약', reject_items: [{ step: 2, msg: '노트' }] })]);
 		expect(r.rejectItems).toEqual([{ step: 2, msg: '노트' }]);
 		expect(parseSellerProductRevision({ id: 'r', status: 'rejected', reject_items: [{ step: 4, msg: '함량' }], fields: {} })?.rejectItems).toEqual([{ step: 4, msg: '함량' }]);
+	});
+});
+
+describe('상태 바꾸기 동작(0082)', () => {
+	it('판매 종료(end)는 크리에이터 동작이 아니다', () => {
+		expect(['pause', 'resume', 'delete'].every(isSetStatusAction)).toBe(true);
+		expect(isSetStatusAction('end')).toBe(false);
 	});
 });

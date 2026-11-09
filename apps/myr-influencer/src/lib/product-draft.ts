@@ -114,20 +114,19 @@ export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'pa
 
 export type ProductMenuItem = { kind: 'edit' | 'review' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
-/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고,
+/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 판매 종료는 메뉴에 없다(운영만 · 0082 · §9-6). 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고,
  *  수정 반려면 "심사 결과 보기"(운영팀 의견 → 반려 내용 고치기 · 시안). 반려 상품은 목록이 바로 심사 결과로 보낸다(메뉴는 같은 항목 하나) */
 export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | null = null): ProductMenuItem[] {
 	const revise: ProductMenuItem[] = revision === 'review' ? [] : [revision === 'rejected' ? { kind: 'review', label: '심사 결과 보기' } : { kind: 'edit', label: '내용 수정' }];
-	const end: ProductMenuItem = { kind: 'end', label: '판매 종료', danger: true, confirm: '판매를 종료하면 샵에서 내려가고 다시 열 수 없어요. 종료할까요?' };
 	switch (s) {
 		case 'draft':
 			return [{ kind: 'edit', label: '이어서 작성' }, { kind: 'delete', label: '삭제', danger: true, confirm: '임시저장한 내용을 지울까요?' }];
 		case 'rejected':
 			return [{ kind: 'review', label: '심사 결과 보기' }];
 		case 'live':
-			return [...revise, { kind: 'pause', label: '일시중지' }, end];
+			return [...revise, { kind: 'pause', label: '일시중지' }];
 		case 'paused':
-			return [...revise, { kind: 'resume', label: '다시 판매' }, end];
+			return [...revise, { kind: 'resume', label: '다시 판매' }];
 		default:
 			return [];
 	}
@@ -136,6 +135,5 @@ export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | 
 export const STATUS_ACTION_DONE: Record<SetStatusAction, string> = {
 	pause: '일시중지했어요 · 샵에서 잠시 내려갔어요',
 	resume: '다시 판매를 시작했어요',
-	end: '판매를 종료했어요',
 	delete: '임시저장을 지웠어요'
 };

@@ -43,6 +43,8 @@ export const filterProducts = (list: Product[], tab: ProductTab) =>
 	tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status) || (tab === 'review' && !!p.revision));
 /** 재고를 보여줄 상태 — 샵에서 팔리는 중이거나 잠깐 멈춘 것만(나머지는 "—") */
 export const showsStock = (s: ProductStatus) => s === 'live' || s === 'paused';
+/** 품절 — 판매 중인데 남은 재고 0(샵이 품절로 보여 준다 · 판매 상태는 그대로 · 재고가 들어오면 다시 팔린다 · §9-6) */
+export const isSoldOut = (p: { status: ProductStatus; stock: number }) => p.status === 'live' && p.stock <= 0;
 export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
 
 /* ---------- 상품 등록 에디터 ---------- */
