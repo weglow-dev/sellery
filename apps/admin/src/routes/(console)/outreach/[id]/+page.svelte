@@ -48,7 +48,7 @@
 				<div class="fld"><label for="o-kr">한국</label><input id="o-kr" name="kr_pct" inputmode="numeric" value={r.audience?.kr_pct ?? ''} /></div>
 				<div class="fld"><label for="o-src">출처</label><input id="o-src" name="audience_source" value={r.audience?.source ?? ''} placeholder="Modash · 수동" /></div>
 			</div>
-			<div class="fld" style="margin-top:10px"><label for="o-dm">DM 초안 <small>(복사해서 @sellery.official 에서 직접 보내요)</small></label>
+			<div class="fld" style="margin-top:10px"><label for="o-dm">DM 초안 <small>(복사해서 @makeyour.recipe 에서 직접 보내요)</small></label>
 				<textarea id="o-dm" name="dm_draft" rows="7">{r.dm_draft ?? ''}</textarea></div>
 			<div class="btnrow">
 				<button type="submit" class="pri sm">저장</button>

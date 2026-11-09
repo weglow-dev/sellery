@@ -8,7 +8,7 @@ import { env } from '$env/dynamic/private';
 import { configureOutreachCollect } from '@sellery/db/server/admin/outreach-collect';
 
 configureOutreachCollect({
-	// 메타 공식(무료) — 브랜드 IG 비즈니스 계정(@sellery.official)에 연결된 페이지의 Page access token · IG 사용자 id. App Review 전엔 모의 데이터
+	// 메타 공식(무료) — 브랜드 IG 비즈니스 계정(@makeyour.recipe)에 연결된 페이지의 Page access token · IG 사용자 id. App Review 전엔 모의 데이터
 	metaPageToken: env.META_PAGE_ACCESS_TOKEN,
 	metaIgUserId: env.META_IG_USER_ID,
 	modashApiKey: env.MODASH_API_KEY,

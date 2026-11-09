@@ -27,7 +27,7 @@
 
 <div class="console-head">
 	<h2>크리에이터 아웃리치</h2>
-	<span class="meta">MYR 제조의뢰 제안 후보 — 기준: 팔로워 {OUTREACH_FILTER.minFollowers / 10000}만↑ · 여성 {OUTREACH_FILTER.femalePct}%↑ · 20~40대 {OUTREACH_FILTER.age2040Pct}%↑ · 한국 {OUTREACH_FILTER.krPct}%↑ · 반응 우상향/유지. DM 은 초안을 복사해 @sellery.official 에서 직접 보내요.</span>
+	<span class="meta">MYR 제조의뢰 제안 후보 — 기준: 팔로워 {OUTREACH_FILTER.minFollowers / 10000}만↑ · 여성 {OUTREACH_FILTER.femalePct}%↑ · 20~40대 {OUTREACH_FILTER.age2040Pct}%↑ · 한국 {OUTREACH_FILTER.krPct}%↑ · 반응 우상향/유지. DM 은 초안을 복사해 @makeyour.recipe 에서 직접 보내요.</span>
 </div>
 
 {#if data.msg}<p class="notice ok" role="status">{data.msg}</p>{/if}

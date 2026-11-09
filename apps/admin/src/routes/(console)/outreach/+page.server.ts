@@ -11,7 +11,7 @@ import { collectOutreachCandidates, countOutreachByStatus, listOutreach, outreac
  *   ?/import  CSV/TSV 붙여넣기(헤더 포함) → upsert (지표 → 적합 점수)
  *   ?/status  행 상태 변경 (select)
  *   ?/collect 제공사(Modash) 검색 1페이지 → 대표 조건으로 걸러진 후보 upsert (MODASH_API_KEY 없으면 안내)
- * DM 은 자동 발송하지 않는다 — 운영자가 초안을 복사해 @sellery.official 에서 보낸 뒤 "DM 보냄" 으로 바꾼다.
+ * DM 은 자동 발송하지 않는다 — 운영자가 초안을 복사해 @makeyour.recipe 에서 보낸 뒤 "DM 보냄" 으로 바꾼다.
  */
 const MSG: Record<string, string> = {
   added: '후보를 추가했어요',

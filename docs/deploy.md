@@ -107,7 +107,7 @@ Preview 주소는 `sellery-<앱>-git-<branch>-weglow-team.vercel.app`(앱별 자
 | `SWEETTRACKER_API_KEY` | **비밀**(Production 만 · 선택) | — | — | 스마트택배(SweetTracker) API 키 — `/api/cron/tracking` 택배 자동 추적(0049 · §5.8). 없으면 크론이 `{skipped:'NO_KEY'}` 로 건너뛰고 [수령 확인] 수동 흐름만 남는다. **월 5,000회 요금제를 다른 서비스와 공유** — Preview 에는 넣지 않는다(프리뷰 크론은 돌지 않지만 수동 호출로 호출량을 쓰지 않게). 값은 대표의 `.env.cloud.local` `SWEETTRACKER_API_KEY` |
 | `SLACK_WEBHOOK_URL` | 선택 | 선택 | brand: 선택 · admin: — | `/auth/confirm` 가입 알림 · 채널 [인증 확인] · 브랜드 가입·정지 한 줄(이메일·핸들·사업자번호 없이) |
 | `PUBLIC_META_PIXEL_ID` · `META_CAPI_ACCESS_TOKEN` · `META_CAPI_TEST_EVENT_CODE`(선택) | — | — | — (**`myr`(옛 `sellery-branding`) 프로젝트**에만) | 메타 광고 전환(2026-10-19) — 브랜딩 랜딩 sellery.life/influencer/oem 의 픽셀(PageView · ViewContent · Lead)과 서버 전환 API(Lead · 전화번호 SHA-256 · `_fbp`/`_fbc`) 를 같은 `event_id` 로 중복 제거. 비면 둘 다 조용히 꺼짐 · 테스트 코드는 검증 뒤 삭제 |
-| `META_PAGE_ACCESS_TOKEN` · `META_IG_USER_ID` | — | — | admin: 선택 | 관리자 아웃리치 [조건으로 수집] **메타 공식** Instagram Creator Marketplace API(무료 · 2026-10-22) — @sellery.official 에 연결된 페이지의 Page 토큰 + IG 사용자 id. 권한 `instagram_creator_marketplace_discovery` 는 App Review 로 Advanced Access(전엔 모의 데이터). 있으면 Modash 보다 우선 |
+| `META_PAGE_ACCESS_TOKEN` · `META_IG_USER_ID` | — | — | admin: 선택 | 관리자 아웃리치 [조건으로 수집] **메타 공식** Instagram Creator Marketplace API(무료 · 2026-10-22) — @makeyour.recipe 에 연결된 페이지의 Page 토큰 + IG 사용자 id. 권한 `instagram_creator_marketplace_discovery` 는 App Review 로 Advanced Access(전엔 모의 데이터). 있으면 Modash 보다 우선 |
 | `MODASH_API_KEY` · `MODASH_KR_LOCATION_ID`(선택) | — | — | admin: 선택 | 관리자 아웃리치 [조건으로 수집] 대안(유료) — Modash Discovery API 검색에 대표 조건(팔로워 5만↑ · 여성 60%↑ · 20~40대 80%↑ · 한국 80%↑ · 성장률 ≥0)을 보내 걸러진 후보를 큐에 넣는다. 없으면 버튼만 꺼짐(수동·CSV 는 동작). 페이지당 ≤15건 · 0.01 크레딧/건 |
 | `RESEND_API_KEY` | **필수(비밀)** — 주문 확인(고객+브랜드) · 고객 셀프 환불 · 토스 콘솔 취소 · 문의 접수 메일 | — | **brand: 필수(비밀)** — 배송 시작 · 브랜드 환불 · 문의 답변 · **admin: 선택** — 관리자 환불 | 거래 메일(2026-09-22 · `packages/db/src/mail` · docs/emails/README.md "거래 메일"). Resend → API Keys → Create → Permission **Sending access** · Domain `sellery.life`(§5.7). `$lib/server/env.ts` → `configureMail()`. **없으면 발송 비활성**(서버 로그 1회 안내 · 주문·환불 흐름은 정상) — Preview 는 비워 둔다(테스트 결제로 실제 고객 주소에 메일이 가지 않게) |
 | `RESEND_API_URL` | — | — | — | 로컬 검증용 목 서버 주소(기본 `https://api.resend.com`). Vercel 에는 넣지 않는다 |
@@ -295,7 +295,7 @@ JSON 이라 주석을 못 넣으므로 각 줄의 뜻은 여기에 둔다. 규�
 **링크 방식.** 기본 `{{ .ConfirmationURL }}` 은 PKCE(`?code=`) 링크라 **가입한 브라우저에서만** 열리고, 데스크톱에서 가입하고 휴대폰 메일 앱에서 열면 실패한다. `{{ .RedirectTo }}` 는 앱이 넘긴 `emailRedirectTo`(예 `https://sellery.life/influencer/auth/confirm?next=%2Finfluencer%2Fhome`) 그대로이므로 거기에 `&token_hash={{ .TokenHash }}&type=signup|recovery|invite` 만 붙인다(`auth/confirm/+server.ts` 가 `verifyOtp({ type, token_hash })` 로 세션을 만든다). 로고는 `https://sellery.life/email/celery.png`(`apps/shop/static/email/celery.png` · 불변).
 
 - 로컬·Preview 확인(실제 메일 없이): `auth.admin.generateLink({ type:'signup'|'magiclink'|'recovery', email })` 의 `hashed_token` 으로 `GET /influencer/auth/confirm?token_hash=…&type=…&next=/influencer/home` 을 열면 같은 경로를 탄다. 시드 연결은 `node packages/db/scripts/dev-seller.mjs --email … --seller s1`(production 거부), 실제 계약자 초대는 `node packages/db/scripts/partner-admin.mjs invite <email> --link s2`(§8.1).
-- 운영 절차(관리자 화면 없음): 가입 완료·채널 [인증 확인] 은 Slack 한 줄(`SLACK_WEBHOOK_URL`, 선택 — 이메일·핸들 없이) → `partner-admin.mjs channels --pending` → 인플루언서 프로필 bio 또는 `@sellery.official` DM 수신함에서 코드 `SLRY-XXXX` 확인 → `verify-channel <ch>`. 정지·복귀는 `suspend`/`reactivate`, 목록은 `list`. **`@sellery.official` DM 수신함 확인 담당자**를 정한다(`inf-console-plan.md §7` 2단계).
+- 운영 절차(관리자 화면 없음): 가입 완료·채널 [인증 확인] 은 Slack 한 줄(`SLACK_WEBHOOK_URL`, 선택 — 이메일·핸들 없이) → `partner-admin.mjs channels --pending` → 인플루언서 프로필 bio 또는 `@makeyour.recipe` DM 수신함에서 코드 `SLRY-XXXX` 확인 → `verify-channel <ch>`. 정지·복귀는 `suspend`/`reactivate`, 목록은 `list`. **`@makeyour.recipe` DM 수신함 확인 담당자**를 정한다(`inf-console-plan.md §7` 2단계).
 
 ### 5.6 관리자 계정 (`profiles.role='admin'`)
 
@@ -604,7 +604,7 @@ node --env-file=.env.local packages/db/scripts/dev-admin.mjs --email admin@local
 | 세션 만료 — PENDING · payment_key 없는 CONFIRMING → EXPIRED | `npx supabase db query --linked "select expire_checkout_sessions()"` | 하루 1회 |
 | PII 파기 — FAILED/EXPIRED 30일 경과 세션의 실명 · 연락처 · 배송지 + **주문 없는 비회원 `customers` 행 삭제**(0021 · 반환값은 두 작업 행 수 합) | `npx supabase db query --linked "select purge_checkout_pii()"` | 주 1회 |
 | 운영 큐 확인(부분취소 · 정산 완료 뒤 취소 등) | `select id, source, result, received_at from payment_events where handled = false order by received_at desc` | 매일 |
-| 채널 인증 대기 | `partner-admin.mjs channels --pending` → bio / `@sellery.official` DM 에서 코드 확인 → `verify-channel` | 매일 |
+| 채널 인증 대기 | `partner-admin.mjs channels --pending` → bio / `@makeyour.recipe` DM 에서 코드 확인 → `verify-channel` | 매일 |
 | 거래 메일 발송 확인 | Resend 대시보드 → Emails — bounce · 4xx(도메인 미인증 `403` · 키 만료 `401`) · Vercel 로그의 `[mail] resend responded …`. 재발송 큐는 없다(§5.7) — 유실분은 고객이 주문 조회 화면에서 보고, 필요하면 브랜드가 문의로 안내 | 매일(첫 주) → 주 1회 |
 
 ### 8.3 Vercel 환경변수 · 재배포 주의 (2026-09-21 실측)
