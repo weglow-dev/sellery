@@ -69,7 +69,7 @@
 		</label>
 		<div class="min-w-0 flex-1">
 			<p class="truncate text-[18px] font-extrabold tracking-[-0.02em] lg:text-[22px]">{me.name}</p>
-			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · 오늘도 좋은 하루예요</p>
+			<p class="mt-0.5 truncate text-[13px] text-white/50 lg:mt-[3px] lg:text-[14px]">{me.handle} · <a href="/my" class="font-bold text-white/70 underline-offset-2 hover:text-fg hover:underline">내 정보</a></p>
 			{#if photo}
 				<label class="relative mt-1.5 block w-fit cursor-pointer text-[12px] font-bold text-accent lg:hidden">
 					사진 변경<input type="file" accept="image/*" onchange={pickPhoto} class="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
@@ -81,6 +81,14 @@
 			<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[12px] font-bold text-white/70">로그아웃</button>
 		</form>
 	</div>
+
+	<!-- 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 배너(정산은 계산되고 지급만 보류) -->
+	{#if data.settleStatus === 'none' || data.settleStatus === 'rejected'}
+		<a href="/my" class="mt-4 flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent/8 px-4 py-3 text-[13px] lg:mt-5 lg:text-[14px]">
+			<span class="min-w-0 flex-1 leading-[1.5]"><b class="font-bold text-accent">{data.settleStatus === 'rejected' ? '사업자 · 정산 정보를 다시 입력해 주세요' : '사업자 · 정산 정보를 입력해 주세요'}</b><span class="block text-white/65 lg:inline lg:pl-2">정보가 확인돼야 정산금이 지급돼요</span></span>
+			<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-accent" />
+		</a>
+	{/if}
 
 	<div class="mt-5 grid grid-cols-2 gap-x-2.5 gap-y-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-3.5">
 		<div class="relative col-span-2 overflow-hidden rounded-3xl bg-panel p-5 lg:col-span-1 lg:px-7 lg:py-[26px]">

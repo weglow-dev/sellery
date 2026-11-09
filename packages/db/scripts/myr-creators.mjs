@@ -14,6 +14,10 @@
 //                                                — Supabase Redirect URLs 에 그 주소가 있어야 링크가 콘솔로 온다(docs/deploy.md MYR 표).
 //   unlink <@handle>                             로그인 계정 연결만 끊는다(계정 · 상품은 그대로)
 //   suspend <@handle> · reactivate <@handle>     콘솔 이용 정지/해제(sellers.active) — 정지되면 콘솔 모든 화면이 /suspended. 샵의 상품 노출도 같이 멈춘다(0056 공개 RPC 가 active 를 본다)
+//   settle-info [--all]                          사업자 · 정산 정보 확인 대기(0085 · --all = 미입력 빼고 전부) — 원문 출력(확인용 · 화면 공유 주의)
+//                                                확인: 홈택스 사업자 상태(휴 · 폐업 아님) · 상호 · 대표자 일치 / 은행 "예금주 조회"로 예금주 = 상호 또는 대표자
+//   settle-verify <@handle>                      확인 완료(확인 중만) — 정산금 지급 가능
+//   settle-reject <@handle> "<사유>"             다시 입력 요청(사유 필수 · 크리에이터 콘솔 홈 배너 · 내 정보에 사유)
 //
 // 연결 규칙: sellers.user_id = 계정(콘솔 게이트의 진실 — @sellery/myr-core server/seller) · 계정 하나는 크리에이터 하나에만 · profiles.role 이 customer 면 seller 로(관리자는 그대로).
 // 키·비밀번호(--password 로 준 값)는 출력하지 않는다. 두 번 실행해도 같은 결과.
@@ -176,10 +180,32 @@ async function cmdList() {
   console.log(formatCreatorsTable([...map.values()]));
 }
 
-const commands = { list: cmdList, account: cmdAccount, invite: cmdInvite, unlink: cmdUnlink, suspend: () => setActive(false), reactivate: () => setActive(true) };
+async function cmdSettleInfo() {
+  const { data, error } = await db.rpc("myr_app_admin_settle_infos", { p_status: flags.all ? null : "pending" });
+  if (error) fail(error.message);
+  console.log(`[${where}] 사업자 · 정산 정보 ${flags.all ? "(전부)" : "확인 대기"} ${data.length}건`);
+  for (const r of data) {
+    console.log(`\n${r.handle}  ${r.name}  [${r.status}]  제출 ${r.submitted_at ?? "—"}`);
+    console.log(`  상호 ${r.company ?? "—"} · 대표자 ${r.ceo ?? "—"} · 사업자번호 ${r.biz_no ? r.biz_no.replace(/^(\d{3})(\d{2})(\d{5})$/, "$1-$2-$3") : "—"}`);
+    console.log(`  계좌 ${r.bank ?? "—"} ${r.account ?? ""} · 예금주 ${r.holder ?? "—"} · 세금계산서 ${r.tax_email ?? "—"}`);
+    if (r.note) console.log(`  요청 사유: ${r.note}`);
+  }
+  if (data.length) console.log(`\n확인 완료: settle-verify <@handle> · 다시 입력 요청: settle-reject <@handle> "사유"`);
+}
+
+async function settleCheck(decision) {
+  const seller = await sellerByHandle(args[0] ?? fail(`usage: settle-${decision} <@handle>${decision === "reject" ? ' "<사유>"' : ""}`));
+  const note = decision === "reject" ? (args[1] ?? fail('usage: settle-reject <@handle> "<사유>"')) : null;
+  const { data, error } = await db.rpc("myr_app_admin_settle_info_check", { p_seller: seller.id, p_decision: decision, p_note: note, p_admin: null });
+  if (error) fail(error.message);
+  if (!data?.ok) fail(`거부: ${data?.code}${data?.status ? ` (지금 ${data.status})` : ""}`);
+  console.log(`[${where}] ${seller.handle} 정산 정보 → ${data.status === "verified" ? "확인 완료" : "다시 입력 요청"}`);
+}
+
+const commands = { "settle-info": cmdSettleInfo, "settle-verify": () => settleCheck("verify"), "settle-reject": () => settleCheck("reject"), list: cmdList, account: cmdAccount, invite: cmdInvite, unlink: cmdUnlink, suspend: () => setActive(false), reactivate: () => setActive(true) };
 if (!cmd || !commands[cmd]) {
   console.error(
-    "usage: node packages/db/scripts/myr-creators.mjs list | account <@handle> <email> [--password pw] | invite <@handle> <email> --console <url> | unlink <@handle> | suspend <@handle> | reactivate <@handle>"
+    "usage: node packages/db/scripts/myr-creators.mjs list | account <@handle> <email> [--password pw] | invite <@handle> <email> --console <url> | unlink <@handle> | suspend <@handle> | reactivate <@handle> | settle-info [--all] | settle-verify <@handle> | settle-reject <@handle> \"사유\""
   );
   process.exit(2);
 }

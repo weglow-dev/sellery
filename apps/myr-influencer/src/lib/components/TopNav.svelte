@@ -43,7 +43,7 @@
 		</a>
 		{#if me}
 			<div class="flex items-center gap-3">
-				<span class="max-w-[160px] truncate text-[14px] font-bold text-white/80" title={me.handle}>{me.name}</span>
+				<a href="/my" class="max-w-[160px] truncate text-[14px] font-bold text-white/80 hover:text-fg" title="내 정보 · {me.handle}">{me.name}</a>
 				<form method="POST" action="/auth/signout">
 					<button type="submit" class="h-9 rounded-xl border border-white/12 px-3 text-[13px] font-bold text-white/70 transition-colors hover:border-white/25 hover:text-fg">로그아웃</button>
 				</form>

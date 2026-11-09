@@ -30,9 +30,12 @@
 	import CheckBox from '$lib/components/auth/CheckBox.svelte';
 	import ErrorText from '$lib/components/auth/ErrorText.svelte';
 	import PasswordToggle from '$lib/components/auth/PasswordToggle.svelte';
+	import SettleInfoForm from '$lib/components/SettleInfoForm.svelte';
+	import type { SettleInfo } from '@sellery/myr-core/settle-info';
 
 	/**
-	 * 크리에이터 초대 가입 — 시안 "MYR Influencer Signup"(모바일) · "… PC". 화면 넷: 초대장 → 가입 폼 → 환영 / 만료.
+	 * 크리에이터 초대 가입 — 시안 "MYR Influencer Signup"(모바일) · "… PC". 화면: 초대장 → 가입 폼 → **사업자 · 정산 정보(2단계 · 건너뛸 수 있다 · 0085 · 2026-11-09)** → 환영 / 만료.
+	 * 2단계는 바로 로그인이 된 경우에만(저장 API 가 세션을 본다) — 건너뛰면 콘솔 홈 배너 · 내 정보 `/my` 에서 넣는다.
 	 * 가입은 form action `?/signup`(+page.server.ts — 계정 생성 · 크리에이터 연결 · 바로 로그인). 칸 규칙 · 문구는 lib/signup-rules.ts(서버 검증도 같은 함수).
 	 * 핸들 중복 · 예약어는 칸을 **벗어날 때** 한 번 서버에 묻는다(`./handle` · 같은 핸들은 기억) — 가입 때 서버가 다시 본다(경합).
 	 * 시안과 다른 점(정한 가입 방식에 맞춤 · docs/myr.md §4.2.1):
@@ -42,11 +45,13 @@
 	 */
 	let { data, form } = $props();
 
-	type Screen = 'invite' | 'form' | 'done' | 'expired';
+	type Screen = 'invite' | 'form' | 'settle' | 'done' | 'expired';
 	// 첫 화면 · 칸 초기값은 서버 데이터로 한 번만(이후는 이 화면 안에서 바뀐다)
 	let screen = $state<Screen>(untrack(() => (data.state === 'valid' ? 'invite' : 'expired')));
 
 	const invite = $derived(data.state === 'valid' ? data : null);
+	/** 2단계 폼의 처음 값 — 비어 있음 · 세금계산서 이메일 = 초대받은 이메일 */
+	const settleSeed = $derived<SettleInfo>({ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite?.email ?? '', status: 'none', note: null, submittedAt: null, checkedAt: null });
 	const validity = $derived(invite ? inviteValidity(invite.expiresAt) : null);
 
 	let values = $state({
@@ -177,7 +182,8 @@
 			busy = false;
 			if (result.type === 'success' && result.data?.ok) {
 				signedIn = result.data.signedIn === true;
-				screen = 'done';
+				// 바로 로그인됐으면 사업자 · 정산 정보(건너뛸 수 있다) → 환영. 아니면 바로 환영(로그인 화면으로)
+				screen = signedIn ? 'settle' : 'done';
 				window.scrollTo(0, 0);
 				return;
 			}
@@ -216,7 +222,7 @@
 	<header class="relative z-[2] hidden h-[72px] shrink-0 border-b border-white/7 lg:block">
 		<div class="mx-auto flex h-full max-w-[1240px] items-center gap-2.5 px-10">
 			<AuthLogo large />
-			{#if screen !== 'done'}
+			{#if screen !== 'done' && screen !== 'settle'}
 				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]"> 로그인</a></span>
 			{/if}
 		</div>
@@ -449,6 +455,22 @@
 				</div>
 			</div>
 		</form>
+	{:else if screen === 'settle'}
+		<!-- 2단계 — 사업자 · 정산 정보(건너뛸 수 있다 · 0085) -->
+		<div class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col overflow-y-auto px-6 pt-10 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:max-w-none lg:items-center lg:overflow-visible lg:px-10 lg:py-16">
+			<div class="flex animate-up-in flex-col lg:w-full lg:max-w-[560px] lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-[#111216] lg:p-12">
+				<p class="text-[13px] font-bold text-accent">가입 완료 · 마지막 단계</p>
+				<h1 class="mt-2 text-[26px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[30px]">정산 받을 정보를<br class="lg:hidden" /> 입력해 주세요</h1>
+				<p class="mt-2.5 text-[14px] leading-[1.6] text-white/62 lg:text-[15px]">MYR 은 사업자 크리에이터와 함께해요. 지금 넣지 않아도 괜찮아요 — 콘솔 <b class="font-bold text-fg">내 정보</b>에서 언제든 넣을 수 있고, 정보가 확인돼야 정산금이 지급돼요.</p>
+				<div class="mt-6">
+					<SettleInfoForm info={settleSeed} submitLabel="저장하고 시작하기" onsaved={() => { screen = 'done'; window.scrollTo(0, 0); showToast('정산 정보를 저장했어요 · 운영팀이 확인할게요'); }}>
+						{#snippet footer()}
+							<button type="button" onclick={() => { screen = 'done'; window.scrollTo(0, 0); }} class="h-12 w-full rounded-2xl text-[14px] font-bold text-white/60 hover:text-fg">나중에 입력할게요</button>
+						{/snippet}
+					</SettleInfoForm>
+				</div>
+			</div>
+		</div>
 	{:else if screen === 'done'}
 		<!-- 환영 -->
 		<div class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-6 pt-[72px] pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:max-w-none lg:items-center lg:justify-center lg:px-10 lg:py-20">

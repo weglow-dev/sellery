@@ -8,6 +8,7 @@ import { homeProductCounts } from '$lib/rules';
 import { listSellerClaimsOfUser } from '$lib/server/claims';
 import { listSellerCsOfUser } from '$lib/server/cs';
 import { getSellerSalesOfUser } from '$lib/server/sales';
+import { getSettleInfoOfUser } from '$lib/server/settle-info';
 import { myProducts } from '$lib/server/seller-products';
 
 /** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 최근 7일(0076) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
@@ -27,8 +28,15 @@ export const load: PageServerLoad = async (event) => {
 				return [];
 			})
 		: Promise.resolve([]);
+	// 사업자 · 정산 정보(0085) — 미입력 · 다시 입력 필요면 홈 배너. 실패해도 홈은 뜬다
+	const settleP = user
+		? getSettleInfoOfUser(user.id).catch((e) => {
+				console.error('[home] settle info failed:', e instanceof Error ? e.message : e);
+				return null;
+			})
+		: Promise.resolve(null);
 	const { rows } = await myProducts(event);
-	const [sales, inquiries, claims] = await Promise.all([salesP, inqP, claimP]);
+	const [sales, inquiries, claims, settle] = await Promise.all([salesP, inqP, claimP, settleP]);
 	const pendingClaims = claims.filter((c) => c.status === 'pending');
 	const waiting = inquiries.filter(isWaiting);
 	// 오늘 처리할 일 — 처리 대기 교환 · 환불(오래된 순) 먼저, 남는 자리에 답변 대기 문의(오래된 순) — 합쳐 3건
@@ -40,5 +48,5 @@ export const load: PageServerLoad = async (event) => {
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, Math.max(0, 3 - todayClaims.length))
 		.map((c) => ({ code: c.code, type: c.type, buyerName: c.buyerName, question: c.firstBody ?? '', createdAt: c.createdAt, product: c.product }));
-	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting: waiting.length, claimWaiting: pendingClaims.length, sales, todayInquiries, todayClaims };
+	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting: waiting.length, claimWaiting: pendingClaims.length, sales, todayInquiries, todayClaims, settleStatus: settle?.status ?? null };
 };
