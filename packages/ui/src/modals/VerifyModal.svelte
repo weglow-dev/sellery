@@ -13,7 +13,7 @@
 	</div>
 	<div class="grid g2">
 		<div class="card" style="box-shadow:none"><div class="lbl-sm">방법 1 · 프로필 인증</div><p style="font-size:12.5px;color:var(--mute);margin:8px 0 0">{PLAT_NAMES[ch.platform]} 프로필 소개글(bio)에 코드를 붙여넣은 뒤 아래 확인 버튼을 누르세요. 확인 후 소개글에서 지워도 됩니다.</p></div>
-		<div class="card" style="box-shadow:none"><div class="lbl-sm">방법 2 · DM 인증</div><p style="font-size:12.5px;color:var(--mute);margin:8px 0 0">해당 계정에서 셀러리 공식 계정 <b>@sellery.official</b>로 코드를 DM으로 보낸 뒤 확인 버튼을 누르세요.</p></div>
+		<div class="card" style="box-shadow:none"><div class="lbl-sm">방법 2 · DM 인증</div><p style="font-size:12.5px;color:var(--mute);margin:8px 0 0">해당 계정에서 공식 계정 <b>@makeyour.recipe</b>로 코드를 DM으로 보낸 뒤 확인 버튼을 누르세요.</p></div>
 	</div>
 	<p style="font-size:11.5px;color:var(--mute);margin-top:12px">실서비스: 프로필 크롤링/공식 API·DM 수신함 매칭으로 코드 존재를 자동 확인합니다. 프로토타입에서는 확인 버튼 클릭 시 즉시 성공 처리됩니다.</p>
 	<div class="foot"><button onclick={closeModal}>나중에</button><button class="pri" onclick={() => act.confirmVerify(chId)}>인증 확인</button></div>

@@ -2,7 +2,7 @@
 	/**
 	 * 인플루언서 상세 — 프로필 · 채널 목록 · 운영 액션(정지/복귀 · 비공개/공개 · 채널 인증 승인/해제).
 	 * UI 는 목록(`sellers/+page`) · 주문 상세와 같은 console-det / kv / actions 톤.
-	 * 인증 승인 전에 운영자가 프로필 bio 또는 @sellery.official DM 에서 코드를 직접 확인해야 한다(0010 계약).
+	 * 인증 승인 전에 운영자가 프로필 bio 또는 @makeyour.recipe DM 에서 코드를 직접 확인해야 한다(0010 계약).
 	 */
 	import { HIDDEN_LABELS, accountLinkLabel, channelPendingSince, channelStatusChip, isChannelPending, sellerStatusChip } from '@sellery/db/admin/seller-rules';
 	import { fmtNum } from '@sellery/db/campaign';
@@ -117,7 +117,7 @@
 				<span class="meta">{data.channels.length}건{#if pendingN} · 대기 {pendingN}{/if}</span>
 			</h4>
 			<p class="hint seller-channel-hint">
-				인증 승인 전에 인플루언서의 <b>프로필 bio 또는 @sellery.official DM 수신함</b>에서 1회용 코드를 직접 확인하세요.
+				인증 승인 전에 인플루언서의 <b>프로필 bio 또는 @makeyour.recipe DM 수신함</b>에서 1회용 코드를 직접 확인하세요.
 				[인증 확인] 은 인플루언서가 누른 것이고, <code>verified</code> 로 바꾸는 것은 운영자만 할 수 있습니다.
 			</p>
 

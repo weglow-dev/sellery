@@ -9,7 +9,7 @@
 //   invite <email> --link <seller>          auth.admin.inviteUserByEmail + app_metadata.link_seller_id → 초대 메일 링크(type=invite) → /influencer/auth/confirm
 //                                           → 시드 행 연결 → /password/new. 시드 8명(*@sellery.demo)은 실제 메일을 못 받으므로 실제 계약자 메일로
 //   channels [--pending]                    seller_channels 표 — --pending = vcode_confirmed_at is not null and not verified ([인증 확인] 누른 채널)
-//   verify-channel <channel>                운영자가 프로필 bio / @sellery.official DM 에서 코드를 확인한 뒤 → verified=true, vcode=null
+//   verify-channel <channel>                운영자가 프로필 bio / @makeyour.recipe DM 에서 코드를 확인한 뒤 → verified=true, vcode=null
 //   unverify-channel <channel>              사칭 발견 시 → verified=false, vcode_confirmed_at=null (메인 채널이면 primary 는 유지)
 //
 //   ── 4단계 샘플 결제 (0012 partner_payments · docs/inf-console-plan.md §5.7 "결제 후 취소 요청") ──

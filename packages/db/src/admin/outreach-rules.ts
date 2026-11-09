@@ -30,7 +30,7 @@ export type OutreachStatus = (typeof OUTREACH_STATUSES)[number];
 export const OUTREACH_STATUS_LABEL: Record<OutreachStatus, { label: string; tone: StatusTone; hint: string }> = {
   candidate: { label: "후보", tone: "gray", hint: "수집됨 · 아직 검토 전" },
   queued: { label: "발송 대기", tone: "blue", hint: "적합 확인 · DM 초안 준비됨" },
-  sent: { label: "DM 보냄", tone: "amber", hint: "운영자가 @sellery.official 에서 보냄" },
+  sent: { label: "DM 보냄", tone: "amber", hint: "운영자가 @makeyour.recipe 에서 보냄" },
   replied: { label: "답장 옴", tone: "green", hint: "대화 진행 중" },
   meeting: { label: "미팅", tone: "green", hint: "미팅 일정 잡힘" },
   joined: { label: "합류", tone: "green", hint: "제조의뢰 접수 / 계약" },
@@ -214,7 +214,7 @@ export function outreachFit(r: { followers?: number | null; trend?: string | nul
 
 /* ---------------- DM 초안 ---------------- */
 
-/** 개인화 DM 초안 — 운영자가 @sellery.official 에서 손으로 보낸다(자동 발송 아님). 500자 안팎 */
+/** 개인화 DM 초안 — 운영자가 @makeyour.recipe 에서 손으로 보낸다(자동 발송 아님). 500자 안팎 */
 export function dmDraft(r: { handle: string; name?: string | null; category?: string | null }, landing = OEM_LANDING_URL): string {
   const who = (r.name ?? "").trim() || `@${r.handle}`;
   const cat = (r.category ?? "").trim();

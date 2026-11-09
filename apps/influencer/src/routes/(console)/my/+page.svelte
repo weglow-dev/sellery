@@ -63,7 +63,7 @@
 			</div>
 			<div class="card static">
 				<div class="lbl-sm">방법 2 · DM 인증</div>
-				<p>해당 계정에서 셀러리 공식 계정 <b>@sellery.official</b> 로 코드를 DM 으로 보낸 뒤 확인 버튼을 누르세요.</p>
+				<p>해당 계정에서 공식 계정 <b>@makeyour.recipe</b> 로 코드를 DM 으로 보낸 뒤 확인 버튼을 누르세요.</p>
 			</div>
 		</div>
 		<p class="meta" style="margin-top:12px">확인 버튼을 누르면 운영팀이 프로필 또는 DM 수신함에서 코드를 대조한 뒤 인증을 완료합니다("인증 대기" 표시). 채널 인증은 샘플 요청·구매의 전제 조건이 아니에요.</p>

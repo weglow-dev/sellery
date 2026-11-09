@@ -126,7 +126,7 @@
 - [ ] **CS 당번**: 고객 문의는 `/cs/new` → 해당 브랜드 `/brand/cs` 로 직행, 관리자는 `/admin/cs` 열람만. 브랜드가 며칠 안 보면 아무도 모른다 → 브랜드 SLA(예 영업일 1일) 를 입점 안내에 명시하고, 운영자가 매일 `/admin/cs` 또는 `partner-admin.mjs cs --open` 으로 미답변을 본다. 담당자 **확인 필요(대표)**.
 - [ ] `official@weglow.biz` 메일함(푸터 고객센터 · 방침 §303)을 누가 보는지, 응답 시간.
 - [ ] Slack: 운영 채널에 `SLACK_WEBHOOK_URL` 을 shop · influencer · brand 세 프로젝트에 넣으면 가입·인증·환불이 한 줄씩 온다(개인정보 없이). 주문 알림은 코드에 없다.
-- [ ] `@sellery.official` 인스타 DM 수신함 담당자(채널 인증 코드 확인 · deploy.md §5.5).
+- [ ] `@makeyour.recipe` 인스타 DM 수신함 담당자(채널 인증 코드 확인 · deploy.md §5.5).
 
 ---
 
