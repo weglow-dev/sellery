@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { BANKS, digitsOnly, formatBizNo, type SettleField, type SettleInfo, type SettleValues } from '@sellery/myr-core/settle-info';
+	import { digitsOnly, formatBizNo, type SettleField, type SettleInfo, type SettleValues } from '@sellery/myr-core/settle-info';
 	import { AUTH_HINT, AUTH_LABEL, authInput } from '$lib/auth-ui';
+	import BankSelect from './BankSelect.svelte';
 
 	/**
 	 * 사업자 · 정산 정보 칸(9번 · 0085) — 내 정보(SettleInfoForm)와 초대 가입 폼(한 폼 · 선택 칸)이 같이 쓴다.
@@ -61,11 +62,7 @@
 		<legend class="mb-3 {heading}">정산 계좌</legend>
 		<div class="flex flex-col gap-2">
 			<label for="s-bank" class={AUTH_LABEL}>은행</label>
-			<select id="s-bank" name={named ? "settle_bank" : undefined} bind:value={values.bank} onchange={() => clear('bank')} class="{authInput({ size: 'md', invalid: !!show('bank'), filled: !!values.bank })} appearance-none">
-				<option value="" disabled>은행을 골라 주세요</option>
-				{#each BANKS as b (b)}<option value={b}>{b}</option>{/each}
-				{#if values.bank && !(BANKS as readonly string[]).includes(values.bank)}<option value={values.bank}>{values.bank}</option>{/if}
-			</select>
+			<BankSelect id="s-bank" name={named ? 'settle_bank' : undefined} bind:value={values.bank} invalid={!!show('bank')} onchange={() => clear('bank')} />
 			{@render err('bank')}
 		</div>
 		<div class="flex flex-col gap-2">
