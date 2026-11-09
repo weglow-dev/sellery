@@ -182,8 +182,8 @@
 			busy = false;
 			if (result.type === 'success' && result.data?.ok) {
 				signedIn = result.data.signedIn === true;
-				// 바로 로그인됐으면 사업자 · 정산 정보(건너뛸 수 있다) → 환영. 아니면 바로 환영(로그인 화면으로)
-				screen = signedIn ? 'settle' : 'done';
+				// 바로 로그인됐으면 사업자 · 정산 정보(건너뛸 수 있다) → 환영. 아니면 바로 환영(로그인 화면으로). 미리보기는 저장 없이 2단계도 보여 준다
+				screen = signedIn || data.preview ? 'settle' : 'done';
 				window.scrollTo(0, 0);
 				return;
 			}
@@ -463,7 +463,7 @@
 				<h1 class="mt-2 text-[26px] leading-[1.3] font-extrabold tracking-[-0.03em] lg:text-[30px]">정산 받을 정보를<br class="lg:hidden" /> 입력해 주세요</h1>
 				<p class="mt-2.5 text-[14px] leading-[1.6] text-white/62 lg:text-[15px]">MYR 은 사업자 크리에이터와 함께해요. 지금 넣지 않아도 괜찮아요 — 콘솔 <b class="font-bold text-fg">내 정보</b>에서 언제든 넣을 수 있고, 정보가 확인돼야 정산금이 지급돼요.</p>
 				<div class="mt-6">
-					<SettleInfoForm info={settleSeed} submitLabel="저장하고 시작하기" onsaved={() => { screen = 'done'; window.scrollTo(0, 0); showToast('정산 정보를 저장했어요 · 운영팀이 확인할게요'); }}>
+					<SettleInfoForm info={settleSeed} preview={!!data.preview} submitLabel="저장하고 시작하기" onsaved={() => { screen = 'done'; window.scrollTo(0, 0); showToast(data.preview ? '미리보기라 저장하지 않았어요' : '정산 정보를 저장했어요 · 운영팀이 확인할게요'); }}>
 						{#snippet footer()}
 							<button type="button" onclick={() => { screen = 'done'; window.scrollTo(0, 0); }} class="h-12 w-full rounded-2xl text-[14px] font-bold text-white/60 hover:text-fg">나중에 입력할게요</button>
 						{/snippet}

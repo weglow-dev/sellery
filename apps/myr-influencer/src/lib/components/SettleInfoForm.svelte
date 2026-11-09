@@ -8,8 +8,9 @@
 	 * 사업자 · 정산 정보 입력(9번 · 0085) — 초대 가입 2단계 · 내 정보 `/my` 공용. 저장은 POST /api/my/settle(서버가 같은 규칙으로 다시 막는다).
 	 * 저장된 사업자번호 · 계좌는 가린 값만 보여 주고, 비워 두면 그대로 둔다(바꿀 때만 입력). 세금계산서 이메일은 초대 이메일(입력 없음).
 	 * 칸 규칙 · 문구는 `@sellery/myr-core/settle-info`. 오류는 [저장]을 누른 뒤부터 보인다.
+	 * preview — 초대 가입 미리보기(/invite/preview · dev · Preview 배포만): 칸 검사만 하고 저장하지 않는다.
 	 */
-	let { info, submitLabel = '저장하기', onsaved, footer }: { info: SettleInfo | null; submitLabel?: string; onsaved?: (info: SettleInfo, recheck: boolean) => void; footer?: Snippet } = $props();
+	let { info, submitLabel = '저장하기', onsaved, footer, preview = false }: { info: SettleInfo | null; submitLabel?: string; onsaved?: (info: SettleInfo, recheck: boolean) => void; footer?: Snippet; preview?: boolean } = $props();
 
 	let values = $state<SettleValues>(untrack(() => ({ company: info?.company ?? '', ceo: info?.ceo ?? '', bizNo: '', bank: info?.bank ?? '', account: '', holder: info?.holder ?? '' })));
 	let attempted = $state(false);
@@ -29,6 +30,10 @@
 		const bad = SETTLE_FIELDS.find((k) => !!errs[k]);
 		if (bad) {
 			document.getElementById(`s-${bad}`)?.focus();
+			return;
+		}
+		if (preview) {
+			onsaved?.({ ...(info as SettleInfo), company: values.company, ceo: values.ceo, bank: values.bank, holder: values.holder, status: 'pending' }, true);
 			return;
 		}
 		busy = true;
