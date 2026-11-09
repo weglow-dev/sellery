@@ -31,8 +31,8 @@ describe('상품 에디터', () => {
 		expect(formatPriceInput('abc')).toBe('');
 		expect(parsePrice('36,000')).toBe(36000);
 	});
-	it('예상 정산 — 판매가 − 10%(디자인 값)', () => {
-		expect(marginText(36000)).toBe('₩32,400 / 개');
+	it('예상 정산 — 판매가의 60%(§9-6 · 65% − PG 5%)', () => {
+		expect(marginText(36000)).toBe('₩21,600 / 개');
 		expect(marginText(0)).toBe('—');
 	});
 	it('1단계는 제품명 · 가격 · 카테고리, 2단계는 노트가 필수 · 3~7 은 선택', () => {
