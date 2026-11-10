@@ -76,3 +76,69 @@ export function parseShipRows(json: unknown): ShipRow[] {
 	}
 	return out;
 }
+
+/* ---------------- 배송 완료 수동 기록(0088) — 운영이 택배사 조회로 확인한 뒤 · 정산(0087)의 대상이 된다 ---------------- */
+
+export type DeliverInput = { orderCode: string; deliveredAt: string | null };
+/** `{ orderCode, date? }` — date = 실제 배송일 'YYYY-MM-DD'(한국 시간 · 그날 정오로 기록) · 없으면 지금 */
+export function parseDeliverInput(raw: unknown): { ok: true; input: DeliverInput } | { ok: false; field: 'orderCode' | 'date'; message: string } {
+	const b = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+	const orderCode = typeof b?.orderCode === 'string' ? b.orderCode.trim().replace(/^#/, '').toLowerCase() : '';
+	if (!ORDER_CODE_RE.test(orderCode)) return { ok: false, field: 'orderCode', message: '주문번호 형식이 올바르지 않아요 (예: MYR1001)' };
+	if (b?.date == null || b.date === '') return { ok: true, input: { orderCode, deliveredAt: null } };
+	const m = typeof b.date === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(b.date.trim()) : null;
+	const t = m ? Date.parse(`${m[1]}-${m[2]}-${m[3]}T12:00:00+09:00`) : NaN;
+	if (!m || Number.isNaN(t) || new Date(t + 9 * 3600 * 1000).toISOString().slice(0, 10) !== `${m[1]}-${m[2]}-${m[3]}`)
+		return { ok: false, field: 'date', message: '배송일은 YYYY-MM-DD 예요 (예: 2026-11-09)' };
+	return { ok: true, input: { orderCode, deliveredAt: new Date(t).toISOString() } };
+}
+
+export const DELIVER_MESSAGES: Record<string, string> = {
+	NOT_FOUND: '주문을 찾을 수 없어요',
+	WRONG_STATUS: '결제 완료(또는 부분 환불) 상태의 주문만 배송 완료로 바꿀 수 있어요',
+	NOT_SHIPPED: '배송중인 줄이 없어요 — 먼저 송장을 기록해 주세요',
+	BAD_DATE: '배송일은 결제일 이후 · 오늘 이전이어야 해요',
+	NO_SERVICE_KEY: '배송 완료 기록이 아직 설정되지 않았어요',
+	DB_ERROR: '잠시 후 다시 시도해주세요'
+};
+export const deliverMessage = (code: string): string => DELIVER_MESSAGES[code] ?? DELIVER_MESSAGES.DB_ERROR;
+
+/** 배송 완료가 없는 배송중 줄(myr_app_admin_undelivered) */
+export type UndeliveredRow = {
+	orderCode: string;
+	itemId: string;
+	product: string;
+	option: string;
+	qty: number;
+	seller: string;
+	courier: string | null;
+	trackingNo: string | null;
+	shippedAt: string | null;
+	days: number;
+	ebut: boolean;
+	trackUrl: string | null;
+};
+export function parseUndelivered(json: unknown): UndeliveredRow[] {
+	if (!Array.isArray(json)) return [];
+	return json
+		.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && typeof (x as Record<string, unknown>).order_code === 'string')
+		.map((x) => {
+			const s = (k: string): string => (typeof x[k] === 'string' ? (x[k] as string) : '');
+			const courier = s('courier') || null;
+			const trackingNo = s('tracking_no') || null;
+			return {
+				orderCode: s('order_code'),
+				itemId: s('item_id'),
+				product: s('product'),
+				option: s('option'),
+				qty: Number(x.qty) || 0,
+				seller: s('seller'),
+				courier,
+				trackingNo,
+				shippedAt: s('shipped_at') || null,
+				days: Number(x.days) || 0,
+				ebut: x.ebut === true,
+				trackUrl: courier && trackingNo ? trackingUrl(courier, trackingNo) : null
+			};
+		});
+}
