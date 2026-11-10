@@ -247,9 +247,7 @@
 						<li class="rounded-[18px] border border-white/8 bg-white/3 p-4">
 							<div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 								<span class="text-[16px] font-extrabold tabular-nums">{won(g.price)}</span>
-								<span class="text-[13px] font-bold text-white/60">{g.discountPct}% 할인</span>
-								{#if g.closedAt && Date.parse(g.closedAt) < Date.parse(g.plannedEndsAt)}<span class="rounded-[6px] bg-white/8 px-1.5 py-0.5 text-[11px] font-bold text-white/55">일찍 종료</span>{/if}
-							</div>
+								<span class="text-[13px] font-bold text-white/60">{g.discountPct}% 할인</span>							</div>
 							<p class="mt-1 text-[12px] text-white/50 tabular-nums">{kstShort(g.startsAt)} ~ {kstShort(g.endsAt)}</p>
 							<div class="mt-3">{@render stats(g, false)}</div>
 						</li>
