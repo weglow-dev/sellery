@@ -247,7 +247,7 @@ as $$
   select jsonb_build_object(
     'settle_status', s.myr_settle_status,
     'preview', public.myr_settlement_preview(s.id, p_now),
-    -- 제조 원장 — 원장이 있거나 정산 줄이 있는 내 상품
+    -- 제조 원장 — 원장이 있거나 · 정산 줄이 있거나 · 팔린 적이 있는 내 상품(원장 없이 팔렸으면 "제조금액 확인 중"으로 보인다)
     'ledgers', coalesce((select jsonb_agg(jsonb_build_object(
                  'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
                  'has_ledger', public.myr_mfg_has_ledger(p.id),
@@ -264,7 +264,9 @@ as $$
                order by p.created_at)
                from public.myr_products p
               where p.seller_id = s.id and p.deleted_at is null
-                and (public.myr_mfg_has_ledger(p.id) or exists (select 1 from public.myr_settlement_rows r where r.product_id = p.id))), '[]'::jsonb),
+                and (public.myr_mfg_has_ledger(p.id) or exists (select 1 from public.myr_settlement_rows r where r.product_id = p.id)
+                     or exists (select 1 from public.myr_order_items i join public.myr_orders o on o.id = i.order_id
+                                 where i.product_id = p.id and o.paid_at is not null and i.status <> 'CANCELED'))), '[]'::jsonb),
     -- 월별 내역(최근 순) — 내 상품 줄만
     'months', coalesce((select jsonb_agg(m.j order by m.month desc) from (
                  select u.month, jsonb_build_object(

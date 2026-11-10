@@ -25,6 +25,7 @@
 		short: monthShort(pv.month),
 		payShort: `${shortDate(nextAt)} 지급 예정`,
 		status: monthStatus({ upcoming: true, held: pv.total.held, settleStatus: st.settleStatus }),
+		held: pv.total.held,
 		sales: pv.total.sales - pv.total.refundAdj,
 		settle: pv.total.settle,
 		offset: pv.total.offset,
@@ -39,6 +40,7 @@
 			short: monthShort(m.month),
 			payShort: `${shortDate(settleAtOfMonth(m.month))} 지급`,
 			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
+			held: 0,
 			sales: m.total.sales - m.total.refundAdj,
 			settle: m.total.settle,
 			offset: m.total.offset,
@@ -97,6 +99,7 @@
 					<span class="mt-1.5 flex items-center gap-2.5 lg:mt-2 lg:gap-3">
 						<span class="text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[40px]">{won(next.net)}</span>
 						<span class="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-bold whitespace-nowrap lg:rounded-lg lg:px-2.5 lg:py-[5px] lg:text-[12px] {CHIP[next.status.tone]}">{next.status.label}</span>
+						{#if next.held}<span class="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-bold whitespace-nowrap lg:rounded-lg lg:px-2.5 lg:py-[5px] lg:text-[12px] {CHIP.hold}">제조금액 확인 중 {next.held}</span>{/if}
 					</span>
 				</span>
 				<span class="relative mt-4 flex gap-[22px] lg:mt-0 lg:flex-1 lg:gap-9 lg:border-l lg:border-white/8 lg:pl-10">
@@ -116,7 +119,10 @@
 				{#each months as mo (mo.href)}
 					<a href={mo.href} class="flex flex-col gap-2.5 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-fg transition-colors lg:gap-3 lg:rounded-[20px] lg:p-[18px] lg:hover:border-white/30">
 						<span class="flex items-center justify-between gap-2">
-							<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP[mo.status.tone]}">{mo.status.label}</span>
+							<span class="flex items-center gap-1.5">
+								<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP[mo.status.tone]}">{mo.status.label}</span>
+								{#if mo.held}<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중 {mo.held}</span>{/if}
+							</span>
 							<span class="text-[11px] text-white/45 lg:text-[12px]">{mo.payShort}</span>
 						</span>
 						<span class="flex items-center gap-3 lg:gap-3.5">
