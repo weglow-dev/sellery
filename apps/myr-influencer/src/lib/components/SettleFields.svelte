@@ -35,7 +35,7 @@
 				id="s-bizNo" name={named ? "settle_bizNo" : undefined}
 				inputmode="numeric"
 				autocomplete="off"
-				placeholder={info?.bizNoMasked ? `${info.bizNoMasked} · 바꿀 때만 입력` : '123-45-67890'}
+				placeholder={info?.bizNoMasked ? `${info.bizNoMasked}` : '123-45-67890'}
 				value={values.bizNo}
 				oninput={(e) => {
 					values.bizNo = formatBizNo(e.currentTarget.value);
@@ -71,7 +71,7 @@
 				id="s-account" name={named ? "settle_account" : undefined}
 				inputmode="numeric"
 				autocomplete="off"
-				placeholder={info?.accountMasked ? `${info.accountMasked} · 바꿀 때만 입력` : '숫자만 입력'}
+				placeholder={info?.accountMasked ? `${info.accountMasked}` : '숫자만 입력'}
 				value={values.account}
 				oninput={(e) => {
 					values.account = digitsOnly(e.currentTarget.value).slice(0, 16);
