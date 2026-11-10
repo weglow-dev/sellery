@@ -106,18 +106,24 @@
 							<span class="text-right whitespace-nowrap">
 								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
 								{#if r.status === 'held'}
-									<span class="mt-0.5 inline-block rounded-md px-[7px] py-[3px] text-[12px] font-bold {CHIP.warn}">제조금액 확인 중</span>
+									<span class="mt-0.5 block text-[15px] font-extrabold text-white/35 lg:text-[18px]">—</span>
 								{:else}
 									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px]">{won(r.payout ?? 0)}</span>
 								{/if}
 							</span>
 						</div>
+						{#if r.status === 'held'}
+							<!-- 보류(제조금액 확인 중) — 머리 아래 한 줄로(2026-11-10) -->
+							<div class="mt-3 flex items-center gap-2 rounded-xl bg-[#ff6b6b]/8 px-3 py-2.5 lg:mt-3.5 lg:gap-2.5 lg:px-3.5">
+								<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중</span>
+								<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">운영팀이 제조금액을 입력하면 정산이 확정돼요</span>
+							</div>
+						{/if}
 						<div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-white/6 pt-3.5 lg:mt-4 lg:grid-cols-4 lg:pt-4">
 							{#each stat(r) as x (x.k)}
 								<div><span class="block text-[11px] text-white/50 lg:text-[12px]">{x.k}</span><span class="mt-[3px] block text-[14px] font-bold tabular-nums lg:text-[15px] {x.c}">{x.v}</span></div>
 							{/each}
 						</div>
-						{#if r.status === 'held'}<p class="mt-3 text-[12px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중이라 정산이 보류됐어요 — 운영팀이 입력하면 확정돼요</p>{/if}
 						{#if its.length}
 							<div class="mt-3.5 rounded-[14px] bg-white/3 lg:mt-4">
 								<button type="button" onclick={() => (opened[r.product.code] = !open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
