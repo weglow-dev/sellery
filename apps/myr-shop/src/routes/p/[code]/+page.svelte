@@ -28,8 +28,6 @@
 	/** 공구(0086) — 링크(`/g/<code>`)로 들어온 고객에게만 서버가 싣는다. 진행 중이면 공구가로 담고, 예정 · 종료는 안내만(기본가) */
 	let now = $state(Date.now());
 	onMount(() => {
-		// 공구 링크로 막 들어왔는데(서버가 gbArrived 로 알려 준다) 이미 끝난 공구면 안내 토스트 한 번
-		if (data.gbArrived && gb && groupbuyStateAt(gb) === 'ended') shop.showToast('이미 종료된 공구예요 · 지금은 기본가로 판매해요', 'info');
 		const t = setInterval(() => (now = Date.now()), 30_000);
 		return () => clearInterval(t);
 	});

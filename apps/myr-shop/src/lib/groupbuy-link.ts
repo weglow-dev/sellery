@@ -8,9 +8,6 @@ export const GB_COOKIE = 'myr_gb';
 export const GB_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
 /** 기억하는 상품 수 — 넘치면 오래된 것부터 버린다 */
 export const GB_COOKIE_MAX = 10;
-/** 링크로 막 들어왔다는 표시(값 = 상품 code · 1분) — 상품 페이지 서버 load 가 한 번 읽고 지운다(끝난 공구 토스트를 그때만) */
-export const GB_ARRIVED_COOKIE = 'myr_gb_new';
-export const GB_ARRIVED_MAX_AGE = 60;
 const PRODUCT_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
 /** 쿠키 값 → { 상품 code: 공구 code } · 형식이 틀린 항목은 버린다 */
