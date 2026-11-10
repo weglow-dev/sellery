@@ -10,7 +10,10 @@
 //   mfg <code>                                상품의 제조 원장(차수 · 제조금액 · 보증금 입금/환급 · 남은 제조금액)
 //   mfg-add <code> <제조금액> ["메모"]           제조 차수 추가(재생산 포함) — 보증금 = 제조금액의 25% 버림 · 0 = "제조금액 없음" 명시(보류를 풀 때)
 //   mfg-deposit <code> <차수> [--date YYYY-MM-DD]   보증금 입금 확인(환급은 입금 확인된 보증금만)
-//   mfg-void <code> <차수> "<사유>"              잘못 넣은 차수 무효(지우지 않는다 · 상계에 쓰였거나 보증금을 환급했으면 거절)
+//   mfg-fix <code> <차수> <올바른 금액> "<사유>"  제조금액 정정 — 올바른 금액으로 새 차수 + 잘못된 차수 무효를 한 번에(보증금 입금 확인일도 옮긴다).
+//                                             이미 상계한 금액은 빼고 남은 만큼만 이후 회차에서 상계된다(확정된 회차는 그대로).
+//                                             올바른 금액이 이미 상계한 금액보다 작으면 거절 + 덜 지급한 차액 안내(운영이 따로 지급)
+//   mfg-void <code> <차수> "<사유>"              차수를 통째로 무효(중복 입력 등 · 지우지 않는다 · 금액을 고칠 때는 mfg-fix)
 //   confirm-held <code>                       보류된 정산 확정(그 상품의 보류 줄을 달 순서로) — 원장이 있어야 한다
 //   run <YYYY-MM>                             회차 수동 실행(크론이 실패했을 때 — 크론과 같은 함수 · 이미 돌았으면 already)
 //   report <YYYY-MM>                          회차 보고(크리에이터 · 상품별 판매 · 정산 뒤 환불 · 이월 · 정산금 · 상계 · 보증금 환급 · 지급)
@@ -60,7 +63,8 @@ const MESSAGES = {
   ALREADY_VOIDED: "이미 무효 처리된 차수입니다",
   REASON_REQUIRED: "사유를 적어 주세요",
   REFUNDED: "보증금을 환급한 차수라 무효로 할 수 없습니다",
-  USED: "이미 상계에 쓰인 금액이라 무효로 할 수 없습니다(남은 제조금액이 상계 합계보다 작아집니다)",
+  USED: "이미 상계에 쓰인 금액이라 무효 · 정정할 수 없습니다(남은 제조금액이 상계 합계보다 작아집니다)",
+  SAME_AMOUNT: "지금 금액과 같습니다",
   NO_MFG: "제조 원장이 없습니다 — 먼저 mfg-add(0원이면 0)",
   NOTHING_HELD: "보류된 정산이 없습니다",
   NOT_CLOSED: "아직 끝나지 않은 달입니다",
@@ -73,6 +77,8 @@ async function rpc(fn, params) {
   return data;
 }
 function check(r) {
+  if (r?.code === "USED" && r.shortfall > 0)
+    fail(`USED — ${MESSAGES.USED}\n  이미 상계한 금액이 올바른 제조금액보다 ${won(r.shortfall)} 많습니다 — 크리에이터에게 ${won(r.shortfall)} 을 덜 지급한 상태라 운영이 따로 지급해야 합니다`);
   if (!r || r.ok === false) fail(`${r?.code ?? "실패"} — ${MESSAGES[r?.code] ?? ""}`);
   return r;
 }
@@ -130,6 +136,18 @@ async function cmdMfgVoid() {
   const r = check(await rpc("myr_mfg_void", { p_product_id: p.id, p_seq: Number(args[1]), p_reason: args[2] ?? "", p_actor: "script" }));
   console.log(`[${where}] ${p.code} ${args[1]}차 무효 · 남은 제조금액 ${won(r.remaining)}`);
 }
+async function cmdMfgFix() {
+  const p = await productId(args[0]);
+  const seq = Number(args[1]);
+  const amount = Number(args[2]);
+  if (!Number.isInteger(seq) || seq < 1) fail("차수는 1 이상 정수");
+  if (!Number.isInteger(amount) || amount < 0) fail("올바른 제조금액은 0 이상 정수(원)");
+  const r = check(await rpc("myr_mfg_fix", { p_product_id: p.id, p_seq: seq, p_amount: amount, p_reason: args[3] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${p.code} ${r.voided_seq}차 무효 → ${r.batch.seq}차 ${won(r.batch.amount)}(보증금 ${won(r.batch.deposit_amount)}${r.batch.deposit_paid_at ? " · 입금 확인 옮김" : ""}) · 남은 제조금액 ${won(r.remaining)}`);
+  if (r.deposit_diff > 0) console.log(`  보증금을 ${won(r.deposit_diff)} 더 받은 상태입니다 — 크리에이터에게 따로 돌려주세요(정산 환급은 새 보증금 기준)`);
+  if (r.deposit_diff < 0) console.log(`  보증금이 ${won(-r.deposit_diff)} 모자랍니다 — 추가로 받거나 입금 확인을 다시 하세요`);
+  await printLedger(p.id);
+}
 async function cmdConfirmHeld() {
   const p = await productId(args[0]);
   const r = check(await rpc("myr_settlement_confirm_held", { p_product_id: p.id, p_actor: "script" }));
@@ -176,6 +194,7 @@ const COMMANDS = {
   mfg: cmdMfg,
   "mfg-add": cmdMfgAdd,
   "mfg-deposit": cmdMfgDeposit,
+  "mfg-fix": cmdMfgFix,
   "mfg-void": cmdMfgVoid,
   "confirm-held": cmdConfirmHeld,
   run: cmdRun,
@@ -183,7 +202,7 @@ const COMMANDS = {
 };
 const fn = COMMANDS[cmd];
 if (!fn) {
-  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-void|confirm-held|run|report> … (파일 머리말 참고)");
+  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report> … (파일 머리말 참고)");
   process.exit(2);
 }
 await fn();

@@ -2,7 +2,7 @@
 --   공구가 줄 · 재생산 차수 · 마이너스 이월 · 보류 → 제조금액 입력 뒤 확정 · 늦게 기록된 배송 완료 · 미배송 · 입금 대기 제외) · 멱등 · 순서 · 아직 안 끝난 달
 -- 2030년 회차를 쓴다(로컬 DB 의 실제 회차와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(60);
+select plan(72);
 
 -- ---------- 권한 ----------
 select table_privs_are('public', 'myr_mfg_batches', 'authenticated', '{}'::text[], 'authenticated 는 제조 원장 표 직접 권한 없음');
@@ -122,7 +122,27 @@ select is(pg_temp.money('2030-03-01', '00000000-0000-4000-8000-0000000a7a03'), a
 -- ---------- 무효 · 보고 ----------
 select is(public.myr_mfg_void('00000000-0000-4000-8000-0000000a7a01', 2, '', 'test') ->> 'code', 'REASON_REQUIRED', '무효는 사유 필수');
 select is(public.myr_mfg_void('00000000-0000-4000-8000-0000000a7a01', 1, '잘못 입력', 'test') ->> 'code', 'REFUNDED', '보증금을 환급한 차수는 무효 불가');
-select is(public.myr_mfg_void('00000000-0000-4000-8000-0000000a7a01', 2, '잘못 입력', 'test') ->> 'code', 'USED', '상계에 쓰인 차수는 무효 불가(남은 제조금액이 상계 합계보다 작아진다)');
+select is(public.myr_mfg_void('00000000-0000-4000-8000-0000000a7a01', 2, '잘못 입력', 'test') - 'ok', '{"code": "USED", "shortfall": 60000}'::jsonb, '상계에 쓰인 차수는 무효 불가 — 덜 지급할 차액(6만)을 알려 준다');
+
+-- ---------- 제조금액 정정(mfg_fix) — 이미 상계한 금액은 빼고 남은 만큼만 이후에 상계 ----------
+-- A 2차 20만(보증금 5만 입금) 중 6만 상계 · 남은 14만. 2차가 사실 10만이었다 → 남은 = 10만 − 6만 = 4만
+select is(public.myr_mfg_fix('00000000-0000-4000-8000-0000000a7a01', 2, 100000, '', 'test') ->> 'code', 'REASON_REQUIRED', '정정은 사유 필수');
+select is(public.myr_mfg_fix('00000000-0000-4000-8000-0000000a7a01', 2, 200000, '금액 오입력', 'test') ->> 'code', 'SAME_AMOUNT', '같은 금액이면 SAME_AMOUNT');
+select is(public.myr_mfg_fix('00000000-0000-4000-8000-0000000a7a01', 1, 900000, '금액 오입력', 'test') ->> 'code', 'REFUNDED', '보증금을 환급한 차수는 정정 불가');
+select is(public.myr_mfg_fix('00000000-0000-4000-8000-0000000a7a01', 2, 30000, '금액 오입력', 'test') - 'ok', '{"code": "USED", "shortfall": 30000}'::jsonb,
+          '올바른 금액(3만)이 이미 상계한 6만보다 작으면 USED · 차액 3만');
+create temp table fx as select public.myr_mfg_fix('00000000-0000-4000-8000-0000000a7a01', 2, 100000, '금액 오입력', 'test') as v;
+select is((select v #>> '{batch,seq}' from fx), '3', '정정 — 새 3차 10만 · 2차 무효');
+select is((select (v ->> 'deposit_diff')::int from fx), 25000, '입금 확인된 보증금 5만 → 새 보증금 2.5만 · 차액 2.5만을 알려 준다');
+select is((public.myr_mfg_ledger('00000000-0000-4000-8000-0000000a7a01') ->> 'remaining')::int, 40000, '정정 뒤 남은 제조금액 = 10만 − 이미 상계한 6만 = 4만');
+select is((select array[deposit_amount::text, (deposit_paid_at is not null)::text, note] from public.myr_mfg_batches where product_id = '00000000-0000-4000-8000-0000000a7a01' and seq = 3),
+          array['25000', 'true', '2차 정정 · 금액 오입력'], '새 차수 보증금 = 10만 × 25% · 입금 확인 옮김 · 메모');
+select is((select void_reason from public.myr_mfg_batches where product_id = '00000000-0000-4000-8000-0000000a7a01' and seq = 2), '3차로 정정 · 금액 오입력', '잘못된 차수는 무효로 남는다');
+select is(pg_temp.money('2030-03-01', '00000000-0000-4000-8000-0000000a7a01'), array[100000, 0, 0, 60000, 200000, 60000, 140000, 0, 0], '이미 확정된 3월 줄은 그대로');
+select pg_temp.line('00000000-0000-4000-8000-0000000a7d14', '00000000-0000-4000-8000-0000000a7a01', 1, 100000, '2030-04-10 12:00+09');
+select is(public.myr_settlement_run('2030-04-01', 'test', '2030-05-01 13:00+09') ->> 'ok', 'true', '4월 회차');
+select is(pg_temp.money('2030-04-01', '00000000-0000-4000-8000-0000000a7a01'), array[100000, 0, 0, 60000, 40000, 40000, 0, 25000, 45000],
+          'A 4월 — 정산 6만 중 남은 4만만 상계 · 다 갚아 3차 보증금 2.5만 환급 · 지급 4.5만');
 select is(public.myr_mfg_add('00000000-0000-4000-8000-0000000a7a03', 10000, '오타', 'test') ->> 'ok', 'true', 'C 잘못 넣은 차수');
 select is(public.myr_mfg_void('00000000-0000-4000-8000-0000000a7a03', 2, '오타', 'test') ->> 'ok', 'true', '상계 전 차수는 무효 처리(지우지 않는다)');
 select is((select count(*)::int from public.myr_mfg_batches where product_id = '00000000-0000-4000-8000-0000000a7a03'), 2, '무효 차수도 기록으로 남는다');

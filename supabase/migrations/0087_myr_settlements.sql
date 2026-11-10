@@ -22,6 +22,9 @@
 --     myr_settlement_confirm_held(product, actor)  보류 줄 확정(그 상품의 보류 줄을 정산월 순서로) — 제조 원장이 없으면 NO_MFG
 --     myr_settlement_report(month)                 회차 보고(크리에이터 · 상품 · 금액 · 줄 수) — 운영 스크립트 · 어드민
 --     myr_mfg_add(product, amount, note, actor) · myr_mfg_deposit(product, seq, paid_at) · myr_mfg_void(product, seq, reason, actor) · myr_mfg_ledger(product)
+--     myr_mfg_fix(product, seq, amount, reason, actor)   제조금액 정정 = 올바른 금액으로 새 차수 + 잘못된 차수 무효(한 번에 · 순서 걱정 없음 · 보증금 입금 확인일 옮김)
+--       남은 제조금액 = 유효 차수 합 − 확정된 상계 합이라, 이미 상계한 금액은 빼고 남은 만큼만 이후 회차에서 상계된다. 확정된 회차 금액은 그대로.
+--       올바른 금액이 이미 상계한 금액보다 작으면 USED + shortfall(덜 지급한 차액) — 시스템이 돌려주지 않는다(운영이 따로 지급 · 2026-11-10)
 --     myr_mfg_pending()                            보류 줄이 있는 상품 + 판매 중인데 제조 원장이 없는 상품
 --   판정(누가 정산되는지 · 얼마인지)은 이 파일의 함수에만 둔다(백엔드 원칙 1) — 크리에이터 정산 탭(6) · 어드민(8)은 여기 결과를 읽는다.
 --   테스트: supabase/tests/myr_settlements.test.sql. 재실행 가능.
@@ -238,13 +241,53 @@ begin
   if b.deposit_refund_row_id is not null then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
   select coalesce(sum(amount), 0) into v_total from public.myr_mfg_batches where product_id = p_product_id and voided_at is null and id <> b.id;
   select coalesce(sum(offset_amount), 0) into v_offset from public.myr_settlement_rows where product_id = p_product_id and status = 'confirmed';
-  if v_total < v_offset then return jsonb_build_object('ok', false, 'code', 'USED'); end if;
+  if v_total < v_offset then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_offset - v_total); end if;
   update public.myr_mfg_batches set voided_at = now(), voided_by = coalesce(p_actor, 'script'), void_reason = btrim(p_reason) where id = b.id;
   return jsonb_build_object('ok', true, 'remaining', public.myr_mfg_remaining(p_product_id));
 end;
 $$;
 revoke all on function public.myr_mfg_void(uuid, integer, text, text) from public, anon, authenticated;
 grant execute on function public.myr_mfg_void(uuid, integer, text, text) to service_role;
+
+-- 제조금액 정정 — { ok, voided_seq, batch, remaining } · NOT_FOUND | ALREADY_VOIDED | REASON_REQUIRED | BAD_AMOUNT | SAME_AMOUNT | REFUNDED | USED(+ shortfall)
+--   새 차수의 보증금 = 올바른 금액 × deposit_pct% · 잘못된 차수에 보증금 입금 확인이 있었으면 그 날짜를 새 차수로 옮긴다(입금 사실은 그대로)
+--   입금 확인된 보증금이 정정으로 달라지면 deposit_diff(= 받은 보증금 − 새 보증금 · 양수면 더 받았다)를 돌려준다 — 차액 정산은 운영이 따로
+create or replace function public.myr_mfg_fix(p_product_id uuid, p_seq integer, p_amount integer, p_reason text, p_actor text)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  b        public.myr_mfg_batches%rowtype;
+  n        public.myr_mfg_batches%rowtype;
+  v_total  integer;
+  v_offset integer;
+begin
+  perform 1 from public.myr_products where id = p_product_id for update;
+  select * into b from public.myr_mfg_batches where product_id = p_product_id and seq = p_seq for update;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if b.voided_at is not null then return jsonb_build_object('ok', false, 'code', 'ALREADY_VOIDED'); end if;
+  if coalesce(btrim(p_reason), '') = '' then return jsonb_build_object('ok', false, 'code', 'REASON_REQUIRED'); end if;
+  if p_amount is null or p_amount < 0 then return jsonb_build_object('ok', false, 'code', 'BAD_AMOUNT'); end if;
+  if p_amount = b.amount then return jsonb_build_object('ok', false, 'code', 'SAME_AMOUNT'); end if;
+  if b.deposit_refund_row_id is not null then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
+  select coalesce(sum(amount), 0) into v_total from public.myr_mfg_batches where product_id = p_product_id and voided_at is null and id <> b.id;
+  select coalesce(sum(offset_amount), 0) into v_offset from public.myr_settlement_rows where product_id = p_product_id and status = 'confirmed';
+  if v_total + p_amount < v_offset then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_offset - (v_total + p_amount)); end if;
+  insert into public.myr_mfg_batches (product_id, seller_id, seq, amount, deposit_amount, deposit_paid_at, note, created_by)
+  values (b.product_id, b.seller_id, (select max(seq) from public.myr_mfg_batches where product_id = p_product_id) + 1,
+          p_amount, (p_amount::bigint * public.myr_deposit_pct() / 100)::integer, b.deposit_paid_at,
+          format('%s차 정정 · %s', b.seq, btrim(p_reason)), coalesce(p_actor, 'script'))
+  returning * into n;
+  update public.myr_mfg_batches set voided_at = now(), voided_by = coalesce(p_actor, 'script'), void_reason = format('%s차로 정정 · %s', n.seq, btrim(p_reason))
+   where id = b.id;
+  return jsonb_build_object('ok', true, 'voided_seq', b.seq, 'batch', public.myr_mfg_batch_json(n), 'remaining', public.myr_mfg_remaining(p_product_id),
+                            'deposit_diff', case when b.deposit_paid_at is not null then b.deposit_amount - n.deposit_amount else 0 end);
+end;
+$$;
+revoke all on function public.myr_mfg_fix(uuid, integer, integer, text, text) from public, anon, authenticated;
+grant execute on function public.myr_mfg_fix(uuid, integer, integer, text, text) to service_role;
 
 -- 원장 보기 — { product, batches[], total, offset, remaining, deposit_paid, deposit_refunded }
 create or replace function public.myr_mfg_ledger(p_product_id uuid)
