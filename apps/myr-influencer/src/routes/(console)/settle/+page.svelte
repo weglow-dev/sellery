@@ -51,7 +51,9 @@
 	const remainSum = $derived(st.ledgers.reduce((n, l) => n + l.remaining, 0));
 	const depositSum = $derived(st.ledgers.reduce((n, l) => n + l.depositPaid - l.depositRefunded, 0));
 	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(remainSum)}`, `돌려받을 보증금 ${won(depositSum)}`] : ['매월 1일 오후 1시 지급']);
-	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.rows.find((r) => r.product.id === l.product.id)?.offset ?? null, pv.month, won) })));
+	// 다음 정산 상환 예정 = 그 상품의 예상 줄(보류 해제분 포함) 상계 합
+	const nextOffset = (id: string) => pv.rows.filter((r) => r.product.id === id).reduce((n, r) => n + (r.offset ?? 0), 0) || null;
+	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, nextOffset(l.product.id), pv.month, won) })));
 
 	const CHIP: Record<SettleTone, string> = {
 		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',

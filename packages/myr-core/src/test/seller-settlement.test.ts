@@ -13,6 +13,8 @@ describe('파서', () => {
 			total: { payout: 57600, held: 1 }, undelivered: { lines: 3, amount: 132000 }
 		});
 		expect([p.rows[0].status, p.rows[0].payout, p.rows[1].status, p.rows[1].payout, p.total.held, p.undelivered.lines]).toEqual(['estimated', 57600, 'held', null, 1, 3]);
+		expect([p.rows[0].origin, p.rows[0].releasedIn]).toEqual([null, null]);
+		expect(settlePreviewFromJson({ rows: [{ product, status: 'estimated', origin: '2026-10', released_in: '2026-11' }] }).rows[0]).toMatchObject({ origin: '2026-10', releasedIn: '2026-11' });
 		expect(settlePreviewFromJson(null)).toMatchObject({ month: '', rows: [], total: { payout: 0 } });
 	});
 	it('정산 탭 — 원장 · 월 · 비어 있으면 기본값', () => {
@@ -28,6 +30,7 @@ describe('파서', () => {
 		const [i] = settleItemsFromJson([{ order_code: 'myr1501', buyer: '김*은', delivered_at: '2026-10-27T03:00:00Z', product: '포도', qty: 2, unit_price: 32000, groupbuy: true, kind: 'refund_adj', amount: 32000 }, null]);
 		expect([i.orderCode, i.kind, i.groupbuy, i.amount, i.refunded]).toEqual(['myr1501', 'refund_adj', true, 32000, 0]);
 		expect(settleItemsFromJson([{ order_code: 'myr1501', kind: 'sale', amount: 32000, refund_snapshot: 32000 }])[0].refunded).toBe(32000);
+		expect(settleItemsFromJson([{ order_code: 'myr1501', origin: '2026-10' }])[0].origin).toBe('2026-10');
 	});
 });
 
@@ -68,6 +71,12 @@ describe('시안 라벨', () => {
 		expect(holdBanner('verified', '12월 1일')).toBeNull();
 		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
 		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
+	});
+	it('보류 해제분은 같은 상품이라도 다른 줄로 묶인다', async () => {
+		const { itemsByProduct, rowKey, settleItemsFromJson } = await import('../seller-settlement');
+		const its = settleItemsFromJson([{ order_code: 'a', product_code: 'x' }, { order_code: 'b', product_code: 'x', origin: '2026-10' }, { order_code: 'c', product_code: 'x' }]);
+		const m = itemsByProduct(its);
+		expect([m.get(rowKey('x', null))?.length, m.get(rowKey('x', '2026-10'))?.length]).toEqual([2, 1]);
 	});
 	it('원장 카드', async () => {
 		const { ledgerCard } = await import('../seller-settlement');

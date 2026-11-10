@@ -14,7 +14,7 @@ select function_privs_are('public', 'myr_settlement_confirm_held', '{uuid,text}'
 select function_privs_are('public', 'myr_settlement_report', '{date}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 report 불가');
 select function_privs_are('public', 'myr_mfg_add', '{uuid,integer,text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 mfg_add 불가');
 select function_privs_are('public', 'myr_mfg_ledger', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 mfg_ledger 불가');
-select function_privs_are('public', 'myr_settlement_apply', '{uuid,text}'::text[], 'service_role', '{}'::text[], 'apply 는 내부 전용(service_role 도 직접 못 부른다)');
+select function_privs_are('public', 'myr_settlement_apply', '{uuid,text,uuid}'::text[], 'service_role', '{}'::text[], 'apply 는 내부 전용(service_role 도 직접 못 부른다)');
 select is(public.myr_settlement_pct(), 60, '정산 비율 60%(platform_settings)');
 
 -- ---------- 픽스처 ----------

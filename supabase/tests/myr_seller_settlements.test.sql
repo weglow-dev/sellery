@@ -1,7 +1,7 @@
 -- pgTAP — 0089 크리에이터 정산 탭: 권한 · 예상(preview)이 실제 회차와 같은지 · 내 것만 · 월 내역 · 줄 내역(이름 가림) · 홈 예상
 -- 2030년을 쓴다(로컬 DB 의 실제 회차와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(26);
+select plan(43);
 
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settlements_of_user 불가');
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settlements_of_user 가능');
@@ -67,6 +67,71 @@ select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_
 select is((select e ->> 'buyer' from jsonb_array_elements(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-01-01')) e limit 1), '김*은', '줄 내역 — 고객 이름 가림');
 select is(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e02', '2030-01-01') @> '[{"product_code": "pgtap-ss-p"}]'::jsonb, false, '다른 크리에이터 계정은 내 줄을 못 본다');
 select ok((select not (v ? 'rows') and v #>> '{total,payout}' = '45000' from hp), '홈 예상 — 합계만(회차 전 지급 4.5만)');
+
+-- ---------- 보류 자동 해제(2026-11-10) — 2월에 보류된 줄이 3월 회차에서 먼저 확정되고, 같은 상품의 3월 줄은 줄어든 남은 제조금액으로 ----------
+-- X: 2월 판매 10만(원장 없음 → 보류) · 원장 10만 · 보증금 2.5만 입금 · 3월 판매 10만
+-- Y: 2월 판매 5만(보류) · 원장 2만 · 3월 판매 없음(그래도 해제)
+-- Z: 2월 판매 3만(보류) · 원장 끝까지 없음(계속 보류)
+-- W: 2월 판매 4만(보류) · 원장 입력 뒤 운영이 confirm_held 로 먼저 확정(회차가 다시 건드리지 않는다)
+insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
+values ('00000000-0000-4000-8000-0000000a9a11', 'pgtap-ss-x', '00000000-0000-4000-8000-0000000a9001', 'diet', 'X 젤리', 100000, 100, 'listed', 'jelly'),
+       ('00000000-0000-4000-8000-0000000a9a12', 'pgtap-ss-y', '00000000-0000-4000-8000-0000000a9001', 'diet', 'Y 스틱', 50000, 100, 'listed', 'stick'),
+       ('00000000-0000-4000-8000-0000000a9a13', 'pgtap-ss-z', '00000000-0000-4000-8000-0000000a9001', 'diet', 'Z 캡슐', 30000, 100, 'listed', 'pill'),
+       ('00000000-0000-4000-8000-0000000a9a14', 'pgtap-ss-w', '00000000-0000-4000-8000-0000000a9001', 'diet', 'W 필름', 40000, 100, 'listed', 'film');
+insert into public.myr_orders (id, code, status, paid_at, buyer_name, shipping, order_name, items_amount)
+values ('00000000-0000-4000-8000-0000000a9b11', 'pgtap-ss-11', 'PAID', '2030-02-02', '최유나', '{}', '주문', 0),
+       ('00000000-0000-4000-8000-0000000a9b12', 'pgtap-ss-12', 'PAID', '2030-03-02', '박민', '{}', '주문', 0);
+insert into public.myr_order_items (id, order_id, product_id, seller_id, product_name, qty, unit_price, ship_status, delivered_at)
+values ('00000000-0000-4000-8000-0000000a9c11', '00000000-0000-4000-8000-0000000a9b11', '00000000-0000-4000-8000-0000000a9a11', '00000000-0000-4000-8000-0000000a9001', 'X 젤리', 1, 100000, 'DELIVERED', '2030-02-10 12:00+09'),
+       ('00000000-0000-4000-8000-0000000a9c12', '00000000-0000-4000-8000-0000000a9b11', '00000000-0000-4000-8000-0000000a9a12', '00000000-0000-4000-8000-0000000a9001', 'Y 스틱', 1, 50000, 'DELIVERED', '2030-02-10 12:00+09'),
+       ('00000000-0000-4000-8000-0000000a9c13', '00000000-0000-4000-8000-0000000a9b11', '00000000-0000-4000-8000-0000000a9a13', '00000000-0000-4000-8000-0000000a9001', 'Z 캡슐', 1, 30000, 'DELIVERED', '2030-02-10 12:00+09'),
+       ('00000000-0000-4000-8000-0000000a9c14', '00000000-0000-4000-8000-0000000a9b11', '00000000-0000-4000-8000-0000000a9a14', '00000000-0000-4000-8000-0000000a9001', 'W 필름', 1, 40000, 'DELIVERED', '2030-02-10 12:00+09'),
+       ('00000000-0000-4000-8000-0000000a9c15', '00000000-0000-4000-8000-0000000a9b12', '00000000-0000-4000-8000-0000000a9a11', '00000000-0000-4000-8000-0000000a9001', 'X 젤리', 1, 100000, 'DELIVERED', '2030-03-10 12:00+09');
+select is(public.myr_settlement_run('2030-02-01', 'test', '2030-03-01 13:00+09') ->> 'ok', 'true', '2월 회차 — X · Y · Z · W 보류');
+select is((select count(*)::int from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+            where u.month = '2030-02-01' and r.status = 'held' and r.product_id in ('00000000-0000-4000-8000-0000000a9a11', '00000000-0000-4000-8000-0000000a9a12', '00000000-0000-4000-8000-0000000a9a13', '00000000-0000-4000-8000-0000000a9a14')),
+          4, '2월 — 원장 없는 4개 보류');
+select public.myr_mfg_add('00000000-0000-4000-8000-0000000a9a11', 100000, '1차', 'test');
+select public.myr_mfg_deposit('00000000-0000-4000-8000-0000000a9a11', 1, '2030-03-05');
+select public.myr_mfg_add('00000000-0000-4000-8000-0000000a9a12', 20000, '1차', 'test');
+select public.myr_mfg_add('00000000-0000-4000-8000-0000000a9a14', 0, '없음', 'test');
+select is(public.myr_settlement_confirm_held('00000000-0000-4000-8000-0000000a9a14', 'test') ->> 'confirmed', '1', 'W — 운영이 회차 전에 먼저 확정');
+
+-- 예상(3월 회차 전) — 보류 해제분이 먼저, 같은 상품의 3월 줄은 이어서
+create temp table pv3 as select public.myr_settlement_preview('00000000-0000-4000-8000-0000000a9001', '2030-04-01 10:00+09') as v;
+select is((select jsonb_agg(jsonb_build_array(e #>> '{product,code}', e ->> 'origin', (e ->> 'offset')::int, (e ->> 'deposit_refund')::int, (e ->> 'payout')::int) order by e ->> 'origin' nulls last, e #>> '{product,code}')
+             from pv3, jsonb_array_elements(v -> 'rows') e),
+          '[["pgtap-ss-x", "2030-02", 60000, 0, 0], ["pgtap-ss-y", "2030-02", 20000, 0, 10000], ["pgtap-ss-x", null, 40000, 25000, 45000]]'::jsonb,
+          '예상 — X 2월분 6만 상계 → X 3월분 남은 4만 상계 · 보증금 2.5만 · Y 2월분(3월 판매 없음) 2만 상계 · Z 는 원장 없어 빠짐');
+select is((select (v #>> '{total,payout}')::int from pv3), 55000, '예상 지급 합계 5.5만(X 0 + X 4.5만 + Y 1만)');
+
+-- 실제 3월 회차 = 예상
+select is(public.myr_settlement_run('2030-03-01', 'test', '2030-04-01 13:00+09') ->> 'released', '2', '3월 회차 — 보류 2개(X · Y) 자동 해제 · W(이미 확정) · Z(원장 없음)는 아님');
+select is((select array[r.mfg_before, r.offset_amount, r.mfg_after, r.deposit_refund, r.payout] from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+            where u.month = '2030-02-01' and r.product_id = '00000000-0000-4000-8000-0000000a9a11'), array[100000, 60000, 40000, 0, 0], 'X 2월분 — 남은 10만 중 6만 상계(확정 때 남은 제조금액으로)');
+select is((select array[r.mfg_before, r.offset_amount, r.mfg_after, r.deposit_refund, r.payout] from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+            where u.month = '2030-03-01' and r.product_id = '00000000-0000-4000-8000-0000000a9a11'), array[40000, 40000, 0, 25000, 45000], 'X 3월분 — 남은 4만 상계 · 다 갚아 보증금 2.5만 · 지급 4.5만(예상과 같다)');
+select is((select ru.month from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id join public.myr_settlement_runs ru on ru.id = r.released_run_id
+            where u.month = '2030-02-01' and r.product_id = '00000000-0000-4000-8000-0000000a9a12'), '2030-03-01'::date, 'Y 2월분 — 3월 판매가 없어도 3월 회차에서 해제');
+select is((select r.status from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+            where u.month = '2030-02-01' and r.product_id = '00000000-0000-4000-8000-0000000a9a13'), 'held', 'Z — 원장이 없으면 계속 보류');
+select is((select r.released_run_id from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+            where u.month = '2030-02-01' and r.product_id = '00000000-0000-4000-8000-0000000a9a14'), null, 'W — 운영이 먼저 확정한 줄은 회차가 다시 건드리지 않는다');
+select is((select count(*)::int from public.myr_mfg_batches where product_id = '00000000-0000-4000-8000-0000000a9a11' and deposit_refund_row_id is not null), 1, 'X 보증금은 한 번만 환급');
+
+-- 정산 탭 — 3월 카드에 2월분이 따로 줄로(같은 상품 두 줄) · 2월 카드는 "3월 정산에서 지급"으로 남고 합계에서 빠진다
+create temp table st3 as select public.myr_app_seller_settlements_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-04-02 10:00+09') as v;
+select is((select jsonb_agg(jsonb_build_array(r #>> '{product,code}', r ->> 'origin') order by r ->> 'origin' nulls first, r #>> '{product,code}')
+             from st3, jsonb_array_elements(v -> 'months') m, jsonb_array_elements(m -> 'rows') r where m ->> 'month' = '2030-03'),
+          '[["pgtap-ss-x", null], ["pgtap-ss-x", "2030-02"], ["pgtap-ss-y", "2030-02"]]'::jsonb, '3월 카드 — X 3월분 + X 2월분 + Y 2월분(같은 상품 X 가 두 줄)');
+select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-03'), 55000, '3월 카드 지급 합계 5.5만(보류 해제분 포함)');
+select is((select jsonb_agg(jsonb_build_array(r #>> '{product,code}', r ->> 'released_in') order by r #>> '{product,code}')
+             from st3, jsonb_array_elements(v -> 'months') m, jsonb_array_elements(m -> 'rows') r
+            where m ->> 'month' = '2030-02' and r #>> '{product,code}' in ('pgtap-ss-x', 'pgtap-ss-y')),
+          '[["pgtap-ss-x", "2030-03"], ["pgtap-ss-y", "2030-03"]]'::jsonb, '2월 카드 — X · Y 는 "3월 정산에서 지급"으로 남는다');
+select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-02'), 24000, '2월 카드 합계 = W 2.4만만(운영이 먼저 확정 · 제조금액 0원) — X · Y 해제분은 빼고(같은 돈을 두 번 더하지 않게)');
+select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-03-01')) e where e ->> 'origin' = '2030-02'), 2,
+          '3월 줄 내역 — 2월분 주문 줄(X · Y)도 origin 과 함께');
 
 select * from finish();
 rollback;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { itemsByProduct, monthShort, monthStatus, settleAtLabel, settleAtOfMonth, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, settleAtOfMonth, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import SettleHold from '$lib/components/SettleHold.svelte';
@@ -8,7 +8,8 @@
 
 	/** 정산 상세(0089 · 시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL). `/settle/next` = 다음 정산(예상) · `/settle/YYYY-MM` = 확정된 회차.
 	 *  상품별 내역(지급액 · 판매 · 정산금 · 상계 · 보증금 · 판매 내역 = 주문 줄 · 고객 이름 가림) · 정산 계산 · 지급 정보 · (다음 정산) 아직 포함되지 않은 판매.
-	 *  보류 상품(제조금액 확인 중)은 지급액 대신 "보류". 정산 뒤 환불 · 지난 이월이 있으면 정산 계산에 줄을 더한다.
+	 *  보류 상품(제조금액 확인 중)은 지급액 대신 "—" + 한 줄 안내. 정산 뒤 환불이 있으면 정산 계산에 줄을 더한다.
+	 *  보류 해제(0089): 지난 달 보류분이 이 정산에서 지급되면 같은 상품이라도 "○월분 · 보류 해제" 줄이 따로 생긴다. 원래 달 상세에는 "○월 정산에서 지급"으로 남고 합계에서 빠진다.
 	 *  모바일: 60px 머리 · 정산 계산 → 상품별 내역 / PC(lg~): 32px 제목 · 왼쪽 상품별 내역 + 오른쪽 420px sticky 정산 계산 · 지급 정보 */
 	let { data } = $props();
 	const st = $derived(data.settle);
@@ -96,19 +97,24 @@
 
 			<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70 lg:mt-0 lg:text-[15px]">상품별 내역</h3>
 			<div class="flex flex-col gap-2 lg:gap-2.5">
-				{#each src.rows as r (r.product.id)}
-					{@const its = byProduct.get(r.product.code) ?? []}
-					{@const open = !!opened[r.product.code]}
+				{#each src.rows as r (rowKey(r.product.code, r.origin))}
+					{@const key = rowKey(r.product.code, r.origin)}
+					{@const its = byProduct.get(key) ?? []}
+					{@const open = !!opened[key]}
 					<div class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:px-5 lg:py-[18px]">
 						<div class="flex items-center gap-3 lg:gap-4">
 							<Tile tile="slate" bg={r.product.tile} iconId={r.product.icon} thumbUrl={r.product.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl lg:h-14 lg:w-14 lg:rounded-2xl" />
-							<span class="min-w-0 flex-1 text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
+							<span class="min-w-0 flex-1">
+								<span class="block text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
+								{#if r.origin}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">{monthShort(r.origin)}분 · 보류 해제</span>{/if}
+								{#if r.releasedIn}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.done}">{monthShort(r.releasedIn)} 정산에서 지급</span>{/if}
+							</span>
 							<span class="text-right whitespace-nowrap">
 								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
 								{#if r.status === 'held'}
 									<span class="mt-0.5 block text-[15px] font-extrabold text-white/35 lg:text-[18px]">—</span>
 								{:else}
-									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px]">{won(r.payout ?? 0)}</span>
+									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px] {r.releasedIn ? 'text-white/40' : ''}">{won(r.payout ?? 0)}</span>
 								{/if}
 							</span>
 						</div>
@@ -126,7 +132,7 @@
 						</div>
 						{#if its.length}
 							<div class="mt-3.5 rounded-[14px] bg-white/3 lg:mt-4">
-								<button type="button" onclick={() => (opened[r.product.code] = !open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
+								<button type="button" onclick={() => (opened[key] = !open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
 									<span>판매 내역 {its.length}건</span>
 									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform {open ? 'rotate-180' : ''}" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
 								</button>

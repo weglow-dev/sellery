@@ -24,6 +24,10 @@ export type SettleRow = {
 	offset: number | null;
 	depositRefund: number | null;
 	payout: number | null;
+	/** 보류였다가 이 정산에서 해제되어 지급되는 지난 달('YYYY-MM') — 그 달 상품 줄이 따로 한 줄 더 생긴다 */
+	origin: string | null;
+	/** 이 줄이 나중에 보류 해제되어 지급된 정산 달('YYYY-MM') — 이 달 합계에서는 빠져 있다 */
+	releasedIn: string | null;
 };
 export type SettleTotal = { sales: number; refundAdj: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
 export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
@@ -54,6 +58,8 @@ export type SettleItem = {
 	amount: number;
 	/** sale 줄: 정산 때 이미 빠진 환불(줄 금액 − amount) */
 	refunded: number;
+	/** 보류 해제분 줄이면 원래 달('YYYY-MM') */
+	origin: string | null;
 };
 
 function productFrom(v: unknown): SettleProduct {
@@ -73,7 +79,9 @@ function rowFrom(v: unknown): SettleRow | null {
 		settle: n(o.settle),
 		offset: nn(o.offset),
 		depositRefund: nn(o.deposit_refund),
-		payout: nn(o.payout)
+		payout: nn(o.payout),
+		origin: typeof o.origin === 'string' ? o.origin : null,
+		releasedIn: typeof o.released_in === 'string' ? o.released_in : null
 	};
 }
 function totalFrom(v: unknown): SettleTotal {
@@ -133,7 +141,8 @@ export function settleItemsFromJson(v: unknown): SettleItem[] {
 			groupbuy: x.groupbuy === true,
 			kind: x.kind === 'refund_adj' ? 'refund_adj' : 'sale',
 			amount: n(x.amount),
-			refunded: x.kind === 'refund_adj' ? 0 : n(x.refund_snapshot)
+			refunded: x.kind === 'refund_adj' ? 0 : n(x.refund_snapshot),
+			origin: typeof x.origin === 'string' ? x.origin : null
 		}));
 }
 
@@ -240,10 +249,16 @@ export function holdBanner(settleStatus: string, nextDate: string): { title: str
 	return { title: '정산이 보류 중이에요', body: `사업자 · 정산 계좌 정보를 등록하면 ${nextDate} 정산부터 바로 지급돼요.`, cta: '정산 정보 등록하기' };
 }
 
-/** 주문 줄 → 상품별 묶음 */
+/** 상품 줄 열쇠 — 같은 상품이라도 보류 해제분(origin)은 다른 줄 */
+export const rowKey = (productCode: string, origin: string | null): string => `${productCode}|${origin ?? ''}`;
+
+/** 주문 줄 → 상품 줄(rowKey)별 묶음 */
 export function itemsByProduct(items: SettleItem[]): Map<string, SettleItem[]> {
 	const m = new Map<string, SettleItem[]>();
-	for (const it of items) m.set(it.productCode, [...(m.get(it.productCode) ?? []), it]);
+	for (const it of items) {
+		const k = rowKey(it.productCode, it.origin);
+		m.set(k, [...(m.get(k) ?? []), it]);
+	}
 	return m;
 }
 
