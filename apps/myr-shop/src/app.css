@@ -20,8 +20,6 @@
 	--animate-up-in: up-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	--animate-slide-in: slide-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	--animate-toast: up-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-	/* 안내 토스트(상단) — 위에서 내려온다 */
-	--animate-toast-top: down-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	/* 주문 완료 체크 배지 "톡" 등장 */
 	--animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
@@ -30,17 +28,6 @@
 	0% {
 		opacity: 0;
 		transform: translateY(18px);
-	}
-	100% {
-		opacity: 1;
-		transform: none;
-	}
-}
-
-@keyframes down-in {
-	0% {
-		opacity: 0;
-		transform: translateY(-18px);
 	}
 	100% {
 		opacity: 1;

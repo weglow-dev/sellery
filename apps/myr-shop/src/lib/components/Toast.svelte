@@ -3,12 +3,9 @@
 </script>
 
 {#if shop.toast}
-	<!-- 담기 토스트는 아래(모바일 담기 바 위 · PC 오른쪽 아래), 안내 토스트(info)는 위(모바일 화면 위 · PC 상단 내비 아래 가운데) -->
 	<div
 		role="status"
-		class="z-30 flex w-[calc(100%-40px)] max-w-[390px] items-center gap-3 rounded-2xl border border-white/10 bg-panel-2 px-4 py-3.5 shadow-[0_10px_30px_rgba(0,0,0,.4)] {shop.toastKind === 'info'
-			? 'absolute top-[max(12px,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 animate-toast-top lg:fixed lg:top-[88px] lg:w-[400px] lg:max-w-none'
-			: 'absolute bottom-[104px] left-1/2 -translate-x-1/2 animate-toast lg:fixed lg:right-8 lg:bottom-8 lg:left-auto lg:w-[360px] lg:translate-x-0'}"
+		class="absolute bottom-[104px] left-1/2 z-30 flex w-[calc(100%-40px)] max-w-[390px] -translate-x-1/2 animate-toast items-center gap-3 rounded-2xl border border-white/10 bg-panel-2 px-4 py-3.5 shadow-[0_10px_30px_rgba(0,0,0,.4)] lg:fixed lg:right-8 lg:bottom-8 lg:left-auto lg:w-[360px] lg:translate-x-0"
 	>
 		{#if shop.toastKind === 'info'}
 			<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/12 text-fg">
