@@ -10,6 +10,7 @@ describe('파서', () => {
 		const o = order([line({ ship_status: 'WHAT', claim: { code: 'rq1', status: 'pending', kind: 'refund' } })]);
 		expect([o.code, o.buyer, o.items[0].shipStatus, o.items[0].claim?.code, o.items[0].product?.icon]).toEqual(['myr1001', '김*은', 'PAID', 'rq1', 'grape']);
 		expect(order([line({ claim: { code: 'rq1', status: 'done' } })]).items[0].claim).toBeNull();
+		expect([order([line({ groupbuy: true })]).items[0].groupbuy, order([line()]).items[0].groupbuy]).toEqual([true, false]); // 공구 줄(0086)
 		expect(sellerOrderFromJson({ id: 'o', code: 'c', items: [] })).toBeNull(); // 내 줄이 없으면 버림
 		expect(sellerOrdersFromJson(null)).toEqual([]);
 	});

@@ -9,10 +9,12 @@
 		GUEST_CONSENT_TEXT,
 		ORDER_EMAIL_PLACEHOLDER,
 		parseOptionalEmail,
+		priceChangeText,
 		rejectedItemsText,
 		validateGuestBuyer,
 		validateShipping,
 		type GuestBuyerDraft,
+		type PriceChange,
 		type RejectedItem,
 		type ShippingDraft
 	} from '@sellery/myr-core/checkout-rules';
@@ -23,11 +25,13 @@
 
 	/** 주문 · 결제 — 받는 분 / (비회원: 주문자 이메일·동의) / 결제 수단(토스 결제위젯) / 주문 상품 / 금액 → [결제하기]
 	 *  결제하기: 검증 → POST /api/checkout(줄 = 장바구니 · 서버가 단가·배송비·잔여 검증) → widgets.setAmount(서버 금액) → requestPayment(successUrl /checkout/success · failUrl /checkout/fail).
-	 *  화면 합계는 표시용 — 결제되는 금액은 서버 응답의 amount. 한 줄이라도 거절되면(LINES_REJECTED) 어느 상품이 왜 안 되는지 보여주고 장바구니로 보낸다. */
+	 *  화면 합계는 표시용 — 결제되는 금액은 서버 응답의 amount. 한 줄이라도 거절되면(LINES_REJECTED) 어느 상품이 왜 안 되는지 보여주고 장바구니로 보낸다.
+	 *  줄마다 화면 단가(price)와 공구 코드(gb · 0086)를 싣는다 — 공구가 끝나 단가가 바뀌었으면 서버가 PRICE_CHANGED 를 돌려주고, 결제창을 열지 않고
+	 *  바뀐 금액을 보여 준다. 고객이 [바뀐 금액으로 결제]를 눌러야 다시 진행한다(모르는 사이 더 비싸게 결제되지 않게). 결제 건을 만든 뒤에는 그 단가로 고정. */
 	let { data } = $props();
 
 	type ApiOk = { ok: true; orderId: string; amount: number; itemsAmount: number; shippingFee: number; orderName: string; phone: string; email: string | null };
-	type ApiFail = { ok: false; code: string; message: string; items?: RejectedItem[] };
+	type ApiFail = { ok: false; code: string; message: string; items?: RejectedItem[]; changes?: PriceChange[] };
 
 	let widgets: TossPaymentsWidgets | null = null;
 	let ready = $state(false);
@@ -36,6 +40,8 @@
 	let submitting = $state(false);
 	let blocked = $state<string | null>(null);
 	let saveAddress = $state(false);
+	/** 결제 직전 가격이 바뀐 줄(PRICE_CHANGED) — 있으면 결제창 대신 확인 상자 */
+	let changed = $state<PriceChange[] | null>(null);
 
 	// 프리필: 서버 기본 배송지 → 없으면 브라우저에 저장된 주문자 정보 (마운트 1회 — 이후는 사용자 입력이 진실)
 	// svelte-ignore state_referenced_locally
@@ -53,7 +59,7 @@
 
 	/** 주문 상품 = 장바구니에서 체크한 줄(살 수 있는 것만) — 합계·배송비도 같은 기준(state.orderLines) */
 	const items = $derived(shop.selectedItems);
-	const canPay = $derived(ready && !widgetError && !blocked && agreedRequired && !submitting && items.length > 0 && (data.guest ? gdraft.consent : true));
+	const canPay = $derived(ready && !widgetError && !blocked && !changed && agreedRequired && !submitting && items.length > 0 && (data.guest ? gdraft.consent : true));
 
 	function nameOf(code: string): string {
 		return shop.cart.find((l) => l.product.code === code)?.product.name ?? code;
@@ -98,7 +104,7 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					lines: items.map((it) => ({ code: it.code, qty: it.qty, optionIndex: 0 })),
+					lines: items.map((it) => ({ code: it.code, qty: it.qty, optionIndex: 0, price: it.unitPrice, ...(it.gbCode ? { gb: it.gbCode } : {}) })),
 					shipping: v.shipping,
 					guest,
 					saveAddress: data.guest ? false : saveAddress,
@@ -113,7 +119,8 @@
 			if (!res.ok || !r || r.ok !== true) {
 				const code = r && r.ok === false ? r.code : '';
 				const message = (r && r.ok === false && r.message) || '결제 준비에 실패했어요 — 잠시 후 다시 시도해주세요';
-				if (code === 'LINES_REJECTED' && r && r.ok === false && r.items?.length) blocked = `${message}: ${rejectedItemsText(r.items, nameOf)}`;
+				if (code === 'PRICE_CHANGED' && r && r.ok === false && r.changes?.length) changed = r.changes;
+				else if (code === 'LINES_REJECTED' && r && r.ok === false && r.items?.length) blocked = `${message}: ${rejectedItemsText(r.items, nameOf)}`;
 				else if (code === 'AMOUNT_TOO_SMALL' || code === 'NO_SERVICE_KEY') blocked = message;
 				else shop.showToast(message);
 				submitting = false;
@@ -135,6 +142,14 @@
 			shop.showToast(e instanceof Error && e.message ? e.message : '결제 요청에 실패했어요 — 다시 시도해주세요');
 			submitting = false;
 		}
+	}
+
+	/** [바뀐 금액으로 결제] — 장바구니를 서버 단가로 맞추고(합계가 바뀐다) 바로 다시 결제를 시작한다 */
+	async function acceptChanges() {
+		if (!changed) return;
+		await shop.applyPriceChanges(changed);
+		changed = null;
+		await handlePay();
 	}
 
 	const inputCls = 'h-[54px] w-full rounded-[14px] border-[1.5px] bg-white/4 px-4 text-[16px] text-fg outline-none focus:border-accent focus:bg-accent/6 lg:text-[15px]';
@@ -215,6 +230,19 @@
 
 				<div>
 					<h3 class="mt-6 mb-2.5 text-[15px] font-extrabold lg:mt-0 lg:mb-3 lg:text-[17px]">결제 수단</h3>
+					{#if changed}
+						<div class="rounded-[14px] border border-accent/30 bg-accent/8 px-4 py-3.5 text-[13px] leading-[1.6] text-white/85" role="alert">
+							<p class="font-extrabold text-fg">가격이 바뀐 상품이 있어요</p>
+							<ul class="mt-1.5 flex flex-col gap-0.5">
+								{#each changed as c (c.code)}<li>{priceChangeText(c, nameOf(c.code), won)}</li>{/each}
+							</ul>
+							<p class="mt-1.5">바뀐 금액으로 결제할까요?</p>
+						</div>
+						<div class="mt-3 flex gap-2">
+							<a href="/cart" class="flex h-12 flex-1 items-center justify-center rounded-[14px] border border-white/14 text-[14px] font-bold text-fg">장바구니로</a>
+							<button type="button" onclick={acceptChanges} class="flex h-12 flex-1 items-center justify-center rounded-[14px] bg-accent text-[14px] font-extrabold text-bg">바뀐 금액으로 결제</button>
+						</div>
+					{/if}
 					{#if blocked}
 						<div class="rounded-[14px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3.5 text-[13px] leading-[1.55] text-white/85" role="alert">{blocked}</div>
 						<a href="/cart" class="mt-3 flex h-12 items-center justify-center rounded-[14px] border border-white/14 text-[14px] font-bold text-fg">장바구니로</a>

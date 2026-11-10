@@ -67,6 +67,22 @@ describe('parseLines', () => {
 		expect(parseLines([{ code: 'a', qty: 1, optionIndex: -1 }])).toBeNull();
 		expect(parseLines(Array.from({ length: 21 }, (_, i) => ({ code: `c${i}`, qty: 1 })))).toBeNull();
 	});
+	it('공구 코드 · 화면 단가(0086) — 있으면 싣고, 합칠 때는 처음 값 · 형식이 틀리면 null', () => {
+		expect(
+			parseLines([
+				{ code: 'a', qty: 1, gb: 'ab12cd34', price: 25600 },
+				{ code: 'a', qty: 1, price: 32000 },
+				{ code: 'b', qty: 1 }
+			])
+		).toEqual([
+			{ code: 'a', qty: 2, option_index: 0, gb: 'ab12cd34', price: 25600 },
+			{ code: 'b', qty: 1, option_index: 0 }
+		]);
+		expect(parseLines([{ code: 'a', qty: 1, gb: 'NOT A CODE' }])).toBeNull();
+		expect(parseLines([{ code: 'a', qty: 1, price: -1 }])).toBeNull();
+		expect(parseLines([{ code: 'a', qty: 1, price: 1.5 }])).toBeNull();
+		expect(parseLines([{ code: 'a', qty: 1, gb: null, price: null }])).toEqual([{ code: 'a', qty: 1, option_index: 0 }]);
+	});
 });
 
 describe('validateShipping', () => {
@@ -170,8 +186,12 @@ describe('RPC 파서', () => {
 			ok: false,
 			code: 'LINES_REJECTED',
 			message: null,
-			items: [{ code: 'a', reason: 'SOLD_OUT', left: 2 }]
+			items: [{ code: 'a', reason: 'SOLD_OUT', left: 2 }],
+			changes: []
 		});
+		expect(
+			parseCreateResult({ ok: false, code: 'PRICE_CHANGED', items: [{ code: 'a', option_index: 0, was: 25600, now: 32000, groupbuy: 'inactive' }, { code: 'b', was: 'x' }] })
+		).toEqual({ ok: false, code: 'PRICE_CHANGED', message: null, items: [], changes: [{ code: 'a', optionIndex: 0, was: 25600, now: 32000, groupbuy: 'inactive' }] });
 		expect(parseCreateResult({ ok: true, checkout: { id: 'x' } })).toMatchObject({ ok: false, code: 'BAD_RESULT' });
 		expect(parseCreateResult('junk')).toMatchObject({ ok: false, code: 'BAD_RESULT' });
 	});

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { groupbuyStateAt, kstLabel, remainLabel } from '@sellery/myr-core/groupbuy';
 	import { DETAIL_ANCHORS, catName, handleSlug, infoRowsOf, won } from '$lib/data';
 	import { goBack } from '$lib/nav';
 	import { shop } from '$lib/state.svelte';
@@ -23,6 +25,16 @@
 	const related = $derived(data.related);
 	const liked = $derived(shop.liked(p.code));
 
+	/** 공구(0086) — 링크(`/g/<code>`)로 들어온 고객에게만 서버가 싣는다. 진행 중이면 공구가로 담고, 예정 · 종료는 안내만(기본가) */
+	let now = $state(Date.now());
+	onMount(() => {
+		const t = setInterval(() => (now = Date.now()), 30_000);
+		return () => clearInterval(t);
+	});
+	const gb = $derived(data.groupbuy);
+	const gbState = $derived(gb ? groupbuyStateAt(gb, now) : null);
+	const unit = $derived(gb && gbState === 'active' ? gb.price : p.price);
+
 	/** 사진 넘겨보기 — 지금 보는 사진 번호 · PC 썸네일 줄이 go(i) 로 옮긴다 */
 	let photo = $state(0);
 	let gallery: ReturnType<typeof ProductGallery> | undefined = $state();
@@ -31,7 +43,7 @@
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	function add() {
 		if (added || p.soldOut) return;
-		shop.add(p, qty);
+		shop.add(p, qty, gb && gbState !== 'ended' ? gb : undefined);
 		added = true;
 		clearTimeout(timer);
 		timer = setTimeout(() => (added = false), 1600);
@@ -41,6 +53,29 @@
 	const h2 = 'mt-3 text-[22px] leading-[1.3] font-extrabold tracking-[-.03em] lg:text-[30px]';
 	const card = 'rounded-[20px] border border-white/8 bg-white/4';
 </script>
+
+<!-- 가격 — 진행 중인 공구면 기본가 취소선 + 공구가 + "공구 · N% · 3일 남음", 예정이면 시작 안내, 끝났으면 종료 안내(기본가) -->
+{#snippet price(at: 'mobile' | 'pc')}
+	{@const big = at === 'pc' ? 'text-[30px]' : 'text-[26px]'}
+	<div class="{at === 'pc' ? 'mt-4 gap-2.5' : 'mt-3.5 gap-2'} flex flex-wrap items-baseline">
+		{#if gb && gbState === 'active'}
+			<span class="text-[15px] font-bold text-white/40 line-through">{won(p.price)}</span>
+			<span class="{big} font-extrabold tracking-[-.02em] text-accent">{won(gb.price)}</span>
+		{:else}
+			<span class="{big} font-extrabold tracking-[-.02em]">{won(p.price)}</span>
+		{/if}
+		<span class="{at === 'pc' ? 'text-[14px]' : 'text-[13px]'} text-white/45">{p.unit}</span>
+	</div>
+	{#if gb && gbState === 'active'}
+		<span class="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-3 py-1.5 text-[12px] font-extrabold text-accent">공구 · {gb.discountPct}% 할인 · {remainLabel(gb.endsAt, now)}</span>
+	{:else if gb && gbState === 'scheduled'}
+		<p class="mt-2.5 rounded-[14px] border border-accent/22 bg-accent/8 px-3.5 py-2.5 text-[13px] leading-[1.5] text-white/85">
+			<b class="font-extrabold text-accent">공구 예정</b> · {kstLabel(gb.startsAt)}부터 {gb.discountPct}% 할인된 {won(gb.price)}에 살 수 있어요
+		</p>
+	{:else if gb}
+		<p class="mt-2.5 rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-2.5 text-[13px] leading-[1.5] text-fg-faint">종료된 공구예요 · 지금은 기본가로 판매해요</p>
+	{/if}
+{/snippet}
 
 <!-- 검색·공유: 설명 = 레시피 노트(또는 스토리) · 이미지 = 제품 사진(없으면 사이트 기본) · 구조화 데이터 = 상품(가격 · 재고) + 경로(홈 › 카테고리 › 제품) -->
 <Seo
@@ -113,10 +148,7 @@
 					{/if}
 				</div>
 				<h1 class="mt-4 text-[26px] leading-[1.28] font-extrabold tracking-[-.03em]">{p.name}</h1>
-				<div class="mt-3.5 flex items-baseline gap-2">
-					<span class="text-[26px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
-					<span class="text-[13px] text-white/45">{p.unit}</span>
-				</div>
+				{@render price('mobile')}
 			</div>
 
 			<!-- 섹션 앵커 -->
@@ -230,10 +262,7 @@
 		{/if}
 		<div>
 			<h1 class="text-[30px] leading-[1.22] font-extrabold tracking-[-.03em]">{p.name}</h1>
-			<div class="mt-4 flex items-baseline gap-2.5">
-				<span class="text-[30px] font-extrabold tracking-[-.02em]">{won(p.price)}</span>
-				<span class="text-[14px] text-white/45">{p.unit}</span>
-			</div>
+			{@render price('pc')}
 		</div>
 		<div class="flex flex-wrap gap-1.5">
 			{#each p.chips as ch (ch)}
@@ -261,7 +290,7 @@
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : `${won(p.price * qty)} 담기`}</span>
+				<span>{p.soldOut ? '품절' : `${won(unit * qty)} 담기`}</span>
 			{/if}
 		</button>
 		<div class="flex flex-col gap-2.5 rounded-2xl border border-white/7 bg-white/3 p-4 text-[13px] text-fg-soft">
@@ -284,7 +313,7 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 				<span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : `${won(p.price * qty)} 담기`}</span>
+				<span>{p.soldOut ? '품절' : `${won(unit * qty)} 담기`}</span>
 			{/if}
 		</button>
 	</div>

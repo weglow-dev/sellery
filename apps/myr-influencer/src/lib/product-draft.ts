@@ -115,10 +115,11 @@ export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'pa
 /** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 수정 반려(2026-11-09 수정 반려도 반려와 같게) */
 export const opensReview = (s: ProductStatus, revision: 'review' | 'rejected' | null = null): boolean => s === 'rejected' || revision === 'rejected';
 
-export type ProductMenuItem = { kind: 'edit' | 'review' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
+export type ProductMenuItem = { kind: 'edit' | 'review' | 'groupbuy' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
 /** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 일시중지 · 다시 판매 · 판매 종료는 메뉴에 없다(운영만 · 0082 · 0083 · §9-6). 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고,
- *  수정 반려면 "심사 결과 보기"(운영팀 의견 → 반려 내용 고치기 · 시안). 반려 상품은 목록이 바로 심사 결과로 보낸다(메뉴는 같은 항목 하나) */
+ *  수정 반려면 "심사 결과 보기"(운영팀 의견 → 반려 내용 고치기 · 시안). 반려 상품은 목록이 바로 심사 결과로 보낸다(메뉴는 같은 항목 하나).
+ *  판매 중이면 "공구 링크"(0086 · 만들기 · 진행 중 실적 · 지난 공구) — 수정 심사 중에도 있다 */
 export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | null = null): ProductMenuItem[] {
 	const revise: ProductMenuItem[] = revision === 'review' ? [] : [revision === 'rejected' ? { kind: 'review', label: '심사 결과 보기' } : { kind: 'edit', label: '내용 수정' }];
 	switch (s) {
@@ -127,7 +128,7 @@ export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | 
 		case 'rejected':
 			return [{ kind: 'review', label: '심사 결과 보기' }];
 		case 'live':
-			return revise;
+			return [...revise, { kind: 'groupbuy', label: '공구 링크' }];
 		case 'paused':
 			return revise;
 		default:

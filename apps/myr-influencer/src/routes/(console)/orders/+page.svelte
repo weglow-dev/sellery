@@ -51,7 +51,7 @@
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 									<span class="truncate text-[14px] font-bold {gone ? 'text-white/50' : ''}">{it.name}{it.option ? ` · ${it.option}` : ''} × {it.qty}</span>
 									<span class="text-[12px] text-white/50">
-										{won(it.amount)}{#if it.refundedQty > 0}<span class="text-[#ff8a8a]">{` · ${it.refundedQty}개 환불`}</span>{/if}{#if mixed && !gone}{` · ${SHIP_LABELS[it.shipStatus].text}`}{/if}
+										{#if it.groupbuy}<span class="mr-1 rounded-[5px] bg-accent/14 px-1.5 py-px text-[11px] font-extrabold text-accent">공구</span>{/if}{won(it.amount)}{#if it.refundedQty > 0}<span class="text-[#ff8a8a]">{` · ${it.refundedQty}개 환불`}</span>{/if}{#if mixed && !gone}{` · ${SHIP_LABELS[it.shipStatus].text}`}{/if}
 									</span>
 								</span>
 								{#if it.claim}

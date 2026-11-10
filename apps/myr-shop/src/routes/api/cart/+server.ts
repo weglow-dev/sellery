@@ -7,7 +7,7 @@ import { clearCart, getCart, setCart } from '$lib/server/cart';
 /**
  * 계정 장바구니(0057 · docs/myr.md §6.2). 세션이 없으면 401 — 비회원 장바구니는 브라우저에만 있다(서버는 모른다).
  *   GET    /api/cart                → { lines }
- *   PUT    /api/cart { code, qty, add? } → { ok, qty, lines }  · qty 0 = 삭제 · 실패 { ok:false, code } (400 BAD_* · 404 NOT_FOUND · 409 NOT_AVAILABLE)
+ *   PUT    /api/cart { code, qty, add?, gb? } → { ok, qty, lines }  · qty 0 = 삭제 · gb = 공구 링크 코드(0086) · 실패 { ok:false, code } (400 BAD_* · 404 NOT_FOUND · 409 NOT_AVAILABLE)
  *   DELETE /api/cart                → { ok, lines: [] }
  * 바뀐 뒤 항상 전체 줄을 돌려준다 — 클라이언트가 그대로 바꿔 끼운다(가격·available 도 서버 값으로). 캐시 금지는 hooks(apiNoStore).
  */

@@ -49,6 +49,10 @@
 			goto(`/products/${encodeURIComponent(p.id)}/review`);
 			return;
 		}
+		if (it.kind === 'groupbuy') {
+			goto(`/products/${encodeURIComponent(p.id)}/groupbuy`);
+			return;
+		}
 		busy = true;
 		try {
 			const res = await fetch(`/api/products/${encodeURIComponent(p.id)}/status`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: it.kind }) });

@@ -21,9 +21,17 @@ const asRows = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
 
 export const getCart = async (userId: string): Promise<CartLine[]> => linesFromRows(await rpc('myr_cart_get', { p_user_id: userId }));
 
-export const setCart = async (userId: string, line: { code: string; qty: number; optionIndex?: number; add?: boolean }): Promise<RpcResult> =>
+/** gb = 공구 링크 코드(0086) — 끝났거나 다른 상품의 코드면 RPC 가 버린다(기본가로 담긴다) · 없으면 줄의 기존 공구를 그대로 둔다 */
+export const setCart = async (userId: string, line: { code: string; qty: number; optionIndex?: number; add?: boolean; gb?: string }): Promise<RpcResult> =>
 	asResult(
-		await rpc('myr_cart_set', { p_user_id: userId, p_code: line.code, p_option_index: line.optionIndex ?? 0, p_qty: line.qty, p_add: line.add ?? false })
+		await rpc('myr_cart_set', {
+			p_user_id: userId,
+			p_code: line.code,
+			p_option_index: line.optionIndex ?? 0,
+			p_qty: line.qty,
+			p_add: line.add ?? false,
+			p_groupbuy: line.gb ?? null
+		})
 	);
 
 export const mergeCart = async (userId: string, lines: MergeLine[]): Promise<RpcResult> =>

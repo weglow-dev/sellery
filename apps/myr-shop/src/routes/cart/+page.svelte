@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { kstLabel } from '@sellery/myr-core/groupbuy';
 	import { won } from '$lib/data';
 	import { shop } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
@@ -7,7 +8,8 @@
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 장바구니 — 줄마다 체크박스 · 수량 · 삭제, 전체 선택 · 선택 삭제, 무료배송까지 남은 금액, 합계(선택한 줄만) → 주문하기(선택한 줄만).
-	 *  모바일: 하단 고정 합계 바 · PC(lg): 왼쪽 줄 목록 + 오른쪽 sticky 주문 요약 */
+	 *  모바일: 하단 고정 합계 바 · PC(lg): 왼쪽 줄 목록 + 오른쪽 sticky 주문 요약.
+	 *  공구 링크로 담은 줄(0086): 진행 중이면 공구가(기본가 취소선) · 예정이면 시작 안내 · 끝났으면 "기본가로 바뀌었어요" */
 	const selectedCount = $derived(shop.selectedItems.length);
 	const buyableCount = $derived(shop.cartItems.filter((it) => it.available).length);
 	const checkCls = 'h-[22px] w-[22px] shrink-0 cursor-pointer appearance-none rounded-[7px] border-[1.5px] border-white/25 bg-transparent transition-colors checked:border-accent checked:bg-accent checked:bg-[url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%230a0b0e%27%20stroke-width=%273%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M5%2012.5l4.5%204.5L19%207.5%27/%3E%3C/svg%3E")] checked:bg-[length:16px_16px] checked:bg-center checked:bg-no-repeat disabled:cursor-not-allowed disabled:opacity-30';
@@ -52,10 +54,22 @@
 							<span class="text-[11px] font-bold text-accent lg:text-[12px]">{it.creator.name}</span>
 							<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{it.name}</span>
 							<span class="hidden text-[13px] text-fg-faint lg:block">{it.unit}</span>
+							{#if it.gb && it.available}
+								{#if it.gbState === 'active'}
+									<span class="text-[12px] font-extrabold text-accent">공구가 · {it.gb.discountPct}% 할인</span>
+								{:else if it.gbState === 'scheduled'}
+									<span class="text-[12px] font-bold text-white/55">공구 예정 · {kstLabel(it.gb.startsAt)}부터 공구가</span>
+								{:else}
+									<span class="text-[12px] font-bold text-[#ff8a8a]">공구가 끝나 기본가로 바뀌었어요</span>
+								{/if}
+							{/if}
 							{#if it.available}
 								<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
 									<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
-									<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
+									<span class="flex items-baseline gap-1.5">
+										{#if it.unitPrice !== it.price}<span class="text-[12px] font-semibold text-white/40 line-through lg:text-[13px]">{won(it.price * it.qty)}</span>{/if}
+										<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
+									</span>
 								</div>
 							{:else}
 								<!-- 계정 장바구니(0057)에서 담은 뒤 품절·판매중지된 줄 — 합계에서 빠지고 삭제만 된다 -->
