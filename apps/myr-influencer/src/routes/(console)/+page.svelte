@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { csRateText, weekBars } from '@sellery/myr-core/seller-sales';
-	import { settleAtLabel } from '@sellery/myr-core/seller-settlement';
+	import { monthLabel, settleAtLabel } from '@sellery/myr-core/seller-settlement';
 	import type { Me } from '$lib/data';
 	import { inqTypeCls } from '$lib/inquiry';
 	import { relativeTime } from '$lib/product-row';
@@ -88,7 +88,7 @@
 			<div class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))] lg:-top-20 lg:h-[280px] lg:w-[280px]"></div>
 			<a href="/settle" class="relative flex items-center gap-1 text-[12px] font-bold text-white/55 hover:text-fg lg:text-[13px]">다음 정산 예정{data.preview.settleAt ? ` · ${settleAtLabel(data.preview.settleAt)}` : ''}<Icon id="chev" size={13} sw={2.4} /></a>
 			<p class="relative mt-1.5 text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:mt-2 lg:text-[40px]">{won(data.preview.total.payout)}</p>
-			<p class="relative mt-1 text-[11px] text-white/40 lg:text-[12px]">배송 완료분 × 60% − 제조금액 상계 · 예상이에요</p>
+			<p class="relative mt-1 text-[11px] text-white/40 lg:text-[12px]">{data.preview.month ? `${monthLabel(data.preview.month)} ` : ''}배송 완료된 판매에서 제조금액을 빼고 받을 예상 금액이에요</p>
 			<div class="relative mt-3.5 flex gap-4 lg:mt-[18px] lg:gap-7">
 				<div><p class="text-[11px] text-white/50 lg:text-[12px]">이번 달 순매출</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{won(sales.net)}</p></div>
 				<div><p class="text-[11px] text-white/50 lg:text-[12px]">주문</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px]">{sales.orders.toLocaleString('ko-KR')}건</p></div>
