@@ -15,7 +15,7 @@
 | **1** | 로그인 · 홈 | — | 게이트 |
 | **1** | 상품 검수(신규 · 수정) | `myr-products.mjs review` · `revisions` · `review-revision` · 재고는 SQL | 크리에이터가 심사 요청을 시작하면 매일 쓴다 · 반려 의견을 터미널로 쓰기 어렵다 |
 | **1** | 크리에이터 초대 | `myr-invites.mjs send` · `list` · `revoke` | 가입이 초대로만 된다(결정 14) |
-| 2 | 주문 · 송장 | `myr-ops.mjs orders` · `ship` · `ship-csv` · 샵 `/api/ops/ship` | 이벗 자동 연동(E2~E3) 전까지 발송 처리 |
+| 2 | 주문 · 송장 · **배송 완료 예외** | `myr-ops.mjs orders` · `ship` · `ship-csv` · `undelivered` · `deliver` · 샵 `/api/ops/ship` · `/api/ops/deliver` | 이벗 자동 연동(E2~E3) 전까지 발송 처리 · 배송 완료가 찍혀야 정산된다(이벗 뒤에도 예외 처리) |
 | 2 | 문의 열람 · 대행 답변 | 없음(크리에이터만 답변) | 크리에이터 미응답 대비 |
 | 2 | 크리에이터 관리 · 사업자 정보 | `myr-creators.mjs list` · `account` | 계정 연결 · 정지 · 정산에 필요한 사업자 정보 확인 |
 | **2** | **교환 · 환불 운영**(회수 확인 · 재발송 송장 · 환불 재시도) | `myr-ops.mjs claims` · `collected` · `reship-claim` · `claim-refund` · 샵 `/api/ops/claims` | 7번(0078) — 단순 변심 · 오배송은 회수 확인이 있어야 환불이 나간다 |
@@ -144,8 +144,12 @@
     - 줄별 상품 · 크리에이터 · 수량 · 금액 · 환불 이력(사진 · 상세 내용)
     - 수취인 전체(열람 기록 `sensitive_access_log`) · 결제(토스 키 · 가상계좌)
 - **송장 입력 · 정정**: 주문 단위 0069 `myr_app_admin_ship` + 배송 시작 메일(`ship.ts` 를 콘솔로 복사) · **CSV 일괄**(`주문번호,택배사,운송장` — 스크립트 `ship-csv` 와 같은 형식).
+- **배송 완료 예외 `/orders/undelivered`**(0088 · 정산의 선행 조건): 배송중으로 N일(기본 5) 넘게 남은 줄 — 주문번호 · 크리에이터 · 상품 · 택배사 · 운송장(**택배 조회 링크**) · 발송 후 며칠 · **이벗 등록 여부**.
+    - 줄을 열어 택배 조회로 확인 → **[배송 완료]**(`myr_app_admin_deliver` · 실제 배송일 입력 · 기본 오늘) — 그 주문의 배송중 줄 전부.
+    - 정산(0087)은 배송 완료일이 있는 줄만 잡는다 — 이벗 송장 수집이 못 찍은 줄(운영 명령으로 발송 · 이벗 미등록 · 택배사 신호 누락)은 여기서 찍어야 정산에 들어간다. **자동으로 찍지 않는다**(분실 · 반송도 완료가 되므로 · 2026-11-10 결정).
+    - 홈 경고: 월말(정산 크론 매월 1일 13:00) 전에 이 목록이 비어 있지 않으면 표시.
 - **예외 환불**(§4.3 그대로): 사유 필수 · 관리자 처리 기록 · 크리에이터 알림 · 진행 중 요청 경고.
-- 없어지는 것: `myr-ops.mjs`(+ `lib/myr-ops-plan.mjs` · 테스트) · 샵 `/api/ops/ship` · `.env.example` 의 `MYR_SHOP_URL`.
+- 없어지는 것: `myr-ops.mjs`(+ `lib/myr-ops-plan.mjs` · 테스트) · 샵 `/api/ops/ship` · `/api/ops/deliver` · `.env.example` 의 `MYR_SHOP_URL`.
 
 ## 5. 문의 (우선 2)
 

@@ -1,6 +1,17 @@
 // 발송 처리 순수 규칙 — apps/myr-shop/src/lib/ship-rules.ts (0069 · S8)
 import { describe, expect, it } from 'vitest';
-import { normalizeCourier, normalizeTracking, parseShipInput, parseShipResult, parseShipRows, shipMessage, trackingUrl } from '../ship-rules';
+import {
+	deliverMessage,
+	normalizeCourier,
+	normalizeTracking,
+	parseDeliverInput,
+	parseShipInput,
+	parseShipResult,
+	parseShipRows,
+	parseUndelivered,
+	shipMessage,
+	trackingUrl
+} from '../ship-rules';
 
 describe('parseShipInput', () => {
 	it('코드 소문자(# 무시) · 택배사 별칭 · 운송장 숫자만', () => {
@@ -52,5 +63,21 @@ describe('RPC 파서', () => {
 		expect(rows).toHaveLength(1);
 		expect(rows[0]).toMatchObject({ code: 'myr1001', amount: 20000, lines: 1, courier: null });
 		expect(parseShipRows(null)).toEqual([]);
+	});
+});
+
+describe('배송 완료 수동 기록(0088)', () => {
+	it('parseDeliverInput — 주문번호 소문자 · 날짜는 한국 시간 그날 정오 · 없으면 지금(null)', () => {
+		expect(parseDeliverInput({ orderCode: ' #MYR1490 ' })).toEqual({ ok: true, input: { orderCode: 'myr1490', deliveredAt: null } });
+		expect(parseDeliverInput({ orderCode: 'myr1490', date: '2026-11-09' })).toEqual({ ok: true, input: { orderCode: 'myr1490', deliveredAt: '2026-11-09T03:00:00.000Z' } });
+		expect(parseDeliverInput({ orderCode: 'myr1490', date: '2026-02-30' })).toMatchObject({ ok: false, field: 'date' });
+		expect(parseDeliverInput({ orderCode: 'myr1490', date: '11/09' })).toMatchObject({ ok: false, field: 'date' });
+		expect(parseDeliverInput({ orderCode: '주문' })).toMatchObject({ ok: false, field: 'orderCode' });
+	});
+	it('parseUndelivered — 택배 조회 링크 · 이벗 여부', () => {
+		const [l] = parseUndelivered([{ order_code: 'myr1493', item_id: 'i', product: '포도', option: '', qty: 1, seller: '@m', courier: 'CJ대한통운', tracking_no: '612300000001', shipped_at: '2026-11-01T00:00:00Z', days: 9, ebut: false }]);
+		expect([l.orderCode, l.days, l.ebut, !!l.trackUrl]).toEqual(['myr1493', 9, false, true]);
+		expect(parseUndelivered([{ bad: 1 }, null])).toEqual([]);
+		expect(deliverMessage('NOT_SHIPPED')).toContain('송장');
 	});
 });

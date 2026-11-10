@@ -13,6 +13,10 @@
 //   prepare [--dry] [--before ISO] [--csv 파일]   배송준비중 수동 전환(0077 · 이벗 연동 전) — 지금(또는 --before 시각) 전에 결제된 결제완료 줄 → 배송준비중.
 //                                           물류센터에 주문을 넘기는 순간에 쓴다. 이때부터 그 줄은 고객 셀프 환불이 막힌다(발주 뒤).
 //                                           --dry 는 바꾸지 않고 대상만 · --csv 는 물류센터에 넘길 CSV(수취인 · 주소 · 상품 · 수량)를 쓴다(개인정보 — 넘긴 뒤 지울 것)
+//   deliver <주문번호> [--date YYYY-MM-DD]     배송 완료 기록(0088) — 택배사 조회로 배송 완료를 확인한 뒤. 그 주문의 배송중 줄 전부 · --date = 실제 배송일(한국 시간 · 없으면 지금)
+//                                           정산(0087)은 배송 완료일이 있는 줄만 잡는다 — 이벗 송장 수집이 못 찍은 줄(운영 명령으로 발송 · 이벗 미등록 · 신호 누락)을 여기서 찍는다.
+//                                           자동으로 찍지 않는다(분실 · 반송도 완료가 되므로). 이미 배송 완료면 "이미 기록됨"
+//   undelivered [--days N]                   배송중으로 N일(기본 5) 넘게 남은 줄 — 택배 조회 링크 · 이벗 등록 여부. 월말(정산 전)에 보고 deliver 로 찍는다
 //   claims [--all]                           교환 · 환불 요청(0078) — 진행 중(처리 대기 · 진행 중) 표 · 할 일 칸(회수 확인 · 재발송 송장 · 환불 재시도) · --all 이면 완료 · 반려까지
 //   collected <요청번호>                       회수 확인 → 환불할 차례면 바로 환불(토스 부분 취소 · 고객 환불 메일). 파손 · 누액 환불처럼 회수가 없는 요청은 NOT_READY
 //   reship-claim <요청번호> <택배사> <운송장>  교환 재발송 송장 → 고객 "교환 상품이 출발했어요" 메일(새 기록일 때). 회수 전이어도 된다(오배송은 먼저 보낼 수 있다)
@@ -126,6 +130,33 @@ async function cmdPrepare() {
   }
 }
 
+async function cmdDeliver() {
+  const orderCode = args[0];
+  if (!orderCode) fail("usage: deliver <주문번호> [--date YYYY-MM-DD]");
+  const date = typeof flags.date === "string" ? flags.date : undefined;
+  const { status, json } = await call("POST", "/api/ops/deliver", { orderCode, ...(date ? { date } : {}) });
+  if (status === 401) fail("CRON_SECRET 이 샵의 값과 다릅니다");
+  if (!json?.ok) fail(`배송 완료 실패 (${status}): ${json?.message ?? json?.code ?? "?"}`);
+  if (json.already) console.log(`이미 기록됨  ${json.orderCode.toUpperCase()}`);
+  else console.log(`배송 완료  ${json.orderCode.toUpperCase()}  ${json.delivered}줄 · ${new Date(Date.parse(json.deliveredAt) + 9 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ")}(KST) — 다음 정산 회차에 들어갑니다`);
+}
+
+async function cmdUndelivered() {
+  const days = flags.days !== undefined ? Number(flags.days) : 5;
+  if (!Number.isFinite(days) || days < 0) fail("--days 는 0 이상 숫자");
+  const { status, json } = await call("GET", `/api/ops/deliver?days=${days}`);
+  if (status === 401) fail("CRON_SECRET 이 샵의 값과 다릅니다");
+  if (!json?.ok) fail(`목록 실패 (${status}): ${json?.message ?? json?.code ?? "?"}`);
+  console.log(`${base} · 배송중 ${json.days}일 넘은 줄 ${json.lines.length}개 (배송 완료가 찍혀야 정산에 들어갑니다)`);
+  for (const l of json.lines)
+    console.log(
+      `  ${l.orderCode.toUpperCase().padEnd(10)} ${String(l.days).padStart(3)}일  ${(l.courier ?? "-").padEnd(6)} ${(l.trackingNo ?? "-").padEnd(16)} ${l.ebut ? "이벗" : "수동"}  ${l.seller}  ${l.product}${l.option ? ` · ${l.option}` : ""} × ${l.qty}` +
+        (l.trackUrl ? `
+             ${l.trackUrl}` : ""),
+    );
+  if (json.lines.length) console.log(`확인 뒤: node packages/db/scripts/myr-ops.mjs deliver <주문번호> --date YYYY-MM-DD`);
+}
+
 async function cmdClaims() {
   const all = !!flags.all;
   const { status, json } = await call("GET", `/api/ops/claims${all ? "?all=1" : ""}`);
@@ -168,6 +199,8 @@ const commands = {
   ship: cmdShip,
   "ship-csv": cmdShipCsv,
   prepare: cmdPrepare,
+  deliver: cmdDeliver,
+  undelivered: cmdUndelivered,
   claims: cmdClaims,
   collected: cmdCollected,
   "reship-claim": cmdReshipClaim,
@@ -175,7 +208,7 @@ const commands = {
 };
 if (!commands[cmd]) {
   console.log(
-    "usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv> | prepare [--dry] [--before ISO] [--csv 파일] | claims [--all] | collected <요청번호> | reship-claim <요청번호> <택배사> <운송장> | claim-refund <요청번호>>"
+    "usage: node packages/db/scripts/myr-ops.mjs <orders [--shipped] [--limit N] | ship <주문번호> <택배사> <운송장> | ship-csv <file.csv> | prepare [--dry] [--before ISO] [--csv 파일] | deliver <주문번호> [--date YYYY-MM-DD] | undelivered [--days N] | claims [--all] | collected <요청번호> | reship-claim <요청번호> <택배사> <운송장> | claim-refund <요청번호>>"
   );
   process.exit(cmd ? 1 : 0);
 }
