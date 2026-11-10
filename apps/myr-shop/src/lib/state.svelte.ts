@@ -69,6 +69,8 @@ class ShopState {
 	buyer = $state<Buyer>({ name: '', phone: '', address: '' });
 	orders = $state<Order[]>([]);
 	toast = $state<string | null>(null);
+	/** 'cart' = 체크 + [보기](장바구니) — 담기 등 기본 · 'info' = 안내만(아이콘 i · 버튼 없음) */
+	toastKind = $state<'cart' | 'info'>('cart');
 	/** 마운트 뒤 localStorage(·서버)를 읽었는지 — 그 전에는 저장하지 않는다(서버 렌더 초기값으로 덮어쓰지 않게) */
 	ready = $state(false);
 	/** 장바구니·찜이 계정(서버)과 동기화 중인가 — true 면 브라우저에는 저장하지 않는다. 로그인했어도 서버를 못 읽으면 false(브라우저 보관으로 계속) */
@@ -234,10 +236,11 @@ class ShopState {
 	}
 
 	// ---- 토스트 ----
-	showToast(msg: string) {
+	showToast(msg: string, kind: 'cart' | 'info' = 'cart') {
 		clearTimeout(this.toastTimer);
 		this.toast = msg;
-		this.toastTimer = setTimeout(() => (this.toast = null), 2400);
+		this.toastKind = kind;
+		this.toastTimer = setTimeout(() => (this.toast = null), kind === 'info' ? 3600 : 2400);
 	}
 }
 
