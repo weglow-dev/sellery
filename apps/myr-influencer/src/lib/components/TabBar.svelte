@@ -18,12 +18,12 @@
 
 <!-- 앱 셸(+layout.svelte) 바닥에 보통 흐름으로 놓인다 — fixed/sticky 는 모바일 브라우저에서 잘려서 쓰지 않는다(myr-shop 과 같은 이유) -->
 <nav class="w-full shrink-0 bg-bg px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden" aria-label="주요 메뉴">
-	<!-- 글자 폭이 달라(홈 · CS 관리 · 내 제품) 칸을 똑같이 나누면 사이가 들쭉날쭉해 보인다 — 탭 사이 · 양 끝 간격을 똑같이(justify-evenly · 2026-11-10) -->
-	<div class="flex h-16 items-center justify-evenly rounded-[22px] border border-white/8 bg-panel px-1 shadow-[0_10px_30px_rgba(0,0,0,.4)]">
+	<!-- 글자 폭이 달라(홈 · CS 관리 · 내 제품) 칸을 똑같이 나누면 사이가 들쭉날쭉해 보인다 — 아이콘 폭을 24px 로 고정하고 양 끝 여백(px-5) 안에서 탭 사이를 똑같이(justify-between · 2026-11-10) -->
+	<div class="flex h-16 items-center justify-between rounded-[22px] border border-white/8 bg-panel px-5 shadow-[0_10px_30px_rgba(0,0,0,.4)]">
 		{#each tabs as t (t.href)}
 			{@const on = active(t.href)}
 			<a href={t.href} aria-current={on ? 'page' : undefined} class="relative flex h-[52px] flex-col items-center justify-center gap-1 px-1.5 transition-colors {on ? 'text-accent' : 'text-white/45'}">
-				<Icon id={t.ic} size={22} />
+				<Icon id={t.ic} size={22} class="w-6" />
 				<span class="text-[11px] font-bold">{t.name}</span>
 				{#if t.href === '/cs' && csCount}
 					<span class="absolute top-2 right-[calc(50%-18px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-extrabold tabular-nums text-bg" aria-label="처리 대기 {csCount}건">{csCount}</span>
