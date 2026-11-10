@@ -21,7 +21,7 @@
 	});
 
 	/** 모바일 하단 탭은 네 화면에서만 — 상세 · 에디터 · 완료 화면은 자기 하단 버튼 줄을 쓴다. PC 상단 내비는 늘 보인다 */
-	const TAB_ROUTES = ['/', '/cs', '/orders', '/products'];
+	const TAB_ROUTES = ['/', '/cs', '/orders', '/settle', '/products'];
 	const showTabs = $derived(TAB_ROUTES.includes(page.url.pathname));
 </script>
 
