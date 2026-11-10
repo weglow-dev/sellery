@@ -78,7 +78,6 @@
 				<div class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))]"></div>
 				<p class="relative text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 예정{pv.settleAt ? ` · ${settleAtLabel(pv.settleAt)}` : ''}</p>
 				<p class="relative mt-1.5 text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[40px]">{won(pv.total.payout)}</p>
-				<p class="relative mt-1 text-[11px] text-white/40 lg:text-[12px]">{pv.month ? `${monthLabel(pv.month)} ` : ''}배송 완료된 판매에서 제조금액을 빼고 받을 예상 금액이에요</p>
 				<div class="relative mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
 					{#each [{ k: '판매', v: won(pv.total.sales - pv.total.refundAdj) }, { k: '정산금(60%)', v: won(pv.total.settle) }, { k: '제조금액 상계', v: minus(pv.total.offset) }, { k: '보증금 환급', v: won(pv.total.depositRefund) }] as x (x.k)}
 						<div><p class="text-[11px] text-white/50 lg:text-[12px]">{x.k}</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:text-[17px]">{x.v}</p></div>
