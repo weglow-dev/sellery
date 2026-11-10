@@ -142,7 +142,7 @@
 			</div>
 		{:else}
 			<!-- 제조금액 · 보증금 -->
-			<div class="flex flex-col gap-[5px] rounded-2xl border border-accent/20 bg-accent/7 px-4 py-3.5 text-[13px] leading-[1.5] text-white/80 lg:mt-5 lg:gap-[7px] lg:rounded-[20px] lg:px-5 lg:py-[18px] lg:text-[14px]">
+			<div class="flex flex-col gap-[5px] rounded-2xl border border-accent/20 bg-accent/7 px-4 py-3.5 text-[12px] lg:text-[13px] leading-[1.5] text-white/80 lg:mt-5 lg:gap-[7px] lg:rounded-[20px] lg:px-5 lg:py-[18px] lg:text-[14px]">
 				{#each ['MYR이 먼저 낸 제조금액은 매달 정산금에서 나눠 상환해요', '제조금액이 모두 상계되면 보증금을 돌려드려요, 그 뒤 판매분부터는 정산금(판매의 60%)을 전액 지급해요'] as t (t)}
 					<span class="flex items-start gap-2 lg:gap-2.5"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent lg:mt-2"></span><span>{t}</span></span>
 				{/each}
