@@ -225,11 +225,11 @@ export const monthShort = (month: string): string => {
 };
 
 export type SettleTone = 'plan' | 'hold' | 'warn' | 'done';
-/** 월 카드 · 상세 상태 — 다음 정산: 지급 예정 / 지급 보류(사업자 정보 확인 전) · 지난 정산: 정산 확정(지급 완료 표시는 작업 순서 7) / 일부 보류(제조금액 확인 중) */
+/** 월 카드 · 상세 상태 — 다음 정산: 지급 예정 / 지급 보류(사업자 정보 확인 전) · 지난 정산: 지급 완료(2026-11-10 대표 — 시안대로 미리 · 실제 입금 기록은 작업 순서 7) / 일부 보류(제조금액 확인 중) */
 export function monthStatus(o: { upcoming: boolean; held: number; settleStatus: string }): { label: string; tone: SettleTone } {
 	if (o.upcoming) return o.settleStatus === 'verified' ? { label: '지급 예정', tone: 'plan' } : { label: '지급 보류', tone: 'hold' };
 	if (o.held > 0) return { label: '일부 보류', tone: 'warn' };
-	return { label: '정산 확정', tone: 'done' };
+	return { label: '지급 완료', tone: 'done' };
 }
 
 /** 정산 보류 배너(사업자 · 정산 정보) — 확인 완료면 null · 확인 중이면 버튼 없이 안내 */

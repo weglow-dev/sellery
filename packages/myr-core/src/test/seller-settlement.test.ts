@@ -64,7 +64,7 @@ describe('시안 라벨', () => {
 		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'none' })).toEqual({ label: '지급 보류', tone: 'hold' });
 		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'verified' })).toEqual({ label: '지급 예정', tone: 'plan' });
 		expect(monthStatus({ upcoming: false, held: 1, settleStatus: 'verified' }).label).toBe('일부 보류');
-		expect(monthStatus({ upcoming: false, held: 0, settleStatus: 'none' }).label).toBe('정산 확정');
+		expect(monthStatus({ upcoming: false, held: 0, settleStatus: 'none' }).label).toBe('지급 완료');
 		expect(holdBanner('verified', '12월 1일')).toBeNull();
 		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
 		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();

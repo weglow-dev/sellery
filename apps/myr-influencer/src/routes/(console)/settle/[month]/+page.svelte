@@ -21,8 +21,8 @@
 	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
 	const byProduct = $derived(itemsByProduct(data.items));
 
-	// 판매 내역(주문 줄) — 상품마다 기본 펼침 · 접으면 기억
-	let closed = $state<Record<string, boolean>>({});
+	// 판매 내역(주문 줄) — 상품마다 기본 닫힘(2026-11-10) · 펼친 것만 기억
+	let opened = $state<Record<string, boolean>>({});
 	const kstDot = (iso: string | null) => (iso ? new Date(Date.parse(iso) + 9 * 3600 * 1000).toISOString().slice(5, 10).replace('-', '.') : '—');
 
 	const CHIP: Record<SettleTone, string> = {
@@ -83,7 +83,7 @@
 			<!-- 모바일 상태 줄 -->
 			<div class="flex items-center gap-2 lg:hidden">
 				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
-				<span class="ml-auto text-[12px] text-white/50">{settleAtLabel(payAt)} {upcoming ? '지급 예정' : '정산'}</span>
+				<span class="ml-auto text-[12px] text-white/50">{settleAtLabel(payAt)} {upcoming ? '지급 예정' : '지급'}</span>
 			</div>
 			{#if upcoming && st.settleStatus !== 'verified'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
 
@@ -98,7 +98,7 @@
 			<div class="flex flex-col gap-2 lg:gap-2.5">
 				{#each src.rows as r (r.product.id)}
 					{@const its = byProduct.get(r.product.code) ?? []}
-					{@const open = !closed[r.product.code]}
+					{@const open = !!opened[r.product.code]}
 					<div class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:px-5 lg:py-[18px]">
 						<div class="flex items-center gap-3 lg:gap-4">
 							<Tile tile="slate" bg={r.product.tile} iconId={r.product.icon} thumbUrl={r.product.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl lg:h-14 lg:w-14 lg:rounded-2xl" />
@@ -106,7 +106,7 @@
 							<span class="text-right whitespace-nowrap">
 								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
 								{#if r.status === 'held'}
-									<span class="mt-0.5 inline-block rounded-md px-[7px] py-[3px] text-[12px] font-bold {CHIP.warn}">보류</span>
+									<span class="mt-0.5 inline-block rounded-md px-[7px] py-[3px] text-[12px] font-bold {CHIP.warn}">제조금액 확인 중</span>
 								{:else}
 									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px]">{won(r.payout ?? 0)}</span>
 								{/if}
@@ -117,10 +117,10 @@
 								<div><span class="block text-[11px] text-white/50 lg:text-[12px]">{x.k}</span><span class="mt-[3px] block text-[14px] font-bold tabular-nums lg:text-[15px] {x.c}">{x.v}</span></div>
 							{/each}
 						</div>
-						{#if r.status === 'held'}<p class="mt-3 text-[12px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중이라 보류됐어요 — 운영팀이 입력하면 정산이 확정돼요</p>{/if}
+						{#if r.status === 'held'}<p class="mt-3 text-[12px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중이라 정산이 보류됐어요 — 운영팀이 입력하면 확정돼요</p>{/if}
 						{#if its.length}
 							<div class="mt-3.5 rounded-[14px] bg-white/3 lg:mt-4">
-								<button type="button" onclick={() => (closed[r.product.code] = open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
+								<button type="button" onclick={() => (opened[r.product.code] = !open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
 									<span>판매 내역 {its.length}건</span>
 									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform {open ? 'rotate-180' : ''}" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
 								</button>
