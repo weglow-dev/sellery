@@ -1,7 +1,7 @@
 -- pgTAP — 0089 크리에이터 정산 탭: 권한 · 예상(preview)이 실제 회차와 같은지 · 내 것만 · 월 내역 · 줄 내역(이름 가림) · 홈 예상
 -- 2030년을 쓴다(로컬 DB 의 실제 회차와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(23);
+select plan(26);
 
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settlements_of_user 불가');
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settlements_of_user 가능');
@@ -35,6 +35,9 @@ values ('00000000-0000-4000-8000-0000000a9c01', '00000000-0000-4000-8000-0000000
 -- ---------- 예상(1월 회차 전 · 2월 1일 10시) ----------
 create temp table pv as select public.myr_settlement_preview('00000000-0000-4000-8000-0000000a9001', '2030-02-01 10:00+09') as v;
 create temp table hp as select public.myr_app_seller_settle_preview_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-01 10:00+09') as v;
+select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settle_preview_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-01 10:00+09'))), 2, '예상 주문 줄 2줄(P · Q · 배송 전 줄 제외)');
+select is((select e ->> 'buyer' from jsonb_array_elements(public.myr_app_seller_settle_preview_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-01 10:00+09')) e limit 1), '김*은', '예상 주문 줄 — 고객 이름 가림');
+select function_privs_are('public', 'myr_app_seller_settle_preview_items_of_user', '{uuid,timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 preview_items 불가');
 select is((select v ->> 'month' from pv), '2030-01', '1일 13시 전 — 다음 회차는 지난달(1월)');
 select is((select (v ->> 'settle_at')::timestamptz from pv), '2030-02-01 13:00+09'::timestamptz, '정산일 = 2월 1일 13:00(KST)');
 select is((select array[(e ->> 'settle')::int, (e ->> 'offset')::int, (e ->> 'deposit_refund')::int, (e ->> 'payout')::int] from pv, jsonb_array_elements(v -> 'rows') e where e #>> '{product,code}' = 'pgtap-ss-p'),

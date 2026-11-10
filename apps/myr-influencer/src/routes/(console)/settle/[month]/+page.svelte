@@ -1,0 +1,175 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { itemsByProduct, monthShort, monthStatus, settleAtLabel, settleAtOfMonth, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { won } from '$lib/rules';
+	import BackHeader from '$lib/components/BackHeader.svelte';
+	import SettleHold from '$lib/components/SettleHold.svelte';
+	import Tile from '$lib/components/Tile.svelte';
+
+	/** 정산 상세(0089 · 시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL). `/settle/next` = 다음 정산(예상) · `/settle/YYYY-MM` = 확정된 회차.
+	 *  상품별 내역(지급액 · 판매 · 정산금 · 상계 · 보증금 · 판매 내역 = 주문 줄 · 고객 이름 가림) · 정산 계산 · 지급 정보 · (다음 정산) 아직 포함되지 않은 판매.
+	 *  보류 상품(제조금액 확인 중)은 지급액 대신 "보류". 정산 뒤 환불 · 지난 이월이 있으면 정산 계산에 줄을 더한다.
+	 *  모바일: 60px 머리 · 정산 계산 → 상품별 내역 / PC(lg~): 32px 제목 · 왼쪽 상품별 내역 + 오른쪽 420px sticky 정산 계산 · 지급 정보 */
+	let { data } = $props();
+	const st = $derived(data.settle);
+	const upcoming = $derived(data.key === 'next');
+	const src = $derived(upcoming ? st.preview : st.months.find((m) => m.month === data.key)!);
+	const month = $derived(upcoming ? st.preview.month : data.key);
+	const payAt = $derived(upcoming ? (st.preview.settleAt ?? settleAtOfMonth(month)) : settleAtOfMonth(month));
+	const status = $derived(monthStatus({ upcoming, held: src.total.held, settleStatus: st.settleStatus }));
+	const target = $derived(`${monthShort(month)} 배송 완료분`);
+	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
+	const byProduct = $derived(itemsByProduct(data.items));
+
+	// 판매 내역(주문 줄) — 상품마다 기본 펼침 · 접으면 기억
+	let closed = $state<Record<string, boolean>>({});
+	const kstDot = (iso: string | null) => (iso ? new Date(Date.parse(iso) + 9 * 3600 * 1000).toISOString().slice(5, 10).replace('-', '.') : '—');
+
+	const CHIP: Record<SettleTone, string> = {
+		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',
+		hold: 'bg-[#ff6b6b]/14 text-[#ff8a8a]',
+		warn: 'bg-accent/16 text-accent',
+		done: 'bg-white/6 text-white/50'
+	};
+	const stat = (r: SettleRow) => [
+		{ k: '판매 금액', v: won(r.sales), c: '' },
+		{ k: '정산금 (60%)', v: won(r.settle), c: '' },
+		{ k: '제조금액 상계', v: r.offset ? `−${won(r.offset)}` : '—', c: r.offset ? 'text-accent' : 'text-white/35' },
+		{ k: '보증금 환급', v: r.depositRefund ? `+${won(r.depositRefund)}` : '—', c: r.depositRefund ? 'text-[#a8dcc8]' : 'text-white/35' }
+	];
+	const calc = $derived(
+		[
+			{ k: '판매 금액', v: won(src.total.sales), c: 'text-fg', show: true },
+			{ k: '정산 뒤 환불', v: `−${won(src.total.refundAdj)}`, c: 'text-[#ff8a8a]', show: src.total.refundAdj > 0 },
+			{ k: '정산금 (판매의 60%)', v: won(src.total.settle), c: 'text-fg', show: true },
+			{ k: '제조금액 상계', v: `−${won(src.total.offset)}`, c: 'text-accent', show: true },
+			{ k: '보증금 환급', v: `+${won(src.total.depositRefund)}`, c: 'text-[#a8dcc8]', show: true }
+		].filter((x) => x.show)
+	);
+</script>
+
+{#snippet calcRows(big: boolean)}
+	<div class="flex flex-col gap-2.5 text-[14px]">
+		{#each calc as x (x.k)}
+			<div class="flex justify-between text-white/60"><span>{x.k}</span><span class="font-semibold tabular-nums {x.c}">{x.v}</span></div>
+		{/each}
+		<div class="mt-1 flex items-baseline justify-between border-t border-white/8 pt-3">
+			<span class="font-bold text-fg">{totalLabel}</span>
+			<span class="font-extrabold text-accent tabular-nums {big ? 'text-[22px]' : 'text-[20px]'}">{won(src.total.payout)}</span>
+		</div>
+	</div>
+	{#if src.total.held}<p class="mt-2.5 text-[12px] leading-[1.6] text-[#ff8a8a]">제조금액 확인 중인 상품 {src.total.held}개는 금액이 정해지면 정산돼요(위 합계에서 빠져 있어요)</p>{/if}
+{/snippet}
+
+{#snippet upcomingNote(cls: string)}
+	{#if upcoming}<p class="text-[12px] leading-[1.6] text-white/45 {cls}">예상 금액이에요. 월말까지 환불·배송 상황에 따라 바뀔 수 있어요.</p>{/if}
+{/snippet}
+
+<div class="flex min-h-0 flex-1 animate-slide-in flex-col lg:mx-auto lg:block lg:w-full lg:max-w-[1240px] lg:animate-fade-in lg:px-10 lg:pt-7 lg:pb-10">
+	<BackHeader title="{monthShort(month)} 정산" fallback="/settle">
+		{#snippet right()}<span class="text-[12px] text-white/45">{target}</span>{/snippet}
+	</BackHeader>
+	<!-- PC 제목 -->
+	<div class="hidden items-center gap-3 lg:flex">
+		<h1 class="text-[32px] font-extrabold tracking-[-0.03em]">{monthShort(month)} 정산</h1>
+		<span class="ml-auto flex items-center gap-2.5">
+			<span class="rounded-lg px-3 py-1.5 text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
+			<span class="text-[13px] text-white/45">{target}</span>
+		</span>
+	</div>
+
+	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1.5 pb-10 lg:mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8 lg:overflow-visible lg:p-0">
+		<div class="min-w-0">
+			<!-- 모바일 상태 줄 -->
+			<div class="flex items-center gap-2 lg:hidden">
+				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
+				<span class="ml-auto text-[12px] text-white/50">{settleAtLabel(payAt)} {upcoming ? '지급 예정' : '정산'}</span>
+			</div>
+			{#if upcoming && st.settleStatus !== 'verified'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
+
+			<!-- 모바일 정산 계산 -->
+			<div class="lg:hidden">
+				<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70">정산 계산</h3>
+				<div class="rounded-[20px] border border-white/8 bg-white/3 p-4">{@render calcRows(false)}</div>
+				{@render upcomingNote('mt-2.5')}
+			</div>
+
+			<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70 lg:mt-0 lg:text-[15px]">상품별 내역</h3>
+			<div class="flex flex-col gap-2 lg:gap-2.5">
+				{#each src.rows as r (r.product.id)}
+					{@const its = byProduct.get(r.product.code) ?? []}
+					{@const open = !closed[r.product.code]}
+					<div class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:px-5 lg:py-[18px]">
+						<div class="flex items-center gap-3 lg:gap-4">
+							<Tile tile="slate" bg={r.product.tile} iconId={r.product.icon} thumbUrl={r.product.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl lg:h-14 lg:w-14 lg:rounded-2xl" />
+							<span class="min-w-0 flex-1 text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
+							<span class="text-right whitespace-nowrap">
+								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
+								{#if r.status === 'held'}
+									<span class="mt-0.5 inline-block rounded-md px-[7px] py-[3px] text-[12px] font-bold {CHIP.warn}">보류</span>
+								{:else}
+									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px]">{won(r.payout ?? 0)}</span>
+								{/if}
+							</span>
+						</div>
+						<div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-white/6 pt-3.5 lg:mt-4 lg:grid-cols-4 lg:pt-4">
+							{#each stat(r) as x (x.k)}
+								<div><span class="block text-[11px] text-white/50 lg:text-[12px]">{x.k}</span><span class="mt-[3px] block text-[14px] font-bold tabular-nums lg:text-[15px] {x.c}">{x.v}</span></div>
+							{/each}
+						</div>
+						{#if r.status === 'held'}<p class="mt-3 text-[12px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중이라 보류됐어요 — 운영팀이 입력하면 정산이 확정돼요</p>{/if}
+						{#if its.length}
+							<div class="mt-3.5 rounded-[14px] bg-white/3 lg:mt-4">
+								<button type="button" onclick={() => (closed[r.product.code] = open)} aria-expanded={open} class="flex h-11 w-full items-center justify-between px-3.5 text-[12px] font-bold text-white/70 lg:px-4 lg:text-[13px]">
+									<span>판매 내역 {its.length}건</span>
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="transition-transform {open ? 'rotate-180' : ''}" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+								</button>
+								{#if open}
+									<div class="px-3.5 pb-0.5 lg:px-4 lg:pb-1">
+										{#each its as it, i (i)}
+											<div class="flex items-center justify-between gap-3 border-t border-white/6 py-2.5 lg:py-3">
+												<span class="min-w-0">
+													<span class="block text-[12px] text-white/50 lg:text-[13px]"><b class="font-bold text-fg">{it.orderCode.toUpperCase()}</b> · {it.buyer} · 배송 완료 {kstDot(it.deliveredAt)}</span>
+													<span class="mt-[3px] block text-[12px] text-white/75 tabular-nums lg:text-[13px]">
+														{#if it.groupbuy}<span class="mr-1 rounded-[5px] bg-accent/14 px-1.5 py-px text-[11px] font-extrabold text-accent">공구</span>{/if}{it.qty}개 × {won(it.unitPrice)}{#if it.kind === 'refund_adj'}<span class="text-[#ff8a8a]">{` · 정산 뒤 환불`}</span>{:else if it.refunded}<span class="text-[#ff8a8a]">{` · 환불 −${won(it.refunded)}`}</span>{/if}
+													</span>
+												</span>
+												<span class="shrink-0 text-[13px] font-bold tabular-nums lg:text-[14px] {it.kind === 'refund_adj' ? 'text-[#ff8a8a]' : ''}">{it.kind === 'refund_adj' ? `−${won(it.amount)}` : won(it.amount)}</span>
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{:else}
+					<p class="rounded-[18px] border border-dashed border-white/10 px-4 py-6 text-center text-[13px] text-white/45">아직 정산할 판매가 없어요</p>
+				{/each}
+			</div>
+
+			{#if upcoming && st.preview.undelivered.lines}
+				<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70 lg:text-[15px]">아직 포함되지 않은 판매</h3>
+				<div class="flex items-start gap-2 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 text-[13px] leading-[1.5] text-white/65">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+					<span>배송 완료 전 판매 <b class="font-bold text-fg">{st.preview.undelivered.lines}건 · {won(st.preview.undelivered.amount)}</b>은 배송이 완료되면 그 달 정산에 들어가요</span>
+				</div>
+			{/if}
+		</div>
+
+		<!-- PC 오른쪽 — 정산 계산 · 지급 정보 -->
+		<aside class="hidden lg:sticky lg:top-8 lg:block">
+			<div class="rounded-3xl border border-white/8 bg-panel p-6">
+				<p class="mb-3.5 text-[16px] font-extrabold">정산 계산</p>
+				{@render calcRows(true)}
+				<p class="mt-[22px] mb-3 text-[14px] font-extrabold text-white/70">지급 정보</p>
+				<div class="flex flex-col gap-2.5 text-[14px]">
+					<div class="flex justify-between text-white/60"><span>지급일</span><span class="font-semibold text-fg tabular-nums">{settleAtLabel(payAt)}</span></div>
+					<div class="flex justify-between text-white/60"><span>정산 대상</span><span class="font-semibold text-fg">{target}</span></div>
+					<div class="flex items-center justify-between text-white/60"><span>상태</span><span class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span></div>
+				</div>
+				{@render upcomingNote('mt-4')}
+				<button type="button" onclick={() => goto('/settle')} class="mt-5 h-[54px] w-full rounded-2xl border-[1.5px] border-white/14 text-[15px] font-bold text-fg transition-colors hover:border-white/35">목록으로</button>
+			</div>
+		</aside>
+	</div>
+</div>

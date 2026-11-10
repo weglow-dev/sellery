@@ -48,3 +48,34 @@ describe('라벨', () => {
 		expect(depositLabel({ depositPaid: 7500, depositUnpaid: 5000, depositRefunded: 7500, remaining: 0 }, won)).toBe('₩7,500 환급 완료 · ₩5,000 입금 확인 전');
 	});
 });
+
+describe('시안 라벨', () => {
+	it('정산 시각 · D-day · 날짜', async () => {
+		const { settleAtOfMonth, dDay, shortDate, monthShort } = await import('../seller-settlement');
+		expect(settleAtOfMonth('2026-11')).toBe('2026-12-01T04:00:00.000Z');
+		expect(settleAtOfMonth('2026-12')).toBe('2027-01-01T04:00:00.000Z');
+		expect(dDay('2026-12-01T04:00:00Z', Date.parse('2026-11-10T03:00:00Z'))).toBe('D-21');
+		expect(dDay('2026-12-01T04:00:00Z', Date.parse('2026-12-01T01:00:00Z'))).toBe('D-DAY');
+		expect(dDay('2026-12-01T04:00:00Z', Date.parse('2026-12-02T01:00:00Z'))).toBe('');
+		expect([shortDate('2026-12-01T04:00:00Z'), monthShort('2026-11')]).toEqual(['12월 1일', '11월']);
+	});
+	it('상태 · 배너', async () => {
+		const { monthStatus, holdBanner } = await import('../seller-settlement');
+		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'none' })).toEqual({ label: '지급 보류', tone: 'hold' });
+		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'verified' })).toEqual({ label: '지급 예정', tone: 'plan' });
+		expect(monthStatus({ upcoming: false, held: 1, settleStatus: 'verified' }).label).toBe('일부 보류');
+		expect(monthStatus({ upcoming: false, held: 0, settleStatus: 'none' }).label).toBe('정산 확정');
+		expect(holdBanner('verified', '12월 1일')).toBeNull();
+		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
+		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
+	});
+	it('원장 카드', async () => {
+		const { ledgerCard } = await import('../seller-settlement');
+		const base = { product: { id: 'p', code: 'c', name: 'n', tile: null, icon: 'pill', thumbUrl: null }, hasLedger: true, batches: [], offset: 0, depositUnpaid: 0, depositRefunded: 0 };
+		const lemon = ledgerCard({ ...base, total: 150000, remaining: 150000, depositPaid: 37500 }, 108000, '2026-11', won);
+		expect([lemon.chip, lemon.paidPct, lemon.planPct, lemon.planText, lemon.depositText]).toEqual(['상환 중', 0, 72, '11월 정산에서 ₩108,000 상환 예정', '보증금 ₩37,500']);
+		const grape = ledgerCard({ ...base, total: 30000, remaining: 0, offset: 30000, depositPaid: 7500, depositRefunded: 7500 }, 0, '2026-11', won);
+		expect([grape.chip, grape.paidPct, grape.planText, grape.depositText]).toEqual(['상환 완료', 100, '', '보증금 ₩7,500 · 환급 완료']);
+		expect(ledgerCard({ ...base, hasLedger: false, total: 0, remaining: 0, depositPaid: 0 }, null, '2026-11', won).chip).toBe('제조금액 확인 중');
+	});
+});

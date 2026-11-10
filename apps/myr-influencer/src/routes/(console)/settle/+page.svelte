@@ -1,195 +1,181 @@
 <script lang="ts">
-	import {
-		depositLabel,
-		monthLabel,
-		payoutHold,
-		repaidPct,
-		SETTLE_ROW_META,
-		settleAtLabel,
-		settleRowText,
-		type SettleItem,
-		type SettleRow
-	} from '@sellery/myr-core/seller-settlement';
+	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, settleAtOfMonth, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
+	import { readParam, syncParam } from '$lib/url-state';
 	import Icon from '$lib/components/Icon.svelte';
+	import SettleHold from '$lib/components/SettleHold.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 정산(0089 · 작업 순서 6 · 시안 없음 — 홈 · 주문 카드에 맞춤). 계산은 DB(0087 · 0089) — 여기는 보여 주기만.
-	 *  ① 다음 정산 예정(예상 · 다음 회차를 지금 돌리면 나올 값) ② 월별 정산 내역(확정 · 보류 · 펼치면 상품 → 주문 줄) ③ 제품별 제조 원장(남은 제조금액 · 보증금).
-	 *  사업자 · 정산 정보 확인 전이면 지급 보류 배너(계산 · 확정은 된다). 지급 완료 · 세금계산서는 작업 순서 7.
-	 *  모바일: 한 줄 · PC(lg~): 1240px · 왼쪽(예상 · 월별) + 오른쪽 380px(제조 원장) */
+	/** 정산(0089 · 시안 "MYR Influencer Admin" · "… PC" 정산 탭 · 2026-11-10). 계산은 DB(0087 · 0089) — 여기는 보여 주기만.
+	 *  [정산 내역 | 제조금액 · 보증금] 전환(주소 ?view=mfg — 상세에 갔다 와도 그대로).
+	 *  정산 내역: 보류 배너(사업자 정보 확인 전) · 다음 정산 카드(D-day · 예상 지급액 · 상태 · 판매 · 정산금 · 상계 · 보증금 → 상세) · 월별 정산(다음 정산 + 지난 회차 → /settle/<월>).
+	 *  제조금액 · 보증금: 안내 · 제품별 카드(상환 중/완료 · 남은 금액 · 막대(갚은 % + 다음 정산 상환 예정) · 보증금).
+	 *  지난 회차 상태는 "정산 확정" — "지급 완료"는 지급(작업 순서 7)이 생기면. 모바일: 한 줄 · PC(lg~): 1240px · 카드 2단 */
 	let { data } = $props();
 	const st = $derived(data.settle);
 	const pv = $derived(st.preview);
-	const hold = $derived(payoutHold(st.settleStatus));
 
-	let open = $state<Record<string, boolean>>({});
-	let items = $state<Record<string, SettleItem[] | 'loading' | 'error'>>({});
-	async function loadItems(month: string) {
-		if (items[month] && items[month] !== 'error') return;
-		items[month] = 'loading';
-		try {
-			const res = await fetch(`/api/settle/items?month=${month}`);
-			// 서버(/api/settle/items)가 이미 화면 모양(SettleItem)으로 바꿔 보낸다
-			const r = (await res.json().catch(() => null)) as { ok?: boolean; items?: SettleItem[] } | null;
-			items[month] = r?.ok && Array.isArray(r.items) ? r.items : 'error';
-		} catch {
-			items[month] = 'error';
-		}
-	}
+	let view = $state<'pay' | 'mfg'>(readParam('view', ['pay', 'mfg'] as const, 'pay'));
+	$effect(() => syncParam('view', view, 'pay'));
 
-	const chip = (tone: string) => (tone === 'ok' ? 'bg-mint/14 text-mint' : tone === 'warn' ? 'bg-[#ff6b6b]/14 text-[#ff8a8a]' : 'bg-white/8 text-white/60');
-	const minus = (n: number) => (n ? `−${won(n)}` : won(0));
-	const kstDate = (iso: string | null) => (iso ? new Date(Date.parse(iso) + 9 * 3600 * 1000).toISOString().slice(5, 10).replace('-', '.') : '—');
+	const nextAt = $derived(pv.settleAt ?? settleAtOfMonth(pv.month));
+	const next = $derived({
+		href: '/settle/next',
+		title: `${monthShort(pv.month)} 정산`,
+		short: monthShort(pv.month),
+		payShort: `${shortDate(nextAt)} 지급 예정`,
+		status: monthStatus({ upcoming: true, held: pv.total.held, settleStatus: st.settleStatus }),
+		sales: pv.total.sales - pv.total.refundAdj,
+		settle: pv.total.settle,
+		offset: pv.total.offset,
+		refund: pv.total.depositRefund,
+		net: pv.total.payout
+	});
+	const months = $derived([
+		next,
+		...st.months.map((m) => ({
+			href: `/settle/${m.month}`,
+			title: `${monthShort(m.month)} 정산`,
+			short: monthShort(m.month),
+			payShort: `${shortDate(settleAtOfMonth(m.month))} 정산`,
+			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
+			sales: m.total.sales - m.total.refundAdj,
+			settle: m.total.settle,
+			offset: m.total.offset,
+			refund: m.total.depositRefund,
+			net: m.total.payout
+		}))
+	]);
+	const remainSum = $derived(st.ledgers.reduce((n, l) => n + l.remaining, 0));
+	const depositSum = $derived(st.ledgers.reduce((n, l) => n + l.depositPaid - l.depositRefunded, 0));
+	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(remainSum)}`, `돌려받을 보증금 ${won(depositSum)}`] : ['매월 1일 오후 1시 지급']);
+	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.rows.find((r) => r.product.id === l.product.id)?.offset ?? null, pv.month, won) })));
+
+	const CHIP: Record<SettleTone, string> = {
+		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',
+		hold: 'bg-[#ff6b6b]/14 text-[#ff8a8a]',
+		warn: 'bg-accent/16 text-accent',
+		done: 'bg-white/6 text-white/50'
+	};
+	const segBtn = (on: boolean) => `flex h-10 items-center justify-center rounded-[10px] text-[14px] font-bold transition-all lg:h-[42px] lg:text-[15px] ${on ? 'bg-[#2a2c33] text-fg' : 'text-white/55'}`;
 </script>
 
-{#snippet rowLine(r: SettleRow)}
-	<li class="flex items-center gap-3 py-2.5">
-		<Tile tile="slate" bg={r.product.tile} iconId={r.product.icon} thumbUrl={r.product.thumbUrl} icon={22} class="h-10 w-10 shrink-0 rounded-xl" />
-		<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-			<span class="truncate text-[14px] font-bold">{r.product.name}</span>
-			<span class="text-[12px] text-white/50 tabular-nums">{settleRowText(r, won)}</span>
-		</span>
-		{#if r.status === 'held'}
-			<span class="shrink-0 rounded-lg px-2 py-1 text-[11.5px] font-bold {chip('warn')}">보류</span>
-		{:else}
-			<span class="shrink-0 text-[15px] font-extrabold tabular-nums">{won(r.payout ?? 0)}</span>
-		{/if}
-	</li>
+{#snippet seg()}
+	<div class="grid grid-cols-2 gap-1 rounded-[14px] bg-white/5 p-1 lg:inline-grid lg:grid-cols-[180px_180px]" role="tablist" aria-label="정산 보기">
+		<button type="button" role="tab" aria-selected={view === 'pay'} onclick={() => (view = 'pay')} class={segBtn(view === 'pay')}>정산 내역</button>
+		<button type="button" role="tab" aria-selected={view === 'mfg'} onclick={() => (view = 'mfg')} class={segBtn(view === 'mfg')}>제조금액 · 보증금</button>
+	</div>
 {/snippet}
 
-<div class="flex min-h-0 flex-1 animate-up-in flex-col lg:mx-auto lg:block lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-10">
-	<div class="flex h-[60px] shrink-0 items-center justify-between px-5 lg:h-auto lg:px-0">
-		<h1 class="text-[18px] font-extrabold tracking-[-0.02em] lg:text-[32px] lg:tracking-[-0.03em]">정산</h1>
-		<span class="text-[12px] text-white/50 lg:text-[14px]">매월 1일 오후 1시 · 지난달 배송 완료분</span>
+<div class="flex min-h-0 flex-1 animate-up-in flex-col lg:mx-auto lg:block lg:w-full lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-10">
+	<!-- 모바일 머리 -->
+	<div class="flex h-[60px] shrink-0 items-center justify-between px-5 lg:hidden">
+		<h1 class="text-[18px] font-extrabold tracking-[-0.02em]">정산</h1>
+		<span class="ml-3 min-w-0 text-right text-[12px] leading-[1.45] text-white/50">
+			{#each rightText as t, i (t)}<span class="inline-block whitespace-nowrap">{i ? ` / ${t}` : t}</span>{/each}
+		</span>
+	</div>
+	<div class="shrink-0 px-5 pb-2 lg:hidden">{@render seg()}</div>
+	<!-- PC 머리 -->
+	<div class="hidden items-center justify-between gap-4 lg:flex">
+		{@render seg()}
+		<span class="text-[14px] text-white/50">{rightText.join(' / ')}</span>
 	</div>
 
-	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-8 lg:mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6 lg:overflow-visible lg:px-0 lg:pb-0">
-		<div class="flex min-w-0 flex-col gap-3 lg:gap-4">
-			{#if hold}
-				<a href="/my" class="flex items-center gap-3 rounded-2xl border border-[#ff6b6b]/35 bg-[#ff6b6b]/10 px-4 py-3">
-					<span class="min-w-0 flex-1 text-[13px] leading-[1.5] font-semibold text-[#ff8a8a]">{hold} — 내 정보에서 확인해 주세요</span>
-					<Icon id="chev" size={16} sw={2.4} class="shrink-0 text-[#ff8a8a]" />
-				</a>
-			{/if}
+	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 lg:overflow-visible lg:p-0">
+		{#if view === 'pay'}
+			{#if st.settleStatus !== 'verified'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
 
-			<!-- ① 다음 정산 예정 -->
-			<section class="relative overflow-hidden rounded-3xl bg-panel p-5 lg:px-7 lg:py-[26px]" aria-label="다음 정산 예정">
-				<div class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))]"></div>
-				<p class="relative text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 예정{pv.settleAt ? ` · ${settleAtLabel(pv.settleAt)}` : ''}</p>
-				<p class="relative mt-1.5 text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[40px]">{won(pv.total.payout)}</p>
-				<div class="relative mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-					{#each [{ k: '판매', v: won(pv.total.sales - pv.total.refundAdj) }, { k: '정산금(60%)', v: won(pv.total.settle) }, { k: '제조금액 상계', v: minus(pv.total.offset) }, { k: '보증금 환급', v: won(pv.total.depositRefund) }] as x (x.k)}
-						<div><p class="text-[11px] text-white/50 lg:text-[12px]">{x.k}</p><p class="mt-0.5 text-[15px] font-bold tabular-nums lg:text-[17px]">{x.v}</p></div>
+			<!-- 다음 정산 -->
+			<a href={next.href} class="relative block overflow-hidden rounded-3xl bg-panel p-5 text-fg lg:mt-5 lg:flex lg:items-center lg:gap-10 lg:px-7 lg:py-[26px]">
+				<span class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))] lg:-top-[90px] lg:right-auto lg:-left-20 lg:h-[280px] lg:w-[280px]"></span>
+				<span class="relative block lg:min-w-[300px] lg:shrink-0">
+					<span class="flex items-center justify-between gap-2 lg:justify-start">
+						<span class="text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 · {settleAtLabel(nextAt)}</span>
+						<span class="text-[12px] font-extrabold text-accent lg:text-[13px]">{dDay(nextAt)}</span>
+					</span>
+					<span class="mt-1.5 flex items-center gap-2.5 lg:mt-2 lg:gap-3">
+						<span class="text-[34px] font-extrabold tracking-[-0.04em] tabular-nums lg:text-[40px]">{won(next.net)}</span>
+						<span class="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-bold whitespace-nowrap lg:rounded-lg lg:px-2.5 lg:py-[5px] lg:text-[12px] {CHIP[next.status.tone]}">{next.status.label}</span>
+					</span>
+				</span>
+				<span class="relative mt-4 flex gap-[22px] lg:mt-0 lg:flex-1 lg:gap-9 lg:border-l lg:border-white/8 lg:pl-10">
+					{#each [{ k: '판매 금액', v: won(next.sales), c: '', pc: false }, { k: '정산금 (60%)', v: won(next.settle), c: '', pc: false }, { k: '제조금액 상계', v: won(next.offset), c: 'text-accent', pc: false }, { k: '보증금 환급', v: won(next.refund), c: '', pc: true }] as x (x.k)}
+						<span class={x.pc ? 'hidden lg:block' : ''}>
+							<span class="block text-[11px] text-white/50 lg:text-[12px]">{x.k}</span>
+							<span class="mt-0.5 block text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px] {x.c}">{x.v}</span>
+						</span>
 					{/each}
-				</div>
-				{#if pv.rows.length}
-					<ul class="relative mt-4 flex flex-col divide-y divide-white/6 border-t border-white/8">
-						{#each pv.rows as r (r.product.id)}{@render rowLine(r)}{/each}
-					</ul>
-				{/if}
-				{#if pv.total.held}
-					<p class="relative mt-3 text-[12px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중인 제품 {pv.total.held}개는 운영팀이 제조금액을 넣으면 정산돼요(합계에서 빠져 있어요)</p>
-				{/if}
-				{#if pv.undelivered.lines}
-					<p class="relative mt-2 text-[12px] leading-[1.5] text-white/55">배송 완료 전 판매 {pv.undelivered.lines}건 · {won(pv.undelivered.amount)}는 배송 완료되면 그 달 정산에 들어가요</p>
-				{/if}
-				{#if !pv.rows.length && !pv.undelivered.lines}
-					<p class="relative mt-3 text-[13px] text-white/50">아직 정산할 판매가 없어요</p>
-				{/if}
-			</section>
+				</span>
+				<span class="relative hidden shrink-0 items-center gap-1 text-[14px] font-bold text-white/60 lg:flex">자세히 보기<Icon id="chev" size={14} sw={2.4} /></span>
+			</a>
 
-			<!-- ② 월별 정산 내역 -->
-			<section aria-label="월별 정산 내역">
-				<h2 class="mt-4 mb-2.5 text-[14px] font-extrabold text-white/80 lg:mt-2 lg:text-[15px]">월별 정산 내역</h2>
-				{#if st.months.length}
-					<ul class="flex flex-col gap-2.5">
-						{#each st.months as m (m.month)}
-							{@const isOpen = !!open[m.month]}
-							{@const its = items[m.month]}
-							<li class="rounded-[18px] border border-white/8 bg-white/3 lg:rounded-[20px]">
-								<button type="button" onclick={() => (open[m.month] = !isOpen)} aria-expanded={isOpen} class="flex w-full items-center gap-3 p-4 text-left lg:p-[18px]">
-									<span class="flex min-w-0 flex-1 flex-col gap-0.5">
-										<span class="flex items-center gap-2">
-											<span class="text-[15px] font-extrabold">{monthLabel(m.month)} 정산</span>
-											{#if m.total.held}<span class="rounded-md px-1.5 py-0.5 text-[11px] font-bold {chip('warn')}">보류 {m.total.held}</span>{/if}
-										</span>
-										<span class="text-[12px] text-white/50 tabular-nums">{[`정산금 ${won(m.total.settle)}`, m.total.offset ? `상계 ${minus(m.total.offset)}` : '', m.total.depositRefund ? `보증금 +${won(m.total.depositRefund)}` : ''].filter(Boolean).join(' · ')}</span>
-									</span>
-									<span class="text-right">
-										<span class="block text-[11px] text-white/45">지급액</span>
-										<span class="block text-[17px] font-extrabold tabular-nums">{won(m.total.payout)}</span>
-									</span>
-									<Icon id="chev" size={16} sw={2.4} class="shrink-0 text-white/40 transition-transform {isOpen ? 'rotate-90' : ''}" />
-								</button>
-								{#if isOpen}
-									<div class="border-t border-white/8 px-4 pb-4 lg:px-[18px]">
-										<ul class="flex flex-col divide-y divide-white/6">
-											{#each m.rows as r (r.product.id)}{@render rowLine(r)}{/each}
-										</ul>
-										{#if its === undefined}
-											<button type="button" onclick={() => loadItems(m.month)} class="mt-2 h-10 w-full rounded-xl border border-white/12 text-[13px] font-bold text-fg hover:bg-white/4">주문 줄 보기</button>
-										{:else if its === 'loading'}
-											<p class="mt-3 text-center text-[13px] text-white/50">불러오는 중…</p>
-										{:else if its === 'error'}
-											<button type="button" onclick={() => loadItems(m.month)} class="mt-2 h-10 w-full rounded-xl border border-white/12 text-[13px] font-bold text-[#ff8a8a]">불러오지 못했어요 · 다시 시도</button>
-										{:else}
-											<ul class="mt-2 flex flex-col gap-1.5 rounded-xl bg-white/4 p-3">
-												{#each its as it, i (i)}
-													<li class="flex items-start justify-between gap-3 text-[12.5px] leading-[1.45]">
-														<span class="min-w-0">
-															<span class="font-bold">{it.orderCode.toUpperCase()}</span>
-															<span class="text-white/50"> · {it.buyer} · 배송 완료 {kstDate(it.deliveredAt)}</span>
-															<span class="block truncate text-white/70">{#if it.groupbuy}<span class="mr-1 rounded-[5px] bg-accent/14 px-1.5 py-px text-[11px] font-extrabold text-accent">공구</span>{/if}{it.product}{it.option ? ` · ${it.option}` : ''} × {it.qty} · {won(it.unitPrice)}{it.refunded ? ` · 환불 −${won(it.refunded)}` : ''}</span>
-														</span>
-														<span class="shrink-0 font-bold tabular-nums {it.kind === 'refund_adj' ? 'text-[#ff8a8a]' : ''}">{it.kind === 'refund_adj' ? `정산 뒤 환불 ${minus(it.amount)}` : won(it.amount)}</span>
-													</li>
-												{/each}
-											</ul>
-										{/if}
-									</div>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="rounded-[18px] border border-dashed border-white/10 px-4 py-6 text-center text-[13px] text-white/45">첫 정산은 다음 달 1일 오후 1시에 확정돼요</p>
-				{/if}
-			</section>
-		</div>
-
-		<!-- ③ 제품별 제조 원장 -->
-		<section class="mt-7 lg:mt-0" aria-label="제조 원장">
-			<h2 class="mb-2.5 text-[14px] font-extrabold text-white/80 lg:text-[15px]">제조금액 · 보증금</h2>
-			{#if st.ledgers.length}
-				<ul class="flex flex-col gap-2.5">
-					{#each st.ledgers as l (l.product.id)}
-						<li class="rounded-[18px] border border-white/8 bg-white/3 p-4">
-							<div class="flex items-center gap-3">
-								<Tile tile="slate" bg={l.product.tile} iconId={l.product.icon} thumbUrl={l.product.thumbUrl} icon={22} class="h-10 w-10 shrink-0 rounded-xl" />
-								<span class="min-w-0 flex-1 truncate text-[14px] font-bold">{l.product.name}</span>
-							</div>
-							{#if !l.hasLedger}
-								<p class="mt-3 rounded-xl bg-[#ff6b6b]/10 px-3 py-2 text-[12.5px] leading-[1.5] text-[#ff8a8a]">제조금액 확인 중 — 운영팀이 입력하면 이 제품의 정산이 확정돼요</p>
-							{:else}
-								<div class="mt-3 flex items-baseline justify-between">
-									<span class="text-[12px] text-white/50">남은 제조금액</span>
-									<span class="text-[18px] font-extrabold tabular-nums">{won(l.remaining)}</span>
-								</div>
-								<div class="mt-2 h-2 overflow-hidden rounded-full bg-white/8" role="progressbar" aria-valuenow={repaidPct(l)} aria-valuemin={0} aria-valuemax={100} aria-label="갚은 비율">
-									<div class="h-full rounded-full bg-accent" style:width="{repaidPct(l)}%"></div>
-								</div>
-								<p class="mt-2 text-[12px] text-white/55 tabular-nums">
-									제조금액 {won(l.total)}{l.batches.length > 1 ? ` (${l.batches.length}차까지)` : ''} · 상계 {won(l.offset)} · {repaidPct(l)}% 갚음
-								</p>
-								<p class="mt-1 text-[12px] text-white/55">보증금 {depositLabel(l, won)}</p>
+			<!-- 월별 정산 -->
+			<h2 class="mt-6 text-[16px] font-extrabold tracking-[-0.02em] lg:mt-7 lg:text-[20px]">월별 정산</h2>
+			<div class="mt-2.5 flex flex-col gap-2 lg:mt-3.5 lg:grid lg:grid-cols-2 lg:gap-3">
+				{#each months as mo (mo.href)}
+					<a href={mo.href} class="flex flex-col gap-2.5 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-fg transition-colors lg:gap-3 lg:rounded-[20px] lg:p-[18px] lg:hover:border-white/30">
+						<span class="flex items-center justify-between gap-2">
+							<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP[mo.status.tone]}">{mo.status.label}</span>
+							<span class="text-[11px] text-white/45 lg:text-[12px]">{mo.payShort}</span>
+						</span>
+						<span class="flex items-center gap-3 lg:gap-3.5">
+							<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/6 text-[13px] font-extrabold text-white/85 lg:h-[52px] lg:w-[52px] lg:rounded-[14px] lg:text-[14px]">{mo.short}</span>
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5 lg:gap-[3px]">
+								<span class="text-[14px] font-bold lg:text-[15px]">{mo.title}</span>
+								<span class="flex flex-wrap gap-x-1 text-[12px] leading-[1.45] text-white/55 lg:text-[13px]">
+									<span class="whitespace-nowrap">판매 {won(mo.sales)}</span><span class="whitespace-nowrap">− 제조금액 상계 {won(mo.offset)}</span>
+								</span>
+							</span>
+							<span class="text-[14px] font-extrabold whitespace-nowrap tabular-nums lg:text-[16px]">{won(mo.net)}</span>
+						</span>
+					</a>
+				{/each}
+			</div>
+		{:else}
+			<!-- 제조금액 · 보증금 -->
+			<div class="flex flex-col gap-[5px] rounded-2xl border border-accent/20 bg-accent/7 px-4 py-3.5 text-[13px] leading-[1.5] text-white/80 lg:mt-5 lg:gap-[7px] lg:rounded-[20px] lg:px-5 lg:py-[18px] lg:text-[14px]">
+				{#each ['MYR이 먼저 낸 제조금액은 매달 정산금에서 나눠 상환해요', '제조금액이 모두 상계되면 보증금을 돌려드려요, 그 뒤 판매분부터는 정산금(판매의 60%)을 전액 지급해요'] as t (t)}
+					<span class="flex items-start gap-2 lg:gap-2.5"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent lg:mt-2"></span><span>{t}</span></span>
+				{/each}
+			</div>
+			<div class="mt-3 flex flex-col gap-2 lg:mt-5 lg:grid lg:grid-cols-2 lg:gap-3">
+				{#each ledgers as { l, c } (l.product.id)}
+					<div class="flex flex-col gap-2.5 rounded-[18px] border border-white/8 bg-white/3 p-3.5 lg:gap-3 lg:rounded-[20px] lg:p-[18px]">
+						<span class="flex items-center justify-between gap-2">
+							<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP[c.tone]}">{c.chip}</span>
+							{#if l.hasLedger}<span class="text-[11px] text-white/45 lg:text-[12px]">제조금액 {won(l.total)}</span>{/if}
+						</span>
+						<span class="flex items-center gap-3 lg:gap-3.5">
+							<Tile tile="slate" bg={l.product.tile} iconId={l.product.icon} thumbUrl={l.product.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl lg:h-[52px] lg:w-[52px] lg:rounded-[14px]" />
+							<span class="flex min-w-0 flex-1 flex-col gap-0.5 lg:gap-[3px]">
+								<span class="truncate text-[14px] font-bold lg:text-[15px]">{l.product.name}</span>
+								<span class="text-[12px] text-white/55 lg:text-[13px]">{l.hasLedger ? c.depositText : '운영팀이 제조금액을 입력하면 정산이 확정돼요'}</span>
+							</span>
+							{#if l.hasLedger}
+								<span class="text-right whitespace-nowrap">
+									<span class="block text-[11px] text-white/45">남은 금액</span>
+									<span class="block text-[14px] font-extrabold tabular-nums lg:text-[16px]">{won(l.remaining)}</span>
+								</span>
 							{/if}
-						</li>
-					{/each}
-				</ul>
-			{:else}
-				<p class="rounded-[18px] border border-dashed border-white/10 px-4 py-6 text-center text-[13px] text-white/45">제조금액이 입력되면 여기에 남은 금액과 보증금이 보여요</p>
-			{/if}
-		</section>
+						</span>
+						{#if l.hasLedger}
+							<span class="block">
+								<span class="flex h-1.5 overflow-hidden rounded-[3px] bg-white/8" role="progressbar" aria-valuenow={c.paidPct} aria-valuemin={0} aria-valuemax={100} aria-label="상환한 비율">
+									<span class={c.tone === 'done' ? 'bg-[#a8dcc8]' : 'bg-accent'} style:width="{c.paidPct}%"></span>
+									<span class="bg-accent/40" style:width="{c.planPct}%"></span>
+								</span>
+								<span class="mt-2 flex items-center justify-between gap-2 text-[12px]">
+									<span class="text-white/55">{c.paidPct}%</span>
+									<span class="font-bold text-accent">{c.planText}</span>
+								</span>
+							</span>
+						{/if}
+					</div>
+				{:else}
+					<p class="rounded-[18px] border border-dashed border-white/10 px-4 py-6 text-center text-[13px] text-white/45 lg:col-span-2">제조금액이 입력되면 여기에 남은 금액과 보증금이 보여요</p>
+				{/each}
+			</div>
+		{/if}
 	</div>
 </div>

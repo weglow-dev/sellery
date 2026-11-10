@@ -192,3 +192,79 @@ export function depositLabel(l: Pick<SettleLedger, 'depositPaid' | 'depositUnpai
 	if (l.depositUnpaid > 0) parts.push(`${won(l.depositUnpaid)} 입금 확인 전`);
 	return parts.join(' · ') || '없음';
 }
+
+/* ---------------- 시안("MYR Influencer Admin" 정산 · 2026-11-10) 라벨 ---------------- */
+
+const KST = 9 * 3600 * 1000;
+const kst = (t: number) => new Date(t + KST);
+
+/** 정산월 'YYYY-MM' → 정산(지급) 시각 = 다음 달 1일 13:00 KST (ISO) */
+export function settleAtOfMonth(month: string): string | null {
+	const m = /^(\d{4})-(\d{2})$/.exec(month);
+	if (!m) return null;
+	const y = Number(m[1]) + (Number(m[2]) === 12 ? 1 : 0);
+	const mo = Number(m[2]) === 12 ? 1 : Number(m[2]) + 1;
+	return new Date(Date.UTC(y, mo - 1, 1, 4, 0, 0)).toISOString();
+}
+
+/** 'D-21' · 'D-DAY' (한국 날짜 기준) · 지났으면 '' */
+export function dDay(settleAt: string | null, now: number = Date.now()): string {
+	if (!settleAt) return '';
+	const day = (t: number) => Math.floor(kst(t).getTime() / 86400000);
+	const d = day(Date.parse(settleAt)) - day(now);
+	return d > 0 ? `D-${d}` : d === 0 ? 'D-DAY' : '';
+}
+
+/** '12월 1일' */
+export const shortDate = (iso: string | null): string => (iso ? `${kst(Date.parse(iso)).getUTCMonth() + 1}월 ${kst(Date.parse(iso)).getUTCDate()}일` : '');
+
+/** '11월' (정산월 짧게) */
+export const monthShort = (month: string): string => {
+	const m = /^\d{4}-(\d{2})$/.exec(month);
+	return m ? `${Number(m[1])}월` : month;
+};
+
+export type SettleTone = 'plan' | 'hold' | 'warn' | 'done';
+/** 월 카드 · 상세 상태 — 다음 정산: 지급 예정 / 지급 보류(사업자 정보 확인 전) · 지난 정산: 정산 확정(지급 완료 표시는 작업 순서 7) / 일부 보류(제조금액 확인 중) */
+export function monthStatus(o: { upcoming: boolean; held: number; settleStatus: string }): { label: string; tone: SettleTone } {
+	if (o.upcoming) return o.settleStatus === 'verified' ? { label: '지급 예정', tone: 'plan' } : { label: '지급 보류', tone: 'hold' };
+	if (o.held > 0) return { label: '일부 보류', tone: 'warn' };
+	return { label: '정산 확정', tone: 'done' };
+}
+
+/** 정산 보류 배너(사업자 · 정산 정보) — 확인 완료면 null · 확인 중이면 버튼 없이 안내 */
+export function holdBanner(settleStatus: string, nextDate: string): { title: string; body: string; cta: string | null } | null {
+	if (settleStatus === 'verified') return null;
+	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나면 ${nextDate} 정산부터 지급돼요.`, cta: null };
+	if (settleStatus === 'rejected') return { title: '정산이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되면 바로 지급돼요.', cta: '정산 정보 다시 입력하기' };
+	return { title: '정산이 보류 중이에요', body: `사업자 · 정산 계좌 정보를 등록하면 ${nextDate} 정산부터 바로 지급돼요.`, cta: '정산 정보 등록하기' };
+}
+
+/** 주문 줄 → 상품별 묶음 */
+export function itemsByProduct(items: SettleItem[]): Map<string, SettleItem[]> {
+	const m = new Map<string, SettleItem[]>();
+	for (const it of items) m.set(it.productCode, [...(m.get(it.productCode) ?? []), it]);
+	return m;
+}
+
+/** 제조 원장 카드(시안 "제조금액 · 보증금") — 칩 · 막대(갚은 % · 다음 정산 상환 예정 %) · 보증금 문구 */
+export function ledgerCard(l: SettleLedger, nextOffset: number | null, nextMonth: string, won: (n: number) => string) {
+	const done = l.hasLedger && l.remaining === 0;
+	const paidPct = repaidPct(l);
+	const planPct = !done && l.total > 0 && nextOffset ? Math.min(100 - paidPct, (nextOffset / l.total) * 100) : 0;
+	const pendingDeposit = l.depositPaid - l.depositRefunded;
+	return {
+		chip: !l.hasLedger ? '제조금액 확인 중' : done ? '상환 완료' : '상환 중',
+		// 시안: 상환 중 = 주황 · 상환 완료 = 회색 · 제조금액 확인 중 = 빨강
+		tone: (!l.hasLedger ? 'hold' : done ? 'done' : 'warn') as SettleTone,
+		paidPct,
+		planPct,
+		planText: !done && nextOffset ? `${monthShort(nextMonth)} 정산에서 ${won(nextOffset)} 상환 예정` : '',
+		depositText:
+			l.depositRefunded > 0 && pendingDeposit === 0 && l.depositUnpaid === 0
+				? `보증금 ${won(l.depositRefunded)} · 환급 완료`
+				: l.depositUnpaid > 0
+					? `보증금 ${won(l.depositPaid + l.depositUnpaid - l.depositRefunded)} · 입금 확인 전 ${won(l.depositUnpaid)}`
+					: `보증금 ${won(pendingDeposit)}`
+	};
+}

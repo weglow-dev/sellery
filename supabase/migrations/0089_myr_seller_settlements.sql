@@ -13,6 +13,8 @@
 --     myr_app_seller_settlements_of_user(user, now)       정산 탭 — 사업자 정보 상태 · 예상 · 제품별 제조 원장 · 월별 확정 내역(상품 줄 · 합계)
 --     myr_app_seller_settle_preview_of_user(user, now)    홈 — 예상 합계만
 --     myr_app_seller_settlement_items_of_user(user, month)   월 내역 펼쳐 보기 — 주문 줄(주문번호 · 고객 이름 가림 · 배송 완료일 · 상품 · 수량 · 단가 · 공구 · sale/정산 뒤 환불)
+--     myr_app_seller_settle_preview_items_of_user(user, now)  다음 정산(예상)의 주문 줄 — 같은 모양 · 같은 대상(myr_settlement_next + candidates)
+--   myr_settlement_next(now)  다음 회차(정산월 · 대상 끝 시각) — preview 와 예상 줄이 같이 쓴다
 --   권한: service role 만(anon · authenticated EXECUTE 회수). 테스트: supabase/tests/myr_seller_settlements.test.sql. 재실행 가능.
 -- ============================================================
 
@@ -154,6 +156,21 @@ $$;
 revoke all on function public.myr_settlement_run(date, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_settlement_run(date, text, timestamptz) to service_role;
 
+-- 다음 회차 — 지난달 회차가 아직이면(매월 1일 13:00 전) 정산월 = 지난달 · 대상 끝 = 이번 달 1일 0시, 아니면 정산월 = 이번 달 · 대상 끝 = 지금
+create or replace function public.myr_settlement_next(p_now timestamptz default now())
+returns table (month date, end_at timestamptz)
+language sql
+stable
+as $$
+  with m as (select date_trunc('month', p_now at time zone 'Asia/Seoul')::date as this)
+  select case when not exists (select 1 from public.myr_settlement_runs u where u.month >= (m.this - interval '1 month')::date)
+              then (m.this - interval '1 month')::date else m.this end,
+         case when not exists (select 1 from public.myr_settlement_runs u where u.month >= (m.this - interval '1 month')::date)
+              then public.myr_month_start(m.this) else p_now end
+    from m
+$$;
+revoke all on function public.myr_settlement_next(timestamptz) from public, anon, authenticated;
+
 -- ------------------------------------------------------------
 -- 다음 정산 예정(크리에이터 · 읽기만) — 다음 회차를 지금 돌리면 나올 값
 --   지난달 회차가 아직이면(매월 1일 13:00 전) 다음 회차 = 지난달 · 대상 = 이번 달 1일 0시 전 배송 완료분, 아니면 다음 회차 = 이번 달 · 대상 = 지금까지 배송 완료분
@@ -165,8 +182,6 @@ stable
 security definer set search_path = public
 as $$
 declare
-  v_this   date := date_trunc('month', p_now at time zone 'Asia/Seoul')::date;
-  v_prev   date := (v_this - interval '1 month')::date;
   v_month  date;
   v_end    timestamptz;
   v_rows   jsonb := '[]'::jsonb;
@@ -177,11 +192,7 @@ declare
   v_refund integer;
   v_payout integer;
 begin
-  if not exists (select 1 from public.myr_settlement_runs where month = v_prev) and not exists (select 1 from public.myr_settlement_runs where month > v_prev) then
-    v_month := v_prev; v_end := public.myr_month_start(v_this);
-  else
-    v_month := v_this; v_end := p_now;
-  end if;
+  select n.month, n.end_at into v_month, v_end from public.myr_settlement_next(p_now) n;
   for pr in
     select n.product_id,
            coalesce(sum(n.amount) filter (where n.kind = 'sale'), 0)::integer as sales,
@@ -312,3 +323,26 @@ as $$
 $$;
 revoke all on function public.myr_app_seller_settlement_items_of_user(uuid, date) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_settlement_items_of_user(uuid, date) to service_role;
+
+-- 다음 정산(예상)의 주문 줄 — 월 내역과 같은 모양
+create or replace function public.myr_app_seller_settle_preview_items_of_user(p_user uuid, p_now timestamptz default now())
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'order_code', o.code, 'buyer', public.myr_mask_name(o.buyer_name), 'delivered_at', i.delivered_at,
+           'product_code', p.code, 'product', i.product_name, 'option', i.option_name, 'qty', i.qty, 'unit_price', i.unit_price,
+           'groupbuy', i.groupbuy_id is not null, 'kind', c.kind, 'amount', c.amount, 'refund_snapshot', c.refund_snapshot)
+         order by c.kind desc, i.delivered_at, o.code), '[]'::jsonb)
+    from public.sellers s
+    cross join lateral public.myr_settlement_next(p_now) n
+    cross join lateral public.myr_settlement_candidates(n.end_at, s.id) c
+    join public.myr_order_items i on i.id = c.order_item_id
+    join public.myr_orders o on o.id = i.order_id
+    join public.myr_products p on p.id = c.product_id
+   where s.user_id = p_user and p_user is not null
+$$;
+revoke all on function public.myr_app_seller_settle_preview_items_of_user(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.myr_app_seller_settle_preview_items_of_user(uuid, timestamptz) to service_role;

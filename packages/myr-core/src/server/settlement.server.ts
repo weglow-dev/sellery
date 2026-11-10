@@ -50,3 +50,10 @@ export async function listSellerSettlementItemsOfUser(userId: string, month: str
 	if (error) throw new Error(`myr_app_seller_settlement_items_of_user failed: ${error.message}`);
 	return settleItemsFromJson(data);
 }
+
+/** 다음 정산(예상)의 주문 줄 */
+export async function listSellerSettlePreviewItemsOfUser(userId: string): Promise<SettleItem[]> {
+	const { data, error } = await admin().rpc('myr_app_seller_settle_preview_items_of_user', { p_user: userId });
+	if (error) throw new Error(`myr_app_seller_settle_preview_items_of_user failed: ${error.message}`);
+	return settleItemsFromJson(data);
+}
