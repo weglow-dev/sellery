@@ -44,7 +44,7 @@ describe('한국 시간 표시', () => {
 		expect(kstLabel('2026-11-15T11:00:00Z')).toBe('11월 15일 오후 8시');
 		expect(kstLabel('2026-11-15T00:30:00Z')).toBe('11월 15일 오전 9시 30분');
 		expect(kstLabel('2026-11-14T15:00:00Z')).toBe('11월 15일 오전 12시');
-		expect(kstShort('2026-11-15T11:05:00Z')).toBe('11.15 20:05');
+		expect(kstShort('2026-11-15T11:05:00Z')).toBe('11.15(20:05)');
 	});
 	it('remainLabel — 일 · 시간 · 분 · 종료', () => {
 		expect(remainLabel(new Date(NOW + 3 * 24 * H + 1000).toISOString(), NOW)).toBe('3일 남음');

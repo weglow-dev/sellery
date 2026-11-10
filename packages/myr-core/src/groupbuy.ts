@@ -57,10 +57,10 @@ export function kstLabel(iso: string): string {
 	return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 ${h < 12 ? '오전' : '오후'} ${h12}시${m ? ` ${m}분` : ''}`;
 }
 
-/** '11.15 20:00' — 목록 · 표 */
+/** '11.15(20:00)' — 목록 · 기간 */
 export function kstShort(iso: string): string {
 	const d = kst(iso);
-	return `${d.getUTCMonth() + 1}.${d.getUTCDate()} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+	return `${d.getUTCMonth() + 1}.${d.getUTCDate()}(${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())})`;
 }
 
 /** 남은 시간 — '2일 23시간 남음' · '3일 남음' · '5시간 남음' · '12분 남음' (끝났으면 '종료') — 넘치게 말하지 않게 내림 */
