@@ -73,7 +73,8 @@
 			<b class="font-extrabold text-accent">공구 예정</b> · {kstLabel(gb.startsAt)}부터 {gb.discountPct}% 할인된 {won(gb.price)}에 살 수 있어요
 		</p>
 	{:else if gb}
-		<p class="mt-2.5 rounded-[14px] border border-white/8 bg-white/3 px-3.5 py-2.5 text-[13px] leading-[1.5] text-fg-faint">종료된 공구예요 · 지금은 기본가로 판매해요</p>
+		<!-- 품절 라벨과 같은 색 계열(#ff6b6b) -->
+		<p class="mt-2.5 rounded-[14px] border border-[#ff6b6b]/35 bg-[#ff6b6b]/10 px-3.5 py-2.5 text-[13px] leading-[1.5] font-semibold text-[#ff8a8a]">종료된 공구예요 · 지금은 기본가로 판매해요</p>
 	{/if}
 {/snippet}
 
