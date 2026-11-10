@@ -1,0 +1,50 @@
+// 크리에이터 정산 탭(0089) — packages/myr-core/src/seller-settlement.ts
+import { describe, expect, it } from 'vitest';
+import { depositLabel, monthLabel, payoutHold, repaidPct, sellerSettlementsFromJson, settleAtLabel, settleItemsFromJson, settlePreviewFromJson, settleRowText } from '../seller-settlement';
+
+const won = (x: number) => `₩${x.toLocaleString('ko-KR')}`;
+const product = { id: 'p', code: 'minji-grape-jelly', name: '포도', tile: null, icon: 'grape', thumb_url: null };
+
+describe('파서', () => {
+	it('예상 — 보류 줄은 상계 · 지급이 null', () => {
+		const p = settlePreviewFromJson({
+			month: '2026-11', settle_at: '2026-12-01T04:00:00+00:00',
+			rows: [{ product, status: 'estimated', sales: 96000, refund_adj: 0, carry_in: 0, settle: 57600, offset: 0, deposit_refund: 0, payout: 57600 }, { product, status: 'held', sales: 50000, settle: 30000, offset: null, payout: null }],
+			total: { payout: 57600, held: 1 }, undelivered: { lines: 3, amount: 132000 }
+		});
+		expect([p.rows[0].status, p.rows[0].payout, p.rows[1].status, p.rows[1].payout, p.total.held, p.undelivered.lines]).toEqual(['estimated', 57600, 'held', null, 1, 3]);
+		expect(settlePreviewFromJson(null)).toMatchObject({ month: '', rows: [], total: { payout: 0 } });
+	});
+	it('정산 탭 — 원장 · 월 · 비어 있으면 기본값', () => {
+		const t = sellerSettlementsFromJson({
+			settle_status: 'verified',
+			ledgers: [{ product, has_ledger: true, batches: [{ seq: 1, amount: 30000, deposit_amount: 7500, deposit_paid: true, deposit_refunded: true }], total: 30000, offset: 30000, remaining: 0, deposit_paid: 7500, deposit_unpaid: 0, deposit_refunded: 7500 }],
+			months: [{ month: '2026-10', settled_at: '2026-11-01T04:00:00Z', rows: [{ product, status: 'confirmed', sales: 64000, settle: 38400, offset: 30000, deposit_refund: 7500, payout: 15900 }], total: { payout: 15900 } }, { bad: 1 }]
+		});
+		expect([t.settleStatus, t.ledgers[0].batches[0].depositRefunded, t.months.length, t.months[0].rows[0].payout]).toEqual(['verified', true, 1, 15900]);
+		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
+	});
+	it('줄 내역', () => {
+		const [i] = settleItemsFromJson([{ order_code: 'myr1501', buyer: '김*은', delivered_at: '2026-10-27T03:00:00Z', product: '포도', qty: 2, unit_price: 32000, groupbuy: true, kind: 'refund_adj', amount: 32000 }, null]);
+		expect([i.orderCode, i.kind, i.groupbuy, i.amount, i.refunded]).toEqual(['myr1501', 'refund_adj', true, 32000, 0]);
+		expect(settleItemsFromJson([{ order_code: 'myr1501', kind: 'sale', amount: 32000, refund_snapshot: 32000 }])[0].refunded).toBe(32000);
+	});
+});
+
+describe('라벨', () => {
+	const NOW = Date.parse('2026-11-10T03:00:00Z');
+	it('monthLabel · settleAtLabel', () => {
+		expect(monthLabel('2026-10', NOW)).toBe('10월');
+		expect(monthLabel('2025-12', NOW)).toBe('2025년 12월');
+		expect(settleAtLabel('2026-12-01T04:00:00+00:00')).toBe('12월 1일(화) 오후 1시');
+	});
+	it('지급 보류 · 갚은 비율 · 보증금', () => {
+		expect(settleRowText({ sales: 64000, refundAdj: 0, carryIn: 0, settle: 38400, offset: 30000, depositRefund: 7500 }, won)).toBe('판매 ₩64,000 · 정산금 ₩38,400 · 상계 −₩30,000 · 보증금 +₩7,500');
+		expect(settleRowText({ sales: 0, refundAdj: 25600, carryIn: -1000, settle: 0, offset: null, depositRefund: null }, won)).toBe('판매 ₩0 · 정산 뒤 환불 −₩25,600 · 지난 이월 −₩1,000 · 정산금 ₩0');
+		expect(payoutHold('verified')).toBeNull();
+		expect(payoutHold('pending')).toContain('보류');
+		expect([repaidPct({ total: 200000, remaining: 150000 }), repaidPct({ total: 0, remaining: 0 })]).toEqual([25, 100]);
+		expect(depositLabel({ depositPaid: 37500, depositUnpaid: 0, depositRefunded: 0, remaining: 150000 }, won)).toBe('₩37,500 제조금액을 다 갚으면 환급');
+		expect(depositLabel({ depositPaid: 7500, depositUnpaid: 5000, depositRefunded: 7500, remaining: 0 }, won)).toBe('₩7,500 환급 완료 · ₩5,000 입금 확인 전');
+	});
+});
