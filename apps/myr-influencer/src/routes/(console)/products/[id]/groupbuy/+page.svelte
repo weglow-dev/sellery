@@ -248,7 +248,10 @@
 							<div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
 								<span class="text-[16px] font-extrabold tabular-nums">{won(g.price)}</span>
 								<span class="text-[13px] font-bold text-white/60">{g.discountPct}% 할인</span>							</div>
-							<p class="mt-1 text-[12px] text-white/50 tabular-nums">{kstShort(g.startsAt)} ~ {kstShort(g.endsAt)}</p>
+							<!-- 예정 공구를 시작 전에 종료하면 끝이 시작보다 앞선다 — 기간 대신 "시작 예정 · 시작 전 종료" -->
+							<p class="mt-1 text-[12px] text-white/50 tabular-nums">
+								{Date.parse(g.endsAt) <= Date.parse(g.startsAt) ? `${kstShort(g.startsAt)} 시작 예정 · 시작 전 종료` : `${kstShort(g.startsAt)} ~ ${kstShort(g.endsAt)}`}
+							</p>
 							<div class="mt-3">{@render stats(g, false)}</div>
 						</li>
 					{/each}
