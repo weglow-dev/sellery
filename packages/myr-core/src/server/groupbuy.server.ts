@@ -16,7 +16,7 @@ export async function lookupGroupbuy(code: string): Promise<{ productCode: strin
 	return g && typeof o?.product_code === 'string' ? { productCode: o.product_code, groupbuy: g } : null;
 }
 
-export type SellerGroupbuyProduct = { id: string; code: string; name: string; price: number; status: string; tile: string | null; icon: string; thumbUrl: string | null };
+export type SellerGroupbuyProduct = { id: string; code: string; name: string; price: number; status: string; soldOut: boolean; tile: string | null; icon: string; thumbUrl: string | null };
 
 /** 상품의 공구 목록(최근 순 · 실적 포함) · 남의 상품이면 null */
 export async function sellerGroupbuys(sellerId: string, productId: string): Promise<{ product: SellerGroupbuyProduct; items: SellerGroupbuy[] } | null> {
@@ -32,6 +32,7 @@ export async function sellerGroupbuys(sellerId: string, productId: string): Prom
 			name: String(p.name ?? ''),
 			price: Number(p.price ?? 0),
 			status: String(p.status ?? ''),
+			soldOut: p.sold_out === true,
 			tile: typeof p.tile === 'string' ? p.tile : null,
 			icon: typeof p.icon === 'string' ? p.icon : 'pill',
 			thumbUrl: typeof p.thumb_url === 'string' ? p.thumb_url : null

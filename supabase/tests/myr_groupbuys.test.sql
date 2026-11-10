@@ -1,7 +1,7 @@
 -- pgTAP — 0086 공구 링크: 권한 · 공구가 · 만들기 거부 코드 · 상태 · 링크 조회 · 장바구니 · 체크아웃(공구가 · PRICE_CHANGED · 고정) · 지금 종료 · 주문 복사 · 실적 · 주문 표시
 -- 실행: npm run test:db — 트랜잭션 안에서 돌고 롤백된다. 트랜잭션 안의 now() 는 고정이라 "지난 시각으로 시작 = 지금부터 진행 중" 이다.
 begin;
-select plan(55);
+select plan(57);
 
 -- ---------- 표 · 권한 ----------
 select has_table('public', 'myr_groupbuys', 'myr_groupbuys 표');
@@ -31,7 +31,8 @@ insert into public.myr_products (id, code, seller_id, category, name, price, sto
 values ('00000000-0000-4000-8000-000000000fa1', 'pgtap-gb-a', '00000000-0000-4000-8000-000000000f91', 'diet', '포도 젤리', 32000, 50, 'listed', 'grape'),
        ('00000000-0000-4000-8000-000000000fa2', 'pgtap-gb-b', '00000000-0000-4000-8000-000000000f91', 'diet', '레몬 스틱', 20000, 50, 'listed', 'lemon'),
        ('00000000-0000-4000-8000-000000000fa3', 'pgtap-gb-pending', '00000000-0000-4000-8000-000000000f91', 'diet', '심사 중', 10000, 50, 'pending', 'pill'),
-       ('00000000-0000-4000-8000-000000000fa4', 'pgtap-gb-other', '00000000-0000-4000-8000-000000000f92', 'diet', '콜라겐 필름', 28000, 50, 'listed', 'film');
+       ('00000000-0000-4000-8000-000000000fa4', 'pgtap-gb-other', '00000000-0000-4000-8000-000000000f92', 'diet', '콜라겐 필름', 28000, 50, 'listed', 'film'),
+       ('00000000-0000-4000-8000-000000000fa5', 'pgtap-gb-soldout', '00000000-0000-4000-8000-000000000f91', 'diet', '품절 젤리', 30000, 0, 'listed', 'jelly');
 
 create temp table s (k text primary key, v jsonb);
 create function pg_temp.mk(p_product text, p_pct integer, p_starts timestamptz, p_ends timestamptz) returns jsonb language sql as $$
@@ -44,6 +45,8 @@ $$;
 -- ---------- 만들기 — 거부 ----------
 select is(public.myr_app_seller_groupbuy_create('00000000-0000-4000-8000-000000000f92', '00000000-0000-4000-8000-000000000fa1', 20, now(), now() + interval '3 days') ->> 'code', 'NOT_FOUND', '남의 상품은 NOT_FOUND');
 select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa3', 20, now(), now() + interval '3 days') ->> 'code', 'NOT_LISTED', '판매 중이 아닌 상품은 NOT_LISTED');
+select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa5', 20, now(), now() + interval '3 days') ->> 'code', 'SOLD_OUT', '품절(재고 0)은 SOLD_OUT');
+select is(public.myr_app_seller_groupbuys('00000000-0000-4000-8000-000000000f91', '00000000-0000-4000-8000-000000000fa5') #>> '{product,sold_out}', 'true', '공구 목록의 상품에 품절 표시');
 select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa1', 0, now(), now() + interval '3 days') ->> 'code', 'BAD_PCT', '할인율 0 은 BAD_PCT');
 select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa1', 71, now(), now() + interval '3 days') ->> 'code', 'BAD_PCT', '할인율 71 은 BAD_PCT (최대 70)');
 select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa1', 20, now() + interval '2 days', now() + interval '1 day') ->> 'code', 'BAD_PERIOD', '종료가 시작보다 앞이면 BAD_PERIOD');

@@ -19,7 +19,8 @@
 --     myr_checkout_items.groupbuy_id → myr_order_items.groupbuy_id(myr_app_confirm_checkout 이 복사)
 --
 --   크리에이터(콘솔 서버가 세션의 seller id 를 넘긴다 · 결정 3):
---     myr_app_seller_groupbuy_create(seller, product, pct, starts, ends)  { ok, groupbuy } · NOT_FOUND | NOT_LISTED | BAD_PCT | BAD_PERIOD | ALREADY_OPEN
+--     myr_app_seller_groupbuy_create(seller, product, pct, starts, ends)  { ok, groupbuy } · NOT_FOUND | NOT_LISTED | SOLD_OUT | BAD_PCT | BAD_PERIOD | ALREADY_OPEN
+--       품절(재고 0)이면 만들지 않는다 — 링크로 와도 살 수 없고 재입고는 운영이 정한다. 진행 중에 품절되면 공구는 그대로(콘솔이 안내)
 --     myr_app_seller_groupbuy_close(seller, code)                          { ok, groupbuy } · NOT_FOUND | ALREADY_ENDED
 --     myr_app_seller_groupbuys(seller, product)                            { product, items:[공구 + 실적] } · 남의 상품이면 null
 --   실적(판매 수량 · 주문 수 · 매출)은 0076 홈 실적과 같은 줄 기준 — myr_sales_lines() 하나로 묶었다(백엔드 원칙 1 · 0076 결과 불변).
@@ -557,6 +558,7 @@ begin
   select * into p from public.myr_products where id = p_product_id and seller_id = p_seller and deleted_at is null for update;
   if not found or p_seller is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
   if p.status <> 'listed' then return jsonb_build_object('ok', false, 'code', 'NOT_LISTED'); end if;
+  if p.stock - p.sold_qty <= 0 then return jsonb_build_object('ok', false, 'code', 'SOLD_OUT'); end if;
   if p_pct is null or p_pct < 1 or p_pct > 70 then return jsonb_build_object('ok', false, 'code', 'BAD_PCT'); end if;
   if v_start is null or p_ends_at is null then return jsonb_build_object('ok', false, 'code', 'BAD_PERIOD'); end if;
   if v_start < now() then v_start := now(); end if;   -- 지난 시각으로 시작하면 지금부터
@@ -610,7 +612,7 @@ security definer set search_path = public
 as $$
   select jsonb_build_object(
            'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'price', p.price, 'status', p.status,
-                                         'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
+                                         'sold_out', (p.stock - p.sold_qty) <= 0, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
            'items', coalesce((select jsonb_agg(public.myr_groupbuy_seller_json(g, p.price) order by g.created_at desc)
                                 from public.myr_groupbuys g where g.product_id = p.id), '[]'::jsonb))
     from public.myr_products p

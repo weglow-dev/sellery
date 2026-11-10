@@ -94,7 +94,8 @@ describe('saveFailure · 메뉴', () => {
 describe('목록에서 바로 심사 결과로', () => {
 	it('반려 · 수정 반려는 메뉴 없이 심사 결과 — 수정 심사 중 · 판매 중은 아님', () => {
 		expect(opensReview('rejected')).toBe(true);
-		expect(opensReview('live', 'rejected')).toBe(true);
+		expect(opensReview('live', 'rejected')).toBe(false); // 판매 중 수정 반려는 메뉴(심사 결과 보기 · 공구 링크)
+		expect(productMenu('live', 'rejected').map((m) => m.kind)).toEqual(['review', 'groupbuy']);
 		expect(opensReview('paused', 'rejected')).toBe(true);
 		expect(opensReview('live', 'review')).toBe(false);
 		expect(opensReview('live')).toBe(false);

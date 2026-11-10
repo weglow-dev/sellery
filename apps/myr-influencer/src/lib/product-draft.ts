@@ -112,8 +112,10 @@ export const isEditableStatus = (s: ProductStatus) => s === 'draft' || s === 're
 /** 수정 심사로 고치는 상태(4-2) — 판매 중 · 일시중지(샵은 승인 전까지 지금 내용) */
 export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'paused';
 
-/** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 수정 반려(2026-11-09 수정 반려도 반려와 같게) */
-export const opensReview = (s: ProductStatus, revision: 'review' | 'rejected' | null = null): boolean => s === 'rejected' || revision === 'rejected';
+/** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 일시중지 상품의 수정 반려(2026-11-09 수정 반려도 반려와 같게).
+ *  판매 중 상품의 수정 반려는 메뉴(심사 결과 보기 · 공구 링크) — 판매 중이라 공구 링크를 만들 수 있다(2026-11-10) */
+export const opensReview = (s: ProductStatus, revision: 'review' | 'rejected' | null = null): boolean =>
+	s === 'rejected' || (revision === 'rejected' && s !== 'live');
 
 export type ProductMenuItem = { kind: 'edit' | 'review' | 'groupbuy' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 

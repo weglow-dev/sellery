@@ -121,6 +121,7 @@ export function parseGroupbuyBody(v: unknown): GroupbuyBody | null {
 export const GB_ERROR_MESSAGES: Record<string, string> = {
 	NOT_FOUND: '제품을 찾을 수 없어요',
 	NOT_LISTED: '판매 중인 제품만 공구 링크를 만들 수 있어요',
+	SOLD_OUT: '품절된 제품은 공구 링크를 만들 수 없어요. 재고가 들어오면 만들 수 있어요',
 	BAD_PCT: `할인율은 ${GB_PCT_MIN}~${GB_PCT_MAX}% 사이로 넣어주세요`,
 	BAD_PERIOD: '기간을 다시 확인해주세요 — 종료는 시작 뒤, 지금 이후여야 해요',
 	ALREADY_OPEN: '이미 진행 중이거나 예정된 공구가 있어요. 그 공구가 끝난 뒤 새로 만들 수 있어요',

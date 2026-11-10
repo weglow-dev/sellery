@@ -28,6 +28,7 @@
 	/** 공구 링크(0086) — 내 제품 메뉴 → [공구 링크].
 	 *  진행 중이거나 예정된 공구가 있으면: 상태 · 할인율 · 공구가 · 기간 · 링크(복사) · 판매 수량 · 주문 · 매출 · [지금 종료]
 	 *  없으면: 만들기(할인율 1~70% · 시작 · 종료 — 한국 시간). 링크는 바로 만들어지고 시작 일시부터 공구가로 팔린다.
+	 *  품절(재고 0)이면 만들 수 없다(재입고는 운영) · 진행 중에 품절되면 공구는 그대로 두고 안내만.
 	 *  아래 "지난 공구" 에 끝난 공구가 실적과 함께 쌓인다. 실적 = 결제된 주문의 공구 줄(환불 뺀 값 · 홈 실적과 같은 기준).
 	 *  모바일: 한 줄 · PC(lg~): 32px 제목 줄 + 2단(왼쪽 진행/만들기 · 오른쪽 지난 공구) */
 	let { data } = $props();
@@ -173,6 +174,7 @@
 						<span class="min-w-0 flex-1 truncate text-[14px] font-semibold text-white/85 select-all">{linkOf(open)}</span>
 						<button type="button" onclick={() => copy(open)} class="h-9 shrink-0 rounded-[10px] bg-accent px-3.5 text-[13px] font-extrabold text-bg hover:bg-[#ff8f5c]">복사</button>
 					</div>
+					{#if p.soldOut}<p class="mt-2.5 rounded-[12px] bg-[#ff6b6b]/10 px-3 py-2 text-[13px] font-semibold text-[#ff8a8a]">지금 품절이라 링크로 들어와도 살 수 없어요 · 재고가 들어오면 공구가로 다시 팔려요</p>{/if}
 					<p class="mt-2 {AUTH_HINT}">{st === 'scheduled' ? '지금 공유해도 돼요 — 시작 전에는 기본가와 "공구 예정" 안내가 보여요' : '이 링크로 들어온 고객에게만 공구가가 보여요'}</p>
 
 					<div class="mt-4">{@render stats(open, true)}</div>
@@ -189,6 +191,8 @@
 				</section>
 			{:else if !listed}
 				<p class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-3.5 text-[14px] leading-[1.55] text-white/70">판매 중인 제품만 공구 링크를 만들 수 있어요.</p>
+			{:else if p.soldOut}
+				<p class="rounded-[18px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3.5 text-[14px] leading-[1.55] text-white/80">품절된 제품은 공구 링크를 만들 수 없어요. 재고가 들어오면 만들 수 있어요.</p>
 			{:else}
 				<form class="{card} flex flex-col gap-4" onsubmit={(e) => (e.preventDefault(), create())} novalidate>
 					<div>
