@@ -9,6 +9,8 @@
 --   myr_groupbuy_price(price, pct)                공구가 = 기본가 × (100 − pct)% 를 10원 아래 버림 — 공구가 계산은 이 한 곳(장바구니 · 체크아웃 · 콘솔)
 --   myr_groupbuy_state(g, now)                    scheduled | active | ended
 --   myr_groupbuy_lookup(code)                     샵 `/g/<code>` · 상품 페이지 — { product_code, groupbuy } · 없으면 null
+--   myr_groupbuy_product_json(g, p)               상품 기준 공구 모양 — price = 옵션 0번(옵션 없으면 대표가) 단가의 공구가(장바구니 · 체크아웃과 같은 myr_product_unit_price) ·
+--                                                 options = 옵션마다 [{ index, name, price, groupbuy_price }](옵션 없으면 []) — 옵션 고르는 화면이 생기면 이 값을 고른 옵션으로 보여 준다
 --   myr_product_unit_price(p, option_index)       옵션 단가 또는 대표가(0058 체크아웃과 같은 규칙 · 이제 체크아웃 · 장바구니가 이 함수를 쓴다)
 --
 --   장바구니(0057): myr_cart_items.groupbuy_id · myr_cart_set(…, p_groupbuy) · myr_cart_merge 줄의 gb · myr_cart_get 줄에 groupbuy
@@ -102,6 +104,23 @@ as $$
 $$;
 revoke all on function public.myr_groupbuy_json(public.myr_groupbuys, integer) from public, anon, authenticated;
 
+-- 상품 기준 공구 모양(샵 링크 · 콘솔) — 단가는 장바구니 · 체크아웃과 같은 myr_product_unit_price 로(대표가를 따로 쓰지 않는다)
+create or replace function public.myr_groupbuy_product_json(g public.myr_groupbuys, p public.myr_products)
+returns jsonb
+language sql
+stable
+as $$
+  select public.myr_groupbuy_json(g, coalesce(public.myr_product_unit_price(p, 0), p.price))
+      || jsonb_build_object('options', coalesce((
+           select jsonb_agg(jsonb_build_object('index', o.i - 1, 'name', coalesce(o.v ->> 'n', ''),
+                                               'price', public.myr_product_unit_price(p, (o.i - 1)::integer),
+                                               'groupbuy_price', public.myr_groupbuy_price(public.myr_product_unit_price(p, (o.i - 1)::integer), g.discount_pct))
+                            order by o.i)
+             from jsonb_array_elements(case when jsonb_typeof(p.options) = 'array' then p.options else '[]'::jsonb end) with ordinality as o(v, i)
+            where public.myr_product_unit_price(p, (o.i - 1)::integer) is not null), '[]'::jsonb))
+$$;
+revoke all on function public.myr_groupbuy_product_json(public.myr_groupbuys, public.myr_products) from public, anon, authenticated;
+
 -- 실적 줄 — 결제된 주문(paid_at 있음 · PAID · PARTIAL_REFUNDED · REFUNDED)의 줄. 0076 홈 실적 · 공구 실적이 같이 쓴다(인라인되도록 SET 없음)
 create or replace function public.myr_sales_lines()
 returns table (order_id uuid, seller_id uuid, product_id uuid, groupbuy_id uuid, qty integer, refunded_qty integer, amount integer,
@@ -167,7 +186,7 @@ language sql
 stable
 security definer set search_path = public
 as $$
-  select jsonb_build_object('product_code', p.code, 'groupbuy', public.myr_groupbuy_json(g, p.price))
+  select jsonb_build_object('product_code', p.code, 'groupbuy', public.myr_groupbuy_product_json(g, p))
     from public.myr_groupbuys g
     join public.myr_products p on p.id = g.product_id and p.deleted_at is null and p.status = 'listed'
     join public.sellers s on s.id = p.seller_id and s.active
@@ -529,19 +548,19 @@ grant execute on function public.myr_app_confirm_checkout(uuid, text, jsonb, boo
 -- ------------------------------------------------------------
 -- 크리에이터 — 공구 만들기 · 지금 종료 · 상품의 공구 목록(실적 포함)
 -- ------------------------------------------------------------
-create or replace function public.myr_groupbuy_seller_json(g public.myr_groupbuys, p_base integer)
+create or replace function public.myr_groupbuy_seller_json(g public.myr_groupbuys, p public.myr_products)
 returns jsonb
 language sql
 stable
 as $$
-  select public.myr_groupbuy_json(g, p_base)
+  select public.myr_groupbuy_product_json(g, p)
       || jsonb_build_object('planned_ends_at', g.ends_at, 'closed_at', g.closed_at, 'created_at', g.created_at,
                             'stats', (select jsonb_build_object('orders', count(distinct l.order_id),
                                                                 'units', coalesce(sum(l.qty - l.refunded_qty), 0),
                                                                 'net', coalesce(sum(l.amount - l.refund_amount), 0))
                                         from public.myr_sales_lines() l where l.groupbuy_id = g.id))
 $$;
-revoke all on function public.myr_groupbuy_seller_json(public.myr_groupbuys, integer) from public, anon, authenticated;
+revoke all on function public.myr_groupbuy_seller_json(public.myr_groupbuys, public.myr_products) from public, anon, authenticated;
 
 create or replace function public.myr_app_seller_groupbuy_create(p_seller uuid, p_product_id uuid, p_pct integer, p_starts_at timestamptz, p_ends_at timestamptz)
 returns jsonb
@@ -577,7 +596,7 @@ begin
       -- 코드가 겹치면 다시
     end;
   end loop;
-  return jsonb_build_object('ok', true, 'groupbuy', public.myr_groupbuy_seller_json(g, p.price));
+  return jsonb_build_object('ok', true, 'groupbuy', public.myr_groupbuy_seller_json(g, p));
 end;
 $$;
 revoke all on function public.myr_app_seller_groupbuy_create(uuid, uuid, integer, timestamptz, timestamptz) from public, anon, authenticated;
@@ -591,14 +610,14 @@ security definer set search_path = public
 as $$
 declare
   g public.myr_groupbuys%rowtype;
-  v_price integer;
+  p public.myr_products%rowtype;
 begin
   select * into g from public.myr_groupbuys where code = lower(btrim(coalesce(p_code, ''))) and seller_id = p_seller for update;
   if not found or p_seller is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
   if public.myr_groupbuy_state(g) = 'ended' then return jsonb_build_object('ok', false, 'code', 'ALREADY_ENDED'); end if;
   update public.myr_groupbuys set closed_at = now() where id = g.id returning * into g;
-  select price into v_price from public.myr_products where id = g.product_id;
-  return jsonb_build_object('ok', true, 'groupbuy', public.myr_groupbuy_seller_json(g, v_price));
+  select * into p from public.myr_products where id = g.product_id;
+  return jsonb_build_object('ok', true, 'groupbuy', public.myr_groupbuy_seller_json(g, p));
 end;
 $$;
 revoke all on function public.myr_app_seller_groupbuy_close(uuid, text) from public, anon, authenticated;
@@ -611,9 +630,9 @@ stable
 security definer set search_path = public
 as $$
   select jsonb_build_object(
-           'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'price', p.price, 'status', p.status,
+           'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'price', coalesce(public.myr_product_unit_price(p, 0), p.price), 'status', p.status,
                                          'sold_out', (p.stock - p.sold_qty) <= 0, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
-           'items', coalesce((select jsonb_agg(public.myr_groupbuy_seller_json(g, p.price) order by g.created_at desc)
+           'items', coalesce((select jsonb_agg(public.myr_groupbuy_seller_json(g, p) order by g.created_at desc)
                                 from public.myr_groupbuys g where g.product_id = p.id), '[]'::jsonb))
     from public.myr_products p
    where p.id = p_product_id and p.seller_id = p_seller and p.deleted_at is null and p_seller is not null

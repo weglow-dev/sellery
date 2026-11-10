@@ -25,7 +25,8 @@
 	const related = $derived(data.related);
 	const liked = $derived(shop.liked(p.code));
 
-	/** 공구(0086) — 링크(`/g/<code>`)로 들어온 고객에게만 서버가 싣는다. 진행 중이면 공구가로 담고, 예정 · 종료는 안내만(기본가) */
+	/** 공구(0086) — 링크(`/g/<code>`)로 들어온 고객에게만 서버가 싣는다. 진행 중이면 공구가로 담고, 예정 · 종료는 안내만(기본가).
+	 *  gb.price = 옵션 0번 공구가(샵은 아직 옵션을 고르지 않는다 · 장바구니 줄도 옵션 0번). 옵션 고르는 화면이 생기면 gb.options[고른 옵션].groupbuyPrice 를 보여 줄 것 */
 	let now = $state(Date.now());
 	onMount(() => {
 		const t = setInterval(() => (now = Date.now()), 30_000);

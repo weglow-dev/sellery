@@ -19,7 +19,7 @@ import { GB_COOKIE_MAX, readGbCookie, writeGbCookie } from '../lib/groupbuy-link
 
 const [a, b] = MOCK_PRODUCTS; // 32,000 · 28,000
 const NOW = Date.parse('2026-11-10T03:00:00Z');
-const gb: Groupbuy = { code: 'ab12cd34', state: 'active', discountPct: 20, startsAt: '2026-11-10T00:00:00Z', endsAt: '2026-11-12T00:00:00Z', price: 25600 };
+const gb: Groupbuy = { code: 'ab12cd34', state: 'active', discountPct: 20, startsAt: '2026-11-10T00:00:00Z', endsAt: '2026-11-12T00:00:00Z', price: 25600, options: [] };
 
 describe('줄 단가 — 진행 중이면 공구가 · 아니면 기본가', () => {
 	it('진행 중 · 끝 시각 지남 · 서버가 ended · 시작 전', () => {

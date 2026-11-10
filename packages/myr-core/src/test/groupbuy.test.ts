@@ -25,7 +25,14 @@ describe('groupbuyPrice', () => {
 describe('groupbuyFromJson · groupbuyStateAt', () => {
 	const raw = { code: 'ab12cd34', state: 'active', discount_pct: 20, starts_at: '2026-11-10T00:00:00Z', ends_at: '2026-11-12T15:00:00Z', price: 25600 };
 	it('DB 모양 → 화면 모양 · 틀리면 null', () => {
-		expect(groupbuyFromJson(raw)).toEqual({ code: 'ab12cd34', state: 'active', discountPct: 20, startsAt: raw.starts_at, endsAt: raw.ends_at, price: 25600 });
+		expect(groupbuyFromJson(raw)).toEqual({ code: 'ab12cd34', state: 'active', discountPct: 20, startsAt: raw.starts_at, endsAt: raw.ends_at, price: 25600, options: [] });
+		// 옵션별 공구가(링크 · 콘솔) — 틀린 항목은 버린다
+		expect(
+			groupbuyFromJson({ ...raw, options: [{ index: 0, name: '14포', price: 32000, groupbuy_price: 25600 }, { index: 1, name: '28포', price: 60000, groupbuy_price: 48000 }, { index: 'x' }] })?.options
+		).toEqual([
+			{ index: 0, name: '14포', price: 32000, groupbuyPrice: 25600 },
+			{ index: 1, name: '28포', price: 60000, groupbuyPrice: 48000 }
+		]);
 		expect(groupbuyFromJson({ ...raw, code: 'X' })).toBeNull();
 		expect(groupbuyFromJson({ ...raw, state: 'open' })).toBeNull();
 		expect(groupbuyFromJson(null)).toBeNull();

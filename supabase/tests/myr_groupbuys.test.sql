@@ -1,7 +1,7 @@
 -- pgTAP — 0086 공구 링크: 권한 · 공구가 · 만들기 거부 코드 · 상태 · 링크 조회 · 장바구니 · 체크아웃(공구가 · PRICE_CHANGED · 고정) · 지금 종료 · 주문 복사 · 실적 · 주문 표시
 -- 실행: npm run test:db — 트랜잭션 안에서 돌고 롤백된다. 트랜잭션 안의 now() 는 고정이라 "지난 시각으로 시작 = 지금부터 진행 중" 이다.
 begin;
-select plan(57);
+select plan(62);
 
 -- ---------- 표 · 권한 ----------
 select has_table('public', 'myr_groupbuys', 'myr_groupbuys 표');
@@ -33,6 +33,10 @@ values ('00000000-0000-4000-8000-000000000fa1', 'pgtap-gb-a', '00000000-0000-400
        ('00000000-0000-4000-8000-000000000fa3', 'pgtap-gb-pending', '00000000-0000-4000-8000-000000000f91', 'diet', '심사 중', 10000, 50, 'pending', 'pill'),
        ('00000000-0000-4000-8000-000000000fa4', 'pgtap-gb-other', '00000000-0000-4000-8000-000000000f92', 'diet', '콜라겐 필름', 28000, 50, 'listed', 'film'),
        ('00000000-0000-4000-8000-000000000fa5', 'pgtap-gb-soldout', '00000000-0000-4000-8000-000000000f91', 'diet', '품절 젤리', 30000, 0, 'listed', 'jelly');
+-- 옵션마다 가격이 다른 상품 — 대표가(30,000)와 옵션 0번(32,000)이 다르다
+insert into public.myr_products (id, code, seller_id, category, name, price, options, stock, status, icon)
+values ('00000000-0000-4000-8000-000000000fa6', 'pgtap-gb-opt', '00000000-0000-4000-8000-000000000f91', 'diet', '옵션 젤리', 30000,
+        '[{"n": "14포", "price": 32000}, {"n": "28포", "price": 60000}]', 50, 'listed', 'jelly');
 
 create temp table s (k text primary key, v jsonb);
 create function pg_temp.mk(p_product text, p_pct integer, p_starts timestamptz, p_ends timestamptz) returns jsonb language sql as $$
@@ -68,6 +72,18 @@ select is(pg_temp.mk('00000000-0000-4000-8000-000000000fa2', 10, now() + interva
 select is(public.myr_groupbuy_lookup(upper((select v #>> '{groupbuy,code}' from s where k = 'a'))) ->> 'product_code', 'pgtap-gb-a', '링크 → 상품 code (대소문자 무관)');
 select is(public.myr_groupbuy_lookup((select v #>> '{groupbuy,code}' from s where k = 'a')) #>> '{groupbuy,price}', '25600', '링크 → 공구가');
 select is(public.myr_groupbuy_lookup('zzzzzzzz'), null, '없는 링크는 null');
+
+-- ---------- 옵션별 가격 — 링크 · 장바구니 · 체크아웃이 같은 단가(myr_product_unit_price) ----------
+insert into s values ('o', pg_temp.mk('00000000-0000-4000-8000-000000000fa6', 20, now(), now() + interval '3 days'));
+select is(public.myr_groupbuy_lookup((select v #>> '{groupbuy,code}' from s where k = 'o')) #>> '{groupbuy,price}', '25600', '링크 공구가 = 옵션 0번(32,000) 기준 — 대표가(30,000) 아님');
+select is(public.myr_groupbuy_lookup((select v #>> '{groupbuy,code}' from s where k = 'o')) #> '{groupbuy,options}',
+          '[{"name": "14포", "index": 0, "price": 32000, "groupbuy_price": 25600}, {"name": "28포", "index": 1, "price": 60000, "groupbuy_price": 48000}]'::jsonb,
+          '링크 — 옵션마다 공구가');
+select is(public.myr_cart_set('00000000-0000-4000-8000-000000000f82', 'pgtap-gb-opt', 1, 1, false, (select v #>> '{groupbuy,code}' from s where k = 'o')) ->> 'ok', 'true', '옵션 1번을 공구로 담기');
+select is((select e #>> '{groupbuy,price}' from jsonb_array_elements(public.myr_cart_get('00000000-0000-4000-8000-000000000f82')) e where e ->> 'code' = 'pgtap-gb-opt'), '48000',
+          '장바구니 옵션 1번 공구가 = 링크의 options[1].groupbuy_price');
+select is(pg_temp.ck('myr_pgtapgb_opt', jsonb_build_array(jsonb_build_object('code', 'pgtap-gb-opt', 'option_index', 1, 'qty', 1, 'gb', (select v #>> '{groupbuy,code}' from s where k = 'o'), 'price', 48000))) #>> '{checkout,items_amount}',
+          '48000', '체크아웃 옵션 1번도 같은 공구가');
 
 -- ---------- 장바구니 ----------
 select is(public.myr_cart_set('00000000-0000-4000-8000-000000000f82', 'pgtap-gb-a', 0, 1, false, (select v #>> '{groupbuy,code}' from s where k = 'a')) ->> 'ok', 'true', '공구 코드로 담기');

@@ -22,8 +22,10 @@ export const groupbuyPrice = (price: number, pct: number): number => Math.floor(
 
 export const groupbuyHref = (code: string): string => `/g/${code}`;
 
-/** 샵 · 장바구니가 받는 모양(DB myr_groupbuy_json) */
-export type Groupbuy = { code: string; state: GroupbuyState; discountPct: number; startsAt: string; endsAt: string; price: number };
+/** 옵션별 가격(DB myr_groupbuy_product_json options) — 옵션 고르는 화면이 생기면 고른 옵션의 groupbuyPrice 를 보여 준다(장바구니 · 체크아웃과 같은 단가) */
+export type GroupbuyOption = { index: number; name: string; price: number; groupbuyPrice: number };
+/** 샵 · 장바구니가 받는 모양(DB myr_groupbuy_json) — price = 옵션 0번(옵션 없으면 대표가)의 공구가 · options 는 링크 · 콘솔 응답에만(장바구니 줄은 그 줄 옵션의 price 하나라 []) */
+export type Groupbuy = { code: string; state: GroupbuyState; discountPct: number; startsAt: string; endsAt: string; price: number; options: GroupbuyOption[] };
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 const isState = (v: unknown): v is GroupbuyState => v === 'scheduled' || v === 'active' || v === 'ended';
@@ -33,7 +35,11 @@ export function groupbuyFromJson(v: unknown): Groupbuy | null {
 	const o = obj(v);
 	if (!o || typeof o.code !== 'string' || !GB_CODE_RE.test(o.code) || !isState(o.state)) return null;
 	if (!Number.isInteger(o.discount_pct) || !isTime(o.starts_at) || !isTime(o.ends_at) || !Number.isInteger(o.price)) return null;
-	return { code: o.code, state: o.state, discountPct: o.discount_pct as number, startsAt: o.starts_at, endsAt: o.ends_at, price: o.price as number };
+	const options = (Array.isArray(o.options) ? o.options : [])
+		.map(obj)
+		.filter((x): x is Record<string, unknown> => !!x && Number.isInteger(x.index) && Number.isInteger(x.price) && Number.isInteger(x.groupbuy_price))
+		.map((x) => ({ index: x.index as number, name: typeof x.name === 'string' ? x.name : '', price: x.price as number, groupbuyPrice: x.groupbuy_price as number }));
+	return { code: o.code, state: o.state, discountPct: o.discount_pct as number, startsAt: o.starts_at, endsAt: o.ends_at, price: o.price as number, options };
 }
 
 /** 지금 시각 기준 상태 — 서버가 준 state 가 ended 면 그대로(지금 종료), 아니면 시각으로 다시 판단(장바구니를 열어 둔 채 시간이 지난 경우) */

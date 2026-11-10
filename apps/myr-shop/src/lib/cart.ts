@@ -107,7 +107,11 @@ export function sanitizeLines(v: unknown): CartLine[] {
 			(l): l is CartLine =>
 				!!l && typeof l === 'object' && isProduct((l as CartLine).product) && Number.isInteger((l as CartLine).qty) && (l as CartLine).qty > 0
 		)
-		.map((l) => ({ product: l.product, qty: clampQty(l.qty), ...(isGroupbuy(l.gb) ? { gb: l.gb } : {}) }));
+		.map((l) => ({
+			product: l.product,
+			qty: clampQty(l.qty),
+			...(isGroupbuy(l.gb) ? { gb: { ...l.gb, options: Array.isArray(l.gb.options) ? l.gb.options : [] } } : {})
+		}));
 }
 
 // ---- 계정 장바구니(0057) 입출력 ----
