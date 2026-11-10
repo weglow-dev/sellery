@@ -12,12 +12,12 @@ select table_privs_are('public', 'myr_cart_items', 'anon', '{}'::text[], 'anon �
 select table_privs_are('public', 'myr_cart_items', 'authenticated', '{}'::text[], 'authenticated 도 장바구니 표 직접 권한 없음');
 select table_privs_are('public', 'myr_likes', 'authenticated', '{}'::text[], 'authenticated 는 찜 표 직접 권한 없음');
 select function_privs_are('public', 'myr_cart_get', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 myr_cart_get 실행 불가');
-select function_privs_are('public', 'myr_cart_set', '{uuid,text,integer,integer,boolean}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_cart_set 실행 불가');
+select function_privs_are('public', 'myr_cart_set', '{uuid,text,integer,integer,boolean,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_cart_set 실행 불가');
 select function_privs_are('public', 'myr_cart_merge', '{uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_cart_merge 실행 불가');
 select function_privs_are('public', 'myr_cart_clear', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 myr_cart_clear 실행 불가');
 select function_privs_are('public', 'myr_like_set', '{uuid,text,boolean}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 myr_like_set 실행 불가');
 select function_privs_are('public', 'myr_likes_get', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 myr_likes_get 실행 불가');
-select function_privs_are('public', 'myr_cart_set', '{uuid,text,integer,integer,boolean}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 myr_cart_set 실행 가능');
+select function_privs_are('public', 'myr_cart_set', '{uuid,text,integer,integer,boolean,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 myr_cart_set 실행 가능');
 
 -- ---------- 픽스처 (롤백됨) ----------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)

@@ -25,6 +25,8 @@ export type SellerOrderLine = {
 	product: { code: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
 	/** 진행 중인 교환·환불 요청(0078) — 없으면 null */
 	claim: { code: string; status: OpenClaimStatus; kind: string } | null;
+	/** 공구 링크로 산 줄(0086) */
+	groupbuy: boolean;
 };
 export type SellerOrder = { id: string; code: string; status: string; paidAt: string | null; buyer: string; items: SellerOrderLine[] };
 
@@ -55,7 +57,8 @@ function lineFromJson(v: unknown): SellerOrderLine | null {
 		shippedAt: sn(o.shipped_at),
 		deliveredAt: sn(o.delivered_at),
 		product: p ? { code: s(p.code), tile: sn(p.tile), icon: s(p.icon, 'pill'), thumbUrl: sn(p.thumb_url) } : null,
-		claim: c && typeof c.code === 'string' && (c.status === 'pending' || c.status === 'progress') ? { code: c.code, status: c.status, kind: s(c.kind) } : null
+		claim: c && typeof c.code === 'string' && (c.status === 'pending' || c.status === 'progress') ? { code: c.code, status: c.status, kind: s(c.kind) } : null,
+		groupbuy: o.groupbuy === true
 	};
 }
 export function sellerOrderFromJson(v: unknown): SellerOrder | null {

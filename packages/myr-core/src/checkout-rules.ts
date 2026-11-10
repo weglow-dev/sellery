@@ -4,6 +4,7 @@
  * Svelte·SvelteKit·DB 를 import 하지 않는다 — 라우트 · 화면 · vitest 공용.
  */
 import { MAX_QTY } from './constants';
+import { GB_CODE_RE } from './groupbuy';
 import { cleanText, normalizePhone } from './text';
 
 /* ---------------- 토스 식별자 ---------------- */
@@ -25,11 +26,12 @@ export function generateOrderId(now = Date.now()): string {
 
 export const LINES_MAX = 20;
 export const CODE_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
-export type CheckoutLine = { code: string; qty: number; option_index: number };
+/** gb = 공구 링크 코드(0086 · 진행 중이면 공구가) · price = 화면이 보여 준 단가(서버 단가와 다르면 PRICE_CHANGED) — 둘 다 있을 때만 싣는다 */
+export type CheckoutLine = { code: string; qty: number; option_index: number; gb?: string; price?: number };
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
-/** 본문 `lines: [{ code, qty, optionIndex? }]` → 같은 (code, option) 합침. 형식 틀림·빈 배열·20줄 초과·합계 9 초과면 null */
+/** 본문 `lines: [{ code, qty, optionIndex?, gb?, price? }]` → 같은 (code, option) 합침(gb · price 는 처음 값). 형식 틀림·빈 배열·20줄 초과·합계 9 초과면 null */
 export function parseLines(v: unknown): CheckoutLine[] | null {
 	if (!Array.isArray(v) || v.length < 1 || v.length > LINES_MAX) return null;
 	const by = new Map<string, CheckoutLine>();
@@ -41,11 +43,15 @@ export function parseLines(v: unknown): CheckoutLine[] | null {
 		const opt = l.optionIndex === undefined ? 0 : l.optionIndex;
 		if (!CODE_RE.test(code) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > MAX_QTY) return null;
 		if (!Number.isInteger(opt) || (opt as number) < 0) return null;
+		if (l.gb != null && (typeof l.gb !== 'string' || !GB_CODE_RE.test(l.gb))) return null;
+		if (l.price != null && (!Number.isInteger(l.price) || (l.price as number) < 0)) return null;
 		const key = `${code}#${opt}`;
 		const cur = by.get(key);
 		const sum = (cur?.qty ?? 0) + (qty as number);
 		if (sum > MAX_QTY) return null;
-		by.set(key, { code, qty: sum, option_index: opt as number });
+		const gb = cur?.gb ?? (l.gb as string | undefined) ?? undefined;
+		const price = cur?.price ?? (l.price as number | undefined) ?? undefined;
+		by.set(key, { code, qty: sum, option_index: opt as number, ...(gb ? { gb } : {}), ...(price != null ? { price } : {}) });
 	}
 	return [...by.values()];
 }
@@ -207,6 +213,7 @@ export const FAIL_MESSAGES: Record<string, string> = {
 	SOLD_OUT: '남은 수량이 부족합니다',
 	NOT_AVAILABLE: '지금은 판매하지 않는 상품이 있어요',
 	LINES_REJECTED: '주문할 수 없는 상품이 있어요 — 장바구니를 확인해주세요',
+	PRICE_CHANGED: '가격이 바뀐 상품이 있어요',
 	AMOUNT_TOO_SMALL: '결제 금액은 100원 이상이어야 합니다',
 	AMOUNT_MISMATCH: '결제 금액이 주문과 달라 승인하지 않았어요',
 	PAYMENT_MISMATCH: '결제 정보가 주문과 달라 승인하지 않았어요',
@@ -241,6 +248,26 @@ export function rejectedItemsText(items: RejectedItem[], nameOf: (code: string) 
 		return `${n} 옵션 오류`;
 	};
 	return items.map(part).join(' · ');
+}
+
+/** 가격 변경(0086 PRICE_CHANGED) — 화면 단가 was → 서버 단가 now. groupbuy: active 공구가 적용 · inactive 공구 기간 밖(끝남 · 시작 전) · null 공구 아님 */
+export type PriceChange = { code: string; optionIndex: number; was: number; now: number; groupbuy: 'active' | 'inactive' | null };
+function parseChanges(v: unknown): PriceChange[] {
+	if (!Array.isArray(v)) return [];
+	return v
+		.map((x) => obj(x))
+		.filter((x): x is Record<string, unknown> => !!x && typeof x.code === 'string' && Number.isInteger(x.was) && Number.isInteger(x.now))
+		.map((x) => ({
+			code: x.code as string,
+			optionIndex: Number.isInteger(x.option_index) ? (x.option_index as number) : 0,
+			was: x.was as number,
+			now: x.now as number,
+			groupbuy: x.groupbuy === 'active' || x.groupbuy === 'inactive' ? x.groupbuy : null
+		}));
+}
+/** 가격 변경 한 줄 — "공구가 끝나 포도 젤리 ₩25,600 → ₩32,000" · "레몬 스틱 ₩20,000 → ₩22,000" */
+export function priceChangeText(c: PriceChange, name: string, won: (n: number) => string): string {
+	return `${c.groupbuy === 'inactive' ? '공구가 끝나 ' : ''}${name} ${won(c.was)} → ${won(c.now)}`;
 }
 
 /** 성공 페이지 실패 뷰 — code → 문구 · 돈 상태 · 버튼 구성 */
@@ -347,15 +374,25 @@ export function parseCheckoutLite(json: unknown): CheckoutLite | null {
 	};
 }
 
-export type CreateResult = { ok: true; checkout: CheckoutLite } | { ok: false; code: string; message: string | null; items: RejectedItem[] };
+export type CreateResult =
+	| { ok: true; checkout: CheckoutLite }
+	| { ok: false; code: string; message: string | null; items: RejectedItem[]; changes: PriceChange[] };
 export function parseCreateResult(json: unknown): CreateResult {
 	const o = obj(json);
-	if (!o) return { ok: false, code: 'BAD_RESULT', message: null, items: [] };
+	const bad = { ok: false as const, code: 'BAD_RESULT', message: null, items: [], changes: [] };
+	if (!o) return bad;
 	if (o.ok === true) {
 		const checkout = parseCheckoutLite(o.checkout);
-		return checkout ? { ok: true, checkout } : { ok: false, code: 'BAD_RESULT', message: null, items: [] };
+		return checkout ? { ok: true, checkout } : bad;
 	}
-	return { ok: false, code: str(o, 'code') ?? 'BAD_RESULT', message: str(o, 'message'), items: parseRejected(o.items) };
+	const code = str(o, 'code') ?? 'BAD_RESULT';
+	return {
+		ok: false,
+		code,
+		message: str(o, 'message'),
+		items: code === 'PRICE_CHANGED' ? [] : parseRejected(o.items),
+		changes: code === 'PRICE_CHANGED' ? parseChanges(o.items) : []
+	};
 }
 function parseRejected(v: unknown): RejectedItem[] {
 	if (!Array.isArray(v)) return [];

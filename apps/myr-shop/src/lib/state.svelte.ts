@@ -5,10 +5,15 @@
  *  계산은 전부 lib/cart.ts(순수 · 테스트됨). 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
  *  상태 변경은 전부 이 모듈의 메서드로만. */
 import { browser } from '$app/environment';
+import type { Groupbuy } from '@sellery/myr-core/groupbuy';
+import type { PriceChange } from '@sellery/myr-core/checkout-rules';
 import {
+	applyPriceChanges,
 	canBuy,
 	cartTotals,
+	gbCodeOf,
 	isProduct,
+	lineGbState,
 	mergeLine,
 	mergePayload,
 	pruneUnselected,
@@ -18,6 +23,7 @@ import {
 	setAllSelected,
 	setLineQty,
 	setUnselected,
+	unitPrice,
 	type CartLine
 } from './cart';
 import type { Product } from './data';
@@ -118,13 +124,19 @@ class ShopState {
 	}
 
 	// ---- 장바구니 (계산은 전부 lib/cart.ts — 테스트 src/test/cart.test.ts) ----
+	/** 줄 보기 — unitPrice = 지금 단가(진행 중인 공구면 공구가) · gb = 공구(gbState: scheduled · active · ended) · gbCode = 결제에 싣는 공구 코드(끝났으면 없음).
+	 *  시각은 장바구니가 바뀔 때 다시 본다 — 열어 둔 채 공구가 끝나도 결제 직전 서버가 다시 확인한다(PRICE_CHANGED) */
 	cartItems = $derived(
 		this.cart.map((l) => ({
 			...l.product,
 			qty: l.qty,
 			available: canBuy(l),
 			selected: canBuy(l) && !this.unselected.includes(l.product.code),
-			lineAmount: l.product.price * l.qty
+			unitPrice: unitPrice(l),
+			gb: l.gb ?? null,
+			gbState: lineGbState(l),
+			gbCode: gbCodeOf(l),
+			lineAmount: unitPrice(l) * l.qty
 		}))
 	);
 	/** 주문에 들어갈 줄(선택 + 살 수 있음) — 합계·배송비·체크아웃은 전부 이 줄 기준 */
@@ -142,7 +154,7 @@ class ShopState {
 	shippingMsg = $derived(this.totals.shippingMsg);
 
 	/** 서버에 반영하고 응답의 전체 줄로 덮어쓴다. 빠른 연속 클릭은 마지막 응답만 적용(seq). 실패하면 토스트 + 서버 값으로 되돌린다. */
-	private syncCart(body: { code: string; qty: number; add?: boolean }) {
+	private syncCart(body: { code: string; qty: number; add?: boolean; gb?: string }) {
 		if (!this.synced) return;
 		const seq = ++this.cartSeq;
 		api<{ lines: CartLine[] }>('/api/cart', 'PUT', body)
@@ -159,10 +171,23 @@ class ShopState {
 				}
 			});
 	}
-	add(product: Product, qty: number) {
-		this.cart = mergeLine(this.cart, product, qty); // 같은 상품이면 합산 + 최신 가격·이름 스냅샷으로
+	/** gb = 공구 링크로 들어와 담을 때의 공구(0086 · 끝나지 않은 것만) */
+	add(product: Product, qty: number, gb?: Groupbuy) {
+		this.cart = mergeLine(this.cart, product, qty, gb); // 같은 상품이면 합산 + 최신 가격·이름 스냅샷으로
 		this.showToast(`${product.name} ${qty}개를 담았어요`);
-		this.syncCart({ code: product.code, qty, add: true });
+		this.syncCart({ code: product.code, qty, add: true, ...(gb ? { gb: gb.code } : {}) });
+	}
+	/** 결제 직전 서버 단가로 맞추기(0086 PRICE_CHANGED) — 화면을 먼저 바꾸고, 로그인이면 계정 장바구니를 다시 읽는다 */
+	async applyPriceChanges(changes: PriceChange[]) {
+		const seq = ++this.cartSeq;
+		this.cart = applyPriceChanges(this.cart, changes);
+		if (!this.synced) return;
+		try {
+			const r = await api<{ lines: CartLine[] }>('/api/cart', 'GET');
+			if (seq === this.cartSeq) this.cart = applyPriceChanges(r.lines, changes);
+		} catch {
+			/* 화면 값 유지 — 결제 때 서버가 다시 확인한다 */
+		}
 	}
 	setQty(code: string, qty: number) {
 		this.cart = setLineQty(this.cart, code, qty);

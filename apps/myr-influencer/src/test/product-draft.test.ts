@@ -78,11 +78,11 @@ describe('saveFailure · 메뉴', () => {
 	it('상태별 메뉴 — 판매 종료 · 삭제는 확인을 받는다', () => {
 		expect(productMenu('draft').map((m) => m.kind)).toEqual(['edit', 'delete']);
 		expect(productMenu('rejected').map((m) => m.kind)).toEqual(['review']); // 반려는 심사 결과로
-		expect(productMenu('live').map((m) => m.kind)).toEqual(['edit']); // 일시중지 · 다시 판매 · 판매 종료는 운영만(0082 · 0083)
+		expect(productMenu('live').map((m) => m.kind)).toEqual(['edit', 'groupbuy']); // 일시중지 · 다시 판매 · 판매 종료는 운영만(0082 · 0083) · 공구 링크(0086)
 		expect(productMenu('paused').map((m) => m.kind)).toEqual(['edit']);
 		expect(productMenu('live')[0].label).toBe('내용 수정');
 		// 수정 심사 중이면 "내용 수정" 이 빠지고, 수정 반려면 "심사 결과 보기"(운영팀 의견 → 고치기)
-		expect(productMenu('live', 'review')).toEqual([]); // 수정 심사 중이면 메뉴 없이 안내
+		expect(productMenu('live', 'review').map((m) => m.kind)).toEqual(['groupbuy']); // 수정 심사 중이면 내용 수정은 빠지고 공구 링크만
 		expect(productMenu('paused', 'rejected').map((m) => [m.kind, m.label])).toEqual([['review', '심사 결과 보기']]);
 		expect(productMenu('review')).toEqual([]);
 		expect(productMenu('ended')).toEqual([]);
@@ -94,7 +94,8 @@ describe('saveFailure · 메뉴', () => {
 describe('목록에서 바로 심사 결과로', () => {
 	it('반려 · 수정 반려는 메뉴 없이 심사 결과 — 수정 심사 중 · 판매 중은 아님', () => {
 		expect(opensReview('rejected')).toBe(true);
-		expect(opensReview('live', 'rejected')).toBe(true);
+		expect(opensReview('live', 'rejected')).toBe(false); // 판매 중 수정 반려는 메뉴(심사 결과 보기 · 공구 링크)
+		expect(productMenu('live', 'rejected').map((m) => m.kind)).toEqual(['review', 'groupbuy']);
 		expect(opensReview('paused', 'rejected')).toBe(true);
 		expect(opensReview('live', 'review')).toBe(false);
 		expect(opensReview('live')).toBe(false);

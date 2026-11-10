@@ -10,13 +10,14 @@ import { rateLimit } from '$lib/server/rate-limit';
 
 /**
  * POST /api/checkout — 결제 세션 생성 (apps/shop api/checkout 의 MYR 판 · docs/myr.md §6.2 · 0058 myr_app_create_checkout).
- * 입력 { lines:[{ code, qty, optionIndex? }], shipping:{ recipient, phone, address1, address2?, postcode?, memo? }, guest?:{ name, phone, email?, consent:true }, saveAddress?, email? }
+ * 입력 { lines:[{ code, qty, optionIndex?, gb?, price? }], shipping:{ recipient, phone, address1, address2?, postcode?, memo? }, guest?:{ name, phone, email?, consent:true }, saveAddress?, email? }
  *   email = 계정 이메일이 없는 회원(카카오 이메일 미동의)이 적은 주문 안내 메일 — 회원 이메일은 계정 이메일 → 이번 입력 → customers.email 순. 입력이 있으면 customers.email 에 저장(다음 결제 프리필 · 메일 대체 주소)
  *   ① 같은 오리진·JSON 만(403) · 본문 형식(400)
  *   ② 로그인 또는 비회원(미로그인이면 guest 필수 — 없으면 401 · IP 레이트리밋 30분 20건)
  *   ③ customers 행 — 회원 ensureCustomer · 비회원 app_guest_customer_upsert(체크아웃 1건 = 행 1개)
  *   ④ myr_app_create_checkout — 줄마다 listed·옵션·단가(서버 값)·잔여(소프트 예약) 검증 · 배송비 · supersede · 세션+줄 insert.
  *      한 줄이라도 미달이면 400 LINES_REJECTED { items:[{code, reason, left}] } — 화면이 그 줄만 표시
+ *      공구(0086): gb 가 진행 중이면 공구가 · price(화면 단가)가 서버 단가와 다르면 409 PRICE_CHANGED { changes:[{code, was, now, groupbuy}] } — 화면이 바뀐 금액을 보여 주고 확인받는다
  *   ⑤ 비회원: HttpOnly 쿠키 myr_gck = 세션 id(45분) — confirm 이 소유 확인에 쓴다. 회원 saveAddress 면 customers.address 갱신(best-effort)
  * 출력 { ok:true, orderId(=toss_order_id), amount, itemsAmount, shippingFee, orderName, customerKey, phone, email }
  */
@@ -82,7 +83,7 @@ export const POST: RequestHandler = async (event) => {
 	const r = parseCreateResult(data);
 	if (!r.ok) {
 		if (r.code === 'BAD_RESULT') return apiError(500, 'DB_ERROR');
-		return apiError(400, r.code, r.message, { items: r.items });
+		return apiError(r.code === 'PRICE_CHANGED' ? 409 : 400, r.code, r.message, { items: r.items, changes: r.changes });
 	}
 
 	if (user && saveAddress) {
