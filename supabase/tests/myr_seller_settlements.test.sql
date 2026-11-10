@@ -1,7 +1,7 @@
 -- pgTAP — 0089 크리에이터 정산 탭: 권한 · 예상(preview)이 실제 회차와 같은지 · 내 것만 · 월 내역 · 줄 내역(이름 가림) · 홈 예상
 -- 2030년을 쓴다(로컬 DB 의 실제 회차와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(43);
+select plan(44);
 
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settlements_of_user 불가');
 select function_privs_are('public', 'myr_app_seller_settlements_of_user', '{uuid,timestamptz}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settlements_of_user 가능');
@@ -132,6 +132,8 @@ select is((select jsonb_agg(jsonb_build_array(r #>> '{product,code}', r ->> 'rel
 select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-02'), 24000, '2월 카드 합계 = W 2.4만만(운영이 먼저 확정 · 제조금액 0원) — X · Y 해제분은 빼고(같은 돈을 두 번 더하지 않게)');
 select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-03-01')) e where e ->> 'origin' = '2030-02'), 2,
           '3월 줄 내역 — 2월분 주문 줄(X · Y)도 origin 과 함께');
+
+select is((select month from public.myr_settlement_next('2030-03-20 10:00+09')), '2030-04-01'::date, '이번 달 회차가 이미 있으면(수동 실행) 다음 회차는 그 다음 달 — 이미 돈 달을 다시 예상하지 않는다');
 
 select * from finish();
 rollback;

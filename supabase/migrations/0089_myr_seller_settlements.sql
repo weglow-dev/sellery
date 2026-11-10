@@ -181,17 +181,19 @@ $$;
 revoke all on function public.myr_settlement_run(date, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_settlement_run(date, text, timestamptz) to service_role;
 
--- 다음 회차 — 지난달 회차가 아직이면(매월 1일 13:00 전) 정산월 = 지난달 · 대상 끝 = 이번 달 1일 0시, 아니면 정산월 = 이번 달 · 대상 끝 = 지금
+-- 다음 회차 — 지난달 회차가 아직이면(매월 1일 13:00 전) 정산월 = 지난달 · 대상 끝 = 이번 달 1일 0시, 아니면 정산월 = 마지막 회차 다음 달(보통 이번 달) · 대상 끝 = 지금
+--   (마지막 회차가 이번 달 이후여도 — 수동 실행 · 테스트 — 다음 회차는 그 다음 달이라 이미 돈 달을 다시 예상하지 않는다)
 create or replace function public.myr_settlement_next(p_now timestamptz default now())
 returns table (month date, end_at timestamptz)
 language sql
 stable
 as $$
-  with m as (select date_trunc('month', p_now at time zone 'Asia/Seoul')::date as this)
-  select case when not exists (select 1 from public.myr_settlement_runs u where u.month >= (m.this - interval '1 month')::date)
-              then (m.this - interval '1 month')::date else m.this end,
-         case when not exists (select 1 from public.myr_settlement_runs u where u.month >= (m.this - interval '1 month')::date)
-              then public.myr_month_start(m.this) else p_now end
+  with m as (select date_trunc('month', p_now at time zone 'Asia/Seoul')::date as this,
+                    (select max(u.month) from public.myr_settlement_runs u) as last)
+  select case when m.last is null or m.last < (m.this - interval '1 month')::date then (m.this - interval '1 month')::date
+              else greatest(m.this, (m.last + interval '1 month')::date) end,
+         case when m.last is null or m.last < (m.this - interval '1 month')::date then public.myr_month_start(m.this)
+              else p_now end
     from m
 $$;
 revoke all on function public.myr_settlement_next(timestamptz) from public, anon, authenticated;

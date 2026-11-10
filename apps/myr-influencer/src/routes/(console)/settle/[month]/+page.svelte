@@ -62,7 +62,7 @@
 			<span class="font-extrabold text-accent tabular-nums {big ? 'text-[22px]' : 'text-[20px]'}">{won(src.total.payout)}</span>
 		</div>
 	</div>
-	{#if src.total.held}<p class="mt-2.5 text-[12px] leading-[1.6] text-[#ff8a8a]">제조금액 확인 중인 상품 {src.total.held}개는 금액이 정해지면 정산돼요(위 합계에서 빠져 있어요)</p>{/if}
+	{#if src.total.held}<p class="mt-2.5 text-[12px] leading-[1.6] text-[#ff8a8a]">제조금액 확인 중인 상품 {src.total.held}개는 금액이 정해지면 정산돼요(합계에서 빠져 있어요)</p>{/if}
 {/snippet}
 
 {#snippet upcomingNote(cls: string)}
@@ -109,7 +109,7 @@
 							<Tile tile="slate" bg={r.product.tile} iconId={r.product.icon} thumbUrl={r.product.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl lg:h-14 lg:w-14 lg:rounded-2xl" />
 							<span class="min-w-0 flex-1">
 								<span class="block text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
-								{#if r.origin}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">{monthShort(r.origin)}분 · 보류 해제</span>{/if}
+								{#if r.origin}<span class="mt-2 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">{monthShort(r.origin)}분 · 보류 해제</span>{/if}
 								{#if r.releasedIn}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.done}">{monthShort(r.releasedIn)} 정산에서 지급</span>{/if}
 							</span>
 							<span class="text-right whitespace-nowrap">
@@ -123,10 +123,10 @@
 						</div>
 						{#if r.status === 'held'}
 							<!-- 보류(제조금액 확인 중 · 입력됐으면 보류 해제 예정) — 머리 아래 한 줄로(2026-11-10) -->
-							<div class="mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 lg:mt-3.5 lg:gap-2.5 lg:px-3.5 {hasLedger(r.product.id) ? 'bg-[#a8dcc8]/8' : 'bg-[#ff6b6b]/8'}">
+							<div class="mt-3 flex items-center gap-2 rounded-xl py-1 lg:mt-3.5 lg:gap-2.5">
 								{#if hasLedger(r.product.id)}
 									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.plan}">보류 해제 예정</span>
-									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 — {nextPay} 정산에서 확정 · 지급돼요</span>
+									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 ({nextPay} 정산에서 지급돼요)</span>
 								{:else}
 									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중</span>
 									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">운영팀이 제조금액을 입력하면 정산이 확정돼요</span>
@@ -171,7 +171,7 @@
 				<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70 lg:text-[15px]">아직 포함되지 않은 판매</h3>
 				<div class="flex items-start gap-2 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 text-[13px] leading-[1.5] text-white/65">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="mt-0.5 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-					<span>배송 완료 전 판매 <b class="font-bold text-fg">{st.preview.undelivered.lines}건 · {won(st.preview.undelivered.amount)}</b>은 배송이 완료되면 그 달 정산에 들어가요</span>
+					<span>배송 완료 전 판매 <b class="font-bold text-fg">{st.preview.undelivered.lines}건 &nbsp;{won(st.preview.undelivered.amount)}</b> 은 배송이 완료되면 그 달 정산에 들어가요</span>
 				</div>
 			{/if}
 		</div>
