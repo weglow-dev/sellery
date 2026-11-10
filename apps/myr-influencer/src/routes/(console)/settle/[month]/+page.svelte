@@ -21,6 +21,9 @@
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
 	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
 	const byProduct = $derived(itemsByProduct(data.items));
+	// 보류 줄인데 제조금액이 이미 들어왔으면 — 다음 정산 크론이 먼저 해제해 그때 지급한다(0089)
+	const hasLedger = (id: string) => st.ledgers.some((l) => l.product.id === id && l.hasLedger);
+	const nextPay = $derived(shortDate(st.preview.settleAt ?? settleAtOfMonth(st.preview.month)));
 
 	// 판매 내역(주문 줄) — 상품마다 기본 닫힘(2026-11-10) · 펼친 것만 기억
 	let opened = $state<Record<string, boolean>>({});
@@ -119,10 +122,15 @@
 							</span>
 						</div>
 						{#if r.status === 'held'}
-							<!-- 보류(제조금액 확인 중) — 머리 아래 한 줄로(2026-11-10) -->
-							<div class="mt-3 flex items-center gap-2 rounded-xl bg-[#ff6b6b]/8 px-3 py-2.5 lg:mt-3.5 lg:gap-2.5 lg:px-3.5">
-								<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중</span>
-								<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">운영팀이 제조금액을 입력하면 정산이 확정돼요</span>
+							<!-- 보류(제조금액 확인 중 · 입력됐으면 보류 해제 예정) — 머리 아래 한 줄로(2026-11-10) -->
+							<div class="mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 lg:mt-3.5 lg:gap-2.5 lg:px-3.5 {hasLedger(r.product.id) ? 'bg-[#a8dcc8]/8' : 'bg-[#ff6b6b]/8'}">
+								{#if hasLedger(r.product.id)}
+									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.plan}">보류 해제 예정</span>
+									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 — {nextPay} 정산에서 확정 · 지급돼요</span>
+								{:else}
+									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중</span>
+									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">운영팀이 제조금액을 입력하면 정산이 확정돼요</span>
+								{/if}
 							</div>
 						{/if}
 						<div class="mt-3.5 grid grid-cols-2 gap-3 border-t border-white/6 pt-3.5 lg:mt-4 lg:grid-cols-4 lg:pt-4">
