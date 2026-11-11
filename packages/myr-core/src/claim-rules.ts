@@ -64,9 +64,10 @@ export function refundCalcText(v: RefundView): string {
 }
 /** 금액 + 식 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" */
 export const refundAmountText = (v: RefundView): string => [won(v.amount), refundCalcText(v)].filter(Boolean).join(' ');
-/** 결제 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) */
-export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number): string {
+/** 결제 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만 */
+export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null): string {
 	if (v.shippingBack) return `상품 ${won(v.goods)} + 배송비 ${won(v.shippingBack)}`;
+	if (shippingFee === null) return `상품 ${won(v.goods)}`;
 	if (shippingFee <= 0) return `상품 ${won(v.goods)} · 무료배송 주문`;
 	return `상품 ${won(v.goods)} · 배송비 ${won(shippingFee)}는 주문 전체가 환불될 때 함께`;
 }
@@ -182,8 +183,8 @@ export type Claim = {
 		status: string;
 		paidAt: string | null;
 		isMember: boolean;
-		/** 주문 배송비(0090 · 무료배송이면 0) — 주문 전체에 한 번 */
-		shippingFee: number;
+		/** 주문 배송비(0090 · 무료배송이면 0) — 주문 전체에 한 번. 옛 응답(0090 전)이면 null → 배송비 칸을 그리지 않는다 */
+		shippingFee: number | null;
 		item: { id: string; name: string; option: string; qty: number; unitPrice: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
 	};
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
@@ -238,7 +239,7 @@ export function claimFromJson(v: unknown): Claim | null {
 			status: s(ord.status, 'PAID'),
 			paidAt: sn(ord.paid_at),
 			isMember: ord.is_member === true,
-			shippingFee: n(ord.shipping_fee),
+			shippingFee: typeof ord.shipping_fee === 'number' && Number.isFinite(ord.shipping_fee) ? ord.shipping_fee : null,
 			item: {
 				id: s(it.id),
 				name: s(it.name),

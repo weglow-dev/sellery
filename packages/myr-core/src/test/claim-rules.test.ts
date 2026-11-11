@@ -157,6 +157,8 @@ describe('처리 방법 이름 · 금액', () => {
 		expect(refundPaidNote({ goods: 36000, shippingBack: 3000 }, 3000)).toBe('상품 ₩36,000 + 배송비 ₩3,000');
 		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, 0)).toBe('상품 ₩32,000 · 무료배송 주문');
 		expect(refundPaidNote({ goods: 36000, shippingBack: 0 }, 3000)).toBe('상품 ₩36,000 · 배송비 ₩3,000는 주문 전체가 환불될 때 함께');
+		// 옛 응답(0090 전 · 배송비 모름) — 무료배송으로 잘못 적지 않는다
+		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, null)).toBe('상품 ₩32,000');
 	});
 	it('새 요청의 예상 차감 — 단순 변심 환불만 왕복 배송비', () => {
 		expect(claimOpenDeduction('refund', '단순 변심', 6000)).toBe(6000);

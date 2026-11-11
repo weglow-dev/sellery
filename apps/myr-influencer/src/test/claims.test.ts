@@ -84,7 +84,7 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	it('배송 완료 줄 → 운송장(조회 링크) · 발송일 · 배송 완료', () => {
 		const s = claimShipping(claim({ order: ord('PAID', { ship_status: 'DELIVERED', courier: 'CJ대한통운', tracking_no: '612300000010', shipped_at: '2026-11-02T00:00:00Z', delivered_at: '2026-11-03T00:00:00Z' }) }));
 		expect(s.label).toBe('배송 완료');
-		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '상품 금액', '배송비', '결제일', '운송장', '발송일', '배송 완료']);
+		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '결제일', '운송장', '발송일', '배송 완료']);
 		expect(s.rows.find((r) => r.k === '운송장')).toMatchObject({ v: 'CJ대한통운 612300000010' });
 		expect(s.rows.find((r) => r.k === '운송장')!.href).toBeTruthy();
 	});
@@ -100,6 +100,8 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 		expect(paid.rows.find((r) => r.k === '배송비')!.v).toBe('₩3,000');
 		const free = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING' }), shipping_fee: 0 } }));
 		expect(free.rows.find((r) => r.k === '배송비')!.v).toBe('무료배송');
+		// 옛 응답(0090 전 · shipping_fee 없음) — 금액 칸을 그리지 않는다(무료배송으로 잘못 보이지 않게)
+		expect(claimShipping(claim({ order: ord('PAID', { ship_status: 'PREPARING' }) })).rows.some((r) => r.k === '배송비' || r.k === '상품 금액')).toBe(false);
 	});
 	it('옛 응답(주문 상태 · 송장 없음) → 결제 완료 주문 · 줄 배송 상태로', () => {
 		const c = claim();
