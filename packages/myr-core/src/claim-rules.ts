@@ -7,7 +7,7 @@
  */
 import { ORDER_CODE_RE } from './checkout-rules';
 import { won } from './constants';
-import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE } from './refund-rules';
+import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
 import { cleanText } from './text';
 import type { OrderItem } from './order-view';
@@ -47,17 +47,50 @@ export function claimPolicy(reason: string, returnFee: number): string[] {
 	}
 }
 
-/** 처리 방법 이름 — 요청 종류에 따라 다르다(환불 요청의 재발송 = "교환으로 전환") · desc 는 금액·회수 안내 */
-export function resolutionOption(r: Resolution, c: Pick<Claim, 'kind' | 'reason' | 'amount' | 'returnFee'>): { id: Resolution; title: string; desc: string } {
+/** 예상 환불 금액(서버 refundQuote) — 콘솔 요청 상세. 처리 대기면 처리 방법별(refund · partial) · 환불 전 진행 중이면 current. 계산 실패한 칸은 null */
+export type ClaimQuotes = { refund?: RefundQuote | null; partial?: RefundQuote | null; current?: RefundQuote | null };
+
+/** 환불 금액을 결제 기준으로 펼친 한 벌(표시용) — 결제 금액(상품 + 함께 돌려줄 배송비) − 왕복 배송비 = 환불 금액.
+ *  값은 서버가 정한 그대로(환불 전 = refundQuote · 환불 뒤 = claimRefundView) — 여기서 금액을 다시 계산하지 않는다. RefundQuote 도 이 모양이다 */
+export type RefundView = Pick<RefundQuote, 'goods' | 'shippingBack' | 'deduction' | 'amount'>;
+/** 이번 환불의 결제 금액 — 상품 + 함께 돌려줄 처음 배송비 */
+export const refundPaid = (v: Pick<RefundView, 'goods' | 'shippingBack'>): number => v.goods + v.shippingBack;
+/** 식 — "(상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" · 더하거나 뺄 게 없으면 '' */
+export function refundCalcText(v: RefundView): string {
+	const parts = [`상품 ${won(v.goods)}`];
+	if (v.shippingBack) parts.push(`+ 배송비 ${won(v.shippingBack)}`);
+	if (v.deduction) parts.push(`− 왕복 배송비 ${won(v.deduction)}`);
+	return parts.length > 1 ? `(${parts.join(' ')})` : '';
+}
+/** 금액 + 식 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" */
+export const refundAmountText = (v: RefundView): string => [won(v.amount), refundCalcText(v)].filter(Boolean).join(' ');
+/** 샵 [바로 환불] 예상 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만 */
+export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null): string {
+	const goods = `상품 ${won(v.goods)}`;
+	if (v.shippingBack) return `${goods} + 배송비 ${won(v.shippingBack)}`;
+	if (shippingFee === null) return goods;
+	if (shippingFee <= 0) return `${goods} · 무료배송 주문`;
+	return `${goods} · 배송비 ${won(shippingFee)}는 주문 전체가 환불될 때 함께`;
+}
+/** 처리 결과 "환불 요청" 줄 — 주문한 수량 중 일부만 요청했을 때만 "1개 (주문 2개 중)" · 전부면 null(줄을 그리지 않는다) */
+export const claimQtyText = (c: Pick<Claim, 'qty' | 'order'>): string | null => (c.qty < c.order.item.qty ? `${c.qty}개 (주문 ${c.order.item.qty}개 중)` : null);
+
+/** 새 요청의 예상 차감 — 단순 변심 환불은 처리 방법 기본(myr_refund_request_options 첫 값 = 부분 환불)대로 왕복 배송비. 그 밖은 0.
+ *  한 번에 보낸 요청은 묶음에서 한 번만(서버 myr_refund_request_fee_due) — 샵 예상 금액은 고른 줄 전체를 한 번에 계산하므로 한 번 */
+export const claimOpenDeduction = (kind: ClaimKind, reason: string, returnFee: number): number => (kind === 'refund' && reason === '단순 변심' ? returnFee : 0);
+
+/** 처리 방법 이름 — 요청 종류에 따라 다르다(환불 요청의 재발송 = "교환으로 전환") · desc 는 금액(서버 예상 금액 · 없으면 빼고) · 회수 안내 */
+export function resolutionOption(r: Resolution, c: Pick<Claim, 'kind' | 'reason'>, quote?: RefundView | null): { id: Resolution; title: string; desc: string } {
+	const money = quote ? `${refundAmountText(quote)} · ` : '';
 	switch (r) {
 		case 'refund':
 			return {
 				id: r,
 				title: c.kind === 'exchange' ? '환불로 전환' : '전액 환불',
-				desc: `${won(c.amount)} · ${c.reason === '파손 · 누액' ? '회수 없이 바로 환불' : '회수 확인 뒤 환불'}`
+				desc: `${money}${c.reason === '파손 · 누액' ? '회수 없이 바로 환불' : '회수 확인 뒤 환불'}`
 			};
 		case 'partial':
-			return { id: r, title: '부분 환불 (왕복 배송비 차감)', desc: `${won(Math.max(0, c.amount - c.returnFee))} · 회수 확인 뒤 환불` };
+			return { id: r, title: '부분 환불 (왕복 배송비 차감)', desc: `${money}회수 확인 뒤 환불` };
 		case 'reship':
 			return { id: r, title: c.kind === 'refund' ? '교환으로 전환' : '새 제품 재발송', desc: '회수 없이 바로 출고 · 배송비 MYR 부담' };
 		case 'reship_collect':
@@ -106,12 +139,14 @@ export function parseClaimDecideBody(v: unknown): ClaimDecideBody | null {
 	const b = obj(v);
 	if (!b) return null;
 	const message = cleanText(typeof b.message === 'string' ? b.message : '');
-	if (!message || message.length > CLAIM_MESSAGE_MAX) return null;
-	if (b.decision === 'reject') return { decision: 'reject', resolution: null, message };
+	if (message.length > CLAIM_MESSAGE_MAX) return null;
+	// 반려는 사유를 고객에게 알려야 하니 메시지 필수 · 승인은 선택(0091 — 비면 null)
+	if (b.decision === 'reject') return message ? { decision: 'reject', resolution: null, message } : null;
 	if (b.decision === 'approve' && isResolution(b.resolution)) return { decision: 'approve', resolution: b.resolution, message };
 	return null;
 }
-export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && cleanText(message).length > 0 && cleanText(message).length <= CLAIM_MESSAGE_MAX;
+/** 승인 버튼 — 처리 방법만 고르면 된다(메시지는 선택 · 0091) · 메시지를 적었으면 길이만 본다 */
+export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && cleanText(message).length <= CLAIM_MESSAGE_MAX;
 
 /* ---------------- 파서 — myr_refund_request_json ---------------- */
 export type Claim = {
@@ -153,6 +188,8 @@ export type Claim = {
 		status: string;
 		paidAt: string | null;
 		isMember: boolean;
+		/** 주문 배송비(0090 · 무료배송이면 0) — 주문 전체에 한 번. 옛 응답(0090 전)이면 null → 배송비 칸을 그리지 않는다 */
+		shippingFee: number | null;
 		item: { id: string; name: string; option: string; qty: number; unitPrice: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
 	};
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
@@ -207,6 +244,7 @@ export function claimFromJson(v: unknown): Claim | null {
 			status: s(ord.status, 'PAID'),
 			paidAt: sn(ord.paid_at),
 			isMember: ord.is_member === true,
+			shippingFee: typeof ord.shipping_fee === 'number' && Number.isFinite(ord.shipping_fee) ? ord.shipping_fee : null,
 			item: {
 				id: s(it.id),
 				name: s(it.name),
@@ -230,8 +268,20 @@ export const claimsFromJson = (v: unknown): Claim[] => (Array.isArray(v) ? v.map
 
 /** 진행 중인 요청(처리 대기 · 진행 중) */
 export const isOpenClaim = (c: Pick<Claim, 'status'>): boolean => c.status === 'pending' || c.status === 'progress';
-/** 환불이 나가면 받을 돈 — 차감 반영(부분 환불) */
-export const claimRefundTotal = (c: Pick<Claim, 'amount' | 'deduction'>): number => Math.max(0, c.amount - c.deduction);
+/** 환불이 끝난 요청에서 함께 돌려준 처음 배송비 — 기록된 환불액(refund_amount) = 줄 금액 − 차감 + 배송비(마지막 줄일 때)에서 거꾸로. 환불 전이면 0
+ *  금액 자체는 계산하지 않는다(환불 전 예상은 서버 refundQuote · 환불 뒤는 refund_amount) */
+export const claimShippingBack = (c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): number =>
+	c.refundAmount === null ? 0 : Math.max(0, c.refundAmount + c.deduction - c.amount);
+/** 환불이 끝난 요청을 결제 기준으로 — 기록된 refund_amount · deduction 그대로 · 환불 전이면 null */
+export function claimRefundView(c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): RefundView | null {
+	if (c.refundAmount === null) return null;
+	return { goods: c.amount, shippingBack: claimShippingBack(c), deduction: c.deduction, amount: c.refundAmount };
+}
+/** 처리 내역 "환불 완료" 한 줄 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" · 환불 전이면 null */
+export const claimRefundedText = (c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): string | null => {
+	const v = claimRefundView(c);
+	return v ? refundAmountText(v) : null;
+};
 
 /** 요청할 수 있는 줄 — 남은 수량 · 발주(배송준비중) 이후. 결제완료 줄은 셀프 즉시 환불(refund-rules customerRefundableItems).
  *  열린 요청이 있는 주문은 신청 페이지 자체가 닫힌다(customerCanRefund · claimStatus) — 같은 줄 중복은 서버(OPEN_EXISTS)가 다시 막는다 */
@@ -272,7 +322,7 @@ export function claimTimeline(c: Claim): ClaimTimelineRow[] {
 	rows.push({ title: `${c.resolution ? RESOLUTION_NAMES[c.resolution] : '처리'} 승인`, at: c.decidedAt, detail: c.message, done: true });
 	if (c.needsCollect) rows.push({ title: '회수 완료', at: c.collectedAt, detail: null, done: !!c.collectedAt });
 	if (c.needsRefund)
-		rows.push({ title: '환불 완료', at: c.refundedAt, detail: c.refundedAt ? `${won(c.refundAmount ?? claimRefundTotal(c))}${c.deduction ? ` (왕복 배송비 ${won(c.deduction)} 차감)` : ''}` : null, done: !!c.refundedAt });
+		rows.push({ title: '환불 완료', at: c.refundedAt, detail: c.refundedAt ? claimRefundedText(c) : null, done: !!c.refundedAt });
 	if (c.needsReship) rows.push({ title: '새 제품 발송', at: c.reshippedAt, detail: c.reshipTrackingNo ? `${c.reshipCourier ?? '택배'} ${c.reshipTrackingNo}` : null, done: !!c.reshippedAt });
 	return rows;
 }

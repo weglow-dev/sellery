@@ -4,9 +4,9 @@
  *   · WAITING_DEPOSIT(입금 전) 은 토스 호출 없이 record 만.
  *   · 토스 취소가 불명(0/5xx)이면 기록하지 않고 CANCEL_UNCERTAIN — payment_events(handled=false) 운영 큐. 같은 줄 묶음으로 재시도하면 같은 Idempotency-Key 라 토스가 같은 결과를 준다.
  *   · 토스 ALREADY_CANCELED_PAYMENT(전액 이미 취소) 는 취소 성공으로 보고 기록한다.
- *   · 교환·환불 요청(0078)에서 나가는 환불은 deduction(왕복 배송비) · tag(요청 코드)를 준다 — 금액은 여기서 한 번 정해(`deductedAmount`) 토스 · record · 메일이 같은 값을 쓴다.
+ *   · 교환·환불 요청(0078)에서 나가는 환불은 deduction(왕복 배송비) · tag(요청 코드)를 준다 — 금액은 `refundQuote` 한 번으로 정해 토스 · record · 메일이 같은 값을 쓴다(화면 예상 금액도 같은 함수).
  */
-import { deductedAmount, parsePrecheckResult, parseRecordResult, refundIdempotencyKey, type RefundLine } from '../refund-rules';
+import { parsePrecheckResult, parseRecordResult, quoteFromPrecheck, refundIdempotencyKey, type PrecheckOk, type RefundLine, type RefundQuote } from '../refund-rules';
 import { admin } from './admin.server';
 import { logPaymentEvent } from './payment-events.server';
 import { notifyOrderRefunded } from './mail-events.server';
@@ -17,6 +17,24 @@ export type RefundActor = 'customer' | 'seller' | 'admin' | 'system';
 export type RefundOutcome =
 	| { ok: true; already: boolean; orderCode: string; status: string; amount: number; refunded: number }
 	| { ok: false; code: string; message?: string; items?: { item_id: string; reason: string; left: number }[] };
+export type RefundQuoteResult = { ok: true; pre: PrecheckOk; quote: RefundQuote } | Extract<RefundOutcome, { ok: false }>;
+
+/** 환불 금액 — precheck(가드 · 줄 + 마지막이면 배송비) → 차감(quoteFromPrecheck). 돈을 움직이지 않는다.
+ *  refundItems 가 실제 환불 금액을 여기서 정하고, 샵 신청 화면 · 콘솔 처리 방법 · 승인 메일의 예상 금액도 이 함수를 부른다 — 금액 계산은 이 한 곳(백엔드 원칙 1) */
+export async function refundQuote(input: { actor: RefundActor; actorId: string | null; orderId: string; items: RefundLine[]; deduction?: number }): Promise<RefundQuoteResult> {
+	const { data: preJson, error: preError } = await admin().rpc('myr_app_refund_precheck', {
+		p_order_id: input.orderId,
+		p_items: input.items,
+		p_actor: input.actor,
+		p_actor_id: input.actorId
+	});
+	if (preError) throw new Error(`myr_app_refund_precheck failed: ${preError.message}`);
+	const pre = parsePrecheckResult(preJson);
+	if (!pre.ok) return { ok: false, code: pre.code, items: pre.items };
+	const quote = quoteFromPrecheck(pre, input.deduction ?? 0);
+	if (!quote) return { ok: false, code: 'BAD_ITEMS', message: '차감 금액이 환불 금액보다 커요' };
+	return { ok: true, pre, quote };
+}
 
 export async function refundItems(input: {
 	actor: RefundActor;
@@ -41,19 +59,11 @@ export async function refundItems(input: {
 	const co = row?.myr_checkouts;
 	const tossOrderId = (Array.isArray(co) ? co[0]?.toss_order_id : co?.toss_order_id) ?? null;
 	const orderCode = row?.code ?? null;
-	const { data: preJson, error: preError } = await db.rpc('myr_app_refund_precheck', {
-		p_order_id: input.orderId,
-		p_items: input.items,
-		p_actor: input.actor,
-		p_actor_id: input.actorId
-	});
-	if (preError) throw new Error(`myr_app_refund_precheck failed: ${preError.message}`);
-	const pre = parsePrecheckResult(preJson);
-	if (!pre.ok) return { ok: false, code: pre.code, items: pre.items };
-	// 실제로 돌려줄 돈 — 차감은 입금 전 취소에는 없다
-	const amount = pre.deposit ? 0 : deductedAmount(pre.amount, input.deduction ?? 0);
-	if (amount === null) return { ok: false, code: 'BAD_ITEMS', message: '차감 금액이 환불 금액보다 커요' };
-	const deduction = pre.deposit ? 0 : pre.amount - amount;
+	// 실제로 돌려줄 돈 — 화면 예상 금액과 같은 함수(refundQuote) · 차감은 입금 전 취소에는 없다
+	const q = await refundQuote(input);
+	if (!q.ok) return q;
+	const { pre } = q;
+	const { amount, deduction } = q.quote;
 
 	const reason = (input.reason || (input.actor === 'customer' ? '고객 요청' : `${input.actor} 환불`)).slice(0, 200);
 	// 제품별 상세(0067) — record 가 줄 refund_reason 에 남기고, 셀러 메일에도 싣는다

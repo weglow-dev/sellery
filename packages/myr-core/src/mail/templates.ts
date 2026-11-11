@@ -15,6 +15,7 @@
  * | 비밀번호 재설정 | passwordResetMail | 크리에이터 로그인 이메일 | 콘솔 /auth/confirm?token_hash=…&type=recovery |
  * 발송·멱등은 ./resend.ts + ../server/mail.ts, 행 조회·훅은 ../server/mail-events.ts.
  */
+import { refundAmountText, type RefundView } from '../claim-rules';
 import { won } from '../constants';
 import { mailIdempotencyKey, renderMailHtml, renderMailText, type MailDoc, type MailRow } from './layout';
 
@@ -281,8 +282,8 @@ export type MailClaim = {
 	message: string | null;
 	/** 남은 할 일 안내(회수 · 환불 · 재발송) — claim-rules claimStepText */
 	stepText: string;
-	refundTotal: number | null;
-	deduction: number;
+	/** 환불 예정 금액 — 서버 refundQuote(실제 환불과 같은 계산)를 결제 기준으로 펼친 값 · 환불 없는 처리 · 계산 실패면 null */
+	refund: RefundView | null;
 };
 const claimKind = (c: Pick<MailClaim, 'kind'>): string => (c.kind === 'exchange' ? '교환' : '환불');
 
@@ -316,7 +317,7 @@ export function claimDecidedMail(c: MailClaim, ctx: MailCtx): MailTemplate {
 		{ label: '상품', value: itemLine({ name: c.productName, option: c.option, qty: c.qty }) },
 		{ label: '결과', value: rejected ? '반려' : `승인 · ${c.resolutionName ?? claimKind(c)}` }
 	];
-	if (!rejected && c.refundTotal != null) rows.push({ label: '환불 예정 금액', value: `${won(c.refundTotal)}${c.deduction ? ` (왕복 배송비 ${won(c.deduction)} 차감)` : ''}` });
+	if (!rejected && c.refund) rows.push({ label: '환불 예정 금액', value: refundAmountText(c.refund) });
 	if (!rejected && c.stepText) rows.push({ label: '다음 단계', value: c.stepText });
 	const notes: string[] = [];
 	if (rejected) notes.push('반려 사유가 궁금하면 주문 상세의 [문의]로 크리에이터에게 물어볼 수 있어요.');

@@ -7,7 +7,11 @@ import {
 	claimFromJson,
 	claimMessage,
 	claimPolicy,
-	claimRefundTotal,
+	claimOpenDeduction,
+	claimQtyText,
+	claimRefundedText,
+	claimRefundView,
+	claimShippingBack,
 	claimsFromJson,
 	claimStepText,
 	claimTimeline,
@@ -16,6 +20,10 @@ import {
 	parseClaimOpenBody,
 	parseClaimOpsInput,
 	photoRequired,
+	refundAmountText,
+	refundCalcText,
+	refundPaid,
+	refundPaidNote,
 	resolutionOption,
 	type Claim
 } from '../claim-rules';
@@ -91,9 +99,12 @@ describe('입력 — 승인 · 반려 · 운영', () => {
 		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'partial', message: ' 확인했어요 ' })).toEqual({ decision: 'approve', resolution: 'partial', message: '확인했어요' });
 		expect(parseClaimDecideBody({ decision: 'reject', resolution: 'refund', message: '어려워요' })).toEqual({ decision: 'reject', resolution: null, message: '어려워요' });
 		expect(parseClaimDecideBody({ decision: 'approve', message: '확인' })).toBeNull();
-		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund', message: '   ' })).toBeNull();
+		// 승인은 메시지 선택(0091) · 반려는 필수
+		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund', message: '   ' })).toEqual({ decision: 'approve', resolution: 'refund', message: '' });
+		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund' })).toEqual({ decision: 'approve', resolution: 'refund', message: '' });
+		expect(parseClaimDecideBody({ decision: 'reject', message: '   ' })).toBeNull();
 		expect(parseClaimDecideBody({ decision: 'reject', message: '가'.repeat(1001) })).toBeNull();
-		expect([canDecide(null, '안내'), canDecide('refund', ' '), canDecide('refund', '안내')]).toEqual([false, false, true]);
+		expect([canDecide(null, '안내'), canDecide('refund', ' '), canDecide('refund', '안내'), canDecide('refund', '가'.repeat(1001))]).toEqual([false, true, true, false]);
 	});
 	it('운영 — 요청번호 대문자 · 택배사 별칭 · 운송장 숫자만', () => {
 		expect(parseClaimOpsInput({ code: 'RQ2001', action: 'collected' })).toEqual({ ok: true, input: { code: 'rq2001', action: 'collected' } });
@@ -122,19 +133,57 @@ describe('파서', () => {
 });
 
 describe('처리 방법 이름 · 금액', () => {
-	it('요청 종류에 따라 이름이 다르다 · 부분 환불은 왕복 배송비 차감 · 파손 환불은 회수 없이', () => {
+	it('요청 종류에 따라 이름이 다르다 · 금액은 서버 예상 금액(refundQuote) 그대로 · 파손 환불은 회수 없이', () => {
 		const refund = claim();
-		expect(resolutionOption('partial', refund)).toEqual({ id: 'partial', title: '부분 환불 (왕복 배송비 차감)', desc: '₩26,000 · 회수 확인 뒤 환불' });
+		expect(resolutionOption('partial', refund, { goods: 32000, shippingBack: 0, deduction: 6000, amount: 26000 })).toEqual({
+			id: 'partial',
+			title: '부분 환불 (왕복 배송비 차감)',
+			desc: '₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불'
+		});
 		expect(resolutionOption('reship', refund).title).toBe('교환으로 전환');
 		const broken = claim({ kind: 'exchange', reason: '파손 · 누액', options: ['reship', 'refund'] });
 		expect(resolutionOption('reship', broken).title).toBe('새 제품 재발송');
-		expect(resolutionOption('refund', broken)).toEqual({ id: 'refund', title: '환불로 전환', desc: '₩32,000 · 회수 없이 바로 환불' });
+		expect(resolutionOption('refund', broken, { goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toEqual({ id: 'refund', title: '환불로 전환', desc: '₩32,000 · 회수 없이 바로 환불' });
 		expect(resolutionOption('reship_collect', claim({ kind: 'exchange', reason: '오배송' })).title).toBe('재발송 + 회수');
 	});
-	it('같은 묶음에서 이미 뺐으면(return_fee 0) 부분 환불 = 전액 · 예상 환불 = 금액 − 차감', () => {
-		expect(resolutionOption('partial', claim({ return_fee: 0 })).desc).toBe('₩32,000 · 회수 확인 뒤 환불');
-		expect(claimRefundTotal({ amount: 32000, deduction: 6000 })).toBe(26000);
-		expect(claimRefundTotal({ amount: 3000, deduction: 6000 })).toBe(0);
+	it('결제 금액 − 왕복 배송비 = 환불 금액 — 마지막 줄이면 결제 금액에 배송비 · 예상 금액이 없으면(계산 실패) 금액 없이 안내만', () => {
+		const last = { goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 };
+		expect(refundPaid(last)).toBe(39000);
+		expect(refundCalcText(last)).toBe('(상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
+		expect(refundAmountText(last)).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
+		expect(refundAmountText({ goods: 36000, shippingBack: 3000, deduction: 0, amount: 39000 })).toBe('₩39,000 (상품 ₩36,000 + 배송비 ₩3,000)');
+		expect(refundAmountText({ goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toBe('₩32,000');
+		expect(resolutionOption('partial', claim(), last).desc).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불');
+		expect(resolutionOption('partial', claim()).desc).toBe('회수 확인 뒤 환불');
+		expect(resolutionOption('refund', claim(), null).desc).toBe('회수 확인 뒤 환불');
+	});
+	it('결제 금액 아래 한 줄 — 배송비 함께 · 무료배송 주문 · 다른 상품이 남아 배송비는 나중', () => {
+		expect(refundPaidNote({ goods: 36000, shippingBack: 3000 }, 3000)).toBe('상품 ₩36,000 + 배송비 ₩3,000');
+		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, 0)).toBe('상품 ₩32,000 · 무료배송 주문');
+		expect(refundPaidNote({ goods: 36000, shippingBack: 0 }, 3000)).toBe('상품 ₩36,000 · 배송비 ₩3,000는 주문 전체가 환불될 때 함께');
+		// 옛 응답(0090 전 · 배송비 모름) — 무료배송으로 잘못 적지 않는다
+		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, null)).toBe('상품 ₩32,000');
+	});
+	it('환불 요청 수량 — 주문 수량 중 일부일 때만', () => {
+		const order = { ...claim().order, item: { ...claim().order.item, qty: 2 } };
+		expect(claimQtyText({ qty: 1, order })).toBe('1개 (주문 2개 중)');
+		expect(claimQtyText({ qty: 2, order })).toBeNull();
+	});
+	it('새 요청의 예상 차감 — 단순 변심 환불만 왕복 배송비', () => {
+		expect(claimOpenDeduction('refund', '단순 변심', 6000)).toBe(6000);
+		expect(claimOpenDeduction('refund', '파손 · 누액', 6000)).toBe(0);
+		expect(claimOpenDeduction('exchange', '오배송', 6000)).toBe(0);
+		expect(claimOpenDeduction('refund', '', 6000)).toBe(0);
+	});
+	it('환불 완료 — 기록된 환불액 · 차감 그대로 결제 기준으로 펼친다(다시 계산하지 않는다)', () => {
+		// MYR2087 — 줄 36,000 · 차감 6,000 · 기록 33,000 → 함께 돌려준 배송비 3,000
+		expect(claimShippingBack({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toBe(3000);
+		expect(claimRefundView({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toEqual({ goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 });
+		expect(claimRefundedText({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
+		expect(claimRefundedText({ amount: 32000, deduction: 6000, refundAmount: 26000 })).toBe('₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)');
+		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: 32000 })).toBe('₩32,000');
+		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: null })).toBeNull();
+		expect(claimShippingBack({ amount: 32000, deduction: 0, refundAmount: null })).toBe(0);
 	});
 	it('처리 기준 문구 — 사유별 · 배송비 숫자는 설정값', () => {
 		expect(claimPolicy('단순 변심', 7000)[1]).toBe('왕복 배송비 ₩7,000은 고객 부담 — 환불 금액에서 빼요');
@@ -169,7 +218,7 @@ describe('단계 문구 · 처리 내역', () => {
 		const p = claim({ status: 'progress', step: 'collect', resolution: 'partial', decided_at: 'd', needs_collect: true, needs_refund: true, deduction: 6000 });
 		expect(claimTimeline(p).map((r) => [r.title, r.done])).toEqual([['요청 접수', true], ['부분 환불 (왕복 배송비 차감) 승인', true], ['회수 완료', false], ['환불 완료', false]]);
 		const done = claim({ status: 'done', step: null, resolution: 'partial', decided_at: 'd', needs_collect: true, collected_at: 'c', needs_refund: true, deduction: 6000, refund_amount: 26000, refunded_at: 'r' });
-		expect(claimTimeline(done)[3]).toEqual({ title: '환불 완료', at: 'r', detail: '₩26,000 (왕복 배송비 ₩6,000 차감)', done: true });
+		expect(claimTimeline(done)[3]).toEqual({ title: '환불 완료', at: 'r', detail: '₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)', done: true });
 	});
 	it('재발송 + 회수 → 회수 · 새 제품 발송 줄', () => {
 		const r = claim({ status: 'progress', step: 'collect', kind: 'exchange', reason: '오배송', resolution: 'reship_collect', decided_at: 'd', needs_collect: true, needs_reship: true, reship_courier: 'CJ대한통운', reship_tracking_no: '1234', reshipped_at: 's' });

@@ -1,7 +1,7 @@
 /** CS 관리 › 교환 · 환불(7번 · 0078) — 탭 · 칩 색 · 답변 기한 · 승인 버튼 · 메시지 템플릿 · 처리 내역 줄.
  *  판정(선택지 · 단계 · 차감)은 DB 가 정한 값(claim JSON)을 그대로 쓰고, 이름 · 문구는 `@sellery/myr-core/claim-rules` 를 쓴다. 여기는 콘솔 화면 모양만.
  *  순수 — $app · $env 를 import 하지 않는다(src/test/claims.test.ts). */
-import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
+import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimQuotes, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
 import { orderShipping, type OrderShipping } from './order-ship';
 import { relativeTime } from './product-row';
 
@@ -49,8 +49,9 @@ export const dueText = (c: Pick<Claim, 'createdAt'>, now?: Date): string => {
 /** 목록 카드 강조 테두리 — 기한이 하루 이하 남은 처리 대기 요청만 */
 export const isUrgentPending = (c: Pick<Claim, 'status' | 'createdAt'>, now?: Date): boolean => c.status === 'pending' && dueDays(c, now) <= 1;
 
-/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) */
-export const resolutionOptions = (c: Claim) => c.options.map((r) => resolutionOption(r, c));
+/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) · 금액은 서버 예상 금액(claimQuotes · 없으면 금액 없이) */
+export const resolutionOptions = (c: Claim, quotes: ClaimQuotes = {}) =>
+	c.options.map((r) => resolutionOption(r, c, r === 'refund' ? quotes.refund : r === 'partial' ? quotes.partial : null));
 export function approveLabel(c: Claim, resolution: Resolution | null): string {
 	return resolution && c.options.includes(resolution) ? `${resolutionOption(resolution, c).title} 승인` : '처리 방법을 선택하세요';
 }
@@ -82,7 +83,11 @@ export function consoleTimeline(c: Claim, now?: Date): { title: string; when: st
 }
 
 /** 주문 · 배송 — 문의 상세와 같은 표(요청이 걸린 줄의 배송 상태 · 송장 · 발송일 · 배송 완료일 · 0080) */
-export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping => orderShipping(c.order);
+/** 그 줄 주문 수량 전체의 상품 금액 — 요청 상세 제품 카드 · "주문 · 배송" 상품 금액(요청 수량 금액은 처리 방법 · 처리 결과) */
+export const claimOrderedAmount = (c: Pick<Claim, 'order'>): number => c.order.item.unitPrice * c.order.item.qty;
+/** 요청 상세 "주문 · 배송" — 그 줄 송장 · 상품 금액(그 줄 전체 수량) · 주문 배송비(0090) */
+export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping =>
+	orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } });
 
 /** 지금 단계 — 진행 중 요청에서 크리에이터가 볼 한 줄(실행은 운영 · 서버) */
 export const STEP_TEXT: Record<string, string> = {

@@ -104,7 +104,7 @@ select is((select jsonb_build_object('status', j #>> '{order,status}', 'courier'
 
 -- ---------- 승인 · 반려 ----------
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f82', 'approve', 'partial', '확인했어요') ->> 'code', 'NOT_FOUND', '다른 크리에이터는 NOT_FOUND');
-select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'approve', 'partial', '   ') ->> 'code', 'BAD_MESSAGE', '메시지 필수 BAD_MESSAGE');
+select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'reject', null, '   ') ->> 'code', 'BAD_MESSAGE', '반려는 메시지 필수 BAD_MESSAGE(0091 — 승인은 선택)');
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'hold', 'partial', '확인') ->> 'code', 'BAD_DECISION', 'BAD_DECISION');
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'approve', 'reship', '확인') ->> 'code', 'BAD_RESOLUTION', '단순 변심에 재발송 BAD_RESOLUTION');
 select is((select jsonb_build_object('refund_now', (j ->> 'refund_now')::boolean, 'step', j #>> '{request,step}', 'collect', (j #>> '{request,needs_collect}')::boolean, 'deduction', (j #>> '{request,deduction}')::int, 'status', j #>> '{request,status}')

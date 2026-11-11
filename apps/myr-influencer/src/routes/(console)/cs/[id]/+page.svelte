@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { claimPolicy, claimRefundTotal, CLAIM_MESSAGE_MAX, canDecide, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
-	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
+	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, refundPaid, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
+	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimOrderedAmount, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
 	import { won } from '$lib/rules';
@@ -23,6 +23,10 @@
 	 *  모바일: 한 줄로 쌓고 하단 버튼 줄 / PC(lg~): 왼쪽 정보 + 오른쪽 420px 고정(sticky) 처리 패널 (디자인 "MYR Influencer Admin PC"). */
 	let { data } = $props();
 	const c = $derived(data.claim);
+	// 처리 결과의 환불 — 요청 결제 금액(요청 수량) − 왕복 배송비 = 환불 금액. 환불 뒤 = 기록된 금액 · 환불 전 = 서버 예상 금액(claimQuotes.current · 실제 환불과 같은 계산)
+	const refundShown = $derived(claimRefundView(c) ?? data.quotes.current ?? null);
+	// 제품 카드 — 그 줄 주문 수량 전체의 금액(주문 · 배송 "상품 금액"과 같은 함수)
+	const orderedAmount = $derived(claimOrderedAmount(c));
 
 	let resolution = $state<Resolution | null>(null);
 	let reply = $state('');
@@ -65,8 +69,12 @@
 </script>
 
 {#snippet options()}
+	<!-- 주문 수량 중 일부만 요청했으면 처리 전에도 먼저 보여 준다(처리 결과의 "환불 요청" 줄과 같은 문구) -->
+	{#if claimQtyText(c)}
+		<div class="mb-2.5 flex items-center justify-between rounded-xl bg-white/5 px-4 py-2.5 text-[13px] lg:text-[14px]"><span class="text-white/60">{KIND_LABEL[c.kind]} 요청</span><span class="font-bold text-fg">{claimQtyText(c)}</span></div>
+	{/if}
 	<div class="flex flex-col gap-2" role="radiogroup" aria-label="처리 방법">
-		{#each resolutionOptions(c) as r (r.id)}
+		{#each resolutionOptions(c, data.quotes) as r (r.id)}
 			{@const on = resolution === r.id}
 			<button
 				type="button"
@@ -93,7 +101,7 @@
 			<button type="button" onclick={() => (reply = rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
 		{/each}
 	</div>
-	<textarea class={TEXTAREA} rows="4" bind:value={reply} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구를 적어주세요 (승인 · 반려 메일에 들어가요)"></textarea>
+	<textarea class={TEXTAREA} rows="4" bind:value={reply} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
 	{#if error}<p role="alert" class="mt-2 text-[13px] text-accent">{error}</p>{/if}
 {/snippet}
 
@@ -148,14 +156,15 @@
 					{#if isUrgentPending(c)}<span class="ml-auto text-[12px] font-bold text-accent">{dueText(c)}</span>{/if}
 				</div>
 
+				<!-- 제품 카드 — 주문한 수량 · 금액 전체(요청 수량은 처리 방법 · 처리 결과의 "환불 요청 N개 (주문 M개 중)") -->
 				<div class="mt-4 flex items-center gap-3.5 rounded-[20px] border border-white/8 bg-white/3 p-4 lg:mt-0 lg:gap-4 lg:p-[18px]">
 					<Tile tile="slate" bg={c.product?.tile} iconId={c.product?.icon} thumbUrl={c.product?.thumbUrl} icon={36} iconCls="lg:h-11 lg:w-11" class="h-16 w-16 rounded-2xl lg:h-20 lg:w-20 lg:rounded-[18px]" />
 					<span class="flex min-w-0 flex-1 flex-col gap-[3px]">
 						<span class="text-[15px] leading-[1.3] font-bold lg:text-[17px]">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''}</span>
-						<span class="text-[12px] text-white/55 lg:text-[13px]">{c.qty}개 · 주문 {c.order.code.toUpperCase()}</span>
-						<span class="mt-0.5 text-[15px] font-extrabold tabular-nums lg:hidden">{won(c.amount)}</span>
+						<span class="text-[12px] text-white/55 lg:text-[13px]">{c.order.item.qty}개 · 주문 {c.order.code.toUpperCase()}</span>
+						<span class="mt-0.5 text-[15px] font-extrabold tabular-nums lg:hidden">{won(orderedAmount)}</span>
 					</span>
-					<span class="hidden text-[20px] font-extrabold whitespace-nowrap tabular-nums lg:block">{won(c.amount)}</span>
+					<span class="hidden text-[20px] font-extrabold whitespace-nowrap tabular-nums lg:block">{won(orderedAmount)}</span>
 				</div>
 
 				<!-- 주문 · 배송 — 문의 상세와 같은 칸(요청이 걸린 줄 · 0080) -->
@@ -230,8 +239,14 @@
 					<dl class="mt-3.5 flex flex-col gap-2.5 text-[14px]">
 						<div class="flex justify-between text-white/60"><dt>처리 방법</dt><dd class="font-semibold text-fg">{c.resolution ? RESOLUTION_NAMES[c.resolution] : '반려'}</dd></div>
 						{#if c.needsRefund}
-							<div class="flex justify-between text-white/60"><dt>환불 금액</dt><dd class="font-semibold text-fg tabular-nums">{won(c.refundAmount ?? claimRefundTotal(c))}</dd></div>
-							{#if c.deduction}<div class="flex justify-between text-white/60"><dt>왕복 배송비 차감</dt><dd class="font-semibold text-fg tabular-nums">−{won(c.deduction)}</dd></div>{/if}
+							{#if refundShown}
+								{#if claimQtyText(c)}<div class="flex justify-between text-white/60"><dt>{KIND_LABEL[c.kind]} 요청</dt><dd class="font-semibold text-fg">{claimQtyText(c)}</dd></div>{/if}
+								<div class="flex justify-between text-white/60"><dt>요청 결제 금액</dt><dd class="font-semibold text-fg tabular-nums">{won(refundPaid(refundShown))}</dd></div>
+								{#if refundShown.deduction}<div class="flex justify-between text-white/60"><dt>왕복 배송비 차감</dt><dd class="font-semibold text-fg tabular-nums">−{won(refundShown.deduction)}</dd></div>{/if}
+								<div class="flex justify-between text-white/60"><dt class="font-bold text-fg">환불 금액</dt><dd class="font-extrabold text-fg tabular-nums">{won(refundShown.amount)}</dd></div>
+							{:else}
+								<div class="flex justify-between text-white/60"><dt>환불 금액</dt><dd class="font-semibold text-fg">확인 중</dd></div>
+							{/if}
 						{/if}
 						<div class="mt-1 flex items-baseline justify-between border-t border-white/8 pt-3"><dt class="font-bold">상태</dt><dd class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold {sm.cls}">{sm.label}</dd></div>
 					</dl>

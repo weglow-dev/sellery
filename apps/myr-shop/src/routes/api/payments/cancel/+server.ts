@@ -1,11 +1,10 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { guestTokenCookieName } from '@sellery/myr-core/checkout-rules';
 import { parseCancelBody, refundMessage } from '@sellery/myr-core/refund-rules';
-import { admin, hasAdmin } from '$lib/server/admin';
+import { hasAdmin } from '$lib/server/admin';
 import { rejectCrossSite } from '$lib/server/checkout-sync';
-import { verifyGuestOrder } from '$lib/server/customers';
+import { orderActor } from '$lib/server/order-actor';
 import { refundItems } from '$lib/server/refund';
 
 /**
@@ -23,24 +22,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 	const body = parseCancelBody(await request.json().catch(() => null));
 	if (!body) return fail(400, 'BAD_REQUEST');
 	if (!hasAdmin()) return fail(503, 'NO_SERVICE_KEY');
-	const db = admin();
 
-	const { user } = await locals.safeGetSession();
-	let orderId: string | null = null;
-	let actorId: string | null = null;
-	if (user) {
-		const { data } = await db.from('myr_orders').select('id').eq('code', body.orderCode).eq('user_id', user.id).maybeSingle();
-		orderId = (data as { id: string } | null)?.id ?? null;
-		actorId = user.id;
-	} else {
-		const id = await verifyGuestOrder(body.orderCode, cookies.get(guestTokenCookieName(body.orderCode)));
-		if (!id) return fail(401, 'UNAUTHORIZED');
-		const { data } = await db.from('myr_orders').select('id, customer_id').eq('id', id).maybeSingle();
-		const row = data as { id: string; customer_id: string | null } | null;
-		orderId = row?.id ?? null;
-		actorId = row?.customer_id ?? null;
-	}
-	if (!orderId) return fail(404, 'NOT_FOUND');
+	const who = await orderActor(locals, cookies, body.orderCode);
+	if (!who.ok) return fail(who.code === 'UNAUTHORIZED' ? 401 : 404, who.code);
+	const { orderId, actorId } = who;
 
 	try {
 		const r = await refundItems({ actor: 'customer', actorId, orderId, items: body.items, reason: body.reason });

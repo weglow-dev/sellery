@@ -4,15 +4,17 @@
  *                claimsForOrder(orderId)                     주문 상세 · 신청 페이지(소유는 라우트가 이미 확인)
  *   크리에이터:   listSellerClaimsOfUser(userId) · sellerClaimsWaitingOfUser(userId) · getSellerClaimOfUser(userId, code)(사진 서명 URL 포함)
  *                decideClaim(userId, code, body)             승인/반려 → 고객 메일(환불은 하지 않는다 — 샵 크론)
+ *                claimQuotes(claim) · claimQuote(claim, deduction)   예상 환불 금액 — 실제 환불과 같은 refundQuote(마지막 줄이면 배송비 포함)
  *   운영 · 크론:  adminClaims(openOnly) · collectClaim(code)(회수 확인 → 환불 차례면 바로 환불 · actor admin) · reshipClaim(code, courier, tracking)(→ 고객 메일)
  *                retryClaimRefunds()                         환불 차례인 요청(1분 지남) — 샵 크론 reconcile. 승인 뒤 바로 환불(파손)도 여기서 나간다 — 결제 키는 샵에만(2026-11-06 대표 결정)
  * 환불은 `refundItems`(토스 부분 취소 · 줄 기록 · 환불 메일) 뒤 `myr_app_claim_refunded` 로 요청에 기록한다. 토스 키는 요청 코드(tag)로 멱등.
  * actor 와 그 id 는 세션에서만(원칙 6) — 이 모듈은 라우트가 넘긴 값을 그대로 쓴다.
  */
-import { CLAIM_CODE_RE, claimFromJson, claimsFromJson, type Claim, type ClaimDecideBody, type ClaimOpenBody } from '../claim-rules';
+import { CLAIM_CODE_RE, claimFromJson, claimsFromJson, type Claim, type ClaimDecideBody, type ClaimOpenBody, type ClaimQuotes } from '../claim-rules';
+import type { RefundQuote } from '../refund-rules';
 import { admin } from './admin.server';
 import { notifyClaimDecided, notifyClaimOpened, notifyClaimReshipped } from './mail-events.server';
-import { refundItems, type RefundActor } from './refund.server';
+import { refundItems, refundQuote, type RefundActor } from './refund.server';
 import { signRefundPhotos } from './refund-photos.server';
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
@@ -94,10 +96,39 @@ export async function decideClaim(userId: string, code: string, body: ClaimDecid
 	const r = obj(data);
 	const claim = claimFromJson(r?.request);
 	if (!r || r.ok !== true || !claim) return fail(typeof r?.code === 'string' ? r.code : 'DB_ERROR');
-	await notifyClaimDecided(claim);
+	// 메일의 환불 예정 금액 — 실제 환불과 같은 계산(refundQuote · 마지막 줄이면 배송비 포함 · 왕복 배송비 차감)
+	const quote = claim.needsRefund ? await claimQuote(claim, claim.deduction) : null;
+	await notifyClaimDecided(claim, quote);
 	// 회수 없이 바로 환불(파손 · 누액)이어도 여기서는 돈을 움직이지 않는다 — 요청은 "환불할 차례"(step refund)로 남고
 	// 샵 크론(reconcile · 10분마다 · retryClaimRefunds)이 환불한다. 토스 시크릿 키를 샵 한 곳에만 두기 위해서(2026-11-06 대표 결정)
 	return { ok: true, claim };
+}
+
+/* ---------------- 예상 금액 — 실제 환불(refundClaim → refundItems)과 같은 refundQuote ---------------- */
+/** 이 요청을 지금 환불하면 나갈 금액(차감 반영). 금액은 환불 순간의 주문 상태로 정해진다 — 다른 줄이 먼저 환불되면(마지막 줄이 되면) 배송비가 붙는다.
+ *  권한은 호출한 쪽(콘솔 = 내 요청 · 운영)이 이미 확인했다 — precheck 는 actor system(줄 · 수량 가드만) */
+export async function claimQuote(c: Pick<Claim, 'qty' | 'order'>, deduction: number): Promise<RefundQuote | null> {
+	try {
+		const r = await refundQuote({ actor: 'system', actorId: null, orderId: c.order.id, items: [{ item_id: c.order.item.id, qty: c.qty }], deduction });
+		return r.ok ? r.quote : null;
+	} catch (e) {
+		console.error('[claims] quote failed:', e instanceof Error ? e.message : e);
+		return null;
+	}
+}
+
+/** 콘솔 요청 상세 — 처리 대기면 처리 방법별(전액 = 차감 없음 · 부분 = 왕복 배송비) · 환불 전 진행 중이면 승인된 처리(current) */
+export async function claimQuotes(c: Claim): Promise<ClaimQuotes> {
+	const out: ClaimQuotes = {};
+	if (c.status === 'pending') {
+		for (const r of c.options) {
+			if (r === 'refund') out.refund = await claimQuote(c, 0);
+			if (r === 'partial') out.partial = await claimQuote(c, c.returnFee);
+		}
+	} else if (c.status === 'progress' && c.needsRefund && !c.refundedAt) {
+		out.current = await claimQuote(c, c.deduction);
+	}
+	return out;
 }
 
 /* ---------------- 환불 실행 — 요청에서 나가는 돈은 여기 한 곳 ---------------- */

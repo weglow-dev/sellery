@@ -5,11 +5,13 @@ import {
 	customerCanRefund,
 	customerRefundableItems,
 	deductedAmount,
-	estimateRefund,
 	isRefundPhotoPath,
 	parseCancelBody,
 	parsePrecheckResult,
 	parseRecordResult,
+	parseRefundQuote,
+	parseRefundQuoteBody,
+	quoteFromPrecheck,
 	refundableItems,
 	refundIdempotencyKey,
 	refundMessage,
@@ -153,28 +155,63 @@ describe('deductedAmount — 요청 환불의 왕복 배송비 차감(0078)', ()
 	});
 });
 
-describe('estimateRefund', () => {
-	it('부분은 단가 × qty · 전부면 배송비 포함 · 남은 수량 넘는 요청은 잘린다', () => {
-		expect(estimateRefund(order(), [{ item_id: A, qty: 1 }])).toEqual({ amount: 10000, full: false });
-		expect(
-			estimateRefund(order(), [
-				{ item_id: A, qty: 2 },
-				{ item_id: B, qty: 1 }
-			])
-		).toEqual({ amount: 43000, full: true });
-		expect(
-			estimateRefund(order(), [
-				{ item_id: A, qty: 9 },
-				{ item_id: B, qty: 9 }
-			])
-		).toEqual({ amount: 43000, full: true });
-		expect(estimateRefund(order({ refundAmount: 10000, items: [item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000)] }), []).amount).toBe(0);
-		expect(
-			estimateRefund(order({ refundAmount: 10000, items: [item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000)] }), [
-				{ item_id: A, qty: 1 },
-				{ item_id: B, qty: 1 }
-			])
-		).toEqual({ amount: 33000, full: true });
+describe('quoteFromPrecheck — 실제 환불 · 예상 금액이 같이 쓰는 금액 계산', () => {
+	const pre = (amount: number, items: number[], over: { deposit?: boolean; full?: boolean } = {}) => ({
+		amount,
+		items: items.map((a, i) => ({ item_id: String(i), qty: 1, amount: a, seller_id: null })),
+		deposit: over.deposit ?? false,
+		full: over.full ?? false
+	});
+	it('정상 — 일부 줄 · 차감 없음', () => {
+		expect(quoteFromPrecheck(pre(10000, [10000]))).toEqual({ amount: 10000, goods: 10000, shippingBack: 0, deduction: 0, full: false, deposit: false });
+	});
+	it('마지막 줄(전부 환불) — precheck 가 붙인 배송비가 shippingBack 으로 · 단순 변심 차감(MYR2087: 36,000 + 3,000 − 6,000 = 33,000)', () => {
+		expect(quoteFromPrecheck(pre(39000, [36000], { full: true }), 6000)).toEqual({ amount: 33000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false });
+	});
+	it('부분 — 마지막 줄이 아니면 배송비 없이 차감만', () => {
+		expect(quoteFromPrecheck(pre(36000, [36000]), 6000)).toEqual({ amount: 30000, goods: 36000, shippingBack: 0, deduction: 6000, full: false, deposit: false });
+	});
+	it('전액 — 차감 없는 전부 환불은 배송비까지 그대로', () => {
+		expect(quoteFromPrecheck(pre(43000, [20000, 20000], { full: true }))).toMatchObject({ amount: 43000, shippingBack: 3000, deduction: 0 });
+	});
+	it('0원 · 입금 전 — 입금 전 취소는 돈이 오가지 않아 0 · 차감도 0', () => {
+		expect(quoteFromPrecheck(pre(43000, [40000], { deposit: true, full: true }), 6000)).toEqual({ amount: 0, goods: 40000, shippingBack: 3000, deduction: 0, full: true, deposit: true });
+	});
+	it('차감이 금액 이상이면 null(환불하지 않는다 · deductedAmount 와 같다)', () => {
+		expect(quoteFromPrecheck(pre(5000, [5000]), 6000)).toBeNull();
+		expect(quoteFromPrecheck(pre(6000, [6000]), 6000)).toBeNull();
+	});
+});
+
+describe('parseRefundQuoteBody · parseRefundQuote — 예상 금액 API', () => {
+	it('본문 — orderCode 소문자 · mode · reason 정리 · 줄', () => {
+		expect(parseRefundQuoteBody({ orderCode: 'MYR2087', mode: 'claim', reason: ' 단순 변심 ', items: [{ itemId: A, qty: 1 }] })).toEqual({
+			orderCode: 'myr2087',
+			mode: 'claim',
+			reason: '단순 변심',
+			items: [{ item_id: A, qty: 1 }]
+		});
+		expect(parseRefundQuoteBody({ orderCode: 'myr2087', mode: 'instant', items: [{ itemId: A, qty: 2 }, { itemId: B, qty: 1 }] })?.reason).toBe('');
+	});
+	it('형식 오류는 null — mode · 빈 줄 · 수량 · 같은 줄 두 번', () => {
+		expect(parseRefundQuoteBody({ orderCode: 'myr2087', mode: 'x', items: [{ itemId: A, qty: 1 }] })).toBeNull();
+		expect(parseRefundQuoteBody({ orderCode: 'myr2087', mode: 'claim', items: [] })).toBeNull();
+		expect(parseRefundQuoteBody({ orderCode: 'myr2087', mode: 'claim', items: [{ itemId: A, qty: 0 }] })).toBeNull();
+		expect(parseRefundQuoteBody({ orderCode: 'myr2087', mode: 'claim', items: [{ itemId: A, qty: 1 }, { itemId: A, qty: 1 }] })).toBeNull();
+		expect(parseRefundQuoteBody({ orderCode: 'bad code', mode: 'claim', items: [{ itemId: A, qty: 1 }] })).toBeNull();
+	});
+	it('응답 — ok 와 amount 가 있어야', () => {
+		expect(parseRefundQuote({ ok: true, amount: 33000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false })).toEqual({
+			amount: 33000,
+			goods: 36000,
+			shippingBack: 3000,
+			deduction: 6000,
+			full: true,
+			deposit: false
+		});
+		expect(parseRefundQuote({ ok: false, code: 'BAD_ITEMS' })).toBeNull();
+		expect(parseRefundQuote({ ok: true })).toBeNull();
+		expect(parseRefundQuote(null)).toBeNull();
 	});
 });
 

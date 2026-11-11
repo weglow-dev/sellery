@@ -4,19 +4,20 @@
 	 *      / 오른쪽 환불 요약(선택 수 · 사유 · 예상 금액 · [환불 신청] → 인라인 확인) + 안내.
 	 *  모바일: 뒤로 헤더(주문번호) · 같은 순서로 쌓고 하단 바 버튼(앱 셸 바닥 — fixed 아님). 입금 대기 주문은 "주문 취소"(토스 호출 없음 · 확인만).
 	 *  사진(0068): 고르는 즉시 POST /api/refunds/photos 로 올리고(줄당 3장 · 4MB · jpeg/png/webp) 경로만 들고 있다가 신청 본문 items[].photos 로 보낸다 · × 는 DELETE. 미리보기는 브라우저 object URL.
-	 *  금액은 화면 추정(estimateRefund) · 서버 precheck 가 다시 계산. 브라우저 confirm() 은 쓰지 않는다. 보낸 뒤 주문 상세로.
+	 *  금액은 서버 예상 금액(RefundQuoteState → /api/refunds/quote · 실제 환불과 같은 refundQuote) — 화면은 계산하지 않는다. 브라우저 confirm() 은 쓰지 않는다. 보낸 뒤 주문 상세로.
 	 *  0078: 줄마다 길이 갈린다 — 결제완료(발주 전) 줄 = [바로 환불](이 화면) · 배송준비중 이후 줄 = [교환 · 환불 요청](ClaimForm · 크리에이터 승인).
 	 *  두 가지가 다 있으면 머리 아래 전환 탭 · 하나뿐이면 그쪽만. 하단 고정 바는 바로 환불만(요청은 요약 카드 안 버튼). */
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { won } from '$lib/data';
+	import { RefundQuoteState } from '$lib/refund-quote.svelte';
 	import { shop } from '$lib/state.svelte';
 	import { displayCode, type OrderView } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import ClaimForm from '$lib/components/ClaimForm.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { claimableItems } from '@sellery/myr-core/claim-rules';
-	import { customerCanRefund, customerRefundableItems, estimateRefund, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
+	import { claimableItems, refundPaidNote } from '@sellery/myr-core/claim-rules';
+	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
 	let { order, returnFee = 6000, backHref }: { order: OrderView; returnFee?: number; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
@@ -54,9 +55,30 @@
 			})
 	);
 	const count = $derived(chosen.reduce((n, c) => n + c.qty, 0));
-	const est = $derived(estimateRefund(order, chosen));
-	const ready = $derived(deposit || (chosen.length > 0 && reason !== ''));
-	const ctaLabel = $derived(deposit ? '주문 취소' : chosen.length === 0 ? '제품을 선택하세요' : reason === '' ? '사유를 선택하세요' : `${won(est.amount)} 환불 신청`);
+	// 예상 환불 금액 — 고른 줄 · 수량이 바뀔 때만 서버에 묻는다(상세 내용 · 사진은 금액과 상관없다)
+	const quote = new RefundQuoteState();
+	onDestroy(() => quote.dispose());
+	const picksKey = $derived(JSON.stringify(chosen.map((c) => ({ itemId: c.item_id, qty: c.qty }))));
+	$effect(() => {
+		const items = JSON.parse(picksKey) as { itemId: string; qty: number }[];
+		const off = deposit || mode !== 'instant';
+		untrack(() => quote.ask(off ? null : { orderCode: order.code, mode: 'instant', reason: '', items }));
+	});
+	const est = $derived(quote.quote);
+	const ready = $derived(deposit || (chosen.length > 0 && reason !== '' && est !== null && !quote.loading));
+	const ctaLabel = $derived(
+		deposit
+			? '주문 취소'
+			: chosen.length === 0
+				? '제품을 선택하세요'
+				: reason === ''
+					? '사유를 선택하세요'
+					: quote.loading
+						? '금액 확인 중…'
+						: est
+							? `${won(est.amount)} 환불 신청`
+							: '금액을 확인하지 못했어요'
+	);
 
 	function toggle(id: string, max: number, on: boolean) {
 		qtyById = { ...qtyById, [id]: on ? max : 0 };
@@ -318,9 +340,11 @@
 								<div class="flex justify-between text-fg-soft"><span>사유</span><span class={reason ? 'text-fg' : 'text-fg-faint'}>{reason || '—'}</span></div>
 							</div>
 							<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
-								<span class="text-[14px] font-bold">예상 환불 금액{#if est.full && order.shippingFee} <span class="text-[12px] font-normal text-fg-faint">(배송비 포함)</span>{/if}</span>
-								<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{won(est.amount)}</span>
+								<span class="text-[14px] font-bold">예상 환불 금액</span>
+								<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{est ? won(est.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
 							</div>
+							{#if est}<p class="mt-1.5 text-right text-[12px] text-fg-faint">{refundPaidNote(est, order.shippingFee)}</p>{/if}
+							{#if quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 잠시 후 다시 골라주세요</p>{/if}
 						{/if}
 						{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
 						<!-- 버튼은 PC 만 여기 · 모바일은 하단 바 -->
@@ -328,7 +352,7 @@
 							{#if !confirming}
 								<button type="button" onclick={() => (confirming = true)} disabled={submitting || !ready} class="{cta} {ready ? ctaOn : ctaOff}">{ctaLabel}</button>
 							{:else}
-								<p class="text-[13.5px] leading-[1.55] text-white/85">{deposit ? '이 주문을 취소할까요? 되돌릴 수 없어요.' : `${won(est.amount)}을 환불할까요? 되돌릴 수 없고, 카드사에 따라 영업일 3일 안에 반영돼요.`}</p>
+								<p class="text-[13.5px] leading-[1.55] text-white/85">{deposit ? '이 주문을 취소할까요? 되돌릴 수 없어요.' : `${won(est?.amount ?? 0)}을 환불할까요? 되돌릴 수 없고, 카드사에 따라 영업일 3일 안에 반영돼요.`}</p>
 								<div class="mt-3 flex gap-2">
 									<button type="button" onclick={() => (confirming = false)} disabled={submitting} class="{cta} flex-1 border border-white/14 text-fg">아니요</button>
 									<button type="button" onclick={submit} disabled={submitting} class="{cta} flex-1 {ctaOn} disabled:opacity-60">{submitting ? '처리 중…' : deposit ? '네, 취소할게요' : '네, 환불할게요'}</button>
@@ -358,7 +382,7 @@
 			{#if !confirming}
 				<button type="button" onclick={() => (confirming = true)} disabled={submitting || !ready} class="{cta} {ready ? ctaOn : ctaOff}">{ctaLabel}</button>
 			{:else}
-				<p class="mb-2.5 text-[13px] leading-[1.5] text-white/85">{deposit ? '이 주문을 취소할까요? 되돌릴 수 없어요.' : `${won(est.amount)}을 환불할까요? 되돌릴 수 없어요.`}</p>
+				<p class="mb-2.5 text-[13px] leading-[1.5] text-white/85">{deposit ? '이 주문을 취소할까요? 되돌릴 수 없어요.' : `${won(est?.amount ?? 0)}을 환불할까요? 되돌릴 수 없어요.`}</p>
 				<div class="flex gap-2">
 					<button type="button" onclick={() => (confirming = false)} disabled={submitting} class="{cta} flex-1 border border-white/14 text-fg">아니요</button>
 					<button type="button" onclick={submit} disabled={submitting} class="{cta} flex-1 {ctaOn} disabled:opacity-60">{submitting ? '처리 중…' : deposit ? '네, 취소할게요' : '네, 환불할게요'}</button>
