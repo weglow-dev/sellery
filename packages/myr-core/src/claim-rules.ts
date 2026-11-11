@@ -10,7 +10,7 @@ import { won } from './constants';
 import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
 import { cleanText } from './text';
-import { shortDate, type OrderItem } from './order-view';
+import type { OrderItem } from './order-view';
 
 export const CLAIM_KINDS = ['refund', 'exchange'] as const;
 export type ClaimKind = (typeof CLAIM_KINDS)[number];

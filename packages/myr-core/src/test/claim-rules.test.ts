@@ -199,10 +199,9 @@ describe('처리 방법 이름 · 금액', () => {
 });
 
 describe('단순 변심 기한(0093) — 서버 값 그대로 안내', () => {
-	it('지난 줄만 안내 · 날짜는 서버 기한(한국 시간)', () => {
+	it('지난 줄만 안내(서버 changeMindOk 그대로)', () => {
 		expect(changeMindNote({ changeMindOk: true, changeMindUntil: '2026-11-10T14:59:59Z' })).toBeNull();
-		expect(changeMindNote({ changeMindOk: false, changeMindUntil: '2026-11-10T14:59:59Z' })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요 (11월 10일까지였어요)');
-		expect(changeMindNote({ changeMindOk: false, changeMindUntil: null })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요');
+		expect(changeMindNote({ changeMindOk: false, changeMindUntil: '2026-11-10T14:59:59Z' })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요');
 	});
 	it('서버 거절 CHANGE_MIND_EXPIRED → 안내 문구', () => {
 		expect(claimMessage('BAD_ITEMS', [{ reason: 'CHANGE_MIND_EXPIRED' }])).toBe('수령 후 7일이 지난 상품은 단순 변심 환불이 어려워요');
