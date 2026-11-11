@@ -79,6 +79,10 @@ describe('입력 — 요청 남기기', () => {
 			items: [{ item_id: ITEM, qty: 1, note: '터졌어요', photos: [PHOTO] }]
 		});
 	});
+	it('상세 내용은 여러 줄 글 — 줄바꿈 · 이모지 그대로 · 제어문자 · 빈 줄 3개 이상만 정리(cleanText 는 이름 · 주소용)', () => {
+		const b = parseClaimOpenBody({ orderCode: 'myr1001', kind: 'refund', reason: '오배송', items: [{ itemId: ITEM, qty: 1, note: ' 다른 맛이 왔어요 \u{1F622}\r\n\n\n\n주문은 레몬맛\x07이에요 ' }] });
+		expect(b?.items[0].note).toBe('다른 맛이 왔어요 \u{1F622}\n\n주문은 레몬맛이에요');
+	});
 	it('형식 틀리면 null — 종류 · 사유 · 빈 줄 · 수량 · 사진 경로 · 4장', () => {
 		const ok = { orderCode: 'myr1001', kind: 'refund', reason: '오배송', items: [{ itemId: ITEM, qty: 1 }] };
 		// 요청 수량 상한 없음(0097) — 150개도 받는다(남은 수량은 서버 TOO_MANY)
@@ -130,6 +134,13 @@ describe('입력 — 승인 · 반려 · 운영', () => {
 		expect(parseClaimDecideBody({ decision: 'reject', message: '   ' })).toBeNull();
 		expect(parseClaimDecideBody({ decision: 'reject', message: '가'.repeat(1001) })).toBeNull();
 		expect([canDecide(null, '안내'), canDecide('refund', ' '), canDecide('refund', '안내'), canDecide('refund', '가'.repeat(1001))]).toEqual([false, true, true, false]);
+	});
+	it('메시지는 여러 줄 글 — 줄바꿈 · 이모지 그대로 · 글자 수는 이모지 1자(DB char_length 와 같은 기준)', () => {
+		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund', message: ' 확인했어요 \u{1F64F}\r\n회수 뒤 환불해드릴게요 ' })?.message).toBe('확인했어요 \u{1F64F}\n회수 뒤 환불해드릴게요');
+		// 이모지 1000개 = 1000자(JS length 로는 2000) — 통과 · 1001개는 거절
+		expect(parseClaimDecideBody({ decision: 'reject', message: '\u{1F64F}'.repeat(1000) })?.message).toHaveLength(2000);
+		expect(parseClaimDecideBody({ decision: 'reject', message: '\u{1F64F}'.repeat(1001) })).toBeNull();
+		expect([canDecide('refund', '\u{1F64F}'.repeat(1000)), canDecide('refund', '\u{1F64F}'.repeat(1001))]).toEqual([true, false]);
 	});
 	it('운영 — 요청번호 대문자 · 택배사 별칭 · 운송장 숫자만', () => {
 		expect(parseClaimOpsInput({ code: 'RQ2001', action: 'collected' })).toEqual({ ok: true, input: { code: 'rq2001', action: 'collected' } });

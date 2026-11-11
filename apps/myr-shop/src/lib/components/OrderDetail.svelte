@@ -131,7 +131,7 @@
 										{@const href = trackingUrl(c.reshipCourier ?? '', c.reshipTrackingNo)}
 										<p class="mt-1 text-[12.5px] text-white/75">교환 발송 {c.reshipCourier ?? '택배'} {#if href}<a {href} target="_blank" rel="noopener" class="font-mono underline">{c.reshipTrackingNo}</a>{:else}<span class="font-mono">{c.reshipTrackingNo}</span>{/if}</p>
 									{/if}
-									{#if c.message}<p class="mt-2 border-l-2 border-accent/50 pl-2.5 text-[12.5px] leading-[1.55] text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
+									{#if c.message}<p class="mt-2 border-l-2 border-accent/50 pl-2.5 text-[12.5px] leading-[1.55] break-words whitespace-pre-line text-white/80"><span class="font-bold text-accent">{c.seller?.name ?? '크리에이터'}</span> {c.message}</p>{/if}
 									<ol class="mt-2.5 flex flex-col gap-1">
 										{#each claimTimeline(c) as t (t.title)}
 											<li class="flex items-center gap-2 text-[12px] {t.done ? 'text-white/70' : 'text-white/35'}">

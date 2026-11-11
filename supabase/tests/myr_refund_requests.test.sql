@@ -1,7 +1,7 @@
 -- pgTAP — 0078 교환·환불 요청: 권한 · 요청 남기기(가드 · 사진 · 줄마다 하나) · 크리에이터 목록 · 승인/반려(처리 방법 · 할 일 · 차감) ·
 --         회수 확인 · 환불 기록 · 재발송 송장 · 완료 판정 · 환불 재시도 대상 · 고아 사진 (docs/myr.md §4.2.1 7번)
 begin;
-select plan(84);
+select plan(85);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open 불가');
@@ -66,10 +66,10 @@ select is((select count(*)::int from public.myr_refund_requests where order_id =
 
 -- ---------- 요청 남기기 — 성공 ----------
 insert into rq select 'rc1', public.myr_app_claim_open('00000000-0000-4000-8000-000000000fb1', '00000000-0000-4000-8000-000000000f83', 'refund', '단순 변심',
-  '[{"item_id":"00000000-0000-4000-8000-000000000fc1","qty":1,"note":"  미개봉이에요  "}]') #>> '{requests,0,code}';
+  '[{"item_id":"00000000-0000-4000-8000-000000000fc1","qty":1,"note":"  미개봉이에요\n포장 그대로 있어요 💚  "}]') #>> '{requests,0,code}';
 select ok((select code from rq where k = 'rc1') ~ '^rq\d+$', '단순 변심 환불 요청 → rq 코드');
 select is((select jsonb_build_object('status', status, 'note', note, 'qty', qty) from public.myr_refund_requests where code = (select code from rq where k = 'rc1')),
-  '{"status": "pending", "note": "미개봉이에요", "qty": 1}'::jsonb, '처리 대기 · 상세 정리');
+  '{"status": "pending", "note": "미개봉이에요\n포장 그대로 있어요 💚", "qty": 1}'::jsonb, '처리 대기 · 상세는 앞뒤 공백만 정리 · 줄바꿈 · 이모지 그대로');
 select is(public.myr_app_claim_open('00000000-0000-4000-8000-000000000fb1', '00000000-0000-4000-8000-000000000f83', 'refund', '단순 변심', '[{"item_id":"00000000-0000-4000-8000-000000000fc1","qty":1}]') -> 'items' -> 0 ->> 'reason', 'OPEN_EXISTS', '같은 줄에 진행 중인 요청이 있으면 OPEN_EXISTS');
 insert into rq select 'rc5', public.myr_app_claim_open('00000000-0000-4000-8000-000000000fb1', '00000000-0000-4000-8000-000000000f83', 'exchange', '파손 · 누액',
   jsonb_build_array(jsonb_build_object('item_id', '00000000-0000-4000-8000-000000000fc5', 'qty', 1, 'photos', jsonb_build_array((select c5 from ph))))) #>> '{requests,0,code}';
@@ -108,8 +108,9 @@ select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'hold', 'partial', '확인') ->> 'code', 'BAD_DECISION', 'BAD_DECISION');
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'approve', 'reship', '확인') ->> 'code', 'BAD_RESOLUTION', '단순 변심에 재발송 BAD_RESOLUTION');
 select is((select jsonb_build_object('refund_now', (j ->> 'refund_now')::boolean, 'step', j #>> '{request,step}', 'collect', (j #>> '{request,needs_collect}')::boolean, 'deduction', (j #>> '{request,deduction}')::int, 'status', j #>> '{request,status}')
-             from (select public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'approve', 'partial', '회수 뒤 배송비 빼고 환불할게요') as j) s),
+             from (select public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'approve', 'partial', E'회수 뒤 배송비 빼고 환불할게요\n감사합니다 🙏') as j) s),
   '{"refund_now": false, "step": "collect", "collect": true, "deduction": 6000, "status": "progress"}'::jsonb, '부분 환불 승인 → 회수 먼저 · 왕복 배송비 차감');
+select is((select message from public.myr_refund_requests where code = (select code from rq where k = 'rc1')), E'회수 뒤 배송비 빼고 환불할게요\n감사합니다 🙏', '고객에게 보낼 메시지 — 줄바꿈 · 이모지 그대로 저장');
 select is(public.myr_app_claim_decide((select code from rq where k = 'rc1'), '00000000-0000-4000-8000-000000000f81', 'reject', null, '다시') ->> 'code', 'NOT_PENDING', '이미 처리한 요청 NOT_PENDING');
 select is((select jsonb_build_object('refund_now', (j ->> 'refund_now')::boolean, 'step', j #>> '{request,step}', 'collect', (j #>> '{request,needs_collect}')::boolean)
              from (select public.myr_app_claim_decide((select code from rq where k = 'rc5'), '00000000-0000-4000-8000-000000000f81', 'approve', 'reship', '새 제품 보내드릴게요') as j) s),

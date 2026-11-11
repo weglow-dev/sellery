@@ -84,9 +84,15 @@ describe('parseCancelBody', () => {
 		});
 		expect(parseCancelBody({ orderCode: 'myr1001' })).toEqual({ orderCode: 'myr1001', items: [], reason: '' });
 	});
-	it('items.note — 정리 · 300자 · 비면 키 없음 · 문자열 아니면 null (0067)', () => {
-		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '  포장이  찢어졌어요 \u{1F49A} ' }] })?.items).toEqual([{ item_id: A, qty: 1, note: '포장이 찢어졌어요' }]);
+	it('items.note — 여러 줄 글: 줄바꿈 · 이모지 그대로 · 제어문자 · 앞뒤 공백만 정리 · 300자(이모지 1자) · 비면 키 없음 · 문자열 아니면 null (0067)', () => {
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '  포장이 찢어졌어요 \u{1F49A}\r\n상자도 젖었어요\x07 ' }] })?.items).toEqual([
+			{ item_id: A, qty: 1, note: '포장이 찢어졌어요 \u{1F49A}\n상자도 젖었어요' }
+		]);
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 'x'.repeat(400) }] })?.items[0].note).toHaveLength(300);
+		// 300자 경계에 이모지가 걸려도 반으로 자르지 않는다(반쪽 이모지는 DB 저장 때 오류)
+		const cut = parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 'x'.repeat(299) + '\u{1F49A}\u{1F49A}' }] })?.items[0].note ?? '';
+		expect([...cut]).toHaveLength(300);
+		expect(cut.endsWith('\u{1F49A}')).toBe(true);
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: '   ' }] })?.items).toEqual([{ item_id: A, qty: 1 }]);
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 1, note: 5 }] })).toBeNull();
 		expect(refundIdempotencyKey('o', [{ item_id: A, qty: 1, note: '메모' }])).toBe(refundIdempotencyKey('o', [{ item_id: A, qty: 1 }]));

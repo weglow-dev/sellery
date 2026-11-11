@@ -9,7 +9,7 @@ import { ORDER_CODE_RE } from './checkout-rules';
 import { QTY_INT_MAX, won } from './constants';
 import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
-import { cleanText } from './text';
+import { charLength, cleanMultiline, sliceChars } from './text';
 import type { OrderItem } from './order-view';
 
 export const CLAIM_KINDS = ['refund', 'exchange'] as const;
@@ -140,7 +140,8 @@ export function parseClaimOpenBody(v: unknown): ClaimOpenBody | null {
 		if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_INT_MAX) return null;
 		if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
 		const line: ClaimLineInput = { item_id: l.itemId, qty: l.qty as number };
-		const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
+		// 상세 내용은 여러 줄 글 — 줄바꿈 · 이모지를 지우지 않는다(cleanText 는 이름 · 주소용)
+		const note = sliceChars(cleanMultiline(l.note), REFUND_NOTE_MAX);
 		if (note) line.note = note;
 		if (l.photos !== undefined && l.photos !== null) {
 			if (!Array.isArray(l.photos) || l.photos.length > REFUND_PHOTO_MAX || !l.photos.every((p) => typeof p === 'string' && isRefundPhotoPath(p))) return null;
@@ -156,15 +157,16 @@ export type ClaimDecideBody = { decision: 'approve'; resolution: Resolution; mes
 export function parseClaimDecideBody(v: unknown): ClaimDecideBody | null {
 	const b = obj(v);
 	if (!b) return null;
-	const message = cleanText(typeof b.message === 'string' ? b.message : '');
-	if (message.length > CLAIM_MESSAGE_MAX) return null;
+	// 고객에게 보낼 메시지는 여러 줄 글 — 줄바꿈 · 이모지를 지우지 않는다 · 글자 수는 DB 와 같은 기준(이모지 1자)
+	const message = cleanMultiline(b.message);
+	if (charLength(message) > CLAIM_MESSAGE_MAX) return null;
 	// 반려는 사유를 고객에게 알려야 하니 메시지 필수 · 승인은 선택(0091 — 비면 null)
 	if (b.decision === 'reject') return message ? { decision: 'reject', resolution: null, message } : null;
 	if (b.decision === 'approve' && isResolution(b.resolution)) return { decision: 'approve', resolution: b.resolution, message };
 	return null;
 }
 /** 승인 버튼 — 처리 방법만 고르면 된다(메시지는 선택 · 0091) · 메시지를 적었으면 길이만 본다 */
-export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && cleanText(message).length <= CLAIM_MESSAGE_MAX;
+export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && charLength(cleanMultiline(message)) <= CLAIM_MESSAGE_MAX;
 
 /* ---------------- 파서 — myr_refund_request_json ---------------- */
 export type Claim = {
