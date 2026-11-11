@@ -10,20 +10,23 @@
 --     주문   myr_order_status_paid(결제된 주문 = PAID · PARTIAL_REFUNDED · REFUNDED) · myr_order_status_alive(끝나지 않은 주문 = WAITING_DEPOSIT · PAID · PARTIAL_REFUNDED)
 --            myr_order_status_open(결제됐고 끝나지 않은 주문 = 둘 다) · myr_order_net(결제 − 환불) · myr_order_owned_by(주문 주인)
 --     줄     myr_line_valid(취소가 아닌 줄) · myr_line_net(줄 금액 − 환불) · myr_line_amount(단가 × 수량) · myr_ship_status_unshipped(출고 전 = 결제완료 · 배송준비중)
---     요청   myr_claim_status_open(열린 요청 = pending · progress) · myr_claim_resolution_deducts(왕복 배송비를 빼는 처리 방법)
+--     요청   myr_claim_status_open(열린 요청 = pending · progress) · myr_claim_resolution_deducts(왕복 배송비를 빼는 처리 방법) · myr_claim_resolution_collects(회수가 필요한 처리 방법)
 --            myr_claim_open_deduction(새 요청의 예상 차감 — 샵 예상 금액이 부른다)
+--            myr_claim_reasons(사유 목록) · myr_claim_kinds · myr_claim_kind_allowed(사유별 요청 종류 — 단순 변심은 환불만) · myr_claim_photo_required(사진 필수 사유)
+--            myr_claim_reason_change_mind(단순 변심 기한이 걸리는 사유)
 --     공구   myr_groupbuy_pct_min · max · ok(할인율 범위 — 표 CHECK · 만들기 · 미리보기 · 콘솔 폼이 같이 쓴다)
 --     제조   myr_deposit_amount(보증금 = 제조비 × 보증금 비율)
 --   화면이 다시 계산하지 않게 응답에 더하는 값
 --     주문(샵)     net_amount · alive · 줄 live · left_amount(남은 수량 금액) · claim_status 는 결제됐고 끝나지 않은 주문에만
 --     주문(콘솔)   주문마다 ship_status(내 줄) · amounts(paid · refunded · net)
---     요청         open · refund_paid · shipping_back · 줄 amount(주문 수량 금액)
+--     요청         open · refund_paid · shipping_back · 줄 amount(주문 수량 금액) · option_collects(처리 방법마다 회수 여부)
 --     환불 precheck  goods · shipping_back
 --     내 상품      editable · approved · 목록 sold_out · 공구 화면 product.listed · pct_min · pct_max
 --     상품 저장    판매가 거절 응답에 max(콘솔 안내 문구가 서버 상한을 쓴다)
---   새 RPC      myr_app_order_refresh_payment(주문, 토스 payment) — 결제됐고 끝나지 않은 주문의 결제 원문 갱신(샵 서버가 상태 묶음을 직접 쓰지 않게)
+--   새 RPC      myr_app_claim_form_rules() — 신청 화면이 쓰는 사유 규칙 한 벌(사유 · 요청 종류 · 사진 필수 · 기한 적용 · 왕복 배송비) — 화면이 사유 규칙을 따로 쓰지 않게
+--               myr_app_order_refresh_payment(주문, 토스 payment) — 결제됐고 끝나지 않은 주문의 결제 원문 갱신(샵 서버가 상태 묶음을 직접 쓰지 않게)
 --   없애는 값   myr_app_seller_sales 의 payout(옛 마진율 계산 — 화면은 정산 예상 myr_settlement_preview 를 쓴다) · myr_sales_lines 의 seller_margin_rate
---   권한: 새 내부 함수는 anon · authenticated EXECUTE 회수 · myr_claim_open_deduction · myr_app_order_refresh_payment 만 service_role.
+--   권한: 새 내부 함수는 anon · authenticated EXECUTE 회수 · myr_claim_open_deduction · myr_app_claim_form_rules · myr_app_order_refresh_payment 만 service_role.
 --   테스트: supabase/tests/myr_single_source.test.sql(새 함수 · 권한 · "식이 지정한 함수 밖에 없다" 검사) + 기존 테스트 그대로.
 -- ============================================================
 
@@ -205,6 +208,85 @@ as $$
   select coalesce(p_resolution = 'partial', false)
 $$;
 revoke all on function public.myr_claim_resolution_deducts(text) from public, anon, authenticated;
+
+-- 요청 사유 · 사유별 규칙 — 요청 접수(myr_app_claim_open)와 신청 화면(myr_app_claim_form_rules)이 같은 함수를 쓴다
+create or replace function public.myr_claim_reasons()
+returns text[]
+language sql
+immutable
+as $$
+  select array['단순 변심', '파손 · 누액', '오배송']
+$$;
+revoke all on function public.myr_claim_reasons() from public, anon, authenticated;
+
+-- 단순 변심 사유인가 — 수령 후 7일 기한(myr_line_change_mind_ok)이 걸리고 환불로만 받는다
+create or replace function public.myr_claim_reason_change_mind(p_reason text)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p_reason = '단순 변심', false)
+$$;
+revoke all on function public.myr_claim_reason_change_mind(text) from public, anon, authenticated;
+
+-- 사유별로 받을 수 있는 요청 종류 — 단순 변심은 환불만(왕복 배송비를 환불액에서 뺀다 · 교환은 뺄 돈이 없다 — docs/myr.md §9-15)
+create or replace function public.myr_claim_kinds(p_reason text)
+returns text[]
+language sql
+immutable
+as $$
+  select case when public.myr_claim_reason_change_mind(p_reason) then array['refund'] else array['refund', 'exchange'] end
+$$;
+revoke all on function public.myr_claim_kinds(text) from public, anon, authenticated;
+
+create or replace function public.myr_claim_kind_allowed(p_kind text, p_reason text)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p_kind = any (public.myr_claim_kinds(p_reason)), false)
+$$;
+revoke all on function public.myr_claim_kind_allowed(text, text) from public, anon, authenticated;
+
+-- 사진이 꼭 있어야 하는 사유 — 파손 · 오배송은 사진으로 확인한다
+create or replace function public.myr_claim_photo_required(p_reason text)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p_reason in ('파손 · 누액', '오배송'), false)
+$$;
+revoke all on function public.myr_claim_photo_required(text) from public, anon, authenticated;
+
+-- 신청 화면이 쓰는 규칙 한 벌 — 사유 목록(순서대로) · 사유마다 받을 수 있는 요청 종류 · 사진 필수 · 단순 변심 기한 적용 · 왕복 배송비
+create or replace function public.myr_app_claim_form_rules()
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select jsonb_build_object(
+    'return_fee', public.myr_claim_return_fee(),
+    'reasons', (select jsonb_agg(jsonb_build_object('reason', t.r, 'kinds', to_jsonb(public.myr_claim_kinds(t.r)),
+                                                    'photo_required', public.myr_claim_photo_required(t.r),
+                                                    'change_mind', public.myr_claim_reason_change_mind(t.r)) order by t.o)
+                  from unnest(public.myr_claim_reasons()) with ordinality t(r, o)))
+$$;
+revoke all on function public.myr_app_claim_form_rules() from public, anon, authenticated;
+grant execute on function public.myr_app_claim_form_rules() to service_role;
+
+-- 처리 방법마다 회수가 필요한가 — 부분 환불 · 재발송 + 회수는 회수 · 전액 환불은 파손 · 누액만 회수 없이(사진으로 확인) · 재발송은 회수 없음.
+--   승인(myr_app_claim_decide 의 needs_collect)과 콘솔 처리 방법 안내(요청 응답 option_collects)가 같이 쓴다
+create or replace function public.myr_claim_resolution_collects(p_resolution text, p_reason text)
+returns boolean
+language sql
+immutable
+as $$
+  select case when p_resolution in ('reship_collect', 'partial') then true
+              when p_resolution = 'refund' then coalesce(p_reason <> '파손 · 누액', true)
+              else false end
+$$;
+revoke all on function public.myr_claim_resolution_collects(text, text) from public, anon, authenticated;
 
 -- 새 요청의 예상 차감 — 환불 요청이고 처리 방법 기본(myr_refund_request_options 첫 값)이 왕복 배송비를 빼는 방법이면 왕복 배송비 · 그 밖은 0.
 --   한 번에 보낸 요청은 묶음에서 한 번만 뺀다(myr_refund_request_fee_due) — 샵 예상 금액은 고른 줄 전체를 한 번에 계산하므로 한 번
@@ -1613,7 +1695,7 @@ $$;
 revoke all on function public.myr_app_refund_record(uuid, jsonb, text, uuid, text, integer, jsonb) from public, anon, authenticated;
 grant execute on function public.myr_app_refund_record(uuid, jsonb, text, uuid, text, integer, jsonb) to service_role;
 
--- 0097 정의 + myr_order_owned_by · myr_order_status_open · myr_line_valid · myr_claim_status_open
+-- 0097 정의 + myr_order_owned_by · myr_order_status_open · myr_line_valid · myr_claim_status_open · 사유 규칙(myr_claim_reasons · kind_allowed · reason_change_mind · photo_required)
 create or replace function public.myr_app_claim_open(p_order_id uuid, p_actor_id uuid, p_kind text, p_reason text, p_lines jsonb)
 returns jsonb
 language plpgsql
@@ -1635,8 +1717,8 @@ declare
   v_batch    uuid := gen_random_uuid();
 begin
   if p_kind is null or p_kind not in ('refund','exchange') then return jsonb_build_object('ok', false, 'code', 'BAD_KIND'); end if;
-  if p_reason is null or p_reason not in ('단순 변심','파손 · 누액','오배송') then return jsonb_build_object('ok', false, 'code', 'BAD_REASON'); end if;
-  if p_reason = '단순 변심' and p_kind = 'exchange' then return jsonb_build_object('ok', false, 'code', 'EXCHANGE_NOT_ALLOWED'); end if;
+  if p_reason is null or not (p_reason = any (public.myr_claim_reasons())) then return jsonb_build_object('ok', false, 'code', 'BAD_REASON'); end if;
+  if not public.myr_claim_kind_allowed(p_kind, p_reason) then return jsonb_build_object('ok', false, 'code', 'EXCHANGE_NOT_ALLOWED'); end if;
   select * into o from public.myr_orders where id = p_order_id for update;
   if not found or not public.myr_order_owned_by(o, p_actor_id) then
     return jsonb_build_object('ok', false, 'code', 'NOT_FOUND');
@@ -1665,12 +1747,12 @@ begin
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'NOT_PREPARED');
     elsif exists (select 1 from public.myr_refund_requests q where q.order_item_id = v_id and public.myr_claim_status_open(q.status)) then
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'OPEN_EXISTS');
-    elsif p_reason = '단순 변심' and not public.myr_line_change_mind_ok(i) then
+    elsif public.myr_claim_reason_change_mind(p_reason) and not public.myr_line_change_mind_ok(i) then
       -- 단순 변심은 수령 후 7일(날짜 기준)까지 — 기한 판정은 myr_line_change_mind_until 한 곳(샵 화면도 같은 값 · 0093)
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'CHANGE_MIND_EXPIRED', 'until', public.myr_line_change_mind_until(i));
     elsif cardinality(v_photos) > 3 or exists (select 1 from unnest(v_photos) p where p !~ ('^' || o.id::text || '/' || v_id::text || '/[0-9a-f-]{36}\.(jpg|png|webp)$')) then
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'BAD_PHOTOS');
-    elsif p_reason in ('파손 · 누액','오배송') and cardinality(v_photos) = 0 then
+    elsif public.myr_claim_photo_required(p_reason) and cardinality(v_photos) = 0 then
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'PHOTO_REQUIRED');
     end if;
     v_seen := v_seen || v_id;
@@ -1694,7 +1776,7 @@ $$;
 revoke all on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) from public, anon, authenticated;
 grant execute on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) to service_role;
 
--- 0091 정의 + myr_claim_resolution_deducts · myr_line_amount
+-- 0091 정의 + myr_claim_resolution_deducts · myr_claim_resolution_collects · myr_line_amount
 create or replace function public.myr_app_claim_decide(p_code text, p_user uuid, p_decision text, p_resolution text, p_message text)
 returns jsonb
 language plpgsql
@@ -1736,9 +1818,7 @@ begin
          needs_refund  = p_resolution in ('refund','partial'),
          needs_reship  = p_resolution in ('reship','reship_collect'),
          -- 파손 · 누액은 회수 없이(사진으로 확인) · 단순 변심 · 오배송 환불과 회수 후 재발송은 회수
-         needs_collect = case when p_resolution = 'reship_collect' or p_resolution = 'partial' then true
-                              when p_resolution = 'refund' then r.reason <> '파손 · 누액'
-                              else false end,
+         needs_collect = public.myr_claim_resolution_collects(p_resolution, r.reason),
          deduction     = case when public.myr_claim_resolution_deducts(p_resolution) then v_fee else 0 end
    where id = r.id
    returning * into r;
@@ -1789,6 +1869,8 @@ as $$
     'id', r.id, 'code', r.code, 'status', r.status, 'open', public.myr_claim_status_open(r.status), 'step', public.myr_refund_request_step(r),
     'kind', r.kind, 'reason', r.reason, 'qty', r.qty, 'note', r.note, 'photos', to_jsonb(r.photos),
     'options', to_jsonb(public.myr_refund_request_options(r.kind, r.reason)),
+    -- 처리 방법마다 회수가 필요한가(승인과 같은 함수) — 콘솔 처리 방법 안내가 사유로 다시 판정하지 않는다
+    'option_collects', coalesce((select jsonb_object_agg(x, public.myr_claim_resolution_collects(x, r.reason)) from unnest(public.myr_refund_request_options(r.kind, r.reason)) x), '{}'::jsonb),
     'resolution', r.resolution, 'message', r.message, 'decided_at', r.decided_at,
     'needs_collect', r.needs_collect, 'collected_at', r.collected_at,
     'needs_reship', r.needs_reship, 'reship_courier', r.reship_courier, 'reship_tracking_no', r.reship_tracking_no, 'reshipped_at', r.reshipped_at,

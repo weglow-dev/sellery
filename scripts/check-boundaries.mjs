@@ -13,7 +13,7 @@
 //   (e) 서버 파일(`*.server.ts` · `+server.ts` · `src/lib/server/**`)이 `@sellery/db/browser` 를 import → 실패 (브라우저 클라이언트는 브라우저에서만)
 //   (f) MYR 앱 · `@sellery/myr-core` 가 셀러리 패키지(`@sellery/{db,payments,core,ui}`)를 import → 실패 · (g) `@sellery/myr-core` 가 SvelteKit 별칭을 import → 실패
 //   (h) MYR 코드(`apps/myr*/src` · `packages/myr-core/src` · 테스트 제외)가 **서버 판정 식을 다시 쓰면** 실패 — 백엔드 원칙 1 · 2(CLAUDE.md).
-//       줄의 남은 수량 · 살아 있는 줄 · 금액 − 환불 · 단가 × 수량 · 주문/요청/상품 상태 묶음 · 품절 · 할인율 범위 · 판매가 상한은 DB 함수 하나가 정하고(0097~0099),
+//       줄의 남은 수량 · 살아 있는 줄 · 금액 − 환불 · 단가 × 수량 · 주문/요청/상품 상태 묶음 · 요청 사유 규칙 · 품절 · 할인율 범위 · 판매가 상한은 DB 함수 하나가 정하고(0097~0099),
 //       화면 · 서버 TS 는 그 값을 응답에서 읽는다. 아래 MYR_MIRROR_RULES 의 식이 나오면 "서버 값을 쓰라"는 안내와 함께 막는다.
 //       DB 함수끼리 같은 식을 다시 쓰는 것은 pgTAP `supabase/tests/myr_single_source.test.sql` 이 막는다(짝).
 //
@@ -165,6 +165,10 @@ const MYR_MIRROR_RULES = [
   {
     re: /===\s*['"](listed|live)['"]\s*\|\|[^\n]*===\s*['"]paused['"]|===\s*['"]draft['"]\s*\|\|[^\n]*===\s*['"]rejected['"]/,
     why: "상품 상태 묶음을 다시 씀 — 서버 값 approved · editable(myr_product_status_*)을 쓴다",
+  },
+  {
+    re: /(===|!==)\s*['"](단순 변심|파손 · 누액|오배송)['"]/,
+    why: "요청 사유 규칙(요청 종류 · 사진 필수 · 기한 적용)을 다시 씀 — 서버 값 ClaimFormRules(myr_app_claim_form_rules)를 쓴다",
   },
   { re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/, why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다" },
   { re: /\bGB_PCT_(MIN|MAX)\b|\b10_?000_?000\b/, why: "공구 할인율 범위 · 판매가 상한 숫자를 화면에 둠 — 서버 값(pctRange · 거절 응답 max)을 쓴다" },

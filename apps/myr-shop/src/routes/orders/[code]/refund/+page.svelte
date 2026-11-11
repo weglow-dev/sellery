@@ -10,4 +10,4 @@
 	<meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<RefundPage order={data.order} returnFee={data.returnFee} backHref={data.backHref} />
+<RefundPage order={data.order} rules={data.rules} backHref={data.backHref} />

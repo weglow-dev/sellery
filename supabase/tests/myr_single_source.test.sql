@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(98);
+select plan(113);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -11,6 +11,9 @@ select function_privs_are('public', 'myr_line_amount', '{integer,integer}'::text
 select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open_deduction 불가');
 select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 claim_open_deduction 불가');
 select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 claim_open_deduction 가능');
+select function_privs_are('public', 'myr_app_claim_form_rules', '{}'::text[], 'anon', '{}'::text[], 'anon 은 claim_form_rules 불가');
+select function_privs_are('public', 'myr_app_claim_form_rules', '{}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 claim_form_rules 불가');
+select function_privs_are('public', 'myr_app_claim_form_rules', '{}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 claim_form_rules 가능');
 select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 order_refresh_payment 불가');
 select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 order_refresh_payment 불가');
 select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 order_refresh_payment 가능');
@@ -50,6 +53,25 @@ select is(public.myr_claim_open_deduction('refund', '오배송'), 0, '오배송 
 select is(public.myr_claim_open_deduction('exchange', '단순 변심'), 0, '교환 → 0');
 select is(public.myr_claim_open_deduction('refund', '모르는 사유'), 0, '모르는 사유 → 0');
 select is(public.myr_claim_open_deduction(null, null), 0, 'null → 0');
+
+-- 사유 규칙 — 신청 화면(myr_app_claim_form_rules)과 요청 접수(myr_app_claim_open)가 같은 함수
+select is(public.myr_app_claim_form_rules() -> 'reasons',
+          '[{"reason": "단순 변심", "kinds": ["refund"], "photo_required": false, "change_mind": true},
+            {"reason": "파손 · 누액", "kinds": ["refund", "exchange"], "photo_required": true, "change_mind": false},
+            {"reason": "오배송", "kinds": ["refund", "exchange"], "photo_required": true, "change_mind": false}]'::jsonb,
+          '신청 화면 규칙 — 사유 순서 · 단순 변심은 환불만 · 파손 · 오배송은 사진 필수 · 단순 변심만 기한 적용');
+select is((public.myr_app_claim_form_rules() ->> 'return_fee')::int, public.myr_claim_return_fee(), '신청 화면 규칙의 왕복 배송비 = myr_claim_return_fee');
+select is((select jsonb_object_agg(k || '/' || r, public.myr_claim_kind_allowed(k, r)) from unnest(array['refund','exchange']) k, unnest(public.myr_claim_reasons()) r),
+          '{"refund/단순 변심": true, "exchange/단순 변심": false, "refund/파손 · 누액": true, "exchange/파손 · 누액": true, "refund/오배송": true, "exchange/오배송": true}'::jsonb,
+          '요청 종류 — 단순 변심 교환만 안 된다');
+select is(jsonb_build_array(public.myr_claim_kind_allowed('exchange', null), public.myr_claim_kind_allowed(null, '오배송'), public.myr_claim_kind_allowed('gift', '오배송'), public.myr_claim_photo_required(null), public.myr_claim_reason_change_mind(null)),
+          '[true, false, false, false, false]'::jsonb, 'null · 모르는 값 — 종류 없음 · 모르는 종류는 거절 · 사진 · 기한은 false(사유 자체는 BAD_REASON 이 먼저 막는다)');
+
+-- 처리 방법마다 회수 여부 — 승인(needs_collect)과 콘솔 안내(option_collects)가 같은 함수
+select is((select jsonb_object_agg(rs || '/' || rn, public.myr_claim_resolution_collects(rs, rn)) from unnest(array['refund','partial','reship','reship_collect']) rs, unnest(public.myr_claim_reasons()) rn),
+          '{"refund/단순 변심": true, "refund/파손 · 누액": false, "refund/오배송": true, "partial/단순 변심": true, "partial/파손 · 누액": true, "partial/오배송": true,
+            "reship/단순 변심": false, "reship/파손 · 누액": false, "reship/오배송": false, "reship_collect/단순 변심": true, "reship_collect/파손 · 누액": true, "reship_collect/오배송": true}'::jsonb,
+          '회수 — 부분 환불 · 재발송 + 회수는 항상 · 전액 환불은 파손 · 누액만 회수 없이 · 재발송은 회수 없음');
 
 -- ---------- 4. 공구 할인율 범위 ----------
 select is((select jsonb_agg(public.myr_groupbuy_pct_ok(v) order by o) from unnest(array[0, 1, 70, 71, null]::int[]) with ordinality t(v, o)),
@@ -145,6 +167,11 @@ select is((select jsonb_object_agg(o.code, jsonb_build_array(public.myr_order_ow
           '주문 주인 — [회원, 비회원 고객, actor 없음] · 주인 없는 주문은 누구 것도 아니다');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000e934', '[]', 'customer', '00000000-0000-4000-8000-00000000e9c1') ->> 'code', 'NOT_FOUND', '환불 precheck — 주인 없는 주문은 NOT_FOUND');
 select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e934', '00000000-0000-4000-8000-00000000e9c1', 'refund', '오배송', '[]') ->> 'code', 'NOT_FOUND', '요청 접수 — 같은 판정');
+select is((select jsonb_agg(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e9c1', k, r, '[]') ->> 'code' order by o)
+             from (values (1, 'exchange', '단순 변심'), (2, 'refund', '모르는 사유'), (3, 'gift', '오배송'), (4, 'exchange', '오배송')) v(o, k, r)),
+          '["EXCHANGE_NOT_ALLOWED", "BAD_REASON", "BAD_KIND", "NOTHING"]'::jsonb, '요청 접수 — 단순 변심 교환 · 모르는 사유 · 모르는 종류는 거절 · 오배송 교환은 통과(줄이 없어 NOTHING)');
+select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e9c1', 'refund', '오배송', '[{"item_id":"00000000-0000-4000-8000-00000000e941","qty":1}]') -> 'items' -> 0 ->> 'reason',
+          'PHOTO_REQUIRED', '요청 접수 — 사진 필수 사유인데 사진이 없으면 PHOTO_REQUIRED(화면 규칙과 같은 함수)');
 
 -- 줄
 select is((select jsonb_object_agg(i.product_name, jsonb_build_array(public.myr_line_valid(i), public.myr_line_live(i), public.myr_line_net(i))) from public.myr_order_items i where i.order_id in (select id from public.myr_orders where code like 'pgtap-ss-%')),
@@ -190,6 +217,9 @@ select is((select jsonb_object_agg(r.code, jsonb_build_array(j -> 'open', j -> '
           '{"pgss01": [false, 10000, 10000, 0], "pgss02": [true, 20000, null, 0], "pgss03": [true, 10000, 13000, 3000]}'::jsonb,
           '요청 응답 — [열림, 요청 상품 금액, 결제 기준 금액(환불 + 차감), 함께 돌려준 배송비]');
 select is((select (public.myr_refund_request_json(r) #>> '{order,item,amount}')::int from public.myr_refund_requests r where r.code = 'pgss01'), 30000, '요청 응답 줄 amount = 주문 수량 전체 금액(3 × 10,000)');
+select is((select jsonb_object_agg(r.code, public.myr_refund_request_json(r) -> 'option_collects') from public.myr_refund_requests r where r.code like 'pgss0%'),
+          '{"pgss01": {"partial": true, "refund": true}, "pgss02": {"refund": false, "reship": false}, "pgss03": {"refund": true, "reship_collect": true}}'::jsonb,
+          '요청 응답 option_collects — 선택지마다 회수 여부(단순 변심 · 파손 · 누액 · 오배송)');
 select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e9c1', 'refund', '오배송',
             '[{"item_id":"00000000-0000-4000-8000-00000000e942","qty":1,"photos":["00000000-0000-4000-8000-00000000e931/00000000-0000-4000-8000-00000000e942/00000000-0000-4000-8000-0000000000aa.jpg"]}]') -> 'items' -> 0 ->> 'reason',
           'OPEN_EXISTS', '열린 요청이 있는 줄은 새 요청 불가(같은 판정)');
@@ -226,6 +256,10 @@ insert into _rules (label, pat, allowed) values
   ('주문 상태 묶음',                          $p$'PAID'\s*,\s*'PARTIAL_REFUNDED'$p$,                             '{myr_order_status_paid,myr_order_status_alive}'),
   ('출고 전 상태 묶음',                       $p$'PAID'\s*,\s*'PREPARING'$p$,                                    '{myr_ship_status_unshipped}'),
   ('열린 요청 상태 묶음',                     $p$'pending'\s*,\s*'progress'$p$,                                  '{myr_claim_status_open}'),
+  ('요청 사유 목록',                          $p$'단순 변심'\s*,\s*'파손 · 누액'$p$,                               '{myr_claim_reasons}'),
+  ('단순 변심 사유 비교',                     $p$=\s*'단순 변심'$p$,                                             '{myr_claim_reason_change_mind}'),
+  ('사진 필수 사유',                          $p$'파손 · 누액'\s*,\s*'오배송'$p$,                                 '{myr_claim_photo_required,myr_claim_reasons}'),
+  ('회수 없는 사유 비교',                     $p$<>\s*'파손 · 누액'$p$,                                          '{myr_claim_resolution_collects}'),
   ('주문 주인',                               $p$user_id is null and (\w+\.)?customer_id$p$,                     '{myr_order_owned_by}'),
   ('판매가 상한',                             $p$10000000$p$,                                                    '{myr_product_price_max}'),
   ('수량 형식 상한',                          $p$999999$p$,                                                      '{myr_qty_max}'),

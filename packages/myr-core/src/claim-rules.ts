@@ -27,11 +27,34 @@ export const isClaimReason = (v: unknown): v is ClaimReason => typeof v === 'str
 const RESOLUTIONS: readonly Resolution[] = ['refund', 'partial', 'reship', 'reship_collect'];
 export const isResolution = (v: unknown): v is Resolution => typeof v === 'string' && (RESOLUTIONS as readonly string[]).includes(v);
 
-/** 요청 종류 · 사유 고르기 — 단순 변심은 환불만(왕복 배송비를 환불액에서 뺀다 · 교환은 뺄 돈이 없다) */
 export const KIND_LABEL: Record<ClaimKind, string> = { refund: '환불', exchange: '교환' };
-export const kindAllowed = (kind: ClaimKind, reason: ClaimReason | ''): boolean => !(kind === 'exchange' && reason === '단순 변심');
-/** 사진이 필요한 사유 — 파손 · 오배송은 사진으로 확인한다(DB PHOTO_REQUIRED 와 같은 목록) */
-export const photoRequired = (reason: ClaimReason | ''): boolean => reason === '파손 · 누액' || reason === '오배송';
+
+/** 신청 화면의 사유 규칙 — 서버 값 그대로(0099 `myr_app_claim_form_rules` · 요청 접수 `myr_app_claim_open` 과 같은 함수들).
+ *  사유마다: 받을 수 있는 요청 종류(kinds — 단순 변심은 환불만) · 사진 필수 · 단순 변심 기한(수령 후 7일)이 걸리는지. 화면은 이 값을 읽기만 한다 */
+export type ClaimReasonRule = { reason: ClaimReason; kinds: ClaimKind[]; photoRequired: boolean; changeMind: boolean };
+export type ClaimFormRules = { returnFee: number | null; reasons: ClaimReasonRule[] };
+export const EMPTY_CLAIM_FORM_RULES: ClaimFormRules = { returnFee: null, reasons: [] };
+export function claimFormRulesFromJson(v: unknown): ClaimFormRules {
+	const o = obj(v);
+	if (!o) return EMPTY_CLAIM_FORM_RULES;
+	const reasons = (Array.isArray(o.reasons) ? o.reasons : [])
+		.map(obj)
+		.filter((r): r is Record<string, unknown> => !!r && isClaimReason(r.reason))
+		.map((r) => ({
+			reason: r.reason as ClaimReason,
+			kinds: Array.isArray(r.kinds) ? r.kinds.filter(isClaimKind) : [],
+			photoRequired: r.photo_required === true,
+			changeMind: r.change_mind === true
+		}));
+	return { returnFee: typeof o.return_fee === 'number' && Number.isFinite(o.return_fee) ? o.return_fee : null, reasons };
+}
+/** 고른 사유의 규칙 · 아직 고르지 않았으면 null */
+export const reasonRule = (rules: ClaimFormRules, reason: ClaimReason | ''): ClaimReasonRule | null => rules.reasons.find((r) => r.reason === reason) ?? null;
+/** 교환을 받지 않는 사유일 때 요청 종류 아래 한 줄 — 받는지 여부는 서버 값(kinds), 여기는 문구만(2026-11-06 대표 결정: 단순 변심은 환불만 — 교환은 왕복 배송비를 뺄 돈이 없다) */
+const REFUND_ONLY_NOTES: Partial<Record<ClaimReason, string>> = { '단순 변심': '단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요' };
+export const refundOnlyNote = (reason: ClaimReason): string => REFUND_ONLY_NOTES[reason] ?? '이 사유는 환불로만 받아요';
+/** 그 사유로 이 요청 종류를 받을 수 있나 — 서버 값(kinds) 그대로 · 사유를 고르기 전에는 막지 않는다 */
+export const kindAllowed = (kind: ClaimKind, rule: ClaimReasonRule | null): boolean => rule === null || rule.kinds.includes(kind);
 
 /** 사유별 처리 기준 — 고객 신청 화면 · 콘솔 상세 "처리 기준"(2026-11-06 대표 승인 · 같은 날 문구 줄임) */
 export function claimPolicy(reason: string, returnFee: number | null): string[] {
@@ -74,14 +97,15 @@ export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, sh
 export const claimQtyText = (c: Pick<Claim, 'qty' | 'order'>): string | null => (c.qty < c.order.item.qty ? `${c.qty}개 (주문 ${c.order.item.qty}개 중)` : null);
 
 /** 처리 방법 이름 — 요청 종류에 따라 다르다(환불 요청의 재발송 = "교환으로 전환") · desc 는 금액(서버 예상 금액 · 없으면 빼고) · 회수 안내 */
-export function resolutionOption(r: Resolution, c: Pick<Claim, 'kind' | 'reason'>, quote?: RefundView | null): { id: Resolution; title: string; desc: string } {
+export function resolutionOption(r: Resolution, c: Pick<Claim, 'kind' | 'optionCollects'>, quote?: RefundView | null): { id: Resolution; title: string; desc: string } {
 	const money = quote ? `${refundAmountText(quote)} · ` : '';
 	switch (r) {
 		case 'refund':
 			return {
 				id: r,
 				title: c.kind === 'exchange' ? '환불로 전환' : '전액 환불',
-				desc: `${money}${c.reason === '파손 · 누액' ? '회수 없이 바로 환불' : '회수 확인 뒤 환불'}`
+				// 회수가 필요한지는 서버 값(optionCollects · 0099 myr_claim_resolution_collects — 승인과 같은 함수) · 응답에 없으면 회수하는 쪽으로 안내
+				desc: `${money}${c.optionCollects[r] === false ? '회수 없이 바로 환불' : '회수 확인 뒤 환불'}`
 			};
 		case 'partial':
 			return { id: r, title: '부분 환불 (왕복 배송비 차감)', desc: `${money}회수 확인 뒤 환불` };
@@ -154,6 +178,8 @@ export type Claim = {
 	note: string | null;
 	photos: string[];
 	options: Resolution[];
+	/** 처리 방법마다 회수가 필요한가 — 서버 값(0099 option_collects) · 콘솔 처리 방법 안내가 사유로 다시 판정하지 않는다 */
+	optionCollects: Partial<Record<Resolution, boolean>>;
 	resolution: Resolution | null;
 	message: string | null;
 	decidedAt: string | null;
@@ -221,6 +247,7 @@ export function claimFromJson(v: unknown): Claim | null {
 		note: sn(o.note),
 		photos: Array.isArray(o.photos) ? o.photos.filter((x): x is string => typeof x === 'string') : [],
 		options: Array.isArray(o.options) ? o.options.filter(isResolution) : [],
+		optionCollects: Object.fromEntries(Object.entries(obj(o.option_collects) ?? {}).filter(([k, v]) => isResolution(k) && typeof v === 'boolean')) as Partial<Record<Resolution, boolean>>,
 		resolution: isResolution(o.resolution) ? o.resolution : null,
 		message: sn(o.message),
 		decidedAt: sn(o.decided_at),

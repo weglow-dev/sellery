@@ -2,7 +2,7 @@
 	/** 교환 · 환불 요청(0078) — 배송준비중 이후 줄. RefundPage 가 [바로 환불 | 교환 · 환불 요청] 중 요청 쪽으로 그린다(머리는 RefundPage).
 	 *  PC: 왼쪽 제품 체크 카드(수량 · 상세 · 사진) · 요청 종류(환불/교환) · 사유 칩 · 처리 기준 / 오른쪽 요약 · [요청 보내기] → 인라인 확인.
 	 *  모바일: 같은 순서로 쌓고, 버튼은 요약 카드 안(요청은 즉시 결제 취소가 아니라 하단 고정 바를 두지 않는다).
-	 *  규칙은 claim-rules(순수): 단순 변심은 환불만 · 파손 · 오배송은 사진 필수 · 처리 기준 문구. 서버(myr_app_claim_open)가 같은 규칙으로 다시 막는다.
+	 *  사유 규칙은 서버 값(rules · 0099 myr_app_claim_form_rules): 사유 목록 · 사유별 요청 종류(단순 변심은 환불만) · 사진 필수 · 단순 변심 기한 적용 — 요청 접수(myr_app_claim_open)와 같은 DB 함수라 화면이 따로 판정하지 않는다.
 	 *  사진은 환불 신청과 같은 API(/api/refunds/photos · 버킷 myr-refunds · 줄당 3장)로 올리고 경로만 보낸다. 보낸 뒤 주문 상세로.
  *  예상 환불 금액은 서버(/api/refunds/quote · 실제 환불과 같은 refundQuote — 마지막 줄이면 배송비 포함 · 단순 변심은 왕복 배송비 차감)가 정한다. */
 	import { onDestroy, untrack } from 'svelte';
@@ -12,20 +12,22 @@
 	import { shop } from '$lib/state.svelte';
 	import type { OrderItem, OrderView } from '@sellery/myr-core/order-view';
 	import {
-		CLAIM_REASONS,
 		changeMindNote,
 		claimMessage,
 		claimPolicy,
 		KIND_LABEL,
 		kindAllowed,
-		photoRequired,
+		reasonRule,
+		refundOnlyNote,
+		type ClaimFormRules,
 		type ClaimKind,
 		type ClaimReason
 	} from '@sellery/myr-core/claim-rules';
 	import { REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, refundLineAmount, remainingQty } from '@sellery/myr-core/refund-rules';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, lines, returnFee, backHref }: { order: OrderView; lines: OrderItem[]; returnFee: number | null; backHref: string } = $props();
+	let { order, lines, rules, backHref }: { order: OrderView; lines: OrderItem[]; rules: ClaimFormRules; backHref: string } = $props();
 
 	let qtyById = $state<Record<string, number>>({});
 	let noteById = $state<Record<string, string>>({});
@@ -40,7 +42,9 @@
 
 	const chosen = $derived(lines.filter((l) => (qtyById[l.id] ?? 0) > 0));
 	const count = $derived(chosen.reduce((n, l) => n + (qtyById[l.id] ?? 0), 0));
-	const needPhoto = $derived(photoRequired(reason));
+	// 고른 사유의 규칙(서버 값) — 요청 종류 · 사진 필수 · 단순 변심 기한 적용
+	const rule = $derived(reasonRule(rules, reason));
+	const needPhoto = $derived(rule?.photoRequired ?? false);
 	const missingPhoto = $derived(needPhoto && chosen.some((l) => !(photosById[l.id]?.length)));
 	const busy = $derived(Object.values(uploading).some((n) => n > 0));
 	// 예상 환불 — 서버가 실제 환불과 같은 계산으로 정한다(고른 줄 · 수량 · 사유가 바뀔 때만 묻는다) · 최종 금액은 크리에이터 승인 · 회수 뒤 정해진다
@@ -55,10 +59,10 @@
 	});
 	const estimate = $derived(kind === 'refund' ? quote.quote : null);
 	// 단순 변심 기한(0093 · 수령 후 7일) — 서버가 줄마다 준 changeMindOk 그대로. 지난 줄은 단순 변심으로 고를 수 없다(서버가 다시 막는다)
-	const changeMind = $derived(reason === '단순 변심');
+	const changeMind = $derived(rule?.changeMind ?? false);
 	const allExpired = $derived(lines.length > 0 && lines.every((l) => !l.changeMindOk));
 	const expiredChosen = $derived(changeMind && chosen.some((l) => !l.changeMindOk));
-	const ready = $derived(chosen.length > 0 && reason !== '' && kindAllowed(kind, reason) && !missingPhoto && !busy && !expiredChosen);
+	const ready = $derived(chosen.length > 0 && reason !== '' && kindAllowed(kind, rule) && !missingPhoto && !busy && !expiredChosen);
 	const ctaLabel = $derived(
 		chosen.length === 0 ? '제품을 선택하세요' : reason === '' ? '사유를 선택하세요' : expiredChosen ? '단순 변심 기한이 지난 상품이 있어요' : missingPhoto ? '사진을 올려주세요' : busy ? '사진을 올리는 중…' : `${KIND_LABEL[kind]} 요청 보내기`
 	);
@@ -73,13 +77,15 @@
 	}
 	function pickReason(r: ClaimReason) {
 		reason = r;
-		// 단순 변심을 고르면 기한이 지난 줄은 선택에서 뺀다(그 줄은 파손 · 오배송으로만)
-		if (r === '단순 변심') qtyById = Object.fromEntries(Object.entries(qtyById).map(([id, q]) => [id, lines.find((l) => l.id === id)?.changeMindOk === false ? 0 : q]));
-		if (!kindAllowed(kind, r)) kind = 'refund';
+		const next = reasonRule(rules, r);
+		// 단순 변심(기한이 걸리는 사유)을 고르면 기한이 지난 줄은 선택에서 뺀다(그 줄은 파손 · 오배송으로만)
+		if (next?.changeMind) qtyById = Object.fromEntries(Object.entries(qtyById).map(([id, q]) => [id, lines.find((l) => l.id === id)?.changeMindOk === false ? 0 : q]));
+		// 고른 요청 종류를 이 사유로 받을 수 없으면 받을 수 있는 첫 종류로
+		if (next && !kindAllowed(kind, next) && next.kinds.length) kind = next.kinds[0];
 		confirming = false;
 	}
 	function pickKind(k: ClaimKind) {
-		if (reason && !kindAllowed(k, reason)) return;
+		if (!kindAllowed(k, rule)) return;
 		kind = k;
 		confirming = false;
 	}
@@ -180,7 +186,7 @@
 					<span class="min-w-0 flex-1">
 						{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
 						<span class="block truncate text-[14.5px] font-bold">{it.name}{it.option ? ` · ${it.option}` : ''}</span>
-						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개{lineAmt === null ? '' : ` · ${won(lineAmt)}`}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
+						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개{#if lineAmt !== null}{` · ${won(lineAmt)}`}{:else if quote.loading}{' · '}<Spinner />{/if}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
 						{#if changeMindNote(it)}<span class="mt-1 block text-[12px] font-semibold text-[#ff8a8a]">{changeMindNote(it)}</span>{/if}
 					</span>
 				</label>
@@ -226,24 +232,26 @@
 		{/each}
 
 		<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">사유</p>
+		{#if rules.reasons.length === 0}<p class="text-[12.5px] text-[#ff8a8a]">사유를 불러오지 못했어요 — 잠시 후 이 화면을 다시 열어주세요</p>{/if}
 		<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="사유">
-			{#each CLAIM_REASONS as r (r)}
-				<button type="button" role="radio" aria-checked={reason === r} disabled={submitting || (r === '단순 변심' && allExpired)} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
+			{#each rules.reasons as rr (rr.reason)}
+				{@const r = rr.reason}
+				<button type="button" role="radio" aria-checked={reason === r} disabled={submitting || (rr.changeMind && allExpired)} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
 			{/each}
 		</div>
 
 		<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">요청 종류</p>
 		<div class="grid max-w-[360px] grid-cols-2 gap-2" role="radiogroup" aria-label="요청 종류">
 			{#each ['refund', 'exchange'] as const as k (k)}
-				{@const allowed = !reason || kindAllowed(k, reason)}
+				{@const allowed = kindAllowed(k, rule)}
 				<button type="button" role="radio" aria-checked={kind === k} disabled={submitting || !allowed} onclick={() => pickKind(k)} class="{chip} {kind === k ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{KIND_LABEL[k]}</button>
 			{/each}
 		</div>
-		{#if reason === '단순 변심'}<p class="text-[12.5px] text-fg-faint">단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요</p>{/if}
+		{#if rule && !kindAllowed('exchange', rule)}<p class="text-[12.5px] text-fg-faint">{refundOnlyNote(rule.reason)}</p>{/if}
 
 		{#if reason}
 			<ul class="mt-1 flex flex-col gap-2 rounded-[18px] border border-accent/25 bg-accent/6 px-4 py-4 text-[13px] leading-[1.55] text-white/80 lg:rounded-[22px] lg:px-5" aria-label="처리 기준">
-				{#each claimPolicy(reason, returnFee) as pl (pl)}
+				{#each claimPolicy(reason, rules.returnFee) as pl (pl)}
 					<li class="flex gap-2.5"><span aria-hidden="true" class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent"></span>{pl}</li>
 				{/each}
 			</ul>
@@ -271,7 +279,7 @@
 				{#if kind !== 'refund'}
 					<span class="text-[15px] font-extrabold text-accent">새 제품 재발송</span>
 				{:else}
-					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{estimate ? won(estimate.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
+					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{#if estimate}{won(estimate.amount)}{:else if chosen.length && quote.loading}<Spinner />{:else}₩0{/if}</span>
 				{/if}
 			</div>
 			{#if kind === 'refund' && quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 요청은 보낼 수 있어요</p>{/if}
