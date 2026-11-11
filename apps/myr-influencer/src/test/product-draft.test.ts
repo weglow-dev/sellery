@@ -65,6 +65,8 @@ describe('detailToDraft · tileKeyOf', () => {
 describe('saveFailure · 메뉴', () => {
 	it('필수 칸 → 그 단계로', () => {
 		expect(saveFailure('INVALID_INPUT', 'name')).toEqual({ message: '제품명을 입력해주세요', step: 1 });
+		// 서버(0073 · 0074)는 판매가 1,000만 원 초과를 field price 로 거절 — 빈 판매가는 화면이 [다음]에서 먼저 막아 여기까지 오지 않는다
+		expect(saveFailure('INVALID_INPUT', 'price')).toEqual({ message: '판매가는 1,000만 원까지 입력할 수 있어요', step: 1 });
 		expect(saveFailure('INVALID_INPUT', 'category').step).toBe(1);
 		expect(saveFailure('INVALID_INPUT', 'note')).toEqual({ message: '레시피 노트를 써주세요', step: 2 });
 		expect(saveFailure('BAD_IMAGE').step).toBe(1);
