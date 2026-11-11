@@ -1,5 +1,6 @@
 /** 환불 순수 규칙 — 입력 검증 · 화면 판정 · RPC 파서 · 토스 Idempotency-Key (테스트 src/test/refund-rules.test.ts). docs/myr.md §6.3. */
 import { ORDER_CODE_RE } from './checkout-rules';
+import { QTY_FORMAT_MAX } from './constants';
 import { cleanText } from './text';
 import type { OrderItem, OrderView } from './order-view';
 
@@ -46,7 +47,7 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 		if (!Array.isArray(b.items) || b.items.length > 50) return null;
 		for (const raw of b.items) {
 			const l = obj(raw);
-			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > 99)
+			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_FORMAT_MAX)
 				return null;
 			if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
 			const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
@@ -130,7 +131,7 @@ export function parseRefundQuoteBody(body: unknown): RefundQuoteBody | null {
 		const x = obj(raw);
 		const itemId = x && typeof x.itemId === 'string' ? x.itemId : '';
 		const qty = x ? x.qty : null;
-		if (!UUID_RE.test(itemId) || typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 99) return null;
+		if (!UUID_RE.test(itemId) || typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > QTY_FORMAT_MAX) return null;
 		if (items.some((i) => i.item_id === itemId)) return null;
 		items.push({ item_id: itemId, qty });
 	}

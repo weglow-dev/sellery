@@ -81,10 +81,13 @@ describe('입력 — 요청 남기기', () => {
 	});
 	it('형식 틀리면 null — 종류 · 사유 · 빈 줄 · 수량 · 사진 경로 · 4장', () => {
 		const ok = { orderCode: 'myr1001', kind: 'refund', reason: '오배송', items: [{ itemId: ITEM, qty: 1 }] };
+		// 요청 수량 상한 없음(0097) — 150개도 받는다(남은 수량은 서버 TOO_MANY)
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 150 }] })?.items[0].qty).toBe(150);
 		expect(parseClaimOpenBody({ ...ok, kind: 'swap' })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, reason: '그냥' })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [] })).toBeNull();
-		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 10 }] })).toBeNull();
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 0 }] })).toBeNull();
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1_000_000 }] })).toBeNull(); // 숫자 형식 범위 밖
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: ['../x.jpg'] }] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: [PHOTO, PHOTO, PHOTO, PHOTO] }] })).toBeNull();
 		expect(parseClaimOpenBody(null)).toBeNull();

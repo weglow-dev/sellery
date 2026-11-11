@@ -117,6 +117,9 @@ describe('parseCancelBody', () => {
 		expect(parseCancelBody({ orderCode: 'bad code' })).toBeNull();
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: 'x', qty: 1 }] })).toBeNull();
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 0 }] })).toBeNull();
+		// 수량 상한 없음(0095 · 0097) — 150개도 받고 남은 수량은 서버(TOO_MANY)가 본다
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 150 }] })?.items).toEqual([{ item_id: A, qty: 150 }]);
+		expect(parseRefundQuoteBody({ orderCode: 'myr1001', mode: 'claim', items: [{ itemId: A, qty: 150 }] })?.items).toEqual([{ item_id: A, qty: 150 }]);
 		expect(parseCancelBody(null)).toBeNull();
 	});
 });
