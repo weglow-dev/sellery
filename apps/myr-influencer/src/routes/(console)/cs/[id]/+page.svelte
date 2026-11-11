@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, refundPaid, refundPaidNote, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
+	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, refundPaid, refundPaidNote, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
 	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
@@ -67,6 +67,10 @@
 </script>
 
 {#snippet options()}
+	<!-- 주문 수량 중 일부만 요청했으면 처리 전에도 먼저 보여 준다(처리 결과의 "환불 요청" 줄과 같은 문구) -->
+	{#if claimQtyText(c)}
+		<div class="mb-2.5 flex items-center justify-between rounded-xl bg-white/5 px-4 py-2.5 text-[13px] lg:text-[14px]"><span class="text-white/60">{KIND_LABEL[c.kind]} 요청</span><span class="font-bold text-fg">{claimQtyText(c)}</span></div>
+	{/if}
 	<div class="flex flex-col gap-2" role="radiogroup" aria-label="처리 방법">
 		{#each resolutionOptions(c, data.quotes) as r (r.id)}
 			{@const on = resolution === r.id}
@@ -233,7 +237,7 @@
 						<div class="flex justify-between text-white/60"><dt>처리 방법</dt><dd class="font-semibold text-fg">{c.resolution ? RESOLUTION_NAMES[c.resolution] : '반려'}</dd></div>
 						{#if c.needsRefund}
 							{#if refundShown}
-								{#if claimQtyText(c)}<div class="flex justify-between text-white/60"><dt>환불 요청</dt><dd class="font-semibold text-fg">{claimQtyText(c)}</dd></div>{/if}
+								{#if claimQtyText(c)}<div class="flex justify-between text-white/60"><dt>{KIND_LABEL[c.kind]} 요청</dt><dd class="font-semibold text-fg">{claimQtyText(c)}</dd></div>{/if}
 								<div class="flex justify-between gap-3 text-white/60">
 									<dt>요청 결제 금액</dt>
 									<dd class="text-right"><span class="block font-semibold text-fg tabular-nums">{won(refundPaid(refundShown))}</span><span class="mt-0.5 block text-[12px] text-white/45">{refundPaidNote(refundShown, c.order.shippingFee, { unitPrice: c.order.item.unitPrice, qty: c.qty })}</span></dd>
