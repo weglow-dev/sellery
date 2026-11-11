@@ -1,6 +1,6 @@
 // 계정 장바구니(0057) 입출력 — apps/myr-shop/src/lib/cart.ts 의 linesFromRows · mergePayload · parse* (API 라우트가 본문 검증에 쓴다)
 import { describe, expect, it } from 'vitest';
-import { canBuy, cartTotals, linesFromRows, mergePayload, parseCodesBody, parseLikeBody, parseMergeBody, parseSetBody } from '../lib/cart';
+import { canBuy, linesFromRows, quoteRequest, mergePayload, parseCodesBody, parseLikeBody, parseMergeBody, parseSetBody } from '../lib/cart';
 import { MAX_QTY, MOCK_PRODUCTS } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS;
@@ -32,14 +32,14 @@ describe('linesFromRows — myr_cart_get 응답', () => {
 	});
 });
 
-describe('cartTotals — 살 수 없는 줄은 합계·수량에서 뺀다', () => {
-	it('available:false 줄은 0 으로 · 전부 못 사면 배송비도 0', () => {
-		const t = cartTotals([
-			{ product: a, qty: 1 }, // 32,000
+describe('살 수 없는 줄은 견적(합계 · 배송비)에 싣지 않는다', () => {
+	it('available:false 줄은 빼고 견적을 묻는다 — 금액은 서버가', () => {
+		const lines = [
+			{ product: a, qty: 1 },
 			{ product: b, qty: 2, available: false }
-		]);
-		expect(t).toMatchObject({ count: 1, subtotal: 32000, shipping: 3000 });
-		expect(cartTotals([{ product: a, qty: 3, available: false }])).toMatchObject({ count: 0, subtotal: 0, shipping: 0, total: 0 });
+		];
+		expect(quoteRequest(lines.filter(canBuy)).map((l) => l.code)).toEqual([a.code]);
+		expect(quoteRequest([{ product: a, qty: 3, available: false }].filter(canBuy))).toEqual([]);
 	});
 });
 

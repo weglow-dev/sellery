@@ -25,7 +25,7 @@
 	import { REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, remainingQty } from '@sellery/myr-core/refund-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
-	let { order, lines, returnFee, backHref }: { order: OrderView; lines: OrderItem[]; returnFee: number; backHref: string } = $props();
+	let { order, lines, returnFee, backHref }: { order: OrderView; lines: OrderItem[]; returnFee: number | null; backHref: string } = $props();
 
 	let qtyById = $state<Record<string, number>>({});
 	let noteById = $state<Record<string, string>>({});

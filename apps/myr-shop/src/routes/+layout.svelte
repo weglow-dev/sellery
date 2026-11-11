@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { bumpDepth } from '$lib/nav';
@@ -19,6 +19,18 @@
 	$effect(() => {
 		void [shop.cart, shop.likes, shop.buyer, shop.orders];
 		shop.persist();
+	});
+	// 장바구니 금액 — 줄 · 수량 · 공구 · 선택이 바뀌면 서버 견적을 다시 받는다(화면은 계산하지 않는다)
+	$effect(() => {
+		void shop.quoteKeyNow;
+		if (shop.ready) untrack(() => void shop.requote());
+	});
+	// 공구가 시작 · 끝나는 시각이 오면 견적을 다시 받는다(지금 공구가 적용되는지는 서버가 판단)
+	$effect(() => {
+		const at = shop.nextQuoteAt;
+		if (at === null) return;
+		const t = setTimeout(() => void shop.requote(), Math.min(Math.max(at - Date.now() + 1000, 0), 2_147_000_000));
+		return () => clearTimeout(t);
 	});
 	afterNavigate(({ from, to }) => {
 		if (from) bumpDepth();

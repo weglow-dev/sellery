@@ -204,7 +204,7 @@
 
 				<SectionTitle>처리 기준</SectionTitle>
 				<ul class="flex flex-col gap-2 rounded-2xl border border-accent/20 bg-accent/7 px-4 py-3.5 text-[13px] leading-normal text-white/80 lg:gap-2.5 lg:rounded-[20px] lg:px-5 lg:py-[18px] lg:text-[14px]">
-					{#each claimPolicy(c.reason, c.returnFee || 6000) as pl (pl)}
+					{#each claimPolicy(c.reason, c.returnFee) as pl (pl)}
 						<li class="flex items-start gap-2 lg:gap-2.5"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent lg:mt-2" aria-hidden="true"></span><span>{pl}</span></li>
 					{/each}
 				</ul>

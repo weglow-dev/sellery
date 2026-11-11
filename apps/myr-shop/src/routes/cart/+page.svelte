@@ -59,7 +59,7 @@
 									<span class="text-[12px] font-extrabold text-accent">공구가 · {it.gb.discountPct}% 할인</span>
 								{:else if it.gbState === 'scheduled'}
 									<span class="text-[12px] font-bold text-white/55">공구 예정 · {kstLabel(it.gb.startsAt)}부터 공구가</span>
-								{:else}
+								{:else if it.gbState === 'ended'}
 									<span class="text-[12px] font-bold text-[#ff8a8a]">공구가 끝나 기본가로 바뀌었어요</span>
 								{/if}
 							{/if}
@@ -67,8 +67,8 @@
 								<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
 									<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
 									<span class="flex items-baseline gap-1.5">
-										{#if it.unitPrice !== it.price}<span class="text-[12px] font-semibold text-white/40 line-through lg:text-[13px]">{won(it.price * it.qty)}</span>{/if}
-										<span class="text-[15px] font-extrabold lg:text-[17px]">{won(it.lineAmount)}</span>
+										{#if it.baseAmount !== null && it.lineAmount !== null && it.baseAmount !== it.lineAmount}<span class="text-[12px] font-semibold text-white/40 line-through lg:text-[13px]">{won(it.baseAmount)}</span>{/if}
+										<span class="text-[15px] font-extrabold lg:text-[17px]">{it.lineAmount === null ? '확인 중' : won(it.lineAmount)}</span>
 									</span>
 								</div>
 							{:else}
@@ -84,7 +84,7 @@
 				{#if shop.cartItems.length}
 					<div class="mt-1 flex items-center gap-2.5 rounded-2xl border border-accent/20 bg-accent/8 px-4 py-3.5 lg:mt-0">
 						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M3 7h13v10H3z" /><path d="M16 10h4l1 3v4h-5" /><circle cx="7" cy="19" r="1.5" /><circle cx="18" cy="19" r="1.5" /></svg>
-						<span class="text-[13px] leading-[1.5] text-white/85 lg:text-[14px]">{shop.shippingMsg}</span>
+						<span class="text-[13px] leading-[1.5] text-white/85 lg:text-[14px]">{shop.shippingMsg || (shop.quoteFailed ? '금액을 확인하지 못했어요 — 잠시 후 다시 시도해주세요' : '배송비를 확인하고 있어요')}</span>
 					</div>
 				{/if}
 			</div>
@@ -110,7 +110,7 @@
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
 			{#if selectedCount}
-				<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{won(shop.total)} 주문하기 ({selectedCount}개)</a>
+				<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{shop.total === null ? '' : `${won(shop.total)} `}주문하기 ({selectedCount}개)</a>
 			{:else}
 				<span class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-white/8 text-[17px] font-extrabold text-white/40">주문할 상품을 선택해주세요</span>
 			{/if}

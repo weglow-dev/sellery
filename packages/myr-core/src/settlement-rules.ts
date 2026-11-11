@@ -1,22 +1,10 @@
 /**
- * MYR 정산 숫자(docs/myr.md §9-6 · 2026-11-09 결정) — 순수. 화면(상품 등록 "예상 정산" · 로그인 패널)이 이 파일 하나를 쓴다.
- *   - 정산 금액 = 판매가(부가세 포함 · 공구가로 팔렸으면 공구가)의 65% − PG 수수료 5%(모든 셀러 고정) = **60%**
- *   - 매월 1일에 지난달 배송 완료분 · 제조금액 상계(상품별) · 보증금 = 제조금액의 25%
- * 정산 계산 · 확정은 DB(0087)가 `platform_settings` 'myr_settlement' { pct, deposit_pct } 로 한다 — 여기 숫자는 화면 표시용 거울(상품 등록 "예상 정산" · 로그인 패널).
- * 비율을 바꾸면 platform_settings 와 여기를 같이 바꾼다(회차 줄에는 그때 비율이 남는다).
- * 퍼센트를 정수로 둔다(0.65 − 0.05 같은 소수 오차를 피한다).
+ * MYR 정산 — 순수(날짜 · 회차 달). docs/myr.md §9-6.
+ * **정산 비율 · 정산금 · 보증금 비율은 여기 두지 않는다** — DB(0087 platform_settings 'myr_settlement' · 0092 myr_settlement_amount)가 한 곳.
+ * 화면(상품 등록 "예상 정산" · 로그인 소개)은 서버 `settlementUnit`(myr_app_settlement_unit)을 부른다(백엔드 원칙 1).
  */
-export const SETTLEMENT_GROSS_PCT = 65;
-export const PG_FEE_PCT = 5;
-/** 크리에이터 정산 비율(%) = 65 − 5 */
-export const SETTLEMENT_PCT = SETTLEMENT_GROSS_PCT - PG_FEE_PCT;
-/** 보증금 = 제조금액의 25% */
-export const DEPOSIT_PCT = 25;
-/** 정산일 — 매월 1일(지난달 배송 완료분) */
+/** 정산일 — 매월 1일(지난달 배송 완료분) · 크론 일정(apps/myr-shop vercel.json)과 같은 날 */
 export const SETTLEMENT_DAY = 1;
-
-/** 판매가(원) → 예상 정산(원) — 화면 추정값(제조금액 상계 전) · 원 단위 반올림 */
-export const settlementOf = (price: number): number => (Number.isFinite(price) && price > 0 ? Math.round((price * SETTLEMENT_PCT) / 100) : 0);
 
 /** 정산 크론 시각 — 매월 1일 13:00(KST) = 04:00 UTC (apps/myr-shop vercel.json `0 4 1 * *` · 2026-11-10 결정) */
 export const SETTLEMENT_CRON_KST = '매월 1일 오후 1시';

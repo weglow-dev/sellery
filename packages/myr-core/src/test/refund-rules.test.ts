@@ -12,14 +12,14 @@ import {
 	parseRefundQuote,
 	parseRefundQuoteBody,
 	quoteFromPrecheck,
-	refundableItems,
 	refundIdempotencyKey,
 	refundMessage,
 	refundPhotoPath,
 	sniffImageType
 } from '../refund-rules';
 
-const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID', shipStatus: OrderItem['shipStatus'] = 'PAID'): OrderItem => ({
+// refundPath 는 서버(0092 myr_line_refund_path)가 정해 주는 값 — 테스트는 서버가 줄 법한 값을 그대로 넣는다
+const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, status = 'PAID', shipStatus: OrderItem['shipStatus'] = 'PAID', refundPath: OrderItem['refundPath'] = qty - refundedQty > 0 && status !== 'CANCELED' ? (shipStatus === 'PAID' ? 'instant' : 'claim') : null): OrderItem => ({
 	id,
 	code: id,
 	name: id,
@@ -38,7 +38,8 @@ const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, statu
 	courier: null,
 	trackingNo: null,
 	shippedAt: null,
-	deliveredAt: null
+	deliveredAt: null,
+	refundPath
 });
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -118,28 +119,26 @@ describe('parseCancelBody', () => {
 	});
 });
 
-describe('customerCanRefund · refundableItems', () => {
-	it('남은 줄 있으면 신청 페이지 ok(배송 상태 무관 · 0078) · 입금 대기 → deposit · 환불·취소 → 불가', () => {
+describe('customerCanRefund · customerRefundableItems — 서버 refundPath 그대로', () => {
+	it('바로 환불 · 요청 줄이 있으면 신청 페이지 ok · 입금 대기 → deposit · 환불·취소 → 불가', () => {
 		expect(customerCanRefund(order())).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT' }))).toEqual({ ok: true, deposit: true });
-		// 0078 — 전부 배송준비중 이후여도 페이지는 열린다(그 줄은 교환 · 환불 요청). 바로 환불은 결제완료 줄만(customerRefundableItems)
+		// 전부 배송준비중 이후(서버 refundPath = claim)여도 페이지는 열린다(그 줄은 교환 · 환불 요청)
 		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: true, deposit: false });
-		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000)] })).ok).toBe(true);
 		expect(customerRefundableItems([item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000), item('c', 1, 1, 1, 'REFUNDED')]).map((i) => i.id)).toEqual([B]);
 		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);
 		expect(customerCanRefund(order({ status: 'CANCELED' })).ok).toBe(false);
 		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED')] })).ok).toBe(false);
+	});
+	it('화면은 판정하지 않는다 — 서버가 null 이면 배송 상태와 상관없이 불가 · instant 면 바로 환불 줄', () => {
+		expect(customerCanRefund(order({ items: [item(A, 1, 10000, 0, 'PAID', 'PAID', null)] }))).toEqual({ ok: false, reason: '환불할 수 있는 상품이 없어요' });
+		expect(customerRefundableItems([item(A, 1, 10000, 0, 'PAID', 'PREPARING', 'instant')]).map((i) => i.id)).toEqual([A]);
 	});
 	it('열린 교환·환불 요청이 있으면 신청 불가(claimOpen) — 끝나면 다시', () => {
 		expect(customerCanRefund({ ...order(), claimStatus: 'pending' })).toEqual({ ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true });
 		expect(customerCanRefund({ ...order(), claimStatus: 'progress' }).ok).toBe(false);
 		expect(customerCanRefund({ ...order(), claimStatus: null })).toEqual({ ok: true, deposit: false });
 		expect(customerCanRefund({ ...order({ status: 'REFUNDED' }), claimStatus: 'pending' })).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
-	});
-	it('남은 수량이 있는 줄만', () => {
-		expect(
-			refundableItems([item(A, 2, 10000, 1, 'PARTIAL_REFUNDED'), item(B, 1, 20000, 1, 'REFUNDED'), item('c', 1, 1, 0, 'CANCELED')]).map((i) => i.id)
-		).toEqual([A]);
 	});
 });
 

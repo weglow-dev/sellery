@@ -29,7 +29,10 @@ export type OrderItem = {
 	trackingNo: string | null;
 	shippedAt: string | null;
 	deliveredAt: string | null;
+	/** 환불 길(0092 myr_line_refund_path) — instant = 바로 환불 · claim = 교환·환불 요청 · null = 불가. 화면은 이 값을 그대로 쓴다 */
+	refundPath: RefundPath;
 };
+export type RefundPath = 'instant' | 'claim' | null;
 export type OrderShipping = { recipient: string; phone: string; address1: string; address2: string; postcode: string; memo: string };
 export type OrderDeposit = { bank: string; account: string; holder: string; due: string | null };
 export type OrderView = {
@@ -90,6 +93,7 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		creator: str(o, 'creator'),
 		creatorHandle: str(o, 'creator_handle'),
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
+		refundPath: o.refund_path === 'instant' || o.refund_path === 'claim' ? o.refund_path : null,
 		courier: strOrNull(o, 'courier'),
 		trackingNo: strOrNull(o, 'tracking_no'),
 		shippedAt: strOrNull(o, 'shipped_at'),

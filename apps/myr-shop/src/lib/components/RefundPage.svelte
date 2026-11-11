@@ -19,7 +19,7 @@
 	import { claimableItems, refundPaidNote } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
-	let { order, returnFee = 6000, backHref }: { order: OrderView; returnFee?: number; backHref: string } = $props();
+	let { order, returnFee, backHref }: { order: OrderView; returnFee: number | null; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
 	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 교환 · 환불 요청(0078)

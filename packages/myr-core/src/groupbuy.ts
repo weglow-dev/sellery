@@ -1,8 +1,8 @@
 /**
  * 공구 링크 — 순수 규칙(0086 · docs/myr.md §9-6 작업 순서 4). 샵 · 크리에이터 콘솔이 같이 쓴다. 테스트 src/test/groupbuy.test.ts.
  *   · 할인율 1~70%(정수) · 모든 옵션에 같은 비율 · 상품당 진행 중이거나 예정된 공구 하나(서버가 ALREADY_OPEN 으로 막는다).
- *   · 공구가 계산의 정답은 DB `myr_groupbuy_price`(장바구니 · 체크아웃이 쓰는 값). 여기 `groupbuyPrice` 는 콘솔이 할인율을 고를 때 미리 보여 주는 용도 —
- *     같은 식(10원 아래 버림)이고 테스트가 pgTAP 과 같은 사례를 고정한다.
+ *   · 공구가 · 공구 상태(예정 · 진행 · 종료)는 여기서 계산하지 않는다 — DB `myr_groupbuy_price` · `myr_groupbuy_state` 한 곳(장바구니 견적 · 체크아웃 · 콘솔 미리보기가 같이 쓴다 · 0092).
+ *     화면은 서버가 준 price · state 를 그대로 쓰고, 시작 · 끝 시각이 오면 서버에 다시 묻는다.
  *   · 시각은 한국 시간으로 보여 준다(입력 'YYYY-MM-DDTHH:mm' 도 한국 시간).
  */
 
@@ -16,9 +16,6 @@ export const GB_STATE_META: Record<GroupbuyState, { label: string }> = {
 	active: { label: '진행 중' },
 	ended: { label: '종료' }
 };
-
-/** 공구가 = 기본가 × (100 − pct)% 를 10원 아래 버림 (DB myr_groupbuy_price 와 같은 식) */
-export const groupbuyPrice = (price: number, pct: number): number => Math.floor((price * (100 - pct)) / 1000) * 10;
 
 export const groupbuyHref = (code: string): string => `/g/${code}`;
 
@@ -40,12 +37,6 @@ export function groupbuyFromJson(v: unknown): Groupbuy | null {
 		.filter((x): x is Record<string, unknown> => !!x && Number.isInteger(x.index) && Number.isInteger(x.price) && Number.isInteger(x.groupbuy_price))
 		.map((x) => ({ index: x.index as number, name: typeof x.name === 'string' ? x.name : '', price: x.price as number, groupbuyPrice: x.groupbuy_price as number }));
 	return { code: o.code, state: o.state, discountPct: o.discount_pct as number, startsAt: o.starts_at, endsAt: o.ends_at, price: o.price as number, options };
-}
-
-/** 지금 시각 기준 상태 — 서버가 준 state 가 ended 면 그대로(지금 종료), 아니면 시각으로 다시 판단(장바구니를 열어 둔 채 시간이 지난 경우) */
-export function groupbuyStateAt(g: Pick<Groupbuy, 'state' | 'startsAt' | 'endsAt'>, now: number = Date.now()): GroupbuyState {
-	if (g.state === 'ended' || now >= Date.parse(g.endsAt)) return 'ended';
-	return now < Date.parse(g.startsAt) ? 'scheduled' : 'active';
 }
 
 /* ---------------- 한국 시간 표시 ---------------- */

@@ -123,7 +123,7 @@ export async function claimQuotes(c: Claim): Promise<ClaimQuotes> {
 	if (c.status === 'pending') {
 		for (const r of c.options) {
 			if (r === 'refund') out.refund = await claimQuote(c, 0);
-			if (r === 'partial') out.partial = await claimQuote(c, c.returnFee);
+			if (r === 'partial') out.partial = c.returnFee === null ? null : await claimQuote(c, c.returnFee);
 		}
 	} else if (c.status === 'progress' && c.needsRefund && !c.refundedAt) {
 		out.current = await claimQuote(c, c.deduction);
@@ -234,12 +234,12 @@ async function adminClaimByCode(code: string): Promise<Claim | null> {
 	return (await claimsForOrder((data as { order_id: string }).order_id)).find((c) => c.code === code) ?? null;
 }
 
-/** 단순 변심 왕복 배송비(platform_settings · 0078) — 신청 화면의 예상 금액 · 처리 기준 문구. 실패하면 기본 6,000 */
-export async function claimReturnFee(): Promise<number> {
+/** 단순 변심 왕복 배송비(platform_settings · 0078) — 신청 화면의 예상 금액 · 처리 기준 문구. 읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
+export async function claimReturnFee(): Promise<number | null> {
 	const { data, error } = await admin().rpc('myr_claim_return_fee');
 	if (error) {
 		console.error('[claims] return fee failed:', error.message);
-		return 6000;
+		return null;
 	}
-	return typeof data === 'number' ? data : 6000;
+	return typeof data === 'number' ? data : null;
 }

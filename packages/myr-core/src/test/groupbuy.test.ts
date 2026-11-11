@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
 	groupbuyErrors,
 	groupbuyFromJson,
-	groupbuyPrice,
-	groupbuyStateAt,
 	isoToKstInput,
 	kstInputToIso,
 	kstLabel,
@@ -16,13 +14,7 @@ import {
 const H = 60 * 60 * 1000;
 const NOW = Date.parse('2026-11-10T03:00:00Z'); // 한국 11.10 12:00
 
-describe('groupbuyPrice', () => {
-	it('DB myr_groupbuy_price 와 같은 사례 — 10원 아래 버림 (supabase/tests/myr_groupbuys.test.sql)', () => {
-		expect([groupbuyPrice(32000, 20), groupbuyPrice(33333, 15), groupbuyPrice(990, 70), groupbuyPrice(100, 1)]).toEqual([25600, 28330, 290, 90]);
-	});
-});
-
-describe('groupbuyFromJson · groupbuyStateAt', () => {
+describe('groupbuyFromJson', () => {
 	const raw = { code: 'ab12cd34', state: 'active', discount_pct: 20, starts_at: '2026-11-10T00:00:00Z', ends_at: '2026-11-12T15:00:00Z', price: 25600 };
 	it('DB 모양 → 화면 모양 · 틀리면 null', () => {
 		expect(groupbuyFromJson(raw)).toEqual({ code: 'ab12cd34', state: 'active', discountPct: 20, startsAt: raw.starts_at, endsAt: raw.ends_at, price: 25600, options: [] });
@@ -36,13 +28,6 @@ describe('groupbuyFromJson · groupbuyStateAt', () => {
 		expect(groupbuyFromJson({ ...raw, code: 'X' })).toBeNull();
 		expect(groupbuyFromJson({ ...raw, state: 'open' })).toBeNull();
 		expect(groupbuyFromJson(null)).toBeNull();
-	});
-	it('지금 시각으로 다시 판단 — 끝 시각이 지나면 ended · 서버가 ended 면 그대로', () => {
-		const g = groupbuyFromJson(raw)!;
-		expect(groupbuyStateAt(g, NOW)).toBe('active');
-		expect(groupbuyStateAt(g, Date.parse(raw.ends_at))).toBe('ended');
-		expect(groupbuyStateAt({ ...g, state: 'ended' }, NOW)).toBe('ended');
-		expect(groupbuyStateAt({ ...g, state: 'scheduled', startsAt: '2026-11-11T00:00:00Z' }, NOW)).toBe('scheduled');
 	});
 });
 

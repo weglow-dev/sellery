@@ -71,3 +71,17 @@ export async function closeGroupbuy(sellerId: string, code: string): Promise<Gro
 	}
 	return asResult(data);
 }
+
+/** 할인율 미리보기(0092 myr_app_groupbuy_preview) — 실제 공구와 같은 단가(옵션 0번) · 같은 공구가 식. 내 상품만(seller 는 게이트가 세션에서) */
+export type GroupbuyPreview = { ok: true; basePrice: number; price: number } | { ok: false; code: string };
+export async function previewGroupbuy(sellerId: string, productId: string, pct: number): Promise<GroupbuyPreview> {
+	const { data, error } = await admin().rpc('myr_app_groupbuy_preview', { p_seller: sellerId, p_product_id: productId, p_pct: pct });
+	if (error) {
+		console.error('[groupbuy] preview failed:', error.message);
+		return { ok: false, code: 'DB_ERROR' };
+	}
+	const r = data as { ok?: boolean; code?: string; price?: unknown; base_price?: unknown } | null;
+	return r?.ok === true && typeof r.price === 'number' && typeof r.base_price === 'number'
+		? { ok: true, basePrice: r.base_price, price: r.price }
+		: { ok: false, code: typeof r?.code === 'string' ? r.code : 'DB_ERROR' };
+}

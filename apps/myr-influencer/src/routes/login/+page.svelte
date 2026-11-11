@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { untrack } from 'svelte';
-	import { LOGIN_QUOTE, LOGIN_STATS, MYR_APPLY_URL } from '$lib/auth-copy';
+	import { LOGIN_QUOTE, loginStats, MYR_APPLY_URL } from '$lib/auth-copy';
 	import { AUTH_LABEL, authButton, authInput } from '$lib/auth-ui';
 	import { EMAIL_RE, loginFieldErrors } from '$lib/console-auth';
 	import AuthLogo from '$lib/components/auth/AuthLogo.svelte';
@@ -78,7 +78,7 @@
 				<h2 class="mt-3.5 text-[46px] leading-[1.18] font-extrabold tracking-[-0.035em] text-balance">내 레시피로 만든 제품,<br />팔로워에게 바로 판매하세요</h2>
 				<p class="mt-[18px] text-[16px] leading-[1.65] text-white/62">제조 의뢰부터 정산까지 MYR이 대신 처리해요.<br />크리에이터는 레시피와 팔로워에게만 집중하면 돼요.</p>
 				<div class="mt-9 grid grid-cols-3 gap-3">
-					{#each LOGIN_STATS as s (s.big)}
+					{#each loginStats(data.settlePct) as s (s.label)}
 						<div class="rounded-[20px] border border-white/8 bg-white/4 p-[18px]">
 							<p class="text-[26px] font-extrabold tracking-[-0.04em] tabular-nums">{s.big}</p>
 							<p class="mt-1.5 text-[12px] leading-[1.5] whitespace-pre-line text-white/55">{s.label}</p>

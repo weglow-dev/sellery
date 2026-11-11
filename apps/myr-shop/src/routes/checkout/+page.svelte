@@ -59,7 +59,8 @@
 
 	/** 주문 상품 = 장바구니에서 체크한 줄(살 수 있는 것만) — 합계·배송비도 같은 기준(state.orderLines) */
 	const items = $derived(shop.selectedItems);
-	const canPay = $derived(ready && !widgetError && !blocked && !changed && agreedRequired && !submitting && items.length > 0 && (data.guest ? gdraft.consent : true));
+	// 금액은 서버 견적(shop.total)을 받은 뒤에만 — 견적 전 · 실패면 결제 버튼을 막는다
+	const canPay = $derived(ready && !widgetError && !blocked && !changed && agreedRequired && !submitting && items.length > 0 && shop.total !== null && (data.guest ? gdraft.consent : true));
 
 	function nameOf(code: string): string {
 		return shop.cart.find((l) => l.product.code === code)?.product.name ?? code;
@@ -104,7 +105,7 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					lines: items.map((it) => ({ code: it.code, qty: it.qty, optionIndex: 0, price: it.unitPrice, ...(it.gbCode ? { gb: it.gbCode } : {}) })),
+					lines: items.map((it) => ({ code: it.code, qty: it.qty, optionIndex: 0, ...(it.unitPrice !== null ? { price: it.unitPrice } : {}), ...(it.gbCode ? { gb: it.gbCode } : {}) })),
 					shipping: v.shipping,
 					guest,
 					saveAddress: data.guest ? false : saveAddress,
@@ -155,7 +156,7 @@
 	const inputCls = 'h-[54px] w-full rounded-[14px] border-[1.5px] bg-white/4 px-4 text-[16px] text-fg outline-none focus:border-accent focus:bg-accent/6 lg:text-[15px]';
 	const border = (k: string) => (invalid[k] ? 'border-[#ff6b6b]' : 'border-white/10');
 	const payBtn = 'h-[58px] w-full rounded-2xl text-[17px] font-extrabold transition-colors duration-250 lg:h-14 lg:text-[16px]';
-	const payLabel = $derived(submitting ? '결제창을 여는 중…' : `${won(shop.total)} 결제하기`);
+	const payLabel = $derived(submitting ? '결제창을 여는 중…' : shop.total === null ? (shop.quoteFailed ? '금액을 확인하지 못했어요' : '금액 확인 중…') : `${won(shop.total)} 결제하기`);
 </script>
 
 <svelte:head><title>주문 · 결제 — MYR Shop</title></svelte:head>
@@ -247,15 +248,20 @@
 						<div class="rounded-[14px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3.5 text-[13px] leading-[1.55] text-white/85" role="alert">{blocked}</div>
 						<a href="/cart" class="mt-3 flex h-12 items-center justify-center rounded-[14px] border border-white/14 text-[14px] font-bold text-fg">장바구니로</a>
 					{:else}
-						<PaymentWidget
-							clientKey={data.clientKey}
-							variantKey={data.variantKey}
-							customerKey={data.customerKey}
-							amount={shop.total}
-							onReady={(w) => { widgets = w; ready = true; }}
-							onError={(m) => (widgetError = m)}
-							onAgreementChange={(v) => (agreedRequired = v)}
-						/>
+						<!-- 결제 위젯은 서버 견적 금액이 있을 때만(처음 금액부터 서버 값) -->
+						{#if shop.total !== null}
+							<PaymentWidget
+								clientKey={data.clientKey}
+								variantKey={data.variantKey}
+								customerKey={data.customerKey}
+								amount={shop.total}
+								onReady={(w) => { widgets = w; ready = true; }}
+								onError={(m) => (widgetError = m)}
+								onAgreementChange={(v) => (agreedRequired = v)}
+							/>
+						{:else}
+							<p class="rounded-[18px] border border-white/8 bg-white/3 px-4 py-5 text-center text-[13px] text-fg-faint" aria-live="polite">{shop.quoteFailed ? '금액을 확인하지 못했어요 — 새로고침 후 다시 시도해주세요' : '결제 금액을 확인하고 있어요…'}</p>
+						{/if}
 					{/if}
 				</div>
 
@@ -266,7 +272,7 @@
 							<div class="flex items-center gap-3.5 rounded-2xl border border-white/8 bg-white/3 px-3.5 py-3">
 								<Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} icon={26} class="h-[52px] w-[52px] rounded-xl" />
 								<span class="min-w-0 flex-1 text-[14px] font-bold">{it.name}<span class="font-semibold text-fg-faint"> × {it.qty}</span></span>
-								<span class="text-[15px] font-extrabold">{won(it.lineAmount)}</span>
+								<span class="text-[15px] font-extrabold">{it.lineAmount === null ? '확인 중' : won(it.lineAmount)}</span>
 							</div>
 						{/each}
 					</div>
@@ -280,7 +286,7 @@
 			<aside class="hidden rounded-3xl border border-white/8 bg-panel p-6 lg:sticky lg:top-[104px] lg:block">
 				<p class="mb-4 text-[16px] font-extrabold">결제 금액</p>
 				<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
-				<p class="mt-2 text-[12px] leading-[1.5] text-fg-faint">결제 금액은 서버가 다시 계산해요 — 화면과 다르면 결제창에 서버 금액이 들어갑니다.</p>
+				<p class="mt-2 text-[12px] leading-[1.5] text-fg-faint">결제 직전에 서버가 재고 · 공구 기간을 다시 확인해요 — 바뀌었으면 결제 전에 알려드려요.</p>
 				<button type="submit" form="checkout-form" disabled={!canPay} class="{payBtn} mt-3.5 {canPay ? 'bg-accent text-bg hover:bg-[#ff8f5c]' : 'bg-white/8 text-white/40'}">{payLabel}</button>
 			</aside>
 		</div>

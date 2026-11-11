@@ -63,24 +63,24 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 	return { orderCode, items, reason };
 }
 
-/** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 남은 수량이 있는 줄이 있을 때 · PAID/PARTIAL_REFUNDED · WAITING_DEPOSIT(입금 전 취소) · 열린 교환·환불 요청 없음.
- *  줄마다 길이 갈린다: 결제완료(발주 전) 줄 = 셀프 즉시 환불(`customerRefundableItems` · 서버 `myr_app_refund_precheck`) · 배송준비중 이후 줄 = 교환·환불 요청(0078 · claim-rules `claimableItems`) */
+/** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 서버가 줄마다 준 환불 길(refundPath · 0092 myr_line_refund_path)이 하나라도 있을 때 · 열린 교환·환불 요청 없음.
+ *  줄마다 길이 갈린다: instant = 셀프 바로 환불(서버 `myr_app_refund_precheck` 가 같은 함수로 다시 막는다) · claim = 교환·환불 요청(`myr_app_claim_open` 도 같은 함수).
+ *  여기서는 판정하지 않고 서버 값과 주문 상태로 **안내 문구만** 고른다 */
 export function customerCanRefund(
 	o: Pick<OrderView, 'status' | 'items'> & { claimStatus?: OrderView['claimStatus'] }
 ): { ok: true; deposit: boolean } | { ok: false; reason: string; claimOpen?: true } {
-	if (o.status === 'WAITING_DEPOSIT') return { ok: true, deposit: true };
+	const any = o.items.some((i) => i.refundPath !== null);
+	if (o.status === 'WAITING_DEPOSIT' && any) return { ok: true, deposit: true };
 	if (o.status === 'REFUNDED') return { ok: false, reason: '이미 환불된 주문이에요' };
 	if (o.status === 'CANCELED') return { ok: false, reason: '취소된 주문이에요' };
 	// 열린 교환·환불 요청(처리 대기 · 진행 중 · 0078 myr_order_claim_status)이 있으면 그 요청이 끝날 때까지 새 신청을 받지 않는다(대표 결정 2026-11-06) — 버튼은 비활성
 	if (o.claimStatus) return { ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true };
-	if (refundableItems(o.items).length) return { ok: true, deposit: false };
+	if (any) return { ok: true, deposit: false };
 	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };
 }
 
-/** 남은 수량이 있는 줄 (취소된 줄 제외) — 셀러 · 관리자 환불과 "전부 환불(배송비)" 판정의 기준 */
-export const refundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
-/** 고객이 직접 환불할 수 있는 줄 — 남은 수량 + 아직 발주 전(결제완료) */
-export const customerRefundableItems = (items: OrderItem[]): OrderItem[] => refundableItems(items).filter((i) => i.shipStatus === 'PAID');
+/** 바로 환불할 수 있는 줄 — 서버 refundPath = instant */
+export const customerRefundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.refundPath === 'instant');
 export const remainingQty = (i: OrderItem): number => Math.max(0, i.qty - i.refundedQty);
 
 

@@ -1,21 +1,94 @@
-/** 장바구니 계산 · API 입출력 검증 — 순수 모듈(테스트 `src/test/cart.test.ts`). 상태(`state.svelte.ts`)와 서버(`lib/server/cart.ts`)는 여기 함수로만 줄을 바꾼다.
- *  숫자는 `data.ts` 의 FREE_SHIPPING · SHIPPING_FEE · MAX_QTY — 0057 `myr_cart_set` 의 상한(9)과 같은 값(바꾸면 둘 다 · docs/myr.md §6.2). */
-import { GB_CODE_RE, groupbuyFromJson, groupbuyStateAt, type Groupbuy, type GroupbuyState } from '@sellery/myr-core/groupbuy';
+/** 장바구니 줄 다루기 · API 입출력 검증 — 순수 모듈(테스트 `src/test/cart.test.ts`). 상태(`state.svelte.ts`)와 서버(`lib/server/cart.ts`)는 여기 함수로만 줄을 바꾼다.
+ *  **가격 · 공구 적용 · 배송비는 여기서 계산하지 않는다** — 서버 견적(0092 `myr_app_cart_quote` · `POST /api/cart/quote`)이 체크아웃과 같은 함수로 정한다(백엔드 원칙 1).
+ *  수량 상한 MAX_QTY 는 0057 `myr_cart_set` 의 상한(9)과 같은 값(서버가 다시 막는다). */
+import { GB_CODE_RE, groupbuyFromJson, type Groupbuy, type GroupbuyState } from '@sellery/myr-core/groupbuy';
 import type { PriceChange } from '@sellery/myr-core/checkout-rules';
-import { FREE_SHIPPING, MAX_QTY, SHIPPING_FEE, won, type Product } from './data';
+import { MAX_QTY, won, type Product } from './data';
 import { fromRow, type Row } from './product-row';
 
 /** 줄 — `available` 는 계정 장바구니(0057)가 주는 값: 담은 뒤 paused·품절·삭제가 되면 false. 비회원 줄(브라우저)은 undefined = 살 수 있다고 본다.
- *  `gb` = 공구 링크로 담은 줄(0086) — 진행 중이면 공구가, 끝나면 기본가(장바구니를 열 때마다 시각으로 다시 판단 · 결제는 서버가 다시 확인) */
+ *  `gb` = 공구 링크로 담은 줄(0086) — 공구가 적용 여부 · 단가는 서버 견적이 정한다(CartQuote) */
 export type CartLine = { product: Product; qty: number; available?: boolean; gb?: Groupbuy };
 export const canBuy = (l: CartLine): boolean => l.available !== false;
 
-/** 줄의 공구 상태(공구 줄이 아니면 null) */
-export const lineGbState = (l: CartLine, now: number = Date.now()): GroupbuyState | null => (l.gb ? groupbuyStateAt(l.gb, now) : null);
-/** 지금 단가 — 진행 중인 공구면 공구가, 아니면 기본가 */
-export const unitPrice = (l: CartLine, now: number = Date.now()): number => (l.gb && lineGbState(l, now) === 'active' ? l.gb.price : l.product.price);
-/** 체크아웃에 싣는 공구 코드 — 끝난 공구는 싣지 않는다 */
-export const gbCodeOf = (l: CartLine, now: number = Date.now()): string | undefined => (l.gb && lineGbState(l, now) !== 'ended' ? l.gb.code : undefined);
+// ---- 서버 견적(0092 myr_app_cart_quote) ----
+/** 견적 요청 줄 — 공구 코드는 있는 그대로 싣는다(끝났는지는 서버가 본다) */
+export type QuoteRequestLine = { code: string; optionIndex: number; qty: number; gb?: string };
+export const quoteRequest = (lines: CartLine[]): QuoteRequestLine[] =>
+	lines.map((l) => ({ code: l.product.code, optionIndex: 0, qty: clampQty(l.qty), ...(l.gb ? { gb: l.gb.code } : {}) }));
+/** 견적 줄 — unitPrice null = 지금 살 수 없는 줄(샵에 없음 · 옵션 틀림) */
+export type QuoteLine = { code: string; qty: number; unitPrice: number | null; basePrice: number | null; lineAmount: number | null; baseAmount: number | null; gbState: GroupbuyState | null; gbCode: string | null };
+export type CartQuote = { lines: QuoteLine[]; itemsAmount: number; shippingFee: number; freeOver: number; freeShippingLeft: number };
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const GB_STATES: readonly string[] = ['scheduled', 'active', 'ended'];
+/** RPC · API 응답 → 견적(형식이 다르면 null — 화면은 금액 대신 "확인 중") */
+export function parseCartQuote(v: unknown): CartQuote | null {
+	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+	if (!o || o.ok !== true || !Array.isArray(o.lines)) return null;
+	const items = numOrNull(o.items_amount);
+	const fee = numOrNull(o.shipping_fee);
+	if (items === null || fee === null) return null;
+	const lines = (o.lines as Record<string, unknown>[])
+		.filter((x) => x && typeof x === 'object' && typeof x.code === 'string')
+		.map((x) => ({
+			code: x.code as string,
+			qty: numOrNull(x.qty) ?? 0,
+			unitPrice: numOrNull(x.unit_price),
+			basePrice: numOrNull(x.base_price),
+			lineAmount: numOrNull(x.line_amount),
+			baseAmount: numOrNull(x.base_amount),
+			gbState: typeof x.groupbuy_state === 'string' && GB_STATES.includes(x.groupbuy_state) ? (x.groupbuy_state as GroupbuyState) : null,
+			gbCode: typeof x.groupbuy_code === 'string' ? x.groupbuy_code : null
+		}));
+	return { lines, itemsAmount: items, shippingFee: fee, freeOver: numOrNull(o.free_over) ?? 0, freeShippingLeft: numOrNull(o.free_shipping_left) ?? 0 };
+}
+/** POST /api/cart/quote 본문 { all, selected } — 줄마다 code · optionIndex · qty(1..MAX_QTY) · gb? · 각 50줄까지. 형식이 틀리면 null */
+export type QuoteBody = { all: QuoteRequestLine[]; selected: QuoteRequestLine[] };
+export function parseQuoteBody(v: unknown): QuoteBody | null {
+	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+	if (!o) return null;
+	const list = (x: unknown): QuoteRequestLine[] | null => {
+		if (!Array.isArray(x) || x.length > MERGE_MAX_LINES) return null;
+		const out: QuoteRequestLine[] = [];
+		for (const raw of x) {
+			const l = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+			if (!l || typeof l.code !== 'string' || !CODE_RE.test(l.code)) return null;
+			if (!Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > MAX_QTY) return null;
+			const optionIndex = l.optionIndex === undefined ? 0 : l.optionIndex;
+			if (!Number.isInteger(optionIndex) || (optionIndex as number) < 0 || (optionIndex as number) > 999) return null;
+			if (l.gb !== undefined && (typeof l.gb !== 'string' || !GB_CODE_RE.test(l.gb))) return null;
+			out.push({ code: l.code, optionIndex: optionIndex as number, qty: l.qty as number, ...(typeof l.gb === 'string' ? { gb: l.gb } : {}) });
+		}
+		return out;
+	};
+	const all = list(o.all);
+	const selected = list(o.selected);
+	return all && selected ? { all, selected } : null;
+}
+/** API 응답 { ok, all, selected }(이미 CartQuote 모양) 확인 — 틀리면 null */
+const isQuote = (q: unknown): q is CartQuote => {
+	const o = q as CartQuote | null;
+	return !!o && typeof o === 'object' && Array.isArray(o.lines) && Number.isFinite(o.itemsAmount) && Number.isFinite(o.shippingFee) && Number.isFinite(o.freeShippingLeft);
+};
+export function parseQuoteResponse(v: unknown): { all: CartQuote; selected: CartQuote } | null {
+	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+	return o && o.ok === true && isQuote(o.all) && isQuote(o.selected) ? { all: o.all, selected: o.selected } : null;
+}
+/** 견적이 바뀌어야 하는 줄의 지문 — 코드 · 수량 · 공구 코드 · 살 수 있음 */
+export const quoteKey = (lines: CartLine[]): string => lines.map((l) => `${l.product.code}:${l.qty}:${l.gb?.code ?? ''}:${canBuy(l) ? 1 : 0}`).join('|');
+/** 다음에 공구 상태가 바뀌는 시각(시작 · 끝 중 가장 가까운 미래) — 그때 견적을 다시 받는다(판정은 서버). 없으면 null */
+export function nextGbBoundary(lines: CartLine[], now: number = Date.now()): number | null {
+	const ts = lines.flatMap((l) => (l.gb ? [Date.parse(l.gb.startsAt), Date.parse(l.gb.endsAt)] : [])).filter((t) => Number.isFinite(t) && t > now);
+	return ts.length ? Math.min(...ts) : null;
+}
+/** 장바구니 합계 줄 — 서버 견적 그대로(무료배송까지 남은 금액도 서버 값) */
+export type CartTotals = { subtotal: number; shipping: number; total: number; shippingMsg: string };
+export const totalsFromQuote = (q: CartQuote): CartTotals => ({
+	subtotal: q.itemsAmount,
+	shipping: q.shippingFee,
+	total: q.itemsAmount + q.shippingFee,
+	shippingMsg: q.shippingFee ? `${won(q.freeShippingLeft)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요'
+});
 
 /** 1..MAX_QTY 로 자른다(정수가 아니면 1) */
 export function clampQty(qty: number): number {
@@ -52,23 +125,6 @@ export function setLineQty(lines: CartLine[], code: string, qty: number): CartLi
 
 export function removeLine(lines: CartLine[], code: string): CartLine[] {
 	return lines.filter((l) => l.product.code !== code);
-}
-
-export type CartTotals = { count: number; subtotal: number; shipping: number; total: number; shippingMsg: string };
-
-/** 수량 합 · 상품 금액 · 배송비(비어 있거나 기준 이상이면 0) · 총액 · 무료배송 안내 문구 — 살 수 없는 줄은 셈에서 뺀다 */
-export function cartTotals(lines: CartLine[], now: number = Date.now()): CartTotals {
-	const buyable = lines.filter(canBuy);
-	const count = buyable.reduce((n, l) => n + l.qty, 0);
-	const subtotal = buyable.reduce((n, l) => n + unitPrice(l, now) * l.qty, 0);
-	const shipping = subtotal === 0 || subtotal >= FREE_SHIPPING ? 0 : SHIPPING_FEE;
-	return {
-		count,
-		subtotal,
-		shipping,
-		total: subtotal + shipping,
-		shippingMsg: shipping ? `${won(FREE_SHIPPING - subtotal)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요'
-	};
 }
 
 // ---- 선택 주문 (2026-11-02 대표 요청) — "선택 해제한 code 목록" 을 기억한다: 새로 담은 줄은 기본 선택이고, 장바구니에서 빠진 code 는 자동으로 정리된다 ----
@@ -127,13 +183,10 @@ export function linesFromRows(rows: unknown): CartLine[] {
 		});
 }
 
-/** 비회원 줄 → `myr_cart_merge` 입력 (option_index 는 아직 0 — 옵션 UI 가 생기면 줄에 실린다) · 끝나지 않은 공구 코드는 gb 로 */
+/** 비회원 줄 → `myr_cart_merge` 입력 (option_index 는 아직 0 — 옵션 UI 가 생기면 줄에 실린다) · 공구 코드는 그대로(끝났으면 myr_cart_set 이 버린다) */
 export type MergeLine = { code: string; qty: number; option_index: number; gb?: string };
-export const mergePayload = (lines: CartLine[], now: number = Date.now()): MergeLine[] =>
-	lines.map((l) => {
-		const gb = gbCodeOf(l, now);
-		return { code: l.product.code, qty: clampQty(l.qty), option_index: 0, ...(gb ? { gb } : {}) };
-	});
+export const mergePayload = (lines: CartLine[]): MergeLine[] =>
+	lines.map((l) => ({ code: l.product.code, qty: clampQty(l.qty), option_index: 0, ...(l.gb ? { gb: l.gb.code } : {}) }));
 
 /** 상품 code 형식 = myr_products.code 제약(소문자·숫자·하이픈 1~48) */
 export const CODE_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;

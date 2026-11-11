@@ -34,10 +34,10 @@ export const kindAllowed = (kind: ClaimKind, reason: ClaimReason | ''): boolean 
 export const photoRequired = (reason: ClaimReason | ''): boolean => reason === '파손 · 누액' || reason === '오배송';
 
 /** 사유별 처리 기준 — 고객 신청 화면 · 콘솔 상세 "처리 기준"(2026-11-06 대표 승인 · 같은 날 문구 줄임) */
-export function claimPolicy(reason: string, returnFee: number): string[] {
+export function claimPolicy(reason: string, returnFee: number | null): string[] {
 	switch (reason) {
 		case '단순 변심':
-			return ['수령 후 7일 이내 · 미개봉만 가능', `왕복 배송비 ${won(returnFee)}은 고객 부담 — 환불 금액에서 빼요`, '식품 특성상 개봉 제품은 교환·환불이 어려워요'];
+			return ['수령 후 7일 이내 · 미개봉만 가능', returnFee === null ? '왕복 배송비는 고객 부담 — 환불 금액에서 빼요' : `왕복 배송비 ${won(returnFee)}은 고객 부담 — 환불 금액에서 빼요`, '식품 특성상 개봉 제품은 교환·환불이 어려워요'];
 		case '파손 · 누액':
 			return ['사진 확인 후 새 제품 재발송 또는 전액 환불'];
 		case '오배송':
@@ -171,7 +171,8 @@ export type Claim = {
 	reshippedAt: string | null;
 	needsRefund: boolean;
 	deduction: number;
-	returnFee: number;
+	/** 왕복 배송비(서버 myr_refund_request_fee_due) — 응답에 없으면 null(숫자를 짐작하지 않는다) */
+	returnFee: number | null;
 	refundAmount: number | null;
 	refundedAt: string | null;
 	doneAt: string | null;
@@ -230,7 +231,7 @@ export function claimFromJson(v: unknown): Claim | null {
 		reshippedAt: sn(o.reshipped_at),
 		needsRefund: o.needs_refund === true,
 		deduction: n(o.deduction),
-		returnFee: n(o.return_fee, 6000),
+		returnFee: typeof o.return_fee === 'number' && Number.isFinite(o.return_fee) ? o.return_fee : null,
 		refundAmount: typeof o.refund_amount === 'number' ? o.refund_amount : null,
 		refundedAt: sn(o.refunded_at),
 		doneAt: sn(o.done_at),
@@ -283,9 +284,9 @@ export const claimRefundedText = (c: Pick<Claim, 'amount' | 'deduction' | 'refun
 	return v ? refundAmountText(v) : null;
 };
 
-/** 요청할 수 있는 줄 — 남은 수량 · 발주(배송준비중) 이후. 결제완료 줄은 셀프 즉시 환불(refund-rules customerRefundableItems).
+/** 요청할 수 있는 줄 — 서버 refundPath = claim(0092 myr_line_refund_path · myr_app_claim_open 이 같은 함수로 다시 막는다).
  *  열린 요청이 있는 주문은 신청 페이지 자체가 닫힌다(customerCanRefund · claimStatus) — 같은 줄 중복은 서버(OPEN_EXISTS)가 다시 막는다 */
-export const claimableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0 && i.shipStatus !== 'PAID');
+export const claimableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.refundPath === 'claim');
 
 /* ---------------- 문구 — 상태 · 단계 · 타임라인 ---------------- */
 export type ClaimTone = 'accent' | 'muted' | 'ok' | 'danger';

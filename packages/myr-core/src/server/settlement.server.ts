@@ -57,3 +57,14 @@ export async function listSellerSettlePreviewItemsOfUser(userId: string): Promis
 	if (error) throw new Error(`myr_app_seller_settle_preview_items_of_user failed: ${error.message}`);
 	return settleItemsFromJson(data);
 }
+
+/** 판매가 1개의 정산금 · 정산 비율(0092 myr_app_settlement_unit) — 정산 회차 · 예상과 같은 함수(비율 = platform_settings · 버림). 콘솔 상품 등록 · 로그인 소개. 실패면 null */
+export async function settlementUnit(price: number): Promise<{ pct: number; amount: number } | null> {
+	const { data, error } = await admin().rpc('myr_app_settlement_unit', { p_price: Number.isInteger(price) && price > 0 ? price : 0 });
+	if (error) {
+		console.error('[settlement] unit failed:', error.message);
+		return null;
+	}
+	const r = data as { pct?: unknown; amount?: unknown } | null;
+	return typeof r?.pct === 'number' && typeof r.amount === 'number' ? { pct: r.pct, amount: r.amount } : null;
+}
