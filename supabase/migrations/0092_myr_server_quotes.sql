@@ -12,6 +12,9 @@
 --     myr_app_groupbuy_preview(seller, product, pct)  콘솔 공구 할인율 미리보기 — 실제 공구와 같은 단가(옵션 0번) · myr_groupbuy_price
 --     myr_line_refund_path(order, item)         줄 환불 길 instant(바로 환불) · claim(교환·환불 요청) · null(불가)
 --
+--   클라우드 보정(0078 정의 그대로 다시 만들기 — 0078 초안이 먼저 올라가 클라우드에 없던 함수)
+--     myr_order_claim_status(order) · myr_app_claims_of_user(user, limit)
+--
 --   바뀌는 함수(판정 부분만 새 함수 호출로 — 나머지 그대로)
 --     myr_shipping_fee              0058 → myr_shipping_rule
 --     myr_app_create_checkout       0086 → 단가 · 공구를 myr_line_price 로
@@ -23,6 +26,37 @@
 --   권한: 새 security definer RPC 는 service role 만(anon · authenticated EXECUTE 회수). 내부 함수도 anon · authenticated 회수.
 --   테스트: supabase/tests/myr_server_quotes.test.sql(새) + 기존 체크아웃 · 공구 · 정산 · 환불 · 요청 테스트가 고치지 않고 통과(계산 결과 불변).
 -- ============================================================
+
+-- ---------- 클라우드 보정 — 0078 의 함수 2개 ----------
+-- 0078 은 PR 작업 중간 버전이 클라우드(sellery)에 먼저 올라가, 그 뒤 0078 에 더해진 이 두 함수가 클라우드에 없다(같은 번호라 다시 적용되지 않음 · 2026-11-11 db push 실패로 발견).
+-- 정의는 0078 그대로 — 로컬 · 새 DB 에서는 같은 내용으로 다시 만들 뿐(변화 없음). 클라우드의 myr_order_json(0077 버전)은 아래 0092 정의가 덮는다.
+create or replace function public.myr_order_claim_status(p_order_id uuid)
+returns text
+language sql
+stable
+set search_path = public
+as $$
+  select case when bool_or(r.status = 'pending') then 'pending' when bool_or(r.status = 'progress') then 'progress' end
+    from public.myr_refund_requests r
+   where r.order_id = p_order_id and r.status in ('pending', 'progress')
+$$;
+revoke all on function public.myr_order_claim_status(uuid) from public, anon, authenticated;
+
+create or replace function public.myr_app_claims_of_user(p_user uuid, p_limit integer default 50)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select coalesce((
+    select jsonb_agg(public.myr_refund_request_json(r) order by r.created_at desc)
+      from (select r.* from public.myr_refund_requests r join public.myr_orders o on o.id = r.order_id
+             where o.user_id = p_user and p_user is not null
+             order by r.created_at desc limit least(greatest(coalesce(p_limit, 50), 1), 200)) r
+  ), '[]'::jsonb)
+$$;
+revoke all on function public.myr_app_claims_of_user(uuid, integer) from public, anon, authenticated;
+grant execute on function public.myr_app_claims_of_user(uuid, integer) to service_role;
 
 -- ---------- 배송비 ----------
 create or replace function public.myr_shipping_rule()
