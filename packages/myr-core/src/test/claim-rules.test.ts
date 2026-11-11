@@ -8,6 +8,7 @@ import {
 	claimMessage,
 	claimPolicy,
 	claimOpenDeduction,
+	claimQtyText,
 	claimRefundedText,
 	claimRefundView,
 	claimShippingBack,
@@ -159,6 +160,14 @@ describe('처리 방법 이름 · 금액', () => {
 		expect(refundPaidNote({ goods: 36000, shippingBack: 0 }, 3000)).toBe('상품 ₩36,000 · 배송비 ₩3,000는 주문 전체가 환불될 때 함께');
 		// 옛 응답(0090 전 · 배송비 모름) — 무료배송으로 잘못 적지 않는다
 		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, null)).toBe('상품 ₩32,000');
+		// 요청 줄 단가 · 수량을 주면 "단가 × 개수" — 주문 수량(× 2)과 헷갈리지 않게
+		expect(refundPaidNote({ goods: 32000, shippingBack: 0 }, 0, { unitPrice: 32000, qty: 1 })).toBe('상품 ₩32,000 × 1개 · 무료배송 주문');
+		expect(refundPaidNote({ goods: 36000, shippingBack: 3000 }, 3000, { unitPrice: 36000, qty: 1 })).toBe('상품 ₩36,000 × 1개 + 배송비 ₩3,000');
+	});
+	it('환불 요청 수량 — 주문 수량 중 일부일 때만', () => {
+		const order = { ...claim().order, item: { ...claim().order.item, qty: 2 } };
+		expect(claimQtyText({ qty: 1, order })).toBe('1개 (주문 2개 중)');
+		expect(claimQtyText({ qty: 2, order })).toBeNull();
 	});
 	it('새 요청의 예상 차감 — 단순 변심 환불만 왕복 배송비', () => {
 		expect(claimOpenDeduction('refund', '단순 변심', 6000)).toBe(6000);

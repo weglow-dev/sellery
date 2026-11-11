@@ -96,7 +96,7 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	});
 	it('상품 금액(그 줄 전체 수량) · 주문 배송비(0090) — 무료배송이면 "무료배송"', () => {
 		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }));
-		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000');
+		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000 (2개)');
 		expect(paid.rows.find((r) => r.k === '배송비')!.v).toBe('₩3,000');
 		const free = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING' }), shipping_fee: 0 } }));
 		expect(free.rows.find((r) => r.k === '배송비')!.v).toBe('무료배송');

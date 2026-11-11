@@ -64,13 +64,17 @@ export function refundCalcText(v: RefundView): string {
 }
 /** 금액 + 식 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" */
 export const refundAmountText = (v: RefundView): string => [won(v.amount), refundCalcText(v)].filter(Boolean).join(' ');
-/** 결제 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만 */
-export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null): string {
-	if (v.shippingBack) return `상품 ${won(v.goods)} + 배송비 ${won(v.shippingBack)}`;
-	if (shippingFee === null) return `상품 ${won(v.goods)}`;
-	if (shippingFee <= 0) return `상품 ${won(v.goods)} · 무료배송 주문`;
-	return `상품 ${won(v.goods)} · 배송비 ${won(shippingFee)}는 주문 전체가 환불될 때 함께`;
+/** 요청 결제 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만.
+ *  count(요청 한 줄의 단가 · 수량)를 주면 상품을 "₩32,000 × 1개"로 — 주문 수량과 헷갈리지 않게 */
+export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null, count?: { unitPrice: number; qty: number }): string {
+	const goods = count ? `상품 ${won(count.unitPrice)} × ${count.qty}개` : `상품 ${won(v.goods)}`;
+	if (v.shippingBack) return `${goods} + 배송비 ${won(v.shippingBack)}`;
+	if (shippingFee === null) return goods;
+	if (shippingFee <= 0) return `${goods} · 무료배송 주문`;
+	return `${goods} · 배송비 ${won(shippingFee)}는 주문 전체가 환불될 때 함께`;
 }
+/** 처리 결과 "환불 요청" 줄 — 주문한 수량 중 일부만 요청했을 때만 "1개 (주문 2개 중)" · 전부면 null(줄을 그리지 않는다) */
+export const claimQtyText = (c: Pick<Claim, 'qty' | 'order'>): string | null => (c.qty < c.order.item.qty ? `${c.qty}개 (주문 ${c.order.item.qty}개 중)` : null);
 
 /** 새 요청의 예상 차감 — 단순 변심 환불은 처리 방법 기본(myr_refund_request_options 첫 값 = 부분 환불)대로 왕복 배송비. 그 밖은 0.
  *  한 번에 보낸 요청은 묶음에서 한 번만(서버 myr_refund_request_fee_due) — 샵 예상 금액은 고른 줄 전체를 한 번에 계산하므로 한 번 */

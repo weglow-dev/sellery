@@ -12,7 +12,7 @@ type ShipFields = { courier: string | null; trackingNo: string | null; shippedAt
 export type ShipOrder = Partial<ShipFields> & {
 	status: string;
 	paidAt: string | null;
-	/** 교환·환불 요청 상세만(0090) — 그 줄 상품 금액 · 주문 배송비(무료배송이면 0). 다른 줄 금액 · 주문 합계는 싣지 않는다 */
+	/** 교환·환불 요청 상세만(0090) — 그 줄 상품 금액(주문 수량 전체 · "(2개)") · 주문 배송비(무료배송이면 0). 다른 줄 금액 · 주문 합계는 싣지 않는다 */
 	money?: { goods: number; shippingFee: number } | null;
 	item: (ShipFields & { name: string; option: string; qty: number; shipStatus: string | null }) | null;
 };
@@ -29,7 +29,7 @@ export function orderShipping(o: ShipOrder): OrderShipping {
 	const rows: OrderShipping['rows'] = [];
 	if (it) rows.push({ k: '주문 상품', v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
 	if (o.money) {
-		rows.push({ k: '상품 금액', v: won(o.money.goods) });
+		rows.push({ k: '상품 금액', v: it ? `${won(o.money.goods)} (${it.qty}개)` : won(o.money.goods) });
 		rows.push({ k: '배송비', v: o.money.shippingFee > 0 ? won(o.money.shippingFee) : '무료배송' });
 	}
 	if (o.paidAt) rows.push({ k: '결제일', v: shortDate(o.paidAt) });
