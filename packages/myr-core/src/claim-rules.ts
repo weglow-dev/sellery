@@ -285,11 +285,10 @@ export const claimRefundedText = (c: Pick<Claim, 'amount' | 'deduction' | 'refun
 };
 
 /** 단순 변심 기한(0093 · 수령 후 7일 · 날짜 기준) 줄 아래 안내 — 서버 changeMindOk · changeMindUntil 그대로(화면이 날짜를 계산하지 않는다).
- *  기한이 지났으면 "수령 후 7일이 지나 단순 변심 환불은 어려워요 (11월 10일까지였어요)" · 아니면 null */
+ *  기한이 지났으면 "수령 후 7일이 지나 단순 변심 환불은 어려워요" · 아니면 null */
 export function changeMindNote(i: Pick<OrderItem, 'changeMindOk' | 'changeMindUntil'>): string | null {
 	if (i.changeMindOk) return null;
-	const until = shortDate(i.changeMindUntil);
-	return `수령 후 7일이 지나 단순 변심 환불은 어려워요${until ? ` (${until}까지였어요)` : ''}`;
+	return `수령 후 7일이 지나 단순 변심 환불은 어려워요`;
 }
 
 /** 요청할 수 있는 줄 — 서버 refundPath = claim(0092 myr_line_refund_path · myr_app_claim_open 이 같은 함수로 다시 막는다).

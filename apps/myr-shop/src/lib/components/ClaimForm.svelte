@@ -239,7 +239,6 @@
 				<button type="button" role="radio" aria-checked={kind === k} disabled={submitting || !allowed} onclick={() => pickKind(k)} class="{chip} {kind === k ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{KIND_LABEL[k]}</button>
 			{/each}
 		</div>
-		{#if allExpired}<p class="text-[12.5px] font-semibold text-[#ff8a8a]">모든 상품이 수령 후 7일이 지나 단순 변심은 고를 수 없어요 — 파손 · 누액 · 오배송이면 사진과 함께 요청해주세요</p>{/if}
 		{#if reason === '단순 변심'}<p class="text-[12.5px] text-fg-faint">단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요</p>{/if}
 
 		{#if reason}
