@@ -150,7 +150,9 @@ class ShopState {
 				gbState: q?.gbState ?? null,
 				gbCode: l.gb && q?.gbState !== 'ended' ? l.gb.code : undefined,
 				lineAmount: q?.lineAmount ?? null,
-				baseAmount: q?.baseAmount ?? null
+				baseAmount: q?.baseAmount ?? null,
+				/** 지금 살 수 있는 수량(서버 견적 · 0096) — 수량 버튼 상한 · 넘으면 안내 */
+				stockLeft: q?.stockLeft ?? null
 			};
 		})
 	);

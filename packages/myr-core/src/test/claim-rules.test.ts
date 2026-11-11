@@ -11,6 +11,7 @@ import {
 	claimQtyText,
 	claimRefundedText,
 	claimRefundView,
+	changeMindNote,
 	claimShippingBack,
 	claimsFromJson,
 	claimStepText,
@@ -80,10 +81,14 @@ describe('입력 — 요청 남기기', () => {
 	});
 	it('형식 틀리면 null — 종류 · 사유 · 빈 줄 · 수량 · 사진 경로 · 4장', () => {
 		const ok = { orderCode: 'myr1001', kind: 'refund', reason: '오배송', items: [{ itemId: ITEM, qty: 1 }] };
+		// 요청 수량 상한 없음(0097) — 150개도 받는다(남은 수량은 서버 TOO_MANY)
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 150 }] })?.items[0].qty).toBe(150);
 		expect(parseClaimOpenBody({ ...ok, kind: 'swap' })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, reason: '그냥' })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [] })).toBeNull();
-		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 10 }] })).toBeNull();
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 0 }] })).toBeNull();
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 2_147_483_648 }] })).toBeNull(); // 정수 범위 밖(전송 형식) — 수량 형식 범위는 서버 myr_qty_parse(0097)
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1.5 }] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: ['../x.jpg'] }] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: [PHOTO, PHOTO, PHOTO, PHOTO] }] })).toBeNull();
 		expect(parseClaimOpenBody(null)).toBeNull();
@@ -194,6 +199,16 @@ describe('처리 방법 이름 · 금액', () => {
 		expect(claimPolicy('파손 · 누액', 6000)).toEqual(['사진 확인 후 새 제품 재발송 또는 전액 환불']);
 		expect(claimPolicy('오배송', 6000)).toEqual(['잘못 간 제품은 택배 기사가 방문해 회수해요']);
 		expect(claimPolicy('???', 6000)).toEqual([]);
+	});
+});
+
+describe('단순 변심 기한(0093) — 서버 값 그대로 안내', () => {
+	it('지난 줄만 안내(서버 changeMindOk 그대로)', () => {
+		expect(changeMindNote({ changeMindOk: true, changeMindUntil: '2026-11-10T14:59:59Z' })).toBeNull();
+		expect(changeMindNote({ changeMindOk: false, changeMindUntil: '2026-11-10T14:59:59Z' })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요');
+	});
+	it('서버 거절 CHANGE_MIND_EXPIRED → 안내 문구', () => {
+		expect(claimMessage('BAD_ITEMS', [{ reason: 'CHANGE_MIND_EXPIRED' }])).toBe('수령 후 7일이 지난 상품은 단순 변심 환불이 어려워요');
 	});
 });
 

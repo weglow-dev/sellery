@@ -39,7 +39,10 @@ const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, statu
 	trackingNo: null,
 	shippedAt: null,
 	deliveredAt: null,
-	refundPath
+	refundPath,
+	changeMindUntil: null,
+	changeMindOk: true,
+	leftQty: Math.max(0, qty - refundedQty) // 서버(0097 myr_line_left)가 줄 법한 값
 });
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -115,6 +118,9 @@ describe('parseCancelBody', () => {
 		expect(parseCancelBody({ orderCode: 'bad code' })).toBeNull();
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: 'x', qty: 1 }] })).toBeNull();
 		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 0 }] })).toBeNull();
+		// 수량 상한 없음(0095 · 0097) — 150개도 받고 남은 수량은 서버(TOO_MANY)가 본다
+		expect(parseCancelBody({ orderCode: 'myr1001', items: [{ itemId: A, qty: 150 }] })?.items).toEqual([{ item_id: A, qty: 150 }]);
+		expect(parseRefundQuoteBody({ orderCode: 'myr1001', mode: 'claim', items: [{ itemId: A, qty: 150 }] })?.items).toEqual([{ item_id: A, qty: 150 }]);
 		expect(parseCancelBody(null)).toBeNull();
 	});
 });

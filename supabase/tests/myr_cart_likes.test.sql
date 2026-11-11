@@ -39,7 +39,7 @@ update public.myr_products set deleted_at = now() where code = 'pgtap-cart-delet
 
 -- ---------- myr_cart_set — 거부 ----------
 select is(public.myr_cart_set(null, 'pgtap-cart-a', 0, 1) ->> 'code', 'NO_USER', 'user 없으면 NO_USER');
-select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, 10) ->> 'code', 'BAD_QTY', 'qty 10 은 BAD_QTY (상한 9)');
+select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, 1000000) ->> 'code', 'BAD_QTY', '숫자 형식 밖(100만)은 BAD_QTY — 구매 수량 상한은 없다(0095)');
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, -1) ->> 'code', 'BAD_QTY', 'qty 음수는 BAD_QTY');
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', -1, 1) ->> 'code', 'BAD_OPTION', 'option_index 음수는 BAD_OPTION');
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'nope', 0, 1) ->> 'code', 'NOT_FOUND', '없는 code 는 NOT_FOUND');
@@ -50,7 +50,7 @@ select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-car
 
 -- ---------- myr_cart_set — 담기 · 더하기 · 수량 · 삭제 ----------
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', ' PGTAP-CART-A ', 0, 2), '{"ok": true, "code": "pgtap-cart-a", "qty": 2}'::jsonb, '담기 — code 는 trim+소문자 · qty 2');
-select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, 8, true) ->> 'qty', '9', 'add=true 는 더하되 9 에서 멈춘다');
+select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, 8, true) ->> 'qty', '10', 'add=true 는 그대로 더한다(9 상한 없음 · 0095)');
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 0, 3) ->> 'qty', '3', 'add=false 는 그 값으로 맞춘다');
 select is(public.myr_cart_set('00000000-0000-4000-8000-0000000000c1', 'pgtap-cart-a', 1, 1) ->> 'qty', '1', '다른 option_index 는 별도 줄');
 select is((select count(*) from public.myr_cart_items where user_id = '00000000-0000-4000-8000-0000000000c1'), 2::bigint, '줄 2개 (옵션 0 · 1)');
@@ -85,8 +85,8 @@ select is(
 );
 select is(
   (select jsonb_agg(jsonb_build_object('code', e->>'code', 'qty', (e->>'qty')::int) order by e->>'code') from jsonb_array_elements(public.myr_cart_get('00000000-0000-4000-8000-0000000000c1')) e),
-  '[{"code": "pgtap-cart-a", "qty": 9}, {"code": "pgtap-cart-b", "qty": 1}]'::jsonb,
-  '합친 결과 — a 는 2+8 → 상한 9 · b 는 1'
+  '[{"code": "pgtap-cart-a", "qty": 10}, {"code": "pgtap-cart-b", "qty": 1}]'::jsonb,
+  '합친 결과 — a 는 2+8 = 10(상한 없음 · 0095) · b 는 1'
 );
 
 -- ---------- myr_cart_clear ----------

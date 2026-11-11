@@ -45,6 +45,11 @@
 		return () => clearTimeout(t);
 	});
 	const unit = $derived(gb && gbState === 'active' ? gb.price : p.price);
+	// 지금 살 수 있는 수량(서버 0096 · 결제 대기 중인 다른 고객 몫 제외) — 수량 버튼 상한 · 표시. 모르면(null) 상한 없이
+	const left = $derived(p.soldOut ? 0 : p.stockLeft);
+	$effect(() => {
+		if (left !== null && left > 0 && qty > left) qty = left;
+	});
 
 	/** 사진 넘겨보기 — 지금 보는 사진 번호 · PC 썸네일 줄이 go(i) 로 옮긴다 */
 	let photo = $state(0);
@@ -77,6 +82,7 @@
 		{/if}
 		<span class="{at === 'pc' ? 'text-[14px]' : 'text-[13px]'} text-white/45">{p.unit}</span>
 	</div>
+	{#if left !== null && left > 0}<p class="mt-1.5 text-[13px] font-semibold text-white/60">남은 수량 <b class="font-extrabold text-fg tabular-nums">{left.toLocaleString('ko-KR')}개</b></p>{/if}
 	{#if gb && gbState === 'active'}
 		<span class="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-3 py-1.5 text-[12px] font-extrabold text-accent">공구 · {gb.discountPct}% 할인 · {remainLabel(gb.endsAt, now)}</span>
 	{:else if gb && gbState === 'scheduled'}
@@ -282,7 +288,7 @@
 			{/each}
 		</div>
 		<div class="flex items-center gap-2.5">
-			<QtyStepper {qty} onchange={(q) => (qty = q)} disabled={p.soldOut} />
+			<QtyStepper {qty} max={left ?? undefined} onchange={(q) => (qty = q)} disabled={p.soldOut} />
 			<button
 				type="button"
 				onclick={() => shop.toggleLike(p)}
@@ -314,7 +320,7 @@
 
 	<!-- 모바일 하단 담기 바 -->
 	<div class="flex w-full shrink-0 items-center gap-2.5 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
-		<QtyStepper {qty} onchange={(q) => (qty = q)} disabled={p.soldOut} />
+		<QtyStepper {qty} max={left ?? undefined} onchange={(q) => (qty = q)} disabled={p.soldOut} />
 		<button
 			type="button"
 			onclick={add}

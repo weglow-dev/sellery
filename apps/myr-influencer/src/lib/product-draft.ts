@@ -87,7 +87,7 @@ export function saveFailure(code: string, field?: string | null): { message: str
 			case 'name':
 				return { message: '제품명을 입력해주세요', step: 1 };
 			case 'price':
-				return { message: '판매가를 입력해주세요', step: 1 };
+				return { message: '판매가는 1,000만 원까지 입력할 수 있어요', step: 1 };
 			case 'category':
 				return { message: '카테고리를 골라주세요', step: 1 };
 			case 'images':

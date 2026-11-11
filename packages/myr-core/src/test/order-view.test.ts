@@ -145,7 +145,8 @@ describe('줄 단위 배송(0077)', () => {
 		expect(orderFromJson({ id: 'o', code: 'myr1', ship_status: 'WHAT' })!.shipStatus).toBeNull();
 	});
 	describe('송장(박스)별 묶음', () => {
-		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
+		// leftQty 는 서버(0097 myr_line_left)가 주는 남은 수량 — 테스트는 서버가 줄 법한 값을 넣는다
+		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, leftQty: 1, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
 		it('한 박스 — 남은 줄이 전부 같은 송장 → single', () => {
 			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-05T00:00:00Z' }), it_({ name: '스틱', option: '레몬', courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-04T00:00:00Z' })]);
 			expect(r.single).toBe(true);
@@ -157,7 +158,7 @@ describe('줄 단위 배송(0077)', () => {
 			expect([r.single, r.boxes.length]).toEqual([false, 1]);
 		});
 		it('취소 줄 제외 · 전액 환불 줄은 박스엔 남지만 single 판정에서 빠진다 · 송장이 없으면 빈 목록', () => {
-			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '환불', refundedQty: 1, status: 'REFUNDED' }), it_({ name: '취소', status: 'CANCELED', courier: 'CJ대한통운', trackingNo: '9' })]);
+			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '환불', refundedQty: 1, leftQty: 0, status: 'REFUNDED' }), it_({ name: '취소', status: 'CANCELED', courier: 'CJ대한통운', trackingNo: '9' })]);
 			expect([r.single, r.boxes.map((b) => b.trackingNo)]).toEqual([true, ['1']]);
 			expect(shipBoxes([it_({})])).toEqual({ boxes: [], single: false });
 		});

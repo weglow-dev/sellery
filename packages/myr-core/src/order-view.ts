@@ -17,6 +17,8 @@ export type OrderItem = {
 	amount: number;
 	status: string;
 	refundedQty: number;
+	/** 남은 수량(0097 myr_line_left = 주문 수량 − 환불 수량) — 서버 값 그대로 · 화면이 빼서 계산하지 않는다. 옛 응답이면 0 */
+	leftQty: number;
 	tile: string;
 	ic: string;
 	thumbUrl: string | null;
@@ -31,6 +33,9 @@ export type OrderItem = {
 	deliveredAt: string | null;
 	/** 환불 길(0092 myr_line_refund_path) — instant = 바로 환불 · claim = 교환·환불 요청 · null = 불가. 화면은 이 값을 그대로 쓴다 */
 	refundPath: RefundPath;
+	/** 단순 변심 마지막 시각(0093 · 수령 다음 날부터 7일째 밤까지 · 수령 전이면 null) · 지금 받을 수 있나 — 서버 값 그대로(화면이 날짜를 계산하지 않는다) */
+	changeMindUntil: string | null;
+	changeMindOk: boolean;
 };
 export type RefundPath = 'instant' | 'claim' | null;
 export type OrderShipping = { recipient: string; phone: string; address1: string; address2: string; postcode: string; memo: string };
@@ -87,6 +92,7 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		amount: num(o, 'amount'),
 		status: str(o, 'status', 'PAID'),
 		refundedQty: num(o, 'refunded_qty'),
+		leftQty: num(o, 'left_qty'),
 		tile: str(o, 'tile', 'linear-gradient(145deg,#6b7280,#262a33)'),
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
@@ -94,6 +100,8 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		creatorHandle: str(o, 'creator_handle'),
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
 		refundPath: o.refund_path === 'instant' || o.refund_path === 'claim' ? o.refund_path : null,
+		changeMindUntil: strOrNull(o, 'change_mind_until'),
+		changeMindOk: o.change_mind_ok !== false,
 		courier: strOrNull(o, 'courier'),
 		trackingNo: strOrNull(o, 'tracking_no'),
 		shippedAt: strOrNull(o, 'shipped_at'),
@@ -198,7 +206,7 @@ export function shipBoxes(items: OrderItem[]): { boxes: ShipBox[]; single: boole
 			if (it.shippedAt && (!box.shippedAt || it.shippedAt < box.shippedAt)) box.shippedAt = it.shippedAt;
 		} else boxes.push({ courier: it.courier, trackingNo: it.trackingNo, shippedAt: it.shippedAt, names: [name] });
 	}
-	const live = items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
+	const live = items.filter((i) => i.status !== 'CANCELED' && i.leftQty > 0);
 	const single = boxes.length === 1 && live.every((i) => i.trackingNo === boxes[0].trackingNo && i.courier === boxes[0].courier);
 	return { boxes, single };
 }

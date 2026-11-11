@@ -13,6 +13,7 @@
 	import type { OrderItem, OrderView } from '@sellery/myr-core/order-view';
 	import {
 		CLAIM_REASONS,
+		changeMindNote,
 		claimMessage,
 		claimPolicy,
 		KIND_LABEL,
@@ -54,9 +55,13 @@
 		untrack(() => quote.ask(off ? null : { orderCode: order.code, mode: 'claim', reason: why, items }));
 	});
 	const estimate = $derived(kind === 'refund' ? quote.quote : null);
-	const ready = $derived(chosen.length > 0 && reason !== '' && kindAllowed(kind, reason) && !missingPhoto && !busy);
+	// 단순 변심 기한(0093 · 수령 후 7일) — 서버가 줄마다 준 changeMindOk 그대로. 지난 줄은 단순 변심으로 고를 수 없다(서버가 다시 막는다)
+	const changeMind = $derived(reason === '단순 변심');
+	const allExpired = $derived(lines.length > 0 && lines.every((l) => !l.changeMindOk));
+	const expiredChosen = $derived(changeMind && chosen.some((l) => !l.changeMindOk));
+	const ready = $derived(chosen.length > 0 && reason !== '' && kindAllowed(kind, reason) && !missingPhoto && !busy && !expiredChosen);
 	const ctaLabel = $derived(
-		chosen.length === 0 ? '제품을 선택하세요' : reason === '' ? '사유를 선택하세요' : missingPhoto ? '사진을 올려주세요' : busy ? '사진을 올리는 중…' : `${KIND_LABEL[kind]} 요청 보내기`
+		chosen.length === 0 ? '제품을 선택하세요' : reason === '' ? '사유를 선택하세요' : expiredChosen ? '단순 변심 기한이 지난 상품이 있어요' : missingPhoto ? '사진을 올려주세요' : busy ? '사진을 올리는 중…' : `${KIND_LABEL[kind]} 요청 보내기`
 	);
 
 	function toggle(it: OrderItem, on: boolean) {
@@ -69,6 +74,8 @@
 	}
 	function pickReason(r: ClaimReason) {
 		reason = r;
+		// 단순 변심을 고르면 기한이 지난 줄은 선택에서 뺀다(그 줄은 파손 · 오배송으로만)
+		if (r === '단순 변심') qtyById = Object.fromEntries(Object.entries(qtyById).map(([id, q]) => [id, lines.find((l) => l.id === id)?.changeMindOk === false ? 0 : q]));
 		if (!kindAllowed(kind, r)) kind = 'refund';
 		confirming = false;
 	}
@@ -168,12 +175,13 @@
 			{@const up = uploading[it.id] ?? 0}
 			<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
 				<label class="flex min-w-0 cursor-pointer items-center gap-3 lg:gap-4">
-					<input type="checkbox" class={checkCls} checked={on} disabled={submitting} onchange={(e) => toggle(it, e.currentTarget.checked)} aria-label="{it.name} 선택" />
+					<input type="checkbox" class={checkCls} checked={on} disabled={submitting || (changeMind && !it.changeMindOk)} onchange={(e) => toggle(it, e.currentTarget.checked)} aria-label="{it.name} 선택" />
 					<Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} alt="" icon={24} class="h-14 w-14 shrink-0 rounded-[14px] lg:h-[60px] lg:w-[60px] lg:rounded-2xl" />
 					<span class="min-w-0 flex-1">
 						{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
 						<span class="block truncate text-[14.5px] font-bold">{it.name}{it.option ? ` · ${it.option}` : ''}</span>
 						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
+						{#if changeMindNote(it)}<span class="mt-1 block text-[12px] font-semibold text-[#ff8a8a]">{changeMindNote(it)}</span>{/if}
 					</span>
 				</label>
 				{#if on}
@@ -220,7 +228,7 @@
 		<p class="mt-2 text-[14px] font-extrabold lg:mt-3 lg:text-[15px]">사유</p>
 		<div class="flex flex-wrap gap-2" role="radiogroup" aria-label="사유">
 			{#each CLAIM_REASONS as r (r)}
-				<button type="button" role="radio" aria-checked={reason === r} disabled={submitting} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
+				<button type="button" role="radio" aria-checked={reason === r} disabled={submitting || (r === '단순 변심' && allExpired)} onclick={() => pickReason(r)} class="{chip} {reason === r ? 'border-accent bg-accent/10 text-accent' : 'border-white/12 text-fg hover:border-white/30'}">{r}</button>
 			{/each}
 		</div>
 
