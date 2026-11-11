@@ -21,7 +21,7 @@ import {
 	validateGuestBuyer,
 	validateShipping
 } from '../checkout-rules';
-import { QTY_FORMAT_MAX } from '../constants';
+import { QTY_INT_MAX } from '../constants';
 import { cleanText, normalizePhone } from '../text';
 
 describe('text', () => {
@@ -60,7 +60,7 @@ describe('parseLines', () => {
 		expect(parseLines([{ code: 'Bad Code', qty: 1 }])).toBeNull();
 		expect(
 			parseLines([
-				{ code: 'a', qty: QTY_FORMAT_MAX },
+				{ code: 'a', qty: QTY_INT_MAX },
 				{ code: 'a', qty: 1 }
 			])
 		).toBeNull();

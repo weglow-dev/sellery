@@ -25,7 +25,7 @@
 	const dueText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 	const lineStatus = (s: string, refunded: number, qty: number) => (s === 'REFUNDED' ? '환불 완료' : s === 'PARTIAL_REFUNDED' ? `${refunded}/${qty} 환불` : s === 'CANCELED' ? '취소' : '');
 	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
-	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0));
+	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.leftQty > 0));
 	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
 	// 상품이 여럿이면 열린 교환·환불 요청이 걸린 줄 옆에 그 상태(주문 칩은 statusLabel 이 이미 요청 상태)
 	const openClaimOf = $derived(new Map(claims.filter(isOpenClaim).map((c) => [c.order.item.id, c.status as 'pending' | 'progress'])));

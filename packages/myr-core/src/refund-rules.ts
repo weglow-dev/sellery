@@ -1,6 +1,6 @@
 /** 환불 순수 규칙 — 입력 검증 · 화면 판정 · RPC 파서 · 토스 Idempotency-Key (테스트 src/test/refund-rules.test.ts). docs/myr.md §6.3. */
 import { ORDER_CODE_RE } from './checkout-rules';
-import { QTY_FORMAT_MAX } from './constants';
+import { QTY_INT_MAX } from './constants';
 import { cleanText } from './text';
 import type { OrderItem, OrderView } from './order-view';
 
@@ -47,7 +47,7 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 		if (!Array.isArray(b.items) || b.items.length > 50) return null;
 		for (const raw of b.items) {
 			const l = obj(raw);
-			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_FORMAT_MAX)
+			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_INT_MAX)
 				return null;
 			if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
 			const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
@@ -82,7 +82,8 @@ export function customerCanRefund(
 
 /** 바로 환불할 수 있는 줄 — 서버 refundPath = instant */
 export const customerRefundableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.refundPath === 'instant');
-export const remainingQty = (i: OrderItem): number => Math.max(0, i.qty - i.refundedQty);
+/** 줄의 남은 수량 — 서버 값(0097 myr_line_left · 환불 가드 TOO_MANY 와 같은 함수) 그대로 */
+export const remainingQty = (i: Pick<OrderItem, 'leftQty'>): number => i.leftQty;
 
 
 /** 토스 Idempotency-Key — 같은 주문·같은 줄 묶음의 재시도는 같은 키(토스가 같은 응답) · 다른 묶음은 다른 키. ≤ 300자.
@@ -131,7 +132,7 @@ export function parseRefundQuoteBody(body: unknown): RefundQuoteBody | null {
 		const x = obj(raw);
 		const itemId = x && typeof x.itemId === 'string' ? x.itemId : '';
 		const qty = x ? x.qty : null;
-		if (!UUID_RE.test(itemId) || typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > QTY_FORMAT_MAX) return null;
+		if (!UUID_RE.test(itemId) || typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > QTY_INT_MAX) return null;
 		if (items.some((i) => i.item_id === itemId)) return null;
 		items.push({ item_id: itemId, qty });
 	}

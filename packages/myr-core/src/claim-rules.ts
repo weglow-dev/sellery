@@ -6,7 +6,7 @@
  * 왕복 배송비 = `return_fee`(platform_settings) · 회수/재발송/환불 여부 = needs_*. 여기서는 그 값을 **이름 · 문구로만** 바꾼다.
  */
 import { ORDER_CODE_RE } from './checkout-rules';
-import { QTY_FORMAT_MAX, won } from './constants';
+import { QTY_INT_MAX, won } from './constants';
 import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
 import { cleanText } from './text';
@@ -119,7 +119,7 @@ export function parseClaimOpenBody(v: unknown): ClaimOpenBody | null {
 	const items: ClaimLineInput[] = [];
 	for (const raw of b.items) {
 		const l = obj(raw);
-		if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_FORMAT_MAX) return null;
+		if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_INT_MAX) return null;
 		if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
 		const line: ClaimLineInput = { item_id: l.itemId, qty: l.qty as number };
 		const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);

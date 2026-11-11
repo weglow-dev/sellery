@@ -1,7 +1,7 @@
 // 계정 장바구니(0057) 입출력 — apps/myr-shop/src/lib/cart.ts 의 linesFromRows · mergePayload · parse* (API 라우트가 본문 검증에 쓴다)
 import { describe, expect, it } from 'vitest';
 import { canBuy, linesFromRows, quoteRequest, mergePayload, parseCodesBody, parseLikeBody, parseMergeBody, parseSetBody } from '../lib/cart';
-import { MOCK_PRODUCTS, QTY_FORMAT_MAX } from '../lib/data';
+import { MOCK_PRODUCTS, QTY_INT_MAX } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS;
 const row = (code: string, qty: number, available: boolean, price = 10000) => ({
@@ -65,7 +65,7 @@ describe('parseSetBody — PUT /api/cart', () => {
 	it('code 형식 · qty 범위·정수 · 본문 꼴이 틀리면 null', () => {
 		expect(parseSetBody({ code: 'Bad Code', qty: 1 })).toBeNull();
 		expect(parseSetBody({ code: 'a', qty: 10 })).toEqual({ code: 'a', qty: 10, add: false }); // 9 상한 없음(0095)
-		expect(parseSetBody({ code: 'a', qty: QTY_FORMAT_MAX + 1 })).toBeNull(); // 숫자 형식 범위만
+		expect(parseSetBody({ code: 'a', qty: QTY_INT_MAX + 1 })).toBeNull(); // 숫자 형식 범위만
 		expect(parseSetBody({ code: 'a', qty: -1 })).toBeNull();
 		expect(parseSetBody({ code: 'a', qty: 1.5 })).toBeNull();
 		expect(parseSetBody({ code: 'a', qty: '1' })).toBeNull();

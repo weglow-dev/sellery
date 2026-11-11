@@ -52,6 +52,13 @@ export const setLike = async (userId: string, code: string, liked: boolean): Pro
 export const mergeLikes = async (userId: string, codes: string[]): Promise<RpcResult> =>
 	asResult(await rpc('myr_likes_merge', { p_user_id: userId, p_codes: codes }));
 
-/** 장바구니 · 체크아웃 요약 견적(0092 myr_app_cart_quote) — 체크아웃과 같은 단가 · 공구 · 배송비 함수. 돈은 움직이지 않는다. 형식이 틀리면 null */
-export const quoteCart = async (lines: QuoteRequestLine[]): Promise<CartQuote | null> =>
-	parseCartQuote(await rpc('myr_app_cart_quote', { p_lines: lines.map((l) => ({ code: l.code, option_index: l.optionIndex, qty: l.qty, ...(l.gb ? { gb: l.gb } : {}) })) }));
+/** 장바구니 · 체크아웃 요약 견적(0092 myr_app_cart_quote) — 체크아웃과 같은 단가 · 공구 · 배송비 함수. 돈은 움직이지 않는다.
+ *  서버가 거절하면(수량 형식 등 — 0097 myr_qty_parse) 그 code 를 그대로 · 응답 모양이 틀리면 BAD_RESPONSE */
+export type QuoteResult = { ok: true; quote: CartQuote } | { ok: false; code: string };
+export const quoteCart = async (lines: QuoteRequestLine[]): Promise<QuoteResult> => {
+	const data = await rpc('myr_app_cart_quote', { p_lines: lines.map((l) => ({ code: l.code, option_index: l.optionIndex, qty: l.qty, ...(l.gb ? { gb: l.gb } : {}) })) });
+	const quote = parseCartQuote(data);
+	if (quote) return { ok: true, quote };
+	const code = (data as { code?: unknown } | null)?.code;
+	return { ok: false, code: typeof code === 'string' ? code : 'BAD_RESPONSE' };
+};

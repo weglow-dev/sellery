@@ -17,6 +17,8 @@ export type OrderItem = {
 	amount: number;
 	status: string;
 	refundedQty: number;
+	/** 남은 수량(0097 myr_line_left = 주문 수량 − 환불 수량) — 서버 값 그대로 · 화면이 빼서 계산하지 않는다. 옛 응답이면 0 */
+	leftQty: number;
 	tile: string;
 	ic: string;
 	thumbUrl: string | null;
@@ -90,6 +92,7 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		amount: num(o, 'amount'),
 		status: str(o, 'status', 'PAID'),
 		refundedQty: num(o, 'refunded_qty'),
+		leftQty: num(o, 'left_qty'),
 		tile: str(o, 'tile', 'linear-gradient(145deg,#6b7280,#262a33)'),
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
@@ -203,7 +206,7 @@ export function shipBoxes(items: OrderItem[]): { boxes: ShipBox[]; single: boole
 			if (it.shippedAt && (!box.shippedAt || it.shippedAt < box.shippedAt)) box.shippedAt = it.shippedAt;
 		} else boxes.push({ courier: it.courier, trackingNo: it.trackingNo, shippedAt: it.shippedAt, names: [name] });
 	}
-	const live = items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
+	const live = items.filter((i) => i.status !== 'CANCELED' && i.leftQty > 0);
 	const single = boxes.length === 1 && live.every((i) => i.trackingNo === boxes[0].trackingNo && i.courier === boxes[0].courier);
 	return { boxes, single };
 }

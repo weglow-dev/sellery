@@ -87,7 +87,8 @@ describe('입력 — 요청 남기기', () => {
 		expect(parseClaimOpenBody({ ...ok, reason: '그냥' })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 0 }] })).toBeNull();
-		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1_000_000 }] })).toBeNull(); // 숫자 형식 범위 밖
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 2_147_483_648 }] })).toBeNull(); // 정수 범위 밖(전송 형식) — 수량 형식 범위는 서버 myr_qty_parse(0097)
+		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1.5 }] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: ['../x.jpg'] }] })).toBeNull();
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: [PHOTO, PHOTO, PHOTO, PHOTO] }] })).toBeNull();
 		expect(parseClaimOpenBody(null)).toBeNull();

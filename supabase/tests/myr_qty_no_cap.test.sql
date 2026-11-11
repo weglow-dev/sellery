@@ -1,6 +1,6 @@
 -- pgTAP — 0095 구매 수량 상한 없음: 장바구니 · 견적 · 체크아웃이 9개를 넘어도 받고, 한도는 재고 · 합계가 20억을 넘으면 오류 대신 AMOUNT_TOO_LARGE
 begin;
-select plan(15);
+select plan(26);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-00000000a701', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-qty@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
@@ -47,6 +47,28 @@ select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000a731', '000
 select is((select qty from public.myr_refund_requests where order_item_id = '00000000-0000-4000-8000-00000000a741'), 150, '요청 수량 150 저장');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000a731', '[{"item_id":"00000000-0000-4000-8000-00000000a742","qty":150}]', 'system', null) ->> 'amount', '5400000', '바로 환불 150개 precheck → 540만 원(전에는 999 · 형식 검사)');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000a731', '[{"item_id":"00000000-0000-4000-8000-00000000a742","qty":151}]', 'system', null) #>> '{items,0,reason}', 'TOO_MANY', '남은 수량(150) 초과 → TOO_MANY(실제 한도)');
+
+-- 0097 — 수량 숫자 형식 한 곳(myr_qty_parse · myr_qty_max)
+select function_privs_are('public', 'myr_qty_parse', '{text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 qty_parse 불가');
+select function_privs_are('public', 'myr_line_left', '{myr_order_items}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 line_left 불가');
+select is(array[public.myr_qty_parse('1'), public.myr_qty_parse('150'), public.myr_qty_parse('999999'), public.myr_qty_parse('0')], array[1, 150, 999999, 0], '숫자 1~6자리 → 그 정수');
+select is(array[public.myr_qty_parse('1000000'), public.myr_qty_parse('-1'), public.myr_qty_parse('1.5'), public.myr_qty_parse('x'), public.myr_qty_parse(''), public.myr_qty_parse(null)],
+          array[-1, -1, -1, -1, -1, -1], '7자리 · 음수 · 소수 · 글자 · 빈 값 · null → -1');
+select is(public.myr_qty_max(), 999999, '형식 범위 999,999');
+-- 6곳이 같은 형식 판정
+select is(public.myr_cart_set('00000000-0000-4000-8000-00000000a701', 'pgtap-qty-a', 0, 1000000) ->> 'code', 'BAD_QTY', '장바구니 저장 100만 → BAD_QTY');
+select is(public.myr_app_cart_quote('[{"code":"pgtap-qty-a","qty":1000000}]') ->> 'code', 'BAD_LINES', '견적 100만 → BAD_LINES');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000a701', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-qty-a","qty":1000000}]', 'myr_t_qty_0007') ->> 'code', 'BAD_LINES', '결제 생성 100만 → BAD_LINES');
+select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000a731', '00000000-0000-4000-8000-00000000a701', 'refund', '오배송', '[{"item_id":"00000000-0000-4000-8000-00000000a742","qty":"x"}]') ->> 'code', 'BAD_ITEMS', '요청 수량이 숫자가 아니면 BAD_ITEMS');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000a731', '[{"item_id":"00000000-0000-4000-8000-00000000a742","qty":1000000}]', 'system', null) ->> 'code', 'BAD_ITEMS', '바로 환불 100만 → BAD_ITEMS(형식)');
+
+-- 0097 — 줄의 남은 수량 한 곳(myr_line_left) · 주문 JSON left_qty
+update public.myr_order_items set refunded_qty = 40 where id = '00000000-0000-4000-8000-00000000a742';
+select is((select jsonb_build_object('fn', public.myr_line_left(i), 'json', (select (e ->> 'left_qty')::int from jsonb_array_elements((select public.myr_order_json(o, false) from public.myr_orders o where o.id = i.order_id) -> 'items') e where e ->> 'id' = i.id::text),
+                                     'too_many', public.myr_app_refund_precheck(i.order_id, jsonb_build_array(jsonb_build_object('item_id', i.id, 'qty', 111)), 'system', null) #>> '{items,0,reason}',
+                                     'ok', public.myr_app_refund_precheck(i.order_id, jsonb_build_array(jsonb_build_object('item_id', i.id, 'qty', 110)), 'system', null) ->> 'ok')
+             from public.myr_order_items i where i.id = '00000000-0000-4000-8000-00000000a742'),
+          '{"fn": 110, "json": 110, "too_many": "TOO_MANY", "ok": "true"}'::jsonb, '150개 중 40개 환불 → 남은 110: 함수 · 주문 JSON · 환불 가드가 같은 값(111 은 TOO_MANY · 110 은 통과)');
 
 select * from finish();
 rollback;

@@ -3,7 +3,7 @@
  * 셀러리 packages/payments checkout-rules.ts · checkout-sync 의 파서 · packages/db guest-order.ts 를 MYR 구조(줄 N개 · 주문 1건)로 복사.
  * Svelte·SvelteKit·DB 를 import 하지 않는다 — 라우트 · 화면 · vitest 공용.
  */
-import { QTY_FORMAT_MAX } from './constants';
+import { QTY_INT_MAX } from './constants';
 import { GB_CODE_RE } from './groupbuy';
 import { cleanText, normalizePhone } from './text';
 
@@ -41,14 +41,14 @@ export function parseLines(v: unknown): CheckoutLine[] | null {
 		const code = typeof l.code === 'string' ? l.code.trim().toLowerCase() : '';
 		const qty = l.qty;
 		const opt = l.optionIndex === undefined ? 0 : l.optionIndex;
-		if (!CODE_RE.test(code) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > QTY_FORMAT_MAX) return null;
+		if (!CODE_RE.test(code) || !Number.isInteger(qty) || (qty as number) < 1 || (qty as number) > QTY_INT_MAX) return null;
 		if (!Number.isInteger(opt) || (opt as number) < 0) return null;
 		if (l.gb != null && (typeof l.gb !== 'string' || !GB_CODE_RE.test(l.gb))) return null;
 		if (l.price != null && (!Number.isInteger(l.price) || (l.price as number) < 0)) return null;
 		const key = `${code}#${opt}`;
 		const cur = by.get(key);
 		const sum = (cur?.qty ?? 0) + (qty as number);
-		if (sum > QTY_FORMAT_MAX) return null;
+		if (sum > QTY_INT_MAX) return null;
 		const gb = cur?.gb ?? (l.gb as string | undefined) ?? undefined;
 		const price = cur?.price ?? (l.price as number | undefined) ?? undefined;
 		by.set(key, { code, qty: sum, option_index: opt as number, ...(gb ? { gb } : {}), ...(price != null ? { price } : {}) });
@@ -213,6 +213,7 @@ export const FAIL_MESSAGES: Record<string, string> = {
 	SOLD_OUT: '남은 수량이 부족합니다',
 	NOT_AVAILABLE: '지금은 판매하지 않는 상품이 있어요',
 	LINES_REJECTED: '주문할 수 없는 상품이 있어요 — 장바구니를 확인해주세요',
+	BAD_LINES: '주문 상품 · 수량을 다시 확인해주세요',
 	PRICE_CHANGED: '가격이 바뀐 상품이 있어요',
 	AMOUNT_TOO_SMALL: '결제 금액은 100원 이상이어야 합니다',
 	AMOUNT_TOO_LARGE: '한 번에 결제하기엔 금액이 너무 커요 — 수량을 나눠 주문해주세요',

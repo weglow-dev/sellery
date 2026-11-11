@@ -1,20 +1,185 @@
 -- ============================================================
--- 0097 — MYR 수량 상한 제거(0095) 뒤에 남은 곳 + 옵션별 재고(2026-11-11 · PR #294 리뷰)
+-- 0097 — MYR 수량 상한 제거(0095) 뒤에 남은 곳 + 옵션별 재고 + 수량 판정 한 곳(2026-11-11 · PR #294 리뷰)
 --   1) 교환·환불 요청 · 바로 환불의 수량 형식 검사가 그대로였다 — 150개 산 고객이 150개를 요청하면 거절됐다.
---      myr_refund_requests.qty 1~9(0078 표 제약) → 1 이상 · myr_app_claim_open \d{1,2}(99) → \d{1,6} · myr_refund_lines \d{1,3}(999) → \d{1,6}
---      실제 한도는 그대로 "남은 수량"(TOO_MANY · 0068 · 0078).
+--      myr_refund_requests.qty 1~9(0078 표 제약) → 1 이상 · myr_app_claim_open(99) · myr_refund_lines(999) → 숫자 형식만.
+--      실제 한도는 그대로 "남은 수량"(TOO_MANY).
 --   2) 결제 생성(myr_app_create_checkout)이 재고를 상품 · 옵션 단위로 따로 봤다 — 재고는 상품 하나에 걸려 있어
---      옵션 A · B 를 각각 남은 수량 이하로 담으면 합계가 재고를 넘어도 통과했고, 결제 승인(myr_app_confirm_checkout · 상품 합계)에서야
---      SOLD_OUT → 자동 결제 취소가 됐다(0058 부터 있던 구조). 이제 같은 상품의 옵션 수량을 합쳐 지금 살 수 있는 수량(myr_product_buyable)과 비교한다.
---      SOLD_OUT 의 left 는 앞 옵션이 쓴 만큼을 뺀 값.
---   바뀌는 함수: myr_app_create_checkout(0096) · myr_app_claim_open(0093) · myr_refund_lines(0068) — 나머지 그대로.
---   테스트: supabase/tests/myr_qty_no_cap.test.sql(추가).
+--      옵션 A · B 를 각각 남은 수량 이하로 담으면 합계가 재고를 넘어도 통과했고, 결제 승인(상품 합계)에서야 SOLD_OUT → 자동 결제 취소가 됐다(0058 부터).
+--      이제 같은 상품의 옵션 수량을 합쳐 지금 살 수 있는 수량(myr_product_buyable)과 비교한다. SOLD_OUT 의 left 는 앞 옵션이 쓴 만큼을 뺀 값.
+--   3) 같은 판정을 함수 하나로(백엔드 원칙 1)
+--      myr_qty_max() · myr_qty_parse(text)   수량 숫자 형식(1~6자리 정수 · 아니면 -1) — 장바구니 저장 · 합치기 · 견적 · 결제 생성 · 요청 접수 · 바로 환불 6곳이
+--                                            각자 쓰던 999,999 · \d{1,6} 을 여기 한 곳으로. 구매 수량 "상한"이 아니라 정수 계산이 안전한 형식 범위다.
+--      myr_line_left(item)                   줄의 남은 수량 = max(주문 수량 − 환불 수량, 0) — 환불 길 4곳(myr_refund_lines · myr_app_refund_precheck ·
+--                                            myr_app_claim_open · myr_line_refund_path)이 이 함수를 쓰고, 주문 JSON 줄마다 left_qty 로 실어 샵 환불 화면이 계산하지 않는다.
+--                                            (발송 · 정산 · 실적 쪽 함수의 같은 식은 별도 PR — 돈 · 정산 경로라 따로 확인한다)
+--   바뀌는 함수(해당 부분만 · 나머지 그대로)
+--     myr_cart_set · myr_cart_merge(0095) · myr_app_cart_quote(0096) · myr_app_create_checkout(0096) · myr_app_claim_open(0093) · myr_refund_lines(0068)
+--     myr_app_refund_precheck(0092) · myr_line_refund_path(0092) · myr_order_json(0093 + left_qty)
+--   권한: 새 내부 함수는 anon · authenticated EXECUTE 회수. 테스트: supabase/tests/myr_qty_no_cap.test.sql(추가) + 기존 환불 · 요청 · 장바구니 · 체크아웃 테스트 그대로.
 -- ============================================================
 
 alter table public.myr_refund_requests drop constraint if exists myr_refund_requests_qty_check;
 alter table public.myr_refund_requests add constraint myr_refund_requests_qty_check check (qty >= 1);
 
--- 0068 정의 + 수량 형식 6자리
+-- ---------- 수량 숫자 형식 — 한 곳 ----------
+create or replace function public.myr_qty_max()
+returns integer
+language sql
+immutable
+as $$
+  select 999999
+$$;
+revoke all on function public.myr_qty_max() from public, anon, authenticated;
+
+-- 1~6자리 숫자면 그 정수, 아니면(null · 음수 · 소수 · 글자 · 7자리 이상) -1
+create or replace function public.myr_qty_parse(p_text text)
+returns integer
+language sql
+immutable
+as $$
+  select case when p_text ~ '^\d{1,6}$' then p_text::integer else -1 end
+$$;
+revoke all on function public.myr_qty_parse(text) from public, anon, authenticated;
+
+-- ---------- 줄의 남은 수량 — 한 곳 ----------
+create or replace function public.myr_line_left(i public.myr_order_items)
+returns integer
+language sql
+stable
+as $$
+  select greatest(coalesce(i.qty, 0) - coalesce(i.refunded_qty, 0), 0)
+$$;
+revoke all on function public.myr_line_left(public.myr_order_items) from public, anon, authenticated;
+
+-- 0095 정의 + 수량 형식 = myr_qty_max
+create or replace function public.myr_cart_set(p_user_id uuid, p_code text, p_option_index integer default 0, p_qty integer default 1, p_add boolean default false, p_groupbuy text default null)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  v_code       text := lower(btrim(coalesce(p_code, '')));
+  v_product_id uuid;
+  v_available  boolean;
+  v_qty        integer;
+  v_gb         uuid;
+begin
+  if p_user_id is null then return jsonb_build_object('ok', false, 'code', 'NO_USER'); end if;
+  -- 구매 수량 상한 없음(2026-11-11 · 0095) — 실제 한도는 결제 때 재고. 999,999 는 숫자 형식 검사일 뿐
+  if p_qty is null or p_qty < 0 or p_qty > public.myr_qty_max() then return jsonb_build_object('ok', false, 'code', 'BAD_QTY'); end if;
+  if p_option_index is null or p_option_index < 0 then return jsonb_build_object('ok', false, 'code', 'BAD_OPTION'); end if;
+
+  select p.id, public.myr_product_available(p, s) into v_product_id, v_available
+    from public.myr_products p
+    left join public.sellers s on s.id = p.seller_id
+   where p.code = v_code and p.deleted_at is null;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+
+  if p_qty = 0 then
+    delete from public.myr_cart_items where user_id = p_user_id and product_id = v_product_id and option_index = p_option_index;
+    return jsonb_build_object('ok', true, 'code', v_code, 'qty', 0);
+  end if;
+  if not v_available then return jsonb_build_object('ok', false, 'code', 'NOT_AVAILABLE'); end if;
+
+  if p_groupbuy is not null then
+    select g.id into v_gb from public.myr_groupbuys g
+     where g.code = lower(btrim(p_groupbuy)) and g.product_id = v_product_id and public.myr_groupbuy_state(g) <> 'ended';
+  end if;
+
+  insert into public.myr_cart_items (user_id, product_id, option_index, qty, groupbuy_id)
+  values (p_user_id, v_product_id, p_option_index, p_qty, v_gb)
+  on conflict (user_id, product_id, option_index) do update
+    set qty = case when p_add then least(public.myr_qty_max(), public.myr_cart_items.qty + excluded.qty) else excluded.qty end,
+        groupbuy_id = coalesce(excluded.groupbuy_id, public.myr_cart_items.groupbuy_id)
+  returning qty into v_qty;
+  return jsonb_build_object('ok', true, 'code', v_code, 'qty', v_qty);
+end;
+$$;
+revoke all on function public.myr_cart_set(uuid, text, integer, integer, boolean, text) from public, anon, authenticated;
+grant execute on function public.myr_cart_set(uuid, text, integer, integer, boolean, text) to service_role;
+
+-- 0095 정의 + 수량 형식 = myr_qty_parse
+create or replace function public.myr_cart_merge(p_user_id uuid, p_lines jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  l        jsonb;
+  r        jsonb;
+  v_qty    integer;
+  v_opt    integer;
+  v_merged integer := 0;
+  v_skip   integer := 0;
+begin
+  if p_user_id is null then return jsonb_build_object('ok', false, 'code', 'NO_USER'); end if;
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) > 50 then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    v_qty := public.myr_qty_parse(l->>'qty');
+    v_opt := case when (l->>'option_index') is null then 0 when (l->>'option_index') ~ '^\d{1,3}$' then (l->>'option_index')::integer else -1 end;
+    r := public.myr_cart_set(p_user_id, l->>'code', v_opt, v_qty, true, nullif(l->>'gb', ''));
+    if (r->>'ok')::boolean and v_qty > 0 then v_merged := v_merged + 1; else v_skip := v_skip + 1; end if;
+  end loop;
+  return jsonb_build_object('ok', true, 'merged', v_merged, 'skipped', v_skip);
+end;
+$$;
+revoke all on function public.myr_cart_merge(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.myr_cart_merge(uuid, jsonb) to service_role;
+
+-- 0096 정의 + 수량 형식 = myr_qty_parse
+create or replace function public.myr_app_cart_quote(p_lines jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer set search_path = public
+as $$
+declare
+  l       jsonb;
+  p       public.myr_products%rowtype;
+  v_code  text;
+  v_opt   integer;
+  v_qty   integer;
+  v_price jsonb;
+  v_unit  integer;
+  v_out   jsonb := '[]'::jsonb;
+  v_items bigint := 0;
+  v_rule  jsonb := public.myr_shipping_rule();
+  v_fee   integer;
+begin
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) > 50 then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    v_code := lower(btrim(coalesce(l ->> 'code', '')));
+    v_opt  := case when (l ->> 'option_index') is null then 0 when (l ->> 'option_index') ~ '^\d{1,3}$' then (l ->> 'option_index')::int else -1 end;
+    v_qty  := public.myr_qty_parse(l ->> 'qty');
+    if v_code !~ '^[a-z0-9][a-z0-9-]{0,47}$' or v_opt < 0 or v_qty < 1 then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+    if (l ->> 'gb') is not null and (l ->> 'gb') !~ '^[a-z0-9]{6,16}$' then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+    select p1.* into p from public.myr_products p1 join public.sellers s on s.id = p1.seller_id and s.active
+     where p1.code = v_code and p1.deleted_at is null and p1.status = 'listed';
+    if not found then
+      v_out := v_out || jsonb_build_object('code', v_code, 'option_index', v_opt, 'qty', v_qty, 'unit_price', null, 'base_price', null, 'line_amount', null,
+                                           'base_amount', null, 'stock_left', 0, 'groupbuy_state', null, 'groupbuy_code', null);
+      continue;
+    end if;
+    v_price := public.myr_line_price(p, v_opt, nullif(l ->> 'gb', ''));
+    v_unit := (v_price ->> 'unit_price')::integer;
+    v_out := v_out || (jsonb_build_object('code', v_code, 'option_index', v_opt, 'qty', v_qty, 'line_amount', v_unit::bigint * v_qty,
+                                          'stock_left', public.myr_product_buyable(p),
+                                          'base_amount', (v_price ->> 'base_price')::bigint * v_qty)
+                       || (v_price - 'groupbuy_id'));
+    v_items := v_items + coalesce(v_unit::bigint * v_qty, 0);
+  end loop;
+  v_fee := public.myr_shipping_fee(least(v_items, 2147483647)::integer);
+  return jsonb_build_object('ok', true, 'lines', v_out, 'items_amount', v_items, 'shipping_fee', v_fee,
+                            'free_over', (v_rule ->> 'free_over')::int,
+                            'free_shipping_left', case when v_items > 0 and v_fee > 0 then greatest((v_rule ->> 'free_over')::int - v_items, 0) else 0 end);
+end;
+$$;
+revoke all on function public.myr_app_cart_quote(jsonb) from public, anon, authenticated;
+grant execute on function public.myr_app_cart_quote(jsonb) to service_role;
+
+-- 0068 정의 + 수량 형식 = myr_qty_parse · 남은 수량 = myr_line_left
 create or replace function public.myr_refund_lines(o public.myr_orders, p_items jsonb)
 returns table (item_id uuid, qty integer, unit_price integer, seller_id uuid, remaining integer, item_status text, problem text, note text, photos text[])
 language plpgsql
@@ -32,12 +197,12 @@ begin
   if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then
     -- 전체: 남은 수량이 있는 줄 전부(상세·사진 없음)
     return query
-      select i.id, (i.qty - i.refunded_qty), i.unit_price, i.seller_id, (i.qty - i.refunded_qty), i.status, null::text, null::text, '{}'::text[]
-        from public.myr_order_items i where i.order_id = o.id and i.status not in ('CANCELED') and (i.qty - i.refunded_qty) > 0;
+      select i.id, public.myr_line_left(i), i.unit_price, i.seller_id, public.myr_line_left(i), i.status, null::text, null::text, '{}'::text[]
+        from public.myr_order_items i where i.order_id = o.id and i.status not in ('CANCELED') and public.myr_line_left(i) > 0;
     return;
   end if;
   for l in select * from jsonb_array_elements(p_items) loop
-    if (l ->> 'item_id') !~ '^[0-9a-f-]{36}$' or (l ->> 'qty') !~ '^\d{1,6}$' then   -- 형식만(0097 · 수량 상한 없음 · 남은 수량은 TOO_MANY)
+    if (l ->> 'item_id') !~ '^[0-9a-f-]{36}$' or public.myr_qty_parse(l ->> 'qty') < 0 then   -- 숫자 형식만(수량 상한 없음 · 남은 수량은 TOO_MANY)
       return query select null::uuid, 0, 0, null::uuid, 0, null::text, 'BAD_FORMAT'::text, null::text, '{}'::text[];
       return;
     end if;
@@ -51,11 +216,11 @@ begin
     v_req := v_req || jsonb_build_object(v_id::text, jsonb_build_object('q', v_qty, 'n', v_note, 'p', v_photos));
   end loop;
   return query
-    select k.id, k.q, i.unit_price, i.seller_id, coalesce(i.qty - i.refunded_qty, 0), i.status,
+    select k.id, k.q, i.unit_price, i.seller_id, public.myr_line_left(i), i.status,
            case when i.id is null then 'NOT_IN_ORDER'
                 when i.status = 'CANCELED' then 'CANCELED'
                 when k.q < 1 then 'BAD_QTY'
-                when k.q > (i.qty - i.refunded_qty) then 'TOO_MANY'
+                when k.q > public.myr_line_left(i) then 'TOO_MANY'
                 else null end,
            k.n, k.p
       from (select (key)::uuid as id, (value ->> 'q')::int as q, value ->> 'n' as n,
@@ -66,7 +231,86 @@ end;
 $$;
 revoke all on function public.myr_refund_lines(public.myr_orders, jsonb) from public, anon, authenticated;
 
--- 0093 정의 + 수량 형식 6자리
+-- 0092 정의 + 남은 수량 = myr_line_left
+create or replace function public.myr_app_refund_precheck(p_order_id uuid, p_items jsonb, p_actor text, p_actor_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer set search_path = public
+as $$
+declare
+  o          public.myr_orders%rowtype;
+  r          record;
+  v_items    jsonb := '[]'::jsonb;
+  v_problems jsonb := '[]'::jsonb;
+  v_amount   integer := 0;
+  v_req_total integer := 0;
+  v_left_total integer;
+  v_full     boolean;
+begin
+  if p_actor is null or p_actor not in ('customer','seller','admin','system') then return jsonb_build_object('ok', false, 'code', 'BAD_ACTOR'); end if;
+  select * into o from public.myr_orders where id = p_order_id;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+
+  -- 소유·권한 (존재 여부를 흘리지 않게 customer 의 남의 주문은 NOT_FOUND)
+  if p_actor = 'customer' then
+    if p_actor_id is null or not (o.user_id = p_actor_id or (o.user_id is null and o.customer_id = p_actor_id)) then
+      return jsonb_build_object('ok', false, 'code', 'NOT_FOUND');
+    end if;
+  end if;
+
+  if o.status in ('REFUNDED','CANCELED') then return jsonb_build_object('ok', false, 'code', 'WRONG_STATUS', 'status', o.status); end if;
+  if o.status not in ('PAID','PARTIAL_REFUNDED','WAITING_DEPOSIT') then return jsonb_build_object('ok', false, 'code', 'WRONG_STATUS', 'status', o.status); end if;
+  -- 고객 셀프 환불은 발주(배송준비중) 전 줄만 — 0077 에서 주문 운송장 기준 → 줄 배송 상태 기준(아래 줄마다)
+
+  for r in select * from public.myr_refund_lines(o, p_items) loop
+    if r.problem = 'BAD_FORMAT' then return jsonb_build_object('ok', false, 'code', 'BAD_ITEMS'); end if;
+    if r.problem is not null then
+      v_problems := v_problems || jsonb_build_object('item_id', r.item_id, 'reason', r.problem, 'left', r.remaining);
+      continue;
+    end if;
+    -- 고객 셀프 환불은 바로 환불 줄만 — 줄 길 판정은 myr_line_refund_path 한 곳(샵 화면 · 요청 가드와 같다 · 0092)
+    if p_actor = 'customer' and exists (select 1 from public.myr_order_items x where x.id = r.item_id and public.myr_line_refund_path(o, x) is distinct from 'instant') then
+      return jsonb_build_object('ok', false, 'code', 'SHIPPED');
+    end if;
+    if p_actor = 'seller' and (p_actor_id is null or r.seller_id is distinct from p_actor_id) then
+      return jsonb_build_object('ok', false, 'code', 'FORBIDDEN');
+    end if;
+    v_items := v_items || jsonb_build_object('item_id', r.item_id, 'qty', r.qty, 'amount', r.unit_price * r.qty, 'seller_id', r.seller_id);
+    v_amount := v_amount + r.unit_price * r.qty;
+    v_req_total := v_req_total + r.qty;
+  end loop;
+  if jsonb_array_length(v_problems) > 0 then return jsonb_build_object('ok', false, 'code', 'BAD_ITEMS', 'items', v_problems); end if;
+  if v_req_total = 0 then return jsonb_build_object('ok', false, 'code', 'NOTHING_LEFT'); end if;
+
+  -- 이번 환불로 주문이 전부 환불되면 배송비도 돌려준다(§9-11 기본) — 배송비는 아직 환불 안 됐을 때 한 번만
+  select coalesce(sum(public.myr_line_left(i)), 0) into v_left_total from public.myr_order_items i where i.order_id = o.id and i.status <> 'CANCELED';
+  v_full := v_req_total >= v_left_total;
+  if v_full and o.shipping_fee > 0 and o.refund_amount + v_amount + o.shipping_fee <= o.amount then v_amount := v_amount + o.shipping_fee; end if;
+
+  return jsonb_build_object('ok', true, 'order_code', o.code, 'order_status', o.status, 'payment_key', o.payment_key,
+                            'amount', v_amount, 'deposit', o.status = 'WAITING_DEPOSIT', 'full', v_full, 'items', v_items);
+end;
+$$;
+revoke all on function public.myr_app_refund_precheck(uuid, jsonb, text, uuid) from public, anon, authenticated;
+grant execute on function public.myr_app_refund_precheck(uuid, jsonb, text, uuid) to service_role;
+
+-- 0092 정의 + 남은 수량 = myr_line_left
+create or replace function public.myr_line_refund_path(o public.myr_orders, i public.myr_order_items)
+returns text
+language sql
+stable
+as $$
+  select case
+    when o.status not in ('PAID', 'PARTIAL_REFUNDED', 'WAITING_DEPOSIT') then null
+    when i.status = 'CANCELED' or public.myr_line_left(i) <= 0 then null
+    when i.ship_status = 'PAID' then 'instant'
+    when o.status = 'WAITING_DEPOSIT' then null
+    else 'claim' end
+$$;
+revoke all on function public.myr_line_refund_path(public.myr_orders, public.myr_order_items) from public, anon, authenticated;
+
+-- 0093 정의 + 수량 형식 = myr_qty_parse · 남은 수량 = myr_line_left
 create or replace function public.myr_app_claim_open(p_order_id uuid, p_actor_id uuid, p_kind text, p_reason text, p_lines jsonb)
 returns jsonb
 language plpgsql
@@ -100,7 +344,7 @@ begin
 
   -- 1) 검사(하나라도 걸리면 아무것도 만들지 않는다)
   for l in select * from jsonb_array_elements(p_lines) loop
-    if (l ->> 'item_id') !~ '^[0-9a-f-]{36}$' or (l ->> 'qty') !~ '^\d{1,6}$' then return jsonb_build_object('ok', false, 'code', 'BAD_ITEMS'); end if;   -- 형식만(0097 · 수량 상한 없음 · 남은 수량은 아래 TOO_MANY)
+    if (l ->> 'item_id') !~ '^[0-9a-f-]{36}$' or public.myr_qty_parse(l ->> 'qty') < 0 then return jsonb_build_object('ok', false, 'code', 'BAD_ITEMS'); end if;   -- 숫자 형식만(수량 상한 없음 · 남은 수량은 아래 TOO_MANY)
     v_id := (l ->> 'item_id')::uuid;
     v_qty := (l ->> 'qty')::int;
     v_photos := coalesce((select array_agg(x) from jsonb_array_elements_text(case when jsonb_typeof(l -> 'photos') = 'array' then l -> 'photos' else '[]'::jsonb end) x where x <> ''), '{}');
@@ -111,7 +355,7 @@ begin
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'CANCELED');
     elsif v_qty < 1 then
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'BAD_QTY');
-    elsif v_qty > i.qty - i.refunded_qty then
+    elsif v_qty > public.myr_line_left(i) then
       v_problems := v_problems || jsonb_build_object('item_id', v_id, 'reason', 'TOO_MANY');
     elsif public.myr_line_refund_path(o, i) is distinct from 'claim' then
       -- 결제완료(발주 전) 줄은 요청이 아니라 바로 환불 — 줄 길 판정은 myr_line_refund_path 한 곳(0092)
@@ -147,7 +391,39 @@ $$;
 revoke all on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) from public, anon, authenticated;
 grant execute on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) to service_role;
 
--- 0096 정의 + 같은 상품 옵션 합쳐 재고 확인
+-- 0093 정의 + 줄마다 left_qty
+create or replace function public.myr_order_json(o public.myr_orders, p_full boolean)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select jsonb_build_object(
+    'id', o.id, 'code', o.code, 'status', o.status,
+    'amount', o.amount, 'items_amount', o.items_amount, 'shipping_fee', o.shipping_fee, 'refund_amount', o.refund_amount,
+    'order_name', o.order_name, 'payment_method', o.payment_method, 'paid_at', o.paid_at, 'created_at', o.created_at,
+    'deposit_due_at', o.deposit_due_at,
+    'deposit', case when o.status = 'WAITING_DEPOSIT' and jsonb_typeof(o.raw_payment -> 'virtualAccount') = 'object'
+                 then jsonb_build_object('bank', o.raw_payment -> 'virtualAccount' ->> 'bankCode', 'account', o.raw_payment -> 'virtualAccount' ->> 'accountNumber',
+                                         'holder', o.raw_payment -> 'virtualAccount' ->> 'customerName', 'due', o.raw_payment -> 'virtualAccount' ->> 'dueDate')
+                 else null end,
+    'courier', o.courier, 'tracking_no', o.tracking_no, 'shipped_at', o.shipped_at, 'delivered_at', o.delivered_at,
+    'ship_status', public.myr_order_ship_status(o.id),
+    'claim_status', public.myr_order_claim_status(o.id),
+    'guest', o.user_id is null, 'buyer_name', o.buyer_name,
+    'shipping', case when p_full then o.shipping else null end,
+    'buyer_email', case when p_full then o.buyer_email else null end,
+    'refund_reason', case when p_full and o.refund_amount > 0 then o.refund_reason else null end,
+    'refunded_at', case when p_full and o.refund_amount > 0 then o.refunded_at else null end,
+    -- 줄마다 환불 길(instant · claim · null · 0092) · 단순 변심 기한 · 지금 가능한지(0093) — 샵 화면이 이 값을 그대로 쓴다
+    'items', coalesce((select jsonb_agg(public.myr_order_item_json(i) || jsonb_build_object('refund_path', public.myr_line_refund_path(o, i), 'left_qty', public.myr_line_left(i),
+                                                                                   'change_mind_until', public.myr_line_change_mind_until(i),
+                                                                                   'change_mind_ok', public.myr_line_change_mind_ok(i)) order by i.created_at, i.id)
+                         from public.myr_order_items i where i.order_id = o.id), '[]'::jsonb))
+$$;
+revoke all on function public.myr_order_json(public.myr_orders, boolean) from public, anon, authenticated;
+
+-- 0096 정의 + 수량 형식 = myr_qty_parse · 같은 상품 옵션 합쳐 재고 확인
 create or replace function public.myr_app_create_checkout(
   p_user_id uuid, p_customer_id uuid, p_buyer jsonb, p_shipping jsonb, p_lines jsonb, p_toss_order_id text, p_prev_checkout_id uuid default null)
 returns jsonb
@@ -156,7 +432,6 @@ volatile
 security definer set search_path = public
 as $$
 declare
-  c_qty_fmt   constant integer := 999999;      -- 숫자 형식 검사일 뿐 · 구매 수량 상한 없음(0095) — 실제 한도는 재고(SOLD_OUT)
   c_max_lines constant integer := 20;
   l            jsonb;
   v_code       text;
@@ -199,15 +474,15 @@ begin
   for l in select * from jsonb_array_elements(p_lines) loop
     v_code := lower(btrim(coalesce(l ->> 'code', '')));
     v_opt  := case when (l ->> 'option_index') is null then 0 when (l ->> 'option_index') ~ '^\d{1,3}$' then (l ->> 'option_index')::int else -1 end;
-    v_qty  := case when (l ->> 'qty') ~ '^\d{1,6}$' then (l ->> 'qty')::int else -1 end;
-    if v_code !~ '^[a-z0-9][a-z0-9-]{0,47}$' or v_opt < 0 or v_qty < 1 or v_qty > c_qty_fmt then
+    v_qty  := public.myr_qty_parse(l ->> 'qty');   -- 숫자 형식만 · 구매 수량 상한 없음(0095) — 실제 한도는 재고(SOLD_OUT)
+    if v_code !~ '^[a-z0-9][a-z0-9-]{0,47}$' or v_opt < 0 or v_qty < 1 then
       return jsonb_build_object('ok', false, 'code', 'BAD_LINES');
     end if;
     if (l ->> 'gb') is not null and (l ->> 'gb') !~ '^[a-z0-9]{6,16}$' then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
     if (l ->> 'price') is not null and (l ->> 'price') !~ '^\d{1,9}$' then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
     v_key := v_code || '#' || v_opt;
     v_qty := v_qty + coalesce((v_merged ->> v_key)::int, 0);
-    if v_qty > c_qty_fmt then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+    if v_qty > public.myr_qty_max() then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
     v_merged := v_merged || jsonb_build_object(v_key, v_qty);
     if (l ->> 'gb') is not null and not (v_gbs ? v_key) then v_gbs := v_gbs || jsonb_build_object(v_key, l ->> 'gb'); end if;
     if (l ->> 'price') is not null and not (v_expect ? v_key) then v_expect := v_expect || jsonb_build_object(v_key, (l ->> 'price')::int); end if;

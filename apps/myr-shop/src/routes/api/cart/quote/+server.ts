@@ -20,8 +20,11 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	if (!rateLimit(`cart-quote:${getClientAddress()}`, 300)) return json({ ok: false, code: 'RATE_LIMITED' }, { status: 429 });
 	try {
 		const [all, selected] = await Promise.all([quoteCart(body.all), quoteCart(body.selected)]);
-		if (!all || !selected) return json({ ok: false, code: 'BAD_RESPONSE' }, { status: 500 });
-		return json({ ok: true, all, selected });
+		// 서버 거절(BAD_LINES — 수량 형식 등)은 400 으로 그대로 · 그 밖은 500
+		const bad = !all.ok ? all : !selected.ok ? selected : null;
+		if (bad) return json({ ok: false, code: bad.code }, { status: bad.code === 'BAD_LINES' ? 400 : 500 });
+		if (!all.ok || !selected.ok) return json({ ok: false, code: 'BAD_RESPONSE' }, { status: 500 });
+		return json({ ok: true, all: all.quote, selected: selected.quote });
 	} catch (e) {
 		console.error('[api/cart/quote] failed:', e instanceof Error ? e.message : e);
 		return json({ ok: false, code: 'DB_ERROR' }, { status: 500 });

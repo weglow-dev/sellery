@@ -1,9 +1,9 @@
 /** 장바구니 줄 다루기 · API 입출력 검증 — 순수 모듈(테스트 `src/test/cart.test.ts`). 상태(`state.svelte.ts`)와 서버(`lib/server/cart.ts`)는 여기 함수로만 줄을 바꾼다.
  *  **가격 · 공구 적용 · 배송비는 여기서 계산하지 않는다** — 서버 견적(0092 `myr_app_cart_quote` · `POST /api/cart/quote`)이 체크아웃과 같은 함수로 정한다(백엔드 원칙 1).
- *  구매 수량 상한은 없다(0095) — QTY_FORMAT_MAX 는 숫자 형식 검사일 뿐이고 실제 한도는 결제 때 재고(서버). */
+ *  구매 수량 상한은 없다(0095) — QTY_INT_MAX 는 정수로 보낼 수 있는지(전송 형식)만 본다. 수량 형식 범위 · 재고 한도는 서버(0097 myr_qty_parse · 0096 myr_product_buyable). */
 import { GB_CODE_RE, groupbuyFromJson, type Groupbuy, type GroupbuyState } from '@sellery/myr-core/groupbuy';
 import type { PriceChange } from '@sellery/myr-core/checkout-rules';
-import { QTY_FORMAT_MAX, won, type Product } from './data';
+import { QTY_INT_MAX, won, type Product } from './data';
 import { fromRow, type Row } from './product-row';
 
 /** 줄 — `available` 는 계정 장바구니(0057)가 주는 값: 담은 뒤 paused·품절·삭제가 되면 false. 비회원 줄(브라우저)은 undefined = 살 수 있다고 본다.
@@ -43,7 +43,7 @@ export function parseCartQuote(v: unknown): CartQuote | null {
 		}));
 	return { lines, itemsAmount: items, shippingFee: fee, freeOver: numOrNull(o.free_over) ?? 0, freeShippingLeft: numOrNull(o.free_shipping_left) ?? 0 };
 }
-/** POST /api/cart/quote 본문 { all, selected } — 줄마다 code · optionIndex · qty(1 이상 · 형식 검사 QTY_FORMAT_MAX) · gb? · 각 50줄까지. 형식이 틀리면 null */
+/** POST /api/cart/quote 본문 { all, selected } — 줄마다 code · optionIndex · qty(1 이상 정수) · gb? · 각 50줄까지. 형식이 틀리면 null */
 export type QuoteBody = { all: QuoteRequestLine[]; selected: QuoteRequestLine[] };
 export function parseQuoteBody(v: unknown): QuoteBody | null {
 	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
@@ -54,7 +54,7 @@ export function parseQuoteBody(v: unknown): QuoteBody | null {
 		for (const raw of x) {
 			const l = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
 			if (!l || typeof l.code !== 'string' || !CODE_RE.test(l.code)) return null;
-			if (!Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_FORMAT_MAX) return null;
+			if (!Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_INT_MAX) return null;
 			const optionIndex = l.optionIndex === undefined ? 0 : l.optionIndex;
 			if (!Number.isInteger(optionIndex) || (optionIndex as number) < 0 || (optionIndex as number) > 999) return null;
 			if (l.gb !== undefined && (typeof l.gb !== 'string' || !GB_CODE_RE.test(l.gb))) return null;
@@ -91,10 +91,10 @@ export const totalsFromQuote = (q: CartQuote): CartTotals => ({
 	shippingMsg: q.shippingFee ? `${won(q.freeShippingLeft)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요'
 });
 
-/** 1 이상 정수로(정수가 아니면 1) — 상한 없음 · 숫자 형식 범위(QTY_FORMAT_MAX)만 */
+/** 1 이상 정수로(정수가 아니면 1) — 상한 없음(정수 범위만) */
 export function clampQty(qty: number): number {
 	if (!Number.isInteger(qty)) return 1;
-	return Math.max(1, Math.min(QTY_FORMAT_MAX, qty));
+	return Math.max(1, Math.min(QTY_INT_MAX, qty));
 }
 
 /** 담기 — 같은 code 가 있으면 수량 합산(상한까지) + 최신 스냅샷으로 교체, 없으면 새 줄. 공구는 새로 온 것이 있으면 그것, 없으면 원래 것 */
@@ -198,10 +198,10 @@ const isCode = (v: unknown): v is string => typeof v === 'string' && CODE_RE.tes
 
 const isGbCode = (v: unknown): v is string => typeof v === 'string' && GB_CODE_RE.test(v);
 
-/** PUT /api/cart 본문 `{ code, qty, add?, gb? }` — qty 0 이상 정수(형식 검사 QTY_FORMAT_MAX)(0 = 삭제) · gb 는 공구 코드(형식이 틀리면 null) · 아니면 null */
+/** PUT /api/cart 본문 `{ code, qty, add?, gb? }` — qty 0 이상 정수(0 = 삭제) · gb 는 공구 코드(형식이 틀리면 null) · 아니면 null */
 export function parseSetBody(v: unknown): { code: string; qty: number; add: boolean; gb?: string } | null {
 	const b = obj(v);
-	if (!b || !isCode(b.code) || !Number.isInteger(b.qty) || (b.qty as number) < 0 || (b.qty as number) > QTY_FORMAT_MAX) return null;
+	if (!b || !isCode(b.code) || !Number.isInteger(b.qty) || (b.qty as number) < 0 || (b.qty as number) > QTY_INT_MAX) return null;
 	if (b.gb != null && !isGbCode(b.gb)) return null;
 	return { code: b.code, qty: b.qty as number, add: b.add === true, ...(isGbCode(b.gb) ? { gb: b.gb } : {}) };
 }
@@ -215,7 +215,7 @@ export function parseMergeBody(v: unknown): MergeLine[] | null {
 	for (const raw of b.lines) {
 		const l = obj(raw);
 		if (!l || !isCode(l.code) || !Number.isInteger(l.qty) || (l.qty as number) <= 0) continue;
-		byCode.set(l.code, Math.min(QTY_FORMAT_MAX, (byCode.get(l.code) ?? 0) + (l.qty as number)));
+		byCode.set(l.code, Math.min(QTY_INT_MAX, (byCode.get(l.code) ?? 0) + (l.qty as number)));
 		if (isGbCode(l.gb) && !gbs.has(l.code)) gbs.set(l.code, l.gb);
 	}
 	return [...byCode].map(([code, qty]) => {

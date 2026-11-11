@@ -17,7 +17,7 @@ import {
 	setUnselected,
 	totalsFromQuote
 } from '../lib/cart';
-import { MOCK_PRODUCTS, QTY_FORMAT_MAX } from '../lib/data';
+import { MOCK_PRODUCTS, QTY_INT_MAX } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS; // 32,000 · 28,000
 
@@ -26,7 +26,7 @@ describe('clampQty', () => {
 		expect(clampQty(0)).toBe(1);
 		expect(clampQty(5)).toBe(5);
 		expect(clampQty(99)).toBe(99);
-		expect(clampQty(QTY_FORMAT_MAX + 5)).toBe(QTY_FORMAT_MAX);
+		expect(clampQty(QTY_INT_MAX + 5)).toBe(QTY_INT_MAX);
 		expect(clampQty(1.5)).toBe(1);
 		expect(clampQty(NaN)).toBe(1);
 	});
