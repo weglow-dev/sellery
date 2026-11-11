@@ -48,7 +48,7 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 		const c = claim();
 		expect(resolutionOptions(c).map((o) => o.title)).toEqual(['부분 환불 (왕복 배송비 차감)', '전액 환불']);
 		// 금액은 서버 예상 금액(claimQuotes) — 처리 방법마다 그 칸의 금액
-		const quotes = { partial: { amount: 33000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false }, refund: { amount: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false } };
+		const quotes = { partial: { amount: 33000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false, lines: [] }, refund: { amount: 39000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false, lines: [] } };
 		expect(resolutionOptions(c, quotes).map((o) => o.desc)).toEqual(['₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불', '₩39,000 (상품 ₩36,000 + 배송비 ₩3,000) · 회수 확인 뒤 환불']);
 		expect(approveLabel(c, 'partial')).toBe('부분 환불 (왕복 배송비 차감) 승인');
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
@@ -71,7 +71,7 @@ describe('처리 내역', () => {
 	});
 	it('부분 환불 끝 → 승인 메시지 · 환불 금액(차감)', () => {
 		const rows = consoleTimeline(
-			claim({ status: 'done', step: null, resolution: 'partial', message: '확인했어요', decided_at: '2026-11-06T11:00:00Z', needs_collect: true, collected_at: '2026-11-06T11:30:00Z', needs_refund: true, deduction: 6000, refund_amount: 26000, refunded_at: '2026-11-06T11:59:30Z' }),
+			claim({ status: 'done', step: null, resolution: 'partial', message: '확인했어요', decided_at: '2026-11-06T11:00:00Z', needs_collect: true, collected_at: '2026-11-06T11:30:00Z', needs_refund: true, deduction: 6000, refund_amount: 26000, refund_paid: 32000, shipping_back: 0, refunded_at: '2026-11-06T11:59:30Z' }),
 			NOW
 		);
 		expect(rows[1].when).toBe('1시간 전 · 확인했어요');
@@ -95,10 +95,10 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 		expect(s.rows.some((r) => r.k === '운송장')).toBe(false);
 	});
 	it('상품 금액(그 줄 전체 수량) · 주문 배송비(0090) — 무료배송이면 "무료배송"', () => {
-		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }));
+		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2, amount: 64000 }), shipping_fee: 3000 } })); // 줄 금액은 서버 값(0099 item.amount)
 		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000 (2개)');
 		// 제품 카드도 같은 값 — 요청 수량(1개)이 아니라 주문 수량 전체
-		expect(claimOrderedAmount(claim({ qty: 1, order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }))).toBe(64000);
+		expect(claimOrderedAmount(claim({ qty: 1, order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2, amount: 64000 }), shipping_fee: 3000 } }))).toBe(64000); // 줄 금액은 서버 값(0099 item.amount)
 		expect(paid.rows.find((r) => r.k === '배송비')!.v).toBe('₩3,000');
 		const free = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING' }), shipping_fee: 0 } }));
 		expect(free.rows.find((r) => r.k === '배송비')!.v).toBe('무료배송');

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { SellerProductDetail } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON } from '../lib/data';
 import { blankDraft } from '../lib/rules';
-import { detailToDraft, draftToPayload, draftVisual, isEditableStatus, isRevisableStatus, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf, opensReview } from '../lib/product-draft';
+import { detailToDraft, draftToPayload, draftVisual, joinFormPack, productMenu, saveFailure, savedImages, splitFormPack, tileKeyOf, opensReview } from '../lib/product-draft';
 
 const IMG = 'https://x.supabase.co/storage/v1/object/public/myr-products/s1/0f8a1c2e.jpg';
 
@@ -30,7 +30,7 @@ describe('draftToPayload', () => {
 
 describe('detailToDraft · tileKeyOf', () => {
 	const d: SellerProductDetail = {
-		id: 'p1', code: 'm101', status: 'rejected', rejectReason: '보완', rejectItems: [], reviewedAt: null, name: '포도 젤리', price: 32000, unit: '14포', category: 'diet', tile: TILE_BG.grape, icon: 'grape',
+		id: 'p1', code: 'm101', status: 'rejected', editable: true, approved: false, rejectReason: '보완', rejectItems: [], reviewedAt: null, name: '포도 젤리', price: 32000, unit: '14포', category: 'diet', tile: TILE_BG.grape, icon: 'grape',
 		image_urls: [IMG], chips: ['젤리'], note: '노트', story_title: '왜', story: '이야기', ingredient_rows: [{ name: '가르시니아', why: '', amount: '' }], howto_steps: [{ t: '식후', d: '' }],
 		faq: [], form: '젤리', pack: '스틱포', shelf_life: '24개월', storage_method: '서늘한 곳'
 	};
@@ -65,17 +65,16 @@ describe('detailToDraft · tileKeyOf', () => {
 describe('saveFailure · 메뉴', () => {
 	it('필수 칸 → 그 단계로', () => {
 		expect(saveFailure('INVALID_INPUT', 'name')).toEqual({ message: '제품명을 입력해주세요', step: 1 });
-		// 서버(0073 · 0074)는 판매가 1,000만 원 초과를 field price 로 거절 — 빈 판매가는 화면이 [다음]에서 먼저 막아 여기까지 오지 않는다
-		expect(saveFailure('INVALID_INPUT', 'price')).toEqual({ message: '판매가는 1,000만 원까지 입력할 수 있어요', step: 1 });
+		// 서버(0073 · 0074)는 판매가 상한 초과를 field price 로 거절하고 상한(max · 0099 myr_product_price_max)을 같이 준다 — 문구는 그 값으로. 빈 판매가는 화면이 [다음]에서 먼저 막아 여기까지 오지 않는다
+		expect(saveFailure('INVALID_INPUT', 'price', 10_000_000)).toEqual({ message: '판매가는 1,000만 원까지 입력할 수 있어요', step: 1 });
+		expect(saveFailure('INVALID_INPUT', 'price', 5_500_000).message).toBe('판매가는 550만 원까지 입력할 수 있어요');
+		expect(saveFailure('INVALID_INPUT', 'price', 12_345).message).toBe('판매가는 12,345원까지 입력할 수 있어요');
+		expect(saveFailure('INVALID_INPUT', 'price')).toEqual({ message: '판매가를 다시 확인해주세요', step: 1 }); // 상한을 못 받았으면 숫자를 짐작하지 않는다
 		expect(saveFailure('INVALID_INPUT', 'category').step).toBe(1);
 		expect(saveFailure('INVALID_INPUT', 'note')).toEqual({ message: '레시피 노트를 써주세요', step: 2 });
 		expect(saveFailure('BAD_IMAGE').step).toBe(1);
 		expect(saveFailure('NOT_EDITABLE').step).toBeUndefined();
 		expect(saveFailure('???').message).toContain('잠시 후');
-	});
-	it('에디터로 바로 고치는 건 임시저장 · 반려 · 수정 심사로 고치는 건 판매 중 · 일시중지', () => {
-		expect((['draft', 'rejected', 'review', 'live', 'paused', 'ended'] as const).filter(isEditableStatus)).toEqual(['draft', 'rejected']);
-		expect((['draft', 'rejected', 'review', 'live', 'paused', 'ended'] as const).filter(isRevisableStatus)).toEqual(['live', 'paused']);
 	});
 	it('상태별 메뉴 — 판매 종료 · 삭제는 확인을 받는다', () => {
 		expect(productMenu('draft').map((m) => m.kind)).toEqual(['edit', 'delete']);

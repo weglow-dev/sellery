@@ -3,16 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { csRateText, emptySellerSales, parseSellerSales, weekBars, weekdayOf } from '../seller-sales';
 
 const raw = {
-	month: '2026-11', gross: 75000, refunds: 25000, net: 50000, orders: 4, units: 5, refunded_orders: 2, payout: null,
+	month: '2026-11', gross: 75000, refunds: 25000, net: 50000, orders: 4, units: 5, refunded_orders: 2,
 	week: [{ date: '2026-11-09', orders: 0 }, { date: '2026-11-10', orders: 1 }, { date: '2026-11-15', orders: 3 }]
 };
 
 describe('parseSellerSales', () => {
-	it('필드 이름을 화면 쪽으로 · payout null 은 그대로(정산 비율 미정)', () => {
+	it('필드 이름을 화면 쪽으로 · 옛 payout 은 싣지 않는다(0099)', () => {
 		const s = parseSellerSales(raw);
-		expect(s).toMatchObject({ month: '2026-11', gross: 75000, refunds: 25000, net: 50000, orders: 4, units: 5, refundedOrders: 2, payout: null });
+		expect(s).toMatchObject({ month: '2026-11', gross: 75000, refunds: 25000, net: 50000, orders: 4, units: 5, refundedOrders: 2 });
 		expect(s.week).toHaveLength(3);
-		expect(parseSellerSales({ ...raw, payout: 15000 }).payout).toBe(15000);
+		expect(parseSellerSales({ ...raw, payout: 15000 })).not.toHaveProperty('payout');
 	});
 	it('모양이 어긋나면 0 실적(홈이 깨지지 않게) · 음수 · 문자는 0', () => {
 		for (const v of [null, undefined, 'x', 3]) expect(parseSellerSales(v)).toEqual(emptySellerSales());

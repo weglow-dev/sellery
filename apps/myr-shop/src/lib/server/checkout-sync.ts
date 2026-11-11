@@ -268,12 +268,9 @@ export async function depositExpire(admin: Admin, order: OrderLite, payment: Tos
 	return { result: r.already ? 'noop' : 'deposit_expired', handled: true };
 }
 
+/** 재조회한 결제 원문을 주문에 반영 — 어떤 주문에 반영할지(결제됐고 끝나지 않은 주문)는 DB 가 정한다(0099 myr_app_order_refresh_payment · myr_order_status_open) */
 async function refreshOrderPayment(admin: Admin, order: OrderLite, payment: TossPayment): Promise<void> {
-	const { error } = await admin
-		.from('myr_orders')
-		.update({ raw_payment: payment, payment_method: payment.method ?? null })
-		.eq('id', order.id)
-		.in('status', ['PAID', 'PARTIAL_REFUNDED']);
+	const { error } = await admin.rpc('myr_app_order_refresh_payment', { p_order_id: order.id, p_payment: payment });
 	if (error) console.error('[checkout-sync] order refresh failed:', error.message);
 }
 

@@ -21,6 +21,7 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import PaymentWidget from '$lib/components/PaymentWidget.svelte';
 	import PriceSummary from '$lib/components/PriceSummary.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 주문 · 결제 — 받는 분 / (비회원: 주문자 이메일·동의) / 결제 수단(토스 결제위젯) / 주문 상품 / 금액 → [결제하기]
@@ -272,20 +273,20 @@
 							<div class="flex items-center gap-3.5 rounded-2xl border border-white/8 bg-white/3 px-3.5 py-3">
 								<Tile tile={it.tile} ic={it.ic} thumbUrl={it.thumbUrl} icon={26} class="h-[52px] w-[52px] rounded-xl" />
 								<span class="min-w-0 flex-1 text-[14px] font-bold">{it.name}<span class="font-semibold text-fg-faint"> × {it.qty}</span></span>
-								<span class="text-[15px] font-extrabold">{it.lineAmount === null ? '확인 중' : won(it.lineAmount)}</span>
+								<span class="text-[15px] font-extrabold">{#if it.lineAmount !== null}{won(it.lineAmount)}{:else if shop.quoteFailed}—{:else}<Spinner />{/if}</span>
 							</div>
 						{/each}
 					</div>
 				</div>
 
 				<div class="mt-6 lg:hidden">
-					<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} boxed />
+					<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} boxed />
 				</div>
 			</form>
 
 			<aside class="hidden rounded-3xl border border-white/8 bg-panel p-6 lg:sticky lg:top-[104px] lg:block">
 				<p class="mb-4 text-[16px] font-extrabold">결제 금액</p>
-				<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
+				<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} />
 				<p class="mt-2 text-[12px] leading-[1.5] text-fg-faint">결제 직전에 서버가 재고 · 공구 기간을 다시 확인해요 — 바뀌었으면 결제 전에 알려드려요.</p>
 				<button type="submit" form="checkout-form" disabled={!canPay} class="{payBtn} mt-3.5 {canPay ? 'bg-accent text-bg hover:bg-[#ff8f5c]' : 'bg-white/8 text-white/40'}">{payLabel}</button>
 			</aside>

@@ -19,6 +19,10 @@ export type OrderItem = {
 	refundedQty: number;
 	/** 남은 수량(0097 myr_line_left = 주문 수량 − 환불 수량) — 서버 값 그대로 · 화면이 빼서 계산하지 않는다. 옛 응답이면 0 */
 	leftQty: number;
+	/** 남은 수량의 금액(0099 myr_line_amount(단가, 남은 수량)) — 서버 값 그대로 · 화면이 단가 × 수량을 계산하지 않는다. 옛 응답이면 0 */
+	leftAmount: number;
+	/** 살아 있는 줄(0099 myr_line_live = 취소가 아니고 남은 수량이 있다) — 서버 값 그대로 · 화면이 상태와 수량으로 다시 판정하지 않는다. 옛 응답이면 false */
+	live: boolean;
 	tile: string;
 	ic: string;
 	thumbUrl: string | null;
@@ -48,6 +52,9 @@ export type OrderView = {
 	itemsAmount: number;
 	shippingFee: number;
 	refundAmount: number;
+	/** 결제 − 환불(0099 myr_order_net) · 끝나지 않은 주문인가(0099 myr_order_status_alive — 입금 대기 · 결제 완료 · 부분 환불) — 서버 값 그대로 */
+	netAmount: number;
+	alive: boolean;
 	orderName: string;
 	paymentMethod: string;
 	paidAt: string | null;
@@ -60,7 +67,8 @@ export type OrderView = {
 	deliveredAt: string | null;
 	/** 주문 배송 상태 = 살아 있는 줄의 가장 덜 진행된 상태(0077 `myr_order_ship_status`) · 옛 응답이거나 살아 있는 줄이 없으면 null */
 	shipStatus: ShipStatus | null;
-	/** 열린 교환·환불 요청 상태 — 처리 대기가 있으면 pending · 진행 중만 있으면 progress · 없으면 null(0078 `myr_order_claim_status`) */
+	/** 열린 교환·환불 요청 상태 — 처리 대기가 있으면 pending · 진행 중만 있으면 progress · 없으면 null(0078 `myr_order_claim_status`).
+	 *  서버가 결제됐고 끝나지 않은 주문에만 싣는다(0099) — 화면은 주문 상태를 다시 보지 않는다 */
 	claimStatus: OpenClaimStatus | null;
 	guest: boolean;
 	buyerName: string;
@@ -93,6 +101,8 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		status: str(o, 'status', 'PAID'),
 		refundedQty: num(o, 'refunded_qty'),
 		leftQty: num(o, 'left_qty'),
+		leftAmount: num(o, 'left_amount'),
+		live: o.live === true,
 		tile: str(o, 'tile', 'linear-gradient(145deg,#6b7280,#262a33)'),
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
@@ -122,6 +132,8 @@ export function orderFromJson(v: unknown): OrderView | null {
 		itemsAmount: num(o, 'items_amount'),
 		shippingFee: num(o, 'shipping_fee'),
 		refundAmount: num(o, 'refund_amount'),
+		netAmount: num(o, 'net_amount'),
+		alive: o.alive === true,
 		orderName: str(o, 'order_name'),
 		paymentMethod: str(o, 'payment_method'),
 		paidAt: strOrNull(o, 'paid_at'),
@@ -133,7 +145,7 @@ export function orderFromJson(v: unknown): OrderView | null {
 		shippedAt: strOrNull(o, 'shipped_at'),
 		deliveredAt: strOrNull(o, 'delivered_at'),
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : null,
-		claimStatus: o.claim_status === 'pending' || o.claim_status === 'progress' ? o.claim_status : null,
+		claimStatus: isOpenClaimStatus(o.claim_status) ? o.claim_status : null,
 		guest: o.guest === true,
 		buyerName: str(o, 'buyer_name'),
 		shipping: ship
@@ -165,7 +177,10 @@ export const SHIP_LABELS: Record<ShipStatus, StatusLabel> = {
 	SHIPPING: { text: '배송 중', tone: 'accent' },
 	DELIVERED: { text: '배송 완료', tone: 'ok' }
 };
-export type OpenClaimStatus = 'pending' | 'progress';
+/** 서버가 "열린 요청"으로 싣는 상태 값(형식) — 열렸는지 판정은 서버(0099 myr_claim_status_open)가 한다 */
+export const OPEN_CLAIM_STATUSES = ['pending', 'progress'] as const;
+export type OpenClaimStatus = (typeof OPEN_CLAIM_STATUSES)[number];
+export const isOpenClaimStatus = (v: unknown): v is OpenClaimStatus => OPEN_CLAIM_STATUSES.includes(v as OpenClaimStatus);
 export const CLAIM_LABELS: Record<OpenClaimStatus, StatusLabel> = {
 	pending: { text: '교환 · 환불 요청', tone: 'danger' },
 	progress: { text: '교환 · 환불 진행 중', tone: 'danger' }
@@ -173,8 +188,8 @@ export const CLAIM_LABELS: Record<OpenClaimStatus, StatusLabel> = {
 export function statusLabel(
 	o: Pick<OrderView, 'status' | 'trackingNo' | 'shippedAt' | 'deliveredAt'> & { shipStatus?: ShipStatus | null; claimStatus?: OpenClaimStatus | null }
 ): StatusLabel {
-	// 요청은 결제된 주문에만 생긴다(0078 claim_open) — 입금 대기 · 취소 · 전액 환불이면 주문 상태가 그대로 맞다
-	if (o.claimStatus && (o.status === 'PAID' || o.status === 'PARTIAL_REFUNDED')) return CLAIM_LABELS[o.claimStatus];
+	// 요청 상태는 서버가 결제됐고 끝나지 않은 주문에만 싣는다(0099) — 입금 대기 · 취소 · 전액 환불이면 null 이라 주문 상태가 그대로 맞다
+	if (o.claimStatus) return CLAIM_LABELS[o.claimStatus];
 	switch (o.status) {
 		case 'WAITING_DEPOSIT':
 			return { text: '입금 대기', tone: 'accent' };
@@ -206,7 +221,7 @@ export function shipBoxes(items: OrderItem[]): { boxes: ShipBox[]; single: boole
 			if (it.shippedAt && (!box.shippedAt || it.shippedAt < box.shippedAt)) box.shippedAt = it.shippedAt;
 		} else boxes.push({ courier: it.courier, trackingNo: it.trackingNo, shippedAt: it.shippedAt, names: [name] });
 	}
-	const live = items.filter((i) => i.status !== 'CANCELED' && i.leftQty > 0);
+	const live = items.filter((i) => i.live);
 	const single = boxes.length === 1 && live.every((i) => i.trackingNo === boxes[0].trackingNo && i.courier === boxes[0].courier);
 	return { boxes, single };
 }

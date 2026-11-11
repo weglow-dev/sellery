@@ -88,9 +88,9 @@
 		saving = true;
 		try {
 			const res = await fetch('/api/products', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: productId, payload: draftToPayload(ed), submit }) });
-			const r = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; code?: string; field?: string } | null;
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; id?: string; code?: string; field?: string; max?: number } | null;
 			if (!r?.ok || !r.id) {
-				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field);
+				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field, r?.max);
 				app.showToast(f.message);
 				if (f.step) step = f.step;
 				return false;
@@ -137,9 +137,9 @@
 		saving = true;
 		try {
 			const res = await fetch(`/api/products/${encodeURIComponent(productId)}/revision`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ payload: draftToPayload(ed) }) });
-			const r = (await res.json().catch(() => null)) as { ok?: boolean; code?: string; field?: string } | null;
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; code?: string; field?: string; max?: number } | null;
 			if (!r?.ok) {
-				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field);
+				const f = saveFailure(r?.code ?? 'DB_ERROR', r?.field, r?.max);
 				app.showToast(f.message);
 				if (f.step) step = f.step;
 				return;

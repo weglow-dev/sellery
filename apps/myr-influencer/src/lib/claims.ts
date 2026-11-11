@@ -83,8 +83,8 @@ export function consoleTimeline(c: Claim, now?: Date): { title: string; when: st
 }
 
 /** 주문 · 배송 — 문의 상세와 같은 표(요청이 걸린 줄의 배송 상태 · 송장 · 발송일 · 배송 완료일 · 0080) */
-/** 그 줄 주문 수량 전체의 상품 금액 — 요청 상세 제품 카드 · "주문 · 배송" 상품 금액(요청 수량 금액은 처리 방법 · 처리 결과) */
-export const claimOrderedAmount = (c: Pick<Claim, 'order'>): number => c.order.item.unitPrice * c.order.item.qty;
+/** 그 줄 주문 수량 전체의 상품 금액 — 요청 상세 제품 카드 · "주문 · 배송" 상품 금액(요청 수량 금액은 처리 방법 · 처리 결과). 서버 값 그대로(0099 · 줄 amount) */
+export const claimOrderedAmount = (c: Pick<Claim, 'order'>): number => c.order.item.amount;
 /** 요청 상세 "주문 · 배송" — 그 줄 송장 · 상품 금액(그 줄 전체 수량) · 주문 배송비(0090) */
 export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping =>
 	orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } });

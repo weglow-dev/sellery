@@ -68,6 +68,9 @@ export type Product = {
 	price: number;
 	stock: number;
 	status: ProductStatus;
+	/** 심사를 통과한 상품(판매 중 · 일시중지) · 품절(남은 재고 0) — 서버 값 그대로(0099) · 화면이 상태 묶음 · 재고 비교를 다시 쓰지 않는다 */
+	approved: boolean;
+	soldOut: boolean;
 	tile: TileKey;
 	thumbUrl?: string | null;
 	/** DB 상품의 비주얼 — 타일 배경(CSS gradient) · 제형 아이콘 id. 있으면 tile 키 대신 이 값으로 그린다(샵과 같은 그림) */
@@ -87,11 +90,11 @@ export type Product = {
 
 export function seedProducts(): Product[] {
 	return [
-		{ id: 'p1', name: '민지의 포도 다이어트 젤리', price: 32000, stock: 184, status: 'live', tile: 'grape', sold: 412, meta: '2주 전 승인' },
-		{ id: 'p7', name: '민지 글루타치온 스틱 — 레몬', price: 36000, stock: 96, status: 'live', tile: 'lemon', sold: 231, meta: '5일 전 승인' },
-		{ id: 'p9', name: '민지 굿나잇 구미', price: 27000, stock: 0, status: 'review', tile: 'plum', sold: 0, meta: '심사 1일차' },
-		{ id: 'p10', name: '프로틴 스틱 (초안)', price: 0, stock: 0, status: 'draft', tile: 'slate', sold: 0, meta: '어제 저장' },
-		{ id: 'p11', name: '민지 콜라겐 필름 (1차)', price: 28000, stock: 0, status: 'ended', tile: 'peach', sold: 1020, meta: '판매 종료' }
+		{ id: 'p1', name: '민지의 포도 다이어트 젤리', price: 32000, stock: 184, status: 'live', approved: true, soldOut: false, tile: 'grape', sold: 412, meta: '2주 전 승인' },
+		{ id: 'p7', name: '민지 글루타치온 스틱 — 레몬', price: 36000, stock: 96, status: 'live', approved: true, soldOut: false, tile: 'lemon', sold: 231, meta: '5일 전 승인' },
+		{ id: 'p9', name: '민지 굿나잇 구미', price: 27000, stock: 0, status: 'review', approved: false, soldOut: true, tile: 'plum', sold: 0, meta: '심사 1일차' },
+		{ id: 'p10', name: '프로틴 스틱 (초안)', price: 0, stock: 0, status: 'draft', approved: false, soldOut: true, tile: 'slate', sold: 0, meta: '어제 저장' },
+		{ id: 'p11', name: '민지 콜라겐 필름 (1차)', price: 28000, stock: 0, status: 'ended', approved: false, soldOut: true, tile: 'peach', sold: 1020, meta: '판매 종료' }
 	];
 }
 

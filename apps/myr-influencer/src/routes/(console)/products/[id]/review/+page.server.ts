@@ -17,7 +17,7 @@ export const load: PageServerLoad = async (event) => {
 	const { product: p, revision } = found;
 	const card = { id: p.id, name: p.name || '이름 없는 제품', price: p.price, tile: p.tile, icon: p.icon, thumbUrl: p.image_urls[0] ?? null };
 	if (p.status === 'rejected') return { kind: 'new' as const, product: card, items: rejectItemsOf(p.rejectItems, p.rejectReason), reviewedAt: p.reviewedAt };
-	if ((p.status === 'listed' || p.status === 'paused') && revision?.status === 'rejected')
+	if (p.approved && revision?.status === 'rejected')
 		return { kind: 'rev' as const, product: card, items: rejectItemsOf(revision.rejectItems, revision.rejectReason), reviewedAt: revision.reviewedAt };
 	redirect(303, '/products');
 };

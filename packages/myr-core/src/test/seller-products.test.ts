@@ -4,15 +4,22 @@ import { isSetStatusAction, SELLER_PRODUCT_STATUSES, parseRejectItems, parseSell
 
 const row = (o: Record<string, unknown> = {}) => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', reject_reason: null, category: 'diet', price: 32000, option_count: 2,
-	stock: 100, sold_qty: 30, stock_left: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumb_url: null,
+	stock: 100, sold_qty: 30, stock_left: 70, sold_out: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumb_url: null,
 	submitted_at: '2026-10-29T00:00:00Z', reviewed_at: null, created_at: '2026-10-29T00:00:00Z', updated_at: '2026-11-01T00:00:00Z', ...o
 });
 
 describe('parseSellerProductRows', () => {
 	it('필드 이름을 화면 쪽 이름으로', () => {
 		expect(parseSellerProductRows([row()])).toEqual([
-			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null }
+			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, soldOut: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null }
 		]);
+	});
+	it('품절 · 직접 수정 · 심사 통과는 서버 값 그대로(0099) — 응답에 없으면 false(상태 · 재고로 짐작하지 않는다)', () => {
+		const [r] = parseSellerProductRows([row({ status: 'draft', stock_left: 0, sold_out: true, editable: true, approved: false })]);
+		expect([r.soldOut, r.editable, r.approved]).toEqual([true, true, false]);
+		const { sold_out: _s, editable: _e, approved: _a, ...old } = row({ status: 'listed', stock_left: 0 });
+		const [o] = parseSellerProductRows([old]);
+		expect([o.soldOut, o.editable, o.approved]).toEqual([false, false, false]);
 	});
 	it('여섯 상태 모두 받는다 · 모르는 상태 · id 없는 행은 버린다', () => {
 		expect(parseSellerProductRows(SELLER_PRODUCT_STATUSES.map((s, i) => row({ id: `p${i}`, status: s }))).map((r) => r.status)).toEqual([...SELLER_PRODUCT_STATUSES]);

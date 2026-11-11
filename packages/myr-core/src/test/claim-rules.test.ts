@@ -7,23 +7,23 @@ import {
 	claimFromJson,
 	claimMessage,
 	claimPolicy,
-	claimOpenDeduction,
 	claimQtyText,
 	claimRefundedText,
 	claimRefundView,
 	changeMindNote,
-	claimShippingBack,
 	claimsFromJson,
+	isOpenClaim,
 	claimStepText,
 	claimTimeline,
 	kindAllowed,
 	parseClaimDecideBody,
 	parseClaimOpenBody,
 	parseClaimOpsInput,
-	photoRequired,
+	reasonRule,
+	refundOnlyNote,
+	claimFormRulesFromJson,
 	refundAmountText,
 	refundCalcText,
-	refundPaid,
 	refundPaidNote,
 	resolutionOption,
 	type Claim
@@ -93,9 +93,29 @@ describe('입력 — 요청 남기기', () => {
 		expect(parseClaimOpenBody({ ...ok, items: [{ itemId: ITEM, qty: 1, photos: [PHOTO, PHOTO, PHOTO, PHOTO] }] })).toBeNull();
 		expect(parseClaimOpenBody(null)).toBeNull();
 	});
-	it('단순 변심은 환불만 · 파손 · 오배송은 사진 필수', () => {
-		expect([kindAllowed('exchange', '단순 변심'), kindAllowed('refund', '단순 변심'), kindAllowed('exchange', '오배송'), kindAllowed('exchange', '')]).toEqual([false, true, true, true]);
-		expect([photoRequired('단순 변심'), photoRequired('파손 · 누액'), photoRequired('오배송'), photoRequired('')]).toEqual([false, true, true, false]);
+	it('사유 규칙은 서버 값 그대로(0099 myr_app_claim_form_rules) — 요청 종류 · 사진 필수 · 기한 적용을 화면이 정하지 않는다', () => {
+		// 서버가 줄 법한 응답(단순 변심은 환불만 · 파손 · 오배송은 사진 필수 — 그 판정 자체는 pgTAP myr_single_source 가 고정한다)
+		const rules = claimFormRulesFromJson({
+			return_fee: 6000,
+			reasons: [
+				{ reason: '단순 변심', kinds: ['refund'], photo_required: false, change_mind: true },
+				{ reason: '파손 · 누액', kinds: ['refund', 'exchange'], photo_required: true, change_mind: false },
+				{ reason: '오배송', kinds: ['refund', 'exchange', 'what'], photo_required: true, change_mind: false },
+				{ reason: '모르는 사유', kinds: ['refund'] }
+			]
+		});
+		expect(rules.returnFee).toBe(6000);
+		expect(rules.reasons.map((r) => r.reason)).toEqual(['단순 변심', '파손 · 누액', '오배송']); // 서버 순서 그대로 · 모르는 사유는 버린다
+		const cm = reasonRule(rules, '단순 변심');
+		expect([kindAllowed('exchange', cm), kindAllowed('refund', cm), cm?.photoRequired, cm?.changeMind]).toEqual([false, true, false, true]);
+		const wrong = reasonRule(rules, '오배송');
+		expect([kindAllowed('exchange', wrong), wrong?.photoRequired, wrong?.changeMind, wrong?.kinds]).toEqual([true, true, false, ['refund', 'exchange']]);
+		// 사유를 고르기 전에는 막지 않는다 · 서버가 규칙을 바꾸면 화면도 따라간다(단순 변심도 교환을 받게 되면)
+		expect([reasonRule(rules, ''), kindAllowed('exchange', null)]).toEqual([null, true]);
+		expect(kindAllowed('exchange', reasonRule(claimFormRulesFromJson({ reasons: [{ reason: '단순 변심', kinds: ['refund', 'exchange'] }] }), '단순 변심'))).toBe(true);
+		// 응답이 없거나 모양이 틀리면 빈 규칙 — 사유를 짐작해 채우지 않는다
+		for (const v of [null, 'x', {}]) expect(claimFormRulesFromJson(v)).toEqual({ returnFee: null, reasons: [] });
+		expect([refundOnlyNote('단순 변심'), refundOnlyNote('오배송')]).toEqual(['단순 변심은 환불로만 받아요 — 왕복 배송비를 빼고 돌려드려요', '이 사유는 환불로만 받아요']);
 	});
 });
 
@@ -140,24 +160,26 @@ describe('파서', () => {
 describe('처리 방법 이름 · 금액', () => {
 	it('요청 종류에 따라 이름이 다르다 · 금액은 서버 예상 금액(refundQuote) 그대로 · 파손 환불은 회수 없이', () => {
 		const refund = claim();
-		expect(resolutionOption('partial', refund, { goods: 32000, shippingBack: 0, deduction: 6000, amount: 26000 })).toEqual({
+		expect(resolutionOption('partial', refund, { paid: 32000, goods: 32000, shippingBack: 0, deduction: 6000, amount: 26000 })).toEqual({
 			id: 'partial',
 			title: '부분 환불 (왕복 배송비 차감)',
 			desc: '₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불'
 		});
 		expect(resolutionOption('reship', refund).title).toBe('교환으로 전환');
-		const broken = claim({ kind: 'exchange', reason: '파손 · 누액', options: ['reship', 'refund'] });
+		// 회수 여부는 서버 값(0099 option_collects · 파손 · 누액 환불은 회수 없이 — myr_claim_resolution_collects)
+		const broken = claim({ kind: 'exchange', reason: '파손 · 누액', options: ['reship', 'refund'], option_collects: { reship: false, refund: false, what: true } });
+		expect(broken.optionCollects).toEqual({ reship: false, refund: false });
 		expect(resolutionOption('reship', broken).title).toBe('새 제품 재발송');
-		expect(resolutionOption('refund', broken, { goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toEqual({ id: 'refund', title: '환불로 전환', desc: '₩32,000 · 회수 없이 바로 환불' });
+		expect(resolutionOption('refund', broken, { paid: 32000, goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toEqual({ id: 'refund', title: '환불로 전환', desc: '₩32,000 · 회수 없이 바로 환불' });
 		expect(resolutionOption('reship_collect', claim({ kind: 'exchange', reason: '오배송' })).title).toBe('재발송 + 회수');
 	});
 	it('결제 금액 − 왕복 배송비 = 환불 금액 — 마지막 줄이면 결제 금액에 배송비 · 예상 금액이 없으면(계산 실패) 금액 없이 안내만', () => {
-		const last = { goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 };
-		expect(refundPaid(last)).toBe(39000);
+		// paid(결제 금액 = 상품 + 함께 돌려줄 배송비)는 서버 값(precheck amount · 0099) — 화면이 더하지 않는다
+		const last = { paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 };
 		expect(refundCalcText(last)).toBe('(상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
 		expect(refundAmountText(last)).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
-		expect(refundAmountText({ goods: 36000, shippingBack: 3000, deduction: 0, amount: 39000 })).toBe('₩39,000 (상품 ₩36,000 + 배송비 ₩3,000)');
-		expect(refundAmountText({ goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toBe('₩32,000');
+		expect(refundAmountText({ paid: 39000, goods: 36000, shippingBack: 3000, deduction: 0, amount: 39000 })).toBe('₩39,000 (상품 ₩36,000 + 배송비 ₩3,000)');
+		expect(refundAmountText({ paid: 32000, goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toBe('₩32,000');
 		expect(resolutionOption('partial', claim(), last).desc).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불');
 		expect(resolutionOption('partial', claim()).desc).toBe('회수 확인 뒤 환불');
 		expect(resolutionOption('refund', claim(), null).desc).toBe('회수 확인 뒤 환불');
@@ -174,21 +196,23 @@ describe('처리 방법 이름 · 금액', () => {
 		expect(claimQtyText({ qty: 1, order })).toBe('1개 (주문 2개 중)');
 		expect(claimQtyText({ qty: 2, order })).toBeNull();
 	});
-	it('새 요청의 예상 차감 — 단순 변심 환불만 왕복 배송비', () => {
-		expect(claimOpenDeduction('refund', '단순 변심', 6000)).toBe(6000);
-		expect(claimOpenDeduction('refund', '파손 · 누액', 6000)).toBe(0);
-		expect(claimOpenDeduction('exchange', '오배송', 6000)).toBe(0);
-		expect(claimOpenDeduction('refund', '', 6000)).toBe(0);
+	// 새 요청의 예상 차감은 DB myr_claim_open_deduction 한 곳(0099) — supabase/tests/myr_single_source.test.sql
+	it('환불 완료 — 서버가 준 환불액 · 결제 기준 금액 · 배송비 · 차감 그대로 펼친다(여기서 계산하지 않는다)', () => {
+		// MYR2087 — 줄 36,000 · 차감 6,000 · 기록 33,000 · 서버가 준 결제 기준 39,000 · 함께 돌려준 배송비 3,000(0099 refund_paid · shipping_back)
+		const myr2087 = { amount: 36000, deduction: 6000, refundAmount: 33000, refundPaid: 39000, shippingBack: 3000 };
+		expect(claimRefundView(myr2087)).toEqual({ paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 });
+		expect(claimRefundedText(myr2087)).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
+		expect(claimRefundedText({ amount: 32000, deduction: 6000, refundAmount: 26000, refundPaid: 32000, shippingBack: 0 })).toBe('₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)');
+		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: 32000, refundPaid: 32000, shippingBack: 0 })).toBe('₩32,000');
+		// 환불 전(서버가 금액을 주지 않았다) — 금액을 만들어 내지 않는다
+		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: null, refundPaid: null, shippingBack: 0 })).toBeNull();
+		expect(claimRefundView({ amount: 32000, deduction: 0, refundAmount: 32000, refundPaid: null, shippingBack: 0 })).toBeNull();
 	});
-	it('환불 완료 — 기록된 환불액 · 차감 그대로 결제 기준으로 펼친다(다시 계산하지 않는다)', () => {
-		// MYR2087 — 줄 36,000 · 차감 6,000 · 기록 33,000 → 함께 돌려준 배송비 3,000
-		expect(claimShippingBack({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toBe(3000);
-		expect(claimRefundView({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toEqual({ goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 });
-		expect(claimRefundedText({ amount: 36000, deduction: 6000, refundAmount: 33000 })).toBe('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
-		expect(claimRefundedText({ amount: 32000, deduction: 6000, refundAmount: 26000 })).toBe('₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)');
-		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: 32000 })).toBe('₩32,000');
-		expect(claimRefundedText({ amount: 32000, deduction: 0, refundAmount: null })).toBeNull();
-		expect(claimShippingBack({ amount: 32000, deduction: 0, refundAmount: null })).toBe(0);
+	it('열린 요청 — 서버 값 open 그대로(상태 묶음을 다시 쓰지 않는다)', () => {
+		expect(isOpenClaim(claim({ status: 'pending', open: true }))).toBe(true);
+		expect(isOpenClaim(claim({ status: 'done', open: false }))).toBe(false);
+		expect(isOpenClaim(claim({ status: 'pending' }))).toBe(false); // 옛 응답(open 없음)은 열렸다고 짐작하지 않는다
+		expect(claim({ refund_amount: 33000, refund_paid: 39000, shipping_back: 3000 })).toMatchObject({ refundAmount: 33000, refundPaid: 39000, shippingBack: 3000 });
 	});
 	it('처리 기준 문구 — 사유별 · 배송비 숫자는 설정값', () => {
 		expect(claimPolicy('단순 변심', 7000)[1]).toBe('왕복 배송비 ₩7,000은 고객 부담 — 환불 금액에서 빼요');
@@ -235,7 +259,7 @@ describe('단계 문구 · 처리 내역', () => {
 	it('부분 환불 승인 → 회수(아직) · 환불(아직) / 끝나면 금액 + 차감', () => {
 		const p = claim({ status: 'progress', step: 'collect', resolution: 'partial', decided_at: 'd', needs_collect: true, needs_refund: true, deduction: 6000 });
 		expect(claimTimeline(p).map((r) => [r.title, r.done])).toEqual([['요청 접수', true], ['부분 환불 (왕복 배송비 차감) 승인', true], ['회수 완료', false], ['환불 완료', false]]);
-		const done = claim({ status: 'done', step: null, resolution: 'partial', decided_at: 'd', needs_collect: true, collected_at: 'c', needs_refund: true, deduction: 6000, refund_amount: 26000, refunded_at: 'r' });
+		const done = claim({ status: 'done', step: null, resolution: 'partial', decided_at: 'd', needs_collect: true, collected_at: 'c', needs_refund: true, deduction: 6000, refund_amount: 26000, refund_paid: 32000, shipping_back: 0, refunded_at: 'r' });
 		expect(claimTimeline(done)[3]).toEqual({ title: '환불 완료', at: 'r', detail: '₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)', done: true });
 	});
 	it('재발송 + 회수 → 회수 · 새 제품 발송 줄', () => {

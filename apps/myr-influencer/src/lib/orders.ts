@@ -1,7 +1,7 @@
 /** 주문(6번 · 0081 · 읽기 전용) — 콘솔 화면 모양만(칩 색 · 날짜 · 송장 줄). 판정(탭 · 상태 칩 · 금액)은 `@sellery/myr-core/seller-orders`.
  *  순수 — $app · $env 를 import 하지 않는다(src/test/orders.test.ts). */
 import { shortDate, type StatusLabel } from '@sellery/myr-core/order-view';
-import { sellerOrderBoxes, sellerShipStatus, type SellerOrder } from '@sellery/myr-core/seller-orders';
+import { sellerOrderBoxes, type SellerOrder } from '@sellery/myr-core/seller-orders';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 /** 칩 색 — 문의 · 요청 상세 "주문 · 배송" 칸과 같은 톤(order-ship.ts) */
@@ -24,8 +24,8 @@ export const orderTracking = (o: Pick<SellerOrder, 'items'>): { text: string; hr
 	sellerOrderBoxes(o).map((b) => ({ text: `${b.courier ?? '택배'} ${b.trackingNo}`, href: b.courier ? trackingUrl(b.courier, b.trackingNo) : null }));
 
 /** 송장이 아직 없을 때 출고 안내 — 문의 · 요청 상세 "주문 · 배송" 칸과 같은 문구(order-ship.ts) · 남은 줄이 없으면 null */
-export function orderShipNote(o: Pick<SellerOrder, 'items'>): string | null {
-	const ship = sellerShipStatus(o);
+export function orderShipNote(o: Pick<SellerOrder, 'shipStatus'>): string | null {
+	const ship = o.shipStatus;
 	if (ship === 'PAID') return '발주 전 · 고객이 직접 취소할 수 있어요';
 	if (ship === 'PREPARING') return 'MYR 물류센터에서 준비 중';
 	return null;

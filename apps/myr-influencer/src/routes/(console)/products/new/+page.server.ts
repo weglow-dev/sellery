@@ -21,7 +21,8 @@ export const load: PageServerLoad = async (event) => {
 	const { product, revision } = found;
 	if (product.status === 'draft') return { product, revision: null, mode: 'new' as const, fixKind: null, step: null };
 	if (product.status === 'rejected') return { product, revision: null, mode: 'fix' as const, fixKind: 'new' as const, step };
-	if (product.status === 'listed' || product.status === 'paused') {
+	// 수정 심사로 고치는 상품(판매 중 · 일시중지) — 서버 값 approved(0099 · 수정본 접수 myr_app_seller_submit_revision 와 같은 판정)
+	if (product.approved) {
 		if (revision?.status === 'rejected') return { product, revision, mode: 'fix' as const, fixKind: 'rev' as const, step };
 		if (!revision) return { product, revision: null, mode: 'edit' as const, fixKind: null, step };
 	}

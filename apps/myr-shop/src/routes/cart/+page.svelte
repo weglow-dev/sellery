@@ -4,6 +4,7 @@
 	import { shop } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import PriceSummary from '$lib/components/PriceSummary.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import QtyStepper from '$lib/components/QtyStepper.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
@@ -68,7 +69,7 @@
 									<QtyStepper qty={it.qty} size="sm" max={it.stockLeft ?? undefined} onchange={(q) => shop.setQty(it.code, q)} />
 									<span class="flex items-baseline gap-1.5">
 										{#if it.baseAmount !== null && it.lineAmount !== null && it.baseAmount !== it.lineAmount}<span class="text-[12px] font-semibold text-white/40 line-through lg:text-[13px]">{won(it.baseAmount)}</span>{/if}
-										<span class="text-[15px] font-extrabold lg:text-[17px]">{it.lineAmount === null ? '확인 중' : won(it.lineAmount)}</span>
+										<span class="text-[15px] font-extrabold lg:text-[17px]">{#if it.lineAmount !== null}{won(it.lineAmount)}{:else if shop.quoteFailed}—{:else}<Spinner />{/if}</span>
 									</span>
 								</div>
 								{#if it.stockLeft !== null && it.qty > it.stockLeft}<p class="mt-1.5 text-[12px] font-bold text-[#ff8a8a] lg:text-[13px]">남은 수량 {it.stockLeft.toLocaleString('ko-KR')}개 — 수량을 줄여주세요</p>{/if}
@@ -94,7 +95,7 @@
 			{#if shop.cartItems.length}
 				<aside class="hidden rounded-3xl border border-white/8 bg-panel p-6 lg:sticky lg:top-[104px] lg:block">
 					<p class="mb-4 text-[16px] font-extrabold">주문 요약</p>
-					<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
+					<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} />
 					{#if selectedCount}
 						<a href="/checkout" class="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-accent text-[16px] font-extrabold text-bg transition-colors hover:bg-[#ff8f5c]">{selectedCount}개 주문하기</a>
 					{:else}
@@ -109,7 +110,7 @@
 	<!-- 모바일 하단 합계 바 -->
 	{#if shop.cartItems.length}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
-			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} />
+			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} />
 			{#if selectedCount}
 				<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{shop.total === null ? '' : `${won(shop.total)} `}주문하기 ({selectedCount}개)</a>
 			{:else}

@@ -25,7 +25,7 @@
 	const dueText = (iso: string | null) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 	const lineStatus = (s: string, refunded: number, qty: number) => (s === 'REFUNDED' ? '환불 완료' : s === 'PARTIAL_REFUNDED' ? `${refunded}/${qty} 환불` : s === 'CANCELED' ? '취소' : '');
 	// 줄마다 배송 상태가 다르면(일부만 출고 등 · 0077) 줄 옆에 그 줄의 배송 상태를 보여 준다
-	const liveItems = $derived(order.items.filter((i) => i.status !== 'CANCELED' && i.leftQty > 0));
+	const liveItems = $derived(order.items.filter((i) => i.live));
 	const mixedShip = $derived(new Set(liveItems.map((i) => i.shipStatus)).size > 1);
 	// 상품이 여럿이면 열린 교환·환불 요청이 걸린 줄 옆에 그 상태(주문 칩은 statusLabel 이 이미 요청 상태)
 	const openClaimOf = $derived(new Map(claims.filter(isOpenClaim).map((c) => [c.order.item.id, c.status as 'pending' | 'progress'])));
@@ -184,13 +184,13 @@
 					</div>
 					<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
 						<span class="text-[14px] font-bold">{order.status === 'WAITING_DEPOSIT' ? '입금할 금액' : '최종 결제'}</span>
-						<span class="text-[22px] font-extrabold tracking-[-.02em] lg:text-[24px]">{won(Math.max(0, order.amount - order.refundAmount))}</span>
+						<span class="text-[22px] font-extrabold tracking-[-.02em] lg:text-[24px]">{won(order.netAmount)}</span>
 					</div>
 					{#if can.ok}
 						<a href={refundHref} class="mt-5 hidden h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:flex">{actionLabel}</a>
 					{:else if can.claimOpen}
 						<span aria-disabled="true" class="mt-5 hidden h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30 lg:flex">교환 · 환불 신청</span>
-					{:else if order.status !== 'REFUNDED' && order.status !== 'CANCELED'}
+					{:else if order.alive}
 						<p class="mt-3 text-[12px] leading-[1.55] text-fg-faint">{can.reason}</p>
 					{/if}
 				</section>

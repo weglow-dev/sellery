@@ -1,13 +1,18 @@
 /**
  * 공구 링크 — 순수 규칙(0086 · docs/myr.md §9-6 작업 순서 4). 샵 · 크리에이터 콘솔이 같이 쓴다. 테스트 src/test/groupbuy.test.ts.
- *   · 할인율 1~70%(정수) · 모든 옵션에 같은 비율 · 상품당 진행 중이거나 예정된 공구 하나(서버가 ALREADY_OPEN 으로 막는다).
+ *   · 할인율은 정수 · 모든 옵션에 같은 비율 · 상품당 진행 중이거나 예정된 공구 하나(서버가 ALREADY_OPEN 으로 막는다).
+ *   · 할인율 범위는 여기 없다 — DB `myr_groupbuy_pct_ok` 한 곳(표 CHECK · 만들기 · 미리보기 · 0099). 콘솔 폼은 서버가 준 범위(pct_min · pct_max)를 보여 주고, 범위 밖이면 서버 거절(BAD_PCT · min · max)을 그대로 안내한다.
  *   · 공구가 · 공구 상태(예정 · 진행 · 종료)는 여기서 계산하지 않는다 — DB `myr_groupbuy_price` · `myr_groupbuy_state` 한 곳(장바구니 견적 · 체크아웃 · 콘솔 미리보기가 같이 쓴다 · 0092).
  *     화면은 서버가 준 price · state 를 그대로 쓰고, 시작 · 끝 시각이 오면 서버에 다시 묻는다.
  *   · 시각은 한국 시간으로 보여 준다(입력 'YYYY-MM-DDTHH:mm' 도 한국 시간).
  */
+import { QTY_INT_MAX } from './constants';
 
-export const GB_PCT_MIN = 1;
-export const GB_PCT_MAX = 70;
+/** 할인율 범위 — 서버 값(0099 myr_groupbuy_pct_min · max). 화면에 숫자를 두지 않는다 */
+export type GroupbuyPctRange = { min: number; max: number };
+export function pctRangeFromJson(min: unknown, max: unknown): GroupbuyPctRange | null {
+	return Number.isInteger(min) && Number.isInteger(max) ? { min: min as number, max: max as number } : null;
+}
 export const GB_CODE_RE = /^[a-z0-9]{6,16}$/;
 
 export type GroupbuyState = 'scheduled' | 'active' | 'ended';
@@ -93,11 +98,11 @@ export type GroupbuyDraft = { pct: string; startsAt: string; endsAt: string };
 export type GroupbuyField = keyof GroupbuyDraft;
 export type GroupbuyBody = { pct: number; startsAt: string; endsAt: string };
 
-/** 칸별 오류 — 빈 객체면 통과. 시작이 지났으면 서버가 지금으로 당긴다(오류 아님) */
+/** 칸별 오류(입력 형식 · 기간 앞뒤) — 빈 객체면 통과. 시작이 지났으면 서버가 지금으로 당긴다(오류 아님).
+ *  할인율은 숫자 형식만 본다 — 범위는 서버가 정한다(미리보기 · 만들기의 BAD_PCT) */
 export function groupbuyErrors(d: GroupbuyDraft, now: number = Date.now()): Partial<Record<GroupbuyField, string>> {
 	const e: Partial<Record<GroupbuyField, string>> = {};
-	const pct = Number(d.pct);
-	if (!/^\d{1,2}$/.test(d.pct.trim()) || pct < GB_PCT_MIN || pct > GB_PCT_MAX) e.pct = `할인율은 ${GB_PCT_MIN}~${GB_PCT_MAX}% 사이 정수로 넣어주세요`;
+	if (!/^\d{1,2}$/.test(d.pct.trim())) e.pct = '할인율을 숫자로 넣어주세요';
 	const s = kstInputToIso(d.startsAt);
 	const en = kstInputToIso(d.endsAt);
 	if (!s) e.startsAt = '시작 일시를 골라주세요';
@@ -107,10 +112,10 @@ export function groupbuyErrors(d: GroupbuyDraft, now: number = Date.now()): Part
 	return e;
 }
 
-/** POST 본문 { pct, startsAt, endsAt(ISO) } → 값 · 틀리면 null (서버가 같은 규칙으로 다시 막는다) */
+/** POST 본문 { pct, startsAt, endsAt(ISO) } → 값 · 형식이 틀리면 null. 할인율은 정수인지만 본다(전송 형식) — 범위 · 기간 판정은 서버(BAD_PCT · BAD_PERIOD) */
 export function parseGroupbuyBody(v: unknown): GroupbuyBody | null {
 	const o = obj(v);
-	if (!o || !Number.isInteger(o.pct) || (o.pct as number) < GB_PCT_MIN || (o.pct as number) > GB_PCT_MAX) return null;
+	if (!o || !Number.isInteger(o.pct) || Math.abs(o.pct as number) > QTY_INT_MAX) return null;
 	if (!isTime(o.startsAt) || !isTime(o.endsAt)) return null;
 	return { pct: o.pct as number, startsAt: new Date(o.startsAt).toISOString(), endsAt: new Date(o.endsAt).toISOString() };
 }
@@ -119,12 +124,14 @@ export const GB_ERROR_MESSAGES: Record<string, string> = {
 	NOT_FOUND: '제품을 찾을 수 없어요',
 	NOT_LISTED: '판매 중인 제품만 공구 링크를 만들 수 있어요',
 	SOLD_OUT: '품절된 제품은 공구 링크를 만들 수 없어요. 재고가 들어오면 만들 수 있어요',
-	BAD_PCT: `할인율은 ${GB_PCT_MIN}~${GB_PCT_MAX}% 사이로 넣어주세요`,
+	BAD_PCT: '할인율을 다시 확인해주세요',
 	BAD_PERIOD: '기간을 다시 확인해주세요 — 종료는 시작 뒤, 지금 이후여야 해요',
 	ALREADY_OPEN: '이미 진행 중이거나 예정된 공구가 있어요. 그 공구가 끝난 뒤 새로 만들 수 있어요',
 	ALREADY_ENDED: '이미 끝난 공구예요'
 };
-export const groupbuyErrorMessage = (code: string | undefined): string => (code && GB_ERROR_MESSAGES[code]) || '처리하지 못했어요. 잠시 후 다시 시도해주세요';
+/** 서버 거절 → 안내 문구. BAD_PCT 는 서버가 같이 준 범위(min · max)로 — 범위를 못 받았으면 숫자 없이 */
+export const groupbuyErrorMessage = (code: string | undefined, range?: GroupbuyPctRange | null): string =>
+	code === 'BAD_PCT' && range ? `할인율은 ${range.min}~${range.max}% 사이로 넣어주세요` : (code && GB_ERROR_MESSAGES[code]) || '처리하지 못했어요. 잠시 후 다시 시도해주세요';
 
 /** 콘솔 목록 줄(DB myr_groupbuy_seller_json) — 공구 + 실적(0076 홈 실적과 같은 줄 기준: 결제된 주문 · 환불 뺀 값) */
 export type SellerGroupbuy = Groupbuy & {

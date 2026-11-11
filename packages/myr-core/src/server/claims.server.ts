@@ -10,7 +10,7 @@
  * 환불은 `refundItems`(토스 부분 취소 · 줄 기록 · 환불 메일) 뒤 `myr_app_claim_refunded` 로 요청에 기록한다. 토스 키는 요청 코드(tag)로 멱등.
  * actor 와 그 id 는 세션에서만(원칙 6) — 이 모듈은 라우트가 넘긴 값을 그대로 쓴다.
  */
-import { CLAIM_CODE_RE, claimFromJson, claimsFromJson, type Claim, type ClaimDecideBody, type ClaimOpenBody, type ClaimQuotes } from '../claim-rules';
+import { CLAIM_CODE_RE, claimFormRulesFromJson, claimFromJson, claimsFromJson, EMPTY_CLAIM_FORM_RULES, type Claim, type ClaimDecideBody, type ClaimFormRules, type ClaimOpenBody, type ClaimQuotes } from '../claim-rules';
 import type { RefundQuote } from '../refund-rules';
 import { admin } from './admin.server';
 import { notifyClaimDecided, notifyClaimOpened, notifyClaimReshipped } from './mail-events.server';
@@ -234,12 +234,24 @@ async function adminClaimByCode(code: string): Promise<Claim | null> {
 	return (await claimsForOrder((data as { order_id: string }).order_id)).find((c) => c.code === code) ?? null;
 }
 
-/** 단순 변심 왕복 배송비(platform_settings · 0078) — 신청 화면의 예상 금액 · 처리 기준 문구. 읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
-export async function claimReturnFee(): Promise<number | null> {
-	const { data, error } = await admin().rpc('myr_claim_return_fee');
+/** 새 요청의 예상 차감(0099 myr_claim_open_deduction) — 단순 변심 환불이면 왕복 배송비 · 그 밖은 0. 처리 방법 기본 · 차감 규칙은 DB 한 곳(승인 myr_app_claim_decide 와 같은 함수).
+ *  읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
+export async function claimOpenDeduction(kind: string, reason: string): Promise<number | null> {
+	const { data, error } = await admin().rpc('myr_claim_open_deduction', { p_kind: kind, p_reason: reason });
 	if (error) {
-		console.error('[claims] return fee failed:', error.message);
+		console.error('[claims] open deduction failed:', error.message);
 		return null;
 	}
 	return typeof data === 'number' ? data : null;
+}
+
+/** 신청 화면의 사유 규칙 한 벌(0099 myr_app_claim_form_rules) — 사유 목록 · 사유별 요청 종류 · 사진 필수 · 단순 변심 기한 적용 · 왕복 배송비.
+ *  요청 접수(myr_app_claim_open)와 같은 DB 함수가 정한다. 읽지 못하면 빈 규칙(화면은 사유를 고를 수 없고 안내만 — 규칙을 짐작하지 않는다) */
+export async function claimFormRules(): Promise<ClaimFormRules> {
+	const { data, error } = await admin().rpc('myr_app_claim_form_rules');
+	if (error) {
+		console.error('[claims] form rules failed:', error.message);
+		return EMPTY_CLAIM_FORM_RULES;
+	}
+	return claimFormRulesFromJson(data);
 }

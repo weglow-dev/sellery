@@ -10,7 +10,7 @@ const H = 3_600_000;
 const D = 24 * H;
 const row = (o: Partial<SellerProductRow> = {}): SellerProductRow => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 0,
-	stock: 100, soldQty: 30, stockLeft: 70, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null,
+	stock: 100, soldQty: 30, stockLeft: 70, soldOut: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null,
 	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), revision: null, ...o
 });
 
@@ -46,7 +46,8 @@ describe('productFromRow · productMeta', () => {
 });
 
 describe('탭 · 재고 표시 · 홈 카운트', () => {
-	const list = (['listed', 'paused', 'pending', 'rejected', 'draft', 'ended'] as const).map((s, i) => productFromRow(row({ id: `p${i}`, status: s }), NOW));
+	// approved 는 서버 값(0099 myr_product_status_approved = 판매 중 · 일시중지) — 행에 실려 온 대로
+	const list = (['listed', 'paused', 'pending', 'rejected', 'draft', 'ended'] as const).map((s, i) => productFromRow(row({ id: `p${i}`, status: s, approved: s === 'listed' || s === 'paused' }), NOW));
 	it('탭 다섯 개 — 판매 중엔 일시중지, 심사 중엔 반려가 함께', () => {
 		expect(PRODUCT_TABS.map((t) => t.name)).toEqual(['전체', '판매 중', '심사 중', '임시저장', '종료']);
 		expect(filterProducts(list, 'live').map((p) => p.status)).toEqual(['live', 'paused']);
@@ -55,8 +56,8 @@ describe('탭 · 재고 표시 · 홈 카운트', () => {
 		expect(filterProducts(list, 'ended').map((p) => p.status)).toEqual(['ended']);
 		expect(productTabCounts(list).map((t) => t.count)).toEqual([6, 2, 2, 1, 1]);
 	});
-	it('재고는 판매 중 · 일시중지만', () => {
-		expect(list.filter((p) => showsStock(p.status)).map((p) => p.status)).toEqual(['live', 'paused']);
+	it('재고는 서버가 심사 통과(approved)라고 한 상품만', () => {
+		expect(list.filter((p) => showsStock(p)).map((p) => p.status)).toEqual(['live', 'paused']);
 	});
 	it('홈 — 판매 중 수 · 심사(반려 포함) + 임시저장 수 · 빈 목록은 0', () => {
 		expect(homeProductCounts(list)).toEqual({ live: 1, pending: 3 });

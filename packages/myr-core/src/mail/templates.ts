@@ -192,7 +192,8 @@ export function orderRefundedSellerMail(o: MailOrder, r: MailRefund, sellerId: s
 	const code = upper(o.code);
 	const sellerName = (mine[0]?.i ?? mineAll[0]).sellerName;
 	const lines = r.deposit ? mineAll : mine.map((p) => ({ ...p.i, qty: p.x.qty }));
-	const amount = r.deposit ? 0 : mine.reduce((n, p) => n + p.i.unitPrice * p.x.qty, 0);
+	// 줄 환불 금액은 서버 precheck 가 준 값(MailRefund.items[].amount) — 여기서 단가 × 수량을 다시 계산하지 않는다
+	const amount = r.deposit ? 0 : mine.reduce((n, p) => n + p.x.amount, 0);
 	const doc: MailDoc = {
 		title: r.deposit ? '주문이 취소되었어요' : '내 상품이 환불되었어요',
 		preheader: `${code} · ${itemLine(lines[0])}`,

@@ -1,6 +1,6 @@
 /**
  * 크리에이터 실적(순수) — 0076 `myr_app_seller_sales` 응답 모양 · 파서 · 화면 계산(CS 비율 · 7일 막대). DB·환경 없음 · src/test/seller-sales.test.ts.
- * 크리에이터 콘솔 홈(8번)이 쓰고, 운영 콘솔 실적도 같은 응답을 쓴다. 순매출 · 주문 · 수량 판정 자체는 RPC 하나에만 있다(백엔드 원칙 1).
+ * 크리에이터 콘솔 홈(8번)이 쓰고, 운영 콘솔 실적도 같은 응답을 쓴다. 순매출 · 주문 · 수량 판정 자체는 RPC 하나에만 있다(백엔드 원칙 1). 정산 예상은 여기 없다 — 정산 탭 · 홈이 `myr_settlement_preview` 를 쓴다(옛 payout 은 0099 에서 없앴다).
  */
 
 export type SellerSalesDay = { date: string; orders: number };
@@ -14,8 +14,6 @@ export type SellerSales = {
 	orders: number;
 	units: number;
 	refundedOrders: number;
-	/** 정산 예정 — 줄 마진율이 하나라도 비면 null(정산 비율 미정 · docs/myr.md §9-6) */
-	payout: number | null;
 	/** 오늘 포함 최근 7일(KST) · 오래된 날부터 */
 	week: SellerSalesDay[];
 };
@@ -23,7 +21,7 @@ export type SellerSales = {
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
 
 export function emptySellerSales(): SellerSales {
-	return { month: '', gross: 0, refunds: 0, net: 0, orders: 0, units: 0, refundedOrders: 0, payout: null, week: [] };
+	return { month: '', gross: 0, refunds: 0, net: 0, orders: 0, units: 0, refundedOrders: 0, week: [] };
 }
 
 /** RPC 응답 → 실적. 모양이 어긋나면 0 으로(홈이 깨지지 않게) */
@@ -41,7 +39,6 @@ export function parseSellerSales(v: unknown): SellerSales {
 		orders: num(r.orders),
 		units: num(r.units),
 		refundedOrders: num(r.refunded_orders),
-		payout: typeof r.payout === 'number' && Number.isFinite(r.payout) ? Math.round(r.payout) : null,
 		week
 	};
 }

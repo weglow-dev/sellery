@@ -65,6 +65,8 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 
 1. **같은 업무 판정·계산은 코드에 한 곳만 둔다** — 정산 완료 여부 · 순매출 · 수수료 · 등급 · 환불 가능 여부 같은 판정은 `@sellery/db`·`@sellery/payments` 의 기존 함수(또는 그 RPC)를 호출한다. 새 화면·필터·알림·CSV 를 만들 때 그 판정을 다시 쓰지 않는다. **SQL 로 같은 계산을 다시 써야 하면 멈추고 보고한다**(출처가 둘이 되면 화면마다 결과가 달라진다).
    **화면에 보여 주는 숫자도 같은 판정이다**(2026-11-11) — 예상 환불 금액 · 장바구니 배송비 · 정산 미리보기 · 공구가 미리보기 · 버튼 표시 조건(환불 가능 여부) 같은 "표시용" 값도 서버 함수를 부르고, TS/Svelte 로 같은 공식을 다시 쓰지 않는다. 실제 처리와 화면이 **같은 서버 함수 하나**를 부르게 만든다(예: MYR `refundQuote` 를 실제 환불 `refundItems` 와 신청 화면 `/api/refunds/quote` 가 같이 쓴다 · 0092 `myr_app_cart_quote` 를 체크아웃과 장바구니가 같이 쓴다). "표시용 거울 — 바꾸면 둘 다" 같은 주석으로 대신하지 않는다(원칙 2).
+   **한 줄짜리 식도 판정이다**(2026-11-11 · 0097~0099) — `수량 − 환불 수량` · `금액 − 환불` · `단가 × 수량` · 상태 묶음(`in ('PAID','PARTIAL_REFUNDED')` 등) · 품절 · 한도 숫자도 처음 쓸 때 이름 붙은 DB 함수로 만들고(MYR: `myr_line_left` · `myr_line_live` · `myr_line_net` · `myr_line_amount` · `myr_order_status_paid/alive/open` · `myr_claim_status_open` · `myr_product_visible` · `myr_product_sold_out` · `myr_groupbuy_pct_ok` · `myr_product_price_max` …), 다음 함수 · 화면은 그 함수(또는 그 값이 실린 응답)를 쓴다. **MYR 은 검사가 막는다** — DB 함수끼리는 pgTAP `supabase/tests/myr_single_source.test.sql` 맨 아래 표(식 · 주인 함수 — 주인 밖에서 식이 나오면 실패 · `npm run test:db`), 화면 · 서버 TS 는 `scripts/check-boundaries.mjs` (h) `MYR_MIRROR_RULES`(CI). 새 판정을 만들면 두 곳에 식과 주인 함수를 같이 적는다.
+   **예외 — 입력 형식 규칙** — 전화번호 · 핸들 · 주문번호 형식 · 필수 칸 · 글자 수 · 숫자인지 · 기간 앞뒤(종료가 시작 뒤)처럼 "입력이 말이 되는가"만 보는 검사는 화면(순수 TS)과 서버에 둘 다 둔다(화면은 빨리 알려 주고 서버가 최종 판정). 금액 · 수량 한도 · 자격 · 상태 판정은 예외가 아니다 — 한도 숫자가 필요하면 서버 응답(거절 응답의 `max` · `min` 등)에서 받는다.
 2. **두 함수에 같은 인자를 맞춰 넘겨야 결과가 맞는 구조는 만들지 않는다** — 그 값(예: "정산 예정일 무시" 플래그)은 객체 하나가 소유하고, 소비하는 쪽은 그 객체에서 읽는다. 어긋나면 예외를 던지게 하고, 문서의 경고 문구로 대신하지 않는다.
 3. **돈·판정 로직을 바꾸기 전에 사용처 표를 먼저 보고한다** — "이 판정을 쓰는 곳 전부"를 화면 · 기준 · 호출 코드 세 칸으로 모아 PR 본문에 적는다. 사용처마다 결과가 같은지 테스트 케이스(정상 · 부분 · 전액환불 · 0원)로 확인한다.
 4. **계산 결과가 바뀌면 안 되는 변경은 "계산 결과 불변" 을 PR 에 명시하고 근거를 적는다** — 테스트, 또는 같은 입력의 전후 비교.
@@ -72,7 +74,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 6. **권한은 서버 세션에서만 정한다** — actor(고객·인플루언서·브랜드·관리자)와 그 ID 는 요청 본문·쿼리에서 받지 않는다. service role 은 RLS 를 통과하므로 RPC 의 권한 검사가 마지막 방어선이다: `security definer` 함수는 본문에서 권한을 검사하고, anon·authenticated 의 EXECUTE 를 회수한다(0007 · 0052 와 같은 방식).
 7. **백엔드를 바꾸면 테스트를 같이 쓰고 돌린다**(2026-10-29) — 규칙·계산·매핑은 `$env`·`$app`·DB 를 import 하지 않는 순수 모듈로 떼어 vitest(`npm test` · `packages/*/src/test` · `apps/*/src/test`), 마이그레이션의 RPC·권한·상태 전이는 pgTAP(`npm run test:db` · `supabase/tests/*.test.sql` · 로컬 Supabase 에서 트랜잭션 롤백)으로. 새 `security definer` RPC 는 **anon·authenticated EXECUTE 없음** 과 **거부 코드(`{ ok:false, code }`) 전부**를 pgTAP 으로 고정한다. 둘 다 돌린 결과를 PR 본문에 적는다. 절차·패턴은 docs/testing.md.
 
-1~6 은 CI 가 검사하지 못한다(7 의 vitest · pgTAP 은 CI 가 돌린다). PR 템플릿 "백엔드를 건드렸다면" 칸을 비워 두지 말 것.
+1~6 은 CI 가 다 검사하지 못한다 — MYR 의 "같은 식 다시 쓰기"(원칙 1)만 위 두 검사가 막고, 나머지는 사람이 본다(7 의 vitest · pgTAP 은 CI 가 돌린다). PR 템플릿 "백엔드를 건드렸다면" 칸을 비워 두지 말 것.
 
 ## 핵심 정책 (숫자는 코드 상수가 정답 · 사람용 설명은 docs/)
 

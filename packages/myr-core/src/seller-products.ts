@@ -26,6 +26,11 @@ export type SellerProductRow = {
 	soldQty: number;
 	/** 남은 재고 = 입고 − 판매(0 아래면 0) — 읽기 전용 */
 	stockLeft: number;
+	/** 품절(남은 재고 0) · 직접 수정할 수 있는 상태(임시저장 · 반려) · 심사를 통과한 상태(판매 중 · 일시중지 — 수정 심사 · 재고 표시) — 서버 값 그대로(0099).
+	 *  콘솔이 상태 묶음 · 재고 비교를 다시 쓰지 않는다. 옛 응답이면 false */
+	soldOut: boolean;
+	editable: boolean;
+	approved: boolean;
 	/** 타일 배경(CSS gradient) · 제형 아이콘 id · 제품 사진 — 샵과 같은 비주얼 */
 	tile: string | null;
 	icon: string;
@@ -83,6 +88,9 @@ export function parseSellerProductRows(data: unknown): SellerProductRow[] {
 			stock: int(r.stock),
 			soldQty: int(r.sold_qty),
 			stockLeft: int(r.stock_left),
+			soldOut: r.sold_out === true,
+			editable: r.editable === true,
+			approved: r.approved === true,
 			tile: strOrNull(r.tile),
 			icon: str(r.icon, 'pill') || 'pill',
 			thumbUrl: strOrNull(r.thumb_url),
@@ -125,6 +133,9 @@ export type SellerProductDetail = SellerProductPayload & {
 	id: string;
 	code: string;
 	status: SellerProductStatus;
+	/** 직접 수정할 수 있는 상태 · 심사를 통과한 상태(수정 심사로 고친다) — 서버 값 그대로(0099 myr_product_status_editable · approved) */
+	editable: boolean;
+	approved: boolean;
 	rejectReason: string | null;
 	/** 상품 반려 의견(0074) · 검수 시각 — "심사 결과" 화면 · 반려 고치기 */
 	rejectItems: RejectItem[];
@@ -161,7 +172,7 @@ function parsePayload(r: Record<string, unknown>): SellerProductPayload {
 export function parseSellerProductDetail(v: unknown): SellerProductDetail | null {
 	const r = v as Record<string, unknown> | null;
 	if (!r || typeof r !== 'object' || typeof r.id !== 'string' || !isSellerProductStatus(r.status)) return null;
-	return { id: r.id, code: str(r.code), status: r.status, rejectReason: strOrNull(r.reject_reason), rejectItems: parseRejectItems(r.reject_items), reviewedAt: strOrNull(r.reviewed_at), ...parsePayload(r) };
+	return { id: r.id, code: str(r.code), status: r.status, editable: r.editable === true, approved: r.approved === true, rejectReason: strOrNull(r.reject_reason), rejectItems: parseRejectItems(r.reject_items), reviewedAt: strOrNull(r.reviewed_at), ...parsePayload(r) };
 }
 
 /* ---------------- 판매 중 상품 수정 심사(0074 · 4-2) ---------------- */

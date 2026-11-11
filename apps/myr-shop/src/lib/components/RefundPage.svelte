@@ -15,11 +15,12 @@
 	import { displayCode, type OrderView } from '@sellery/myr-core/order-view';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import ClaimForm from '$lib/components/ClaimForm.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { claimableItems, refundPaidNote } from '@sellery/myr-core/claim-rules';
-	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
+	import { claimableItems, refundPaidNote, type ClaimFormRules } from '@sellery/myr-core/claim-rules';
+	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, refundLineAmount, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
-	let { order, returnFee, backHref }: { order: OrderView; returnFee: number | null; backHref: string } = $props();
+	let { order, rules, backHref }: { order: OrderView; rules: ClaimFormRules; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
 	const deposit = $derived(can.ok && can.deposit);
 	// 고객이 직접 환불할 수 있는 줄 = 아직 발주 전(결제완료) — 0077 · 배송준비중 이후 줄은 교환 · 환불 요청(0078)
@@ -205,7 +206,7 @@
 		{#if !can.ok}
 			<p class="mx-5 mt-2 rounded-[14px] border border-white/8 bg-white/3 px-4 py-3 text-[13px] text-white/70 lg:mx-0 lg:mt-6">{can.reason} <a href={backHref} class="font-bold text-accent">주문 상세</a></p>
 		{:else if mode === 'claim'}
-			<ClaimForm {order} lines={claimLines} {returnFee} {backHref} />
+			<ClaimForm {order} lines={claimLines} {rules} {backHref} />
 		{:else}
 			<div class="flex flex-col gap-3 px-5 pb-6 lg:mt-7 lg:grid lg:grid-cols-2 lg:items-start lg:gap-8 lg:px-0 lg:pb-0">
 				<!-- 왼쪽: 제품 · 사유 -->
@@ -229,6 +230,7 @@
 							{@const max = remainingQty(it)}
 							{@const q = qtyById[it.id] ?? 0}
 							{@const on = q > 0}
+							{@const lineAmt = refundLineAmount(it, q, est)}
 							{@const noteId = `rf-note-${it.id}`}
 							<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
 								<label class="flex min-w-0 cursor-pointer items-center gap-3 lg:gap-4">
@@ -237,7 +239,7 @@
 									<span class="min-w-0 flex-1">
 										{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
 										<span class="block truncate text-[14.5px] font-bold">{it.name}{#if it.option} · {it.option}{/if}</span>
-										<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}</span>
+										<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개{#if lineAmt !== null}{` · ${won(lineAmt)}`}{:else if quote.loading}{' · '}<Spinner />{/if}</span>
 									</span>
 								</label>
 								{#if on}
@@ -341,7 +343,7 @@
 							</div>
 							<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
 								<span class="text-[14px] font-bold">예상 환불 금액</span>
-								<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{est ? won(est.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
+								<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{#if est}{won(est.amount)}{:else if chosen.length && quote.loading}<Spinner />{:else}₩0{/if}</span>
 							</div>
 							{#if est}<p class="mt-1.5 text-right text-[12px] text-fg-faint">{refundPaidNote(est, order.shippingFee)}</p>{/if}
 							{#if quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 잠시 후 다시 골라주세요</p>{/if}

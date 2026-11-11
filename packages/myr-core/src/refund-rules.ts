@@ -103,19 +103,39 @@ export function deductedAmount(amount: number, deduction = 0): number | null {
 	return deduction < amount ? amount - deduction : null;
 }
 
-/** 환불 금액 한 벌 — amount = 돌려줄 돈 · goods = 줄 합 · shippingBack = 이번에 함께 돌려주는 처음 배송비(마지막 줄일 때) · deduction = 뺀 왕복 배송비.
+/** 환불 금액 한 벌 — amount = 돌려줄 돈 · paid = 이번 환불의 결제 금액(상품 + 함께 돌려주는 처음 배송비 = precheck amount) · goods = 줄 합 ·
+ *  shippingBack = 이번에 함께 돌려주는 처음 배송비(마지막 줄일 때) · deduction = 뺀 왕복 배송비. paid · goods · shippingBack 은 서버 precheck 값 그대로(0099).
  *  입금 전 취소(deposit)는 돈이 오가지 않아 amount 0 */
-export type RefundQuote = { amount: number; goods: number; shippingBack: number; deduction: number; full: boolean; deposit: boolean };
+export type RefundQuoteLine = { itemId: string; qty: number; amount: number };
+export type RefundQuote = {
+	amount: number;
+	paid: number;
+	goods: number;
+	shippingBack: number;
+	deduction: number;
+	full: boolean;
+	deposit: boolean;
+	/** 줄마다 요청 수량의 금액(precheck items · 서버 myr_line_amount) — 신청 화면의 줄 금액이 이 값을 쓴다 */
+	lines: RefundQuoteLine[];
+};
 
 /** precheck 결과 + 차감 → 환불 금액. 실제 환불(refundItems)과 화면 예상 금액(refundQuote → 샵 신청 화면 · 콘솔 · 승인 메일)이 이 함수 하나를 쓴다(백엔드 원칙 1).
  *  차감이 금액 이상이거나 음수면 null(환불하지 않는다 — deductedAmount) */
-export function quoteFromPrecheck(pre: Pick<PrecheckOk, 'amount' | 'items' | 'deposit' | 'full'>, deduction = 0): RefundQuote | null {
-	const goods = pre.items.reduce((n, i) => n + i.amount, 0);
-	const shippingBack = Math.max(0, pre.amount - goods);
-	if (pre.deposit) return { amount: 0, goods, shippingBack, deduction: 0, full: pre.full, deposit: true };
-	const amount = deductedAmount(pre.amount, deduction);
+export function quoteFromPrecheck(pre: Pick<PrecheckOk, 'amount' | 'goods' | 'shippingBack' | 'deposit' | 'full' | 'items'>, deduction = 0): RefundQuote | null {
+	const { amount: paid, goods, shippingBack } = pre;
+	const lines = pre.items.map((i) => ({ itemId: i.item_id, qty: i.qty, amount: i.amount }));
+	if (pre.deposit) return { amount: 0, paid, goods, shippingBack, deduction: 0, full: pre.full, deposit: true, lines };
+	const amount = deductedAmount(paid, deduction);
 	if (amount === null) return null;
-	return { amount, goods, shippingBack, deduction, full: pre.full, deposit: false };
+	return { amount, paid, goods, shippingBack, deduction, full: pre.full, deposit: false, lines };
+}
+
+/** 신청 화면 줄 금액 — 서버 값만 고른다(화면이 단가 × 수량을 계산하지 않는다 · 0099).
+ *  고르지 않았거나 남은 수량 전부면 줄의 leftAmount · 일부만 골랐으면 예상 금액 응답의 그 줄 금액 · 아직 응답이 없으면 null(화면은 수량만 보여 준다) */
+export function refundLineAmount(it: Pick<OrderItem, 'id' | 'leftQty' | 'leftAmount'>, qty: number, quote: Pick<RefundQuote, 'lines'> | null): number | null {
+	if (qty <= 0 || qty === it.leftQty) return it.leftAmount;
+	const l = quote?.lines.find((x) => x.itemId === it.id && x.qty === qty);
+	return l ? l.amount : null;
 }
 
 /** 예상 금액 API(샵 POST /api/refunds/quote) 본문 — mode instant = 바로 환불(결제완료 줄) · claim = 교환·환불 요청(배송준비중 이후 줄 · 사유로 차감이 정해진다) */
@@ -144,8 +164,15 @@ export function parseRefundQuote(json: unknown): RefundQuote | null {
 	if (!o || o.ok !== true) return null;
 	const n = (k: string) => (typeof o[k] === 'number' && Number.isFinite(o[k] as number) ? (o[k] as number) : null);
 	const amount = n('amount');
-	if (amount === null) return null;
-	return { amount, goods: n('goods') ?? 0, shippingBack: n('shippingBack') ?? 0, deduction: n('deduction') ?? 0, full: o.full === true, deposit: o.deposit === true };
+	const paid = n('paid');
+	const goods = n('goods');
+	const shippingBack = n('shippingBack');
+	if (amount === null || paid === null || goods === null || shippingBack === null) return null;
+	const lines = (Array.isArray(o.lines) ? o.lines : [])
+		.map(obj)
+		.filter((x): x is Record<string, unknown> => !!x && typeof x.itemId === 'string' && Number.isInteger(x.qty) && Number.isInteger(x.amount))
+		.map((x) => ({ itemId: x.itemId as string, qty: x.qty as number, amount: x.amount as number }));
+	return { amount, paid, goods, shippingBack, deduction: n('deduction') ?? 0, full: o.full === true, deposit: o.deposit === true, lines };
 }
 
 /* ---- RPC 파서 ---- */
@@ -157,7 +184,10 @@ export type PrecheckOk = {
 	orderCode: string;
 	orderStatus: string;
 	paymentKey: string | null;
+	/** 환불할 금액(차감 전) = goods + shippingBack — 셋 다 서버가 준다(0099 · 화면이 금액을 다시 나누지 않는다) */
 	amount: number;
+	goods: number;
+	shippingBack: number;
 	deposit: boolean;
 	full: boolean;
 	items: { item_id: string; qty: number; amount: number; seller_id: string | null }[];
@@ -169,7 +199,9 @@ export function parsePrecheckResult(json: unknown): PrecheckResult {
 	if (o.ok === true) {
 		const orderCode = str(o, 'order_code');
 		const amount = num(o, 'amount');
-		if (!orderCode || amount === null) return { ok: false, code: 'BAD_RESULT' };
+		const goods = num(o, 'goods');
+		const shippingBack = num(o, 'shipping_back');
+		if (!orderCode || amount === null || goods === null || shippingBack === null) return { ok: false, code: 'BAD_RESULT' };
 		const items = (Array.isArray(o.items) ? o.items : [])
 			.map(obj)
 			.filter((x): x is Record<string, unknown> => !!x && typeof x.item_id === 'string')
@@ -180,6 +212,8 @@ export function parsePrecheckResult(json: unknown): PrecheckResult {
 			orderStatus: str(o, 'order_status') ?? '',
 			paymentKey: str(o, 'payment_key'),
 			amount,
+			goods,
+			shippingBack,
 			deposit: o.deposit === true,
 			full: o.full === true,
 			items

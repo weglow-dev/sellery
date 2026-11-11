@@ -145,8 +145,8 @@ describe('줄 단위 배송(0077)', () => {
 		expect(orderFromJson({ id: 'o', code: 'myr1', ship_status: 'WHAT' })!.shipStatus).toBeNull();
 	});
 	describe('송장(박스)별 묶음', () => {
-		// leftQty 는 서버(0097 myr_line_left)가 주는 남은 수량 — 테스트는 서버가 줄 법한 값을 넣는다
-		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, leftQty: 1, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
+		// leftQty · live 는 서버(0097 myr_line_left · 0099 myr_line_live)가 주는 값 — 테스트는 서버가 줄 법한 값을 넣는다
+		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, leftQty: 1, live: true, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
 		it('한 박스 — 남은 줄이 전부 같은 송장 → single', () => {
 			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-05T00:00:00Z' }), it_({ name: '스틱', option: '레몬', courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-04T00:00:00Z' })]);
 			expect(r.single).toBe(true);
@@ -158,7 +158,7 @@ describe('줄 단위 배송(0077)', () => {
 			expect([r.single, r.boxes.length]).toEqual([false, 1]);
 		});
 		it('취소 줄 제외 · 전액 환불 줄은 박스엔 남지만 single 판정에서 빠진다 · 송장이 없으면 빈 목록', () => {
-			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '환불', refundedQty: 1, leftQty: 0, status: 'REFUNDED' }), it_({ name: '취소', status: 'CANCELED', courier: 'CJ대한통운', trackingNo: '9' })]);
+			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1' }), it_({ name: '환불', refundedQty: 1, leftQty: 0, live: false, status: 'REFUNDED' }), it_({ name: '취소', status: 'CANCELED', live: false, courier: 'CJ대한통운', trackingNo: '9' })]);
 			expect([r.single, r.boxes.map((b) => b.trackingNo)]).toEqual([true, ['1']]);
 			expect(shipBoxes([it_({})])).toEqual({ boxes: [], single: false });
 		});
@@ -175,9 +175,16 @@ describe('교환 · 환불 요청 상태(0078)', () => {
 	it('요청이 없거나 끝나면 원래 판정 · 입금 대기 · 취소 · 전액 환불은 주문 상태 그대로', () => {
 		expect(statusLabel({ ...b, claimStatus: null }).text).toBe('배송 중');
 		expect(statusLabel(b).text).toBe('배송 중');
-		expect(statusLabel({ ...b, status: 'REFUNDED', claimStatus: 'progress' }).text).toBe('환불 완료');
-		expect(statusLabel({ ...b, status: 'CANCELED', claimStatus: 'pending' }).text).toBe('취소됨');
-		expect(statusLabel({ ...b, status: 'WAITING_DEPOSIT', claimStatus: 'pending' }).text).toBe('입금 대기');
+		// 서버는 결제됐고 끝나지 않은 주문에만 요청 상태를 싣는다(0099 myr_order_json) — 전액 환불 · 취소 · 입금 대기 주문은 claimStatus 가 null 로 온다
+		expect(statusLabel({ ...b, status: 'REFUNDED', claimStatus: null }).text).toBe('환불 완료');
+		expect(statusLabel({ ...b, status: 'CANCELED', claimStatus: null }).text).toBe('취소됨');
+		expect(statusLabel({ ...b, status: 'WAITING_DEPOSIT', claimStatus: null }).text).toBe('입금 대기');
+	});
+	it('파서 — 서버 판정 값(0099)을 그대로: 결제 − 환불 · 끝나지 않은 주문 · 살아 있는 줄 · 남은 수량 금액 · 없으면 0 / false(짐작하지 않는다)', () => {
+		const o = orderFromJson({ id: 'o', code: 'myr1', status: 'PARTIAL_REFUNDED', amount: 53000, refund_amount: 10000, net_amount: 43000, alive: true, items: [{ id: 'i', qty: 3, refunded_qty: 1, left_qty: 2, left_amount: 20000, live: true }] })!;
+		expect([o.netAmount, o.alive, o.items[0].live, o.items[0].leftAmount]).toEqual([43000, true, true, 20000]);
+		const old = orderFromJson({ id: 'o', code: 'myr1', status: 'PAID', amount: 53000, refund_amount: 0, items: [{ id: 'i', qty: 3, refunded_qty: 0, left_qty: 3 }] })!;
+		expect([old.netAmount, old.alive, old.items[0].live, old.items[0].leftAmount]).toEqual([0, false, false, 0]);
 	});
 	it('파서 — claim_status 는 pending · progress 만, 나머지는 null', () => {
 		expect(orderFromJson({ id: 'o', code: 'myr1', claim_status: 'pending' })!.claimStatus).toBe('pending');

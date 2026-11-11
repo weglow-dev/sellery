@@ -2,8 +2,6 @@
 	import { onMount, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import {
-		GB_PCT_MAX,
-		GB_PCT_MIN,
 		GB_STATE_META,
 		groupbuyErrors,
 		groupbuyHref,
@@ -25,7 +23,7 @@
 
 	/** 공구 링크(0086) — 내 제품 메뉴 → [공구 링크].
 	 *  진행 중이거나 예정된 공구가 있으면: 상태 · 할인율 · 공구가 · 기간 · 링크(복사) · 판매 수량 · 주문 · 매출 · [지금 종료]
-	 *  없으면: 만들기(할인율 1~70% · 시작 · 종료 — 한국 시간). 링크는 바로 만들어지고 시작 일시부터 공구가로 팔린다.
+	 *  없으면: 만들기(할인율 · 시작 · 종료 — 한국 시간). 할인율 범위는 서버 값(0099 · data.pctRange) — 범위 밖이면 미리보기 · 만들기가 서버 거절 문구를 그대로 보여 준다. 링크는 바로 만들어지고 시작 일시부터 공구가로 팔린다.
 	 *  품절(재고 0)이면 만들 수 없다(재입고는 운영) · 진행 중에 품절되면 공구는 그대로 두고 안내만.
 	 *  아래 "지난 공구" 에 끝난 공구가 실적과 함께 쌓인다. 실적 = 결제된 주문의 공구 줄(환불 뺀 값 · 홈 실적과 같은 기준).
 	 *  모바일: 한 줄 · PC(lg~): 32px 제목 줄 + 2단(왼쪽 진행/만들기 · 오른쪽 지난 공구) */
@@ -47,7 +45,8 @@
 		return () => clearTimeout(t);
 	});
 	const past = $derived(data.items.filter((g) => g !== open));
-	const listed = $derived(p.status === 'listed');
+	// 공구를 만들 수 있는 판매 중 상품인가 — 서버 값(0099 myr_product_listed · 만들기 RPC 와 같은 함수)
+	const listed = $derived(p.listed);
 
 	// ---- 만들기 ----
 	const HOUR = 60 * 60 * 1000;
@@ -61,23 +60,29 @@
 	let busy = $state(false);
 	let formError = $state<string | null>(null);
 	const errs = $derived(groupbuyErrors(draft, now));
-	const show = (k: GroupbuyField) => (attempted ? errs[k] : undefined);
 	const pctNum = $derived(/^\d{1,2}$/.test(draft.pct.trim()) ? Number(draft.pct) : null);
-	// 공구가 미리보기 — 실제 공구와 같은 서버 계산(GET …/groupbuy/preview · 옵션 0번 단가) · 할인율이 바뀌면 잠깐 뒤 묻는다
+	// 공구가 미리보기 — 실제 공구와 같은 서버 계산(GET …/groupbuy/preview · 옵션 0번 단가) · 할인율이 바뀌면 잠깐 뒤 묻는다.
+	// 할인율 범위도 여기서 서버가 정한다(만들기와 같은 함수) — 범위 밖이면 서버 거절 문구(pctRejected)를 그대로 보여 준다
 	let preview = $state<{ pct: number; price: number; basePrice: number } | null>(null);
+	let pctRejected = $state<{ pct: number; message: string } | null>(null);
+	const pctServerError = $derived(pctRejected !== null && pctRejected.pct === pctNum ? pctRejected.message : undefined);
+	const show = (k: GroupbuyField) => (attempted ? errs[k] : undefined) ?? (k === 'pct' ? pctServerError : undefined);
 	$effect(() => {
-		const pct = pctNum && pctNum >= GB_PCT_MIN && pctNum <= GB_PCT_MAX ? pctNum : null;
+		const pct = pctNum;
 		const id = p.id;
 		if (pct === null) {
 			preview = null;
+			pctRejected = null;
 			return;
 		}
 		let stale = false;
 		const t = setTimeout(async () => {
 			try {
 				const res = await fetch(`/api/products/${encodeURIComponent(id)}/groupbuy/preview?pct=${pct}`);
-				const r = (await res.json().catch(() => null)) as { ok?: boolean; price?: number; basePrice?: number } | null;
-				if (!stale) preview = r?.ok && typeof r.price === 'number' && typeof r.basePrice === 'number' ? { pct, price: r.price, basePrice: r.basePrice } : null;
+				const r = (await res.json().catch(() => null)) as { ok?: boolean; code?: string; message?: string; price?: number; basePrice?: number } | null;
+				if (stale) return;
+				preview = r?.ok && typeof r.price === 'number' && typeof r.basePrice === 'number' ? { pct, price: r.price, basePrice: r.basePrice } : null;
+				pctRejected = r?.code === 'BAD_PCT' && r.message ? { pct, message: r.message } : null;
 			} catch {
 				if (!stale) preview = null;
 			}
@@ -91,7 +96,7 @@
 	async function create() {
 		attempted = true;
 		formError = null;
-		const bad = (['pct', 'startsAt', 'endsAt'] as const).find((k) => !!errs[k]);
+		const bad = (['pct', 'startsAt', 'endsAt'] as const).find((k) => !!show(k));
 		if (bad) {
 			document.getElementById(`gb-${bad}`)?.focus();
 			return;
@@ -235,7 +240,7 @@
 								id="gb-pct"
 								inputmode="numeric"
 								maxlength="2"
-								placeholder="{GB_PCT_MIN}~{GB_PCT_MAX}"
+								placeholder={data.pctRange ? `${data.pctRange.min}~${data.pctRange.max}` : ''}
 								value={draft.pct}
 								oninput={(e) => {
 									draft.pct = e.currentTarget.value.replace(/\D/g, '').slice(0, 2);
