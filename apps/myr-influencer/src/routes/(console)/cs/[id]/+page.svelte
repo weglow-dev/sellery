@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, refundPaid, refundPaidNote, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
-	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
+	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimOrderedAmount, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
 	import { won } from '$lib/rules';
@@ -25,6 +25,8 @@
 	const c = $derived(data.claim);
 	// 처리 결과의 환불 — 요청 결제 금액(요청 수량) − 왕복 배송비 = 환불 금액. 환불 뒤 = 기록된 금액 · 환불 전 = 서버 예상 금액(claimQuotes.current · 실제 환불과 같은 계산)
 	const refundShown = $derived(claimRefundView(c) ?? data.quotes.current ?? null);
+	// 제품 카드 — 그 줄 주문 수량 전체의 금액(주문 · 배송 "상품 금액"과 같은 함수)
+	const orderedAmount = $derived(claimOrderedAmount(c));
 
 	let resolution = $state<Resolution | null>(null);
 	let reply = $state('');
@@ -154,14 +156,15 @@
 					{#if isUrgentPending(c)}<span class="ml-auto text-[12px] font-bold text-accent">{dueText(c)}</span>{/if}
 				</div>
 
+				<!-- 제품 카드 — 주문한 수량 · 금액 전체(요청 수량은 처리 방법 · 처리 결과의 "환불 요청 N개 (주문 M개 중)") -->
 				<div class="mt-4 flex items-center gap-3.5 rounded-[20px] border border-white/8 bg-white/3 p-4 lg:mt-0 lg:gap-4 lg:p-[18px]">
 					<Tile tile="slate" bg={c.product?.tile} iconId={c.product?.icon} thumbUrl={c.product?.thumbUrl} icon={36} iconCls="lg:h-11 lg:w-11" class="h-16 w-16 rounded-2xl lg:h-20 lg:w-20 lg:rounded-[18px]" />
 					<span class="flex min-w-0 flex-1 flex-col gap-[3px]">
 						<span class="text-[15px] leading-[1.3] font-bold lg:text-[17px]">{c.order.item.name}{c.order.item.option ? ` · ${c.order.item.option}` : ''}</span>
-						<span class="text-[12px] text-white/55 lg:text-[13px]">{c.qty}개 · 주문 {c.order.code.toUpperCase()}</span>
-						<span class="mt-0.5 text-[15px] font-extrabold tabular-nums lg:hidden">{won(c.amount)}</span>
+						<span class="text-[12px] text-white/55 lg:text-[13px]">{c.order.item.qty}개 · 주문 {c.order.code.toUpperCase()}</span>
+						<span class="mt-0.5 text-[15px] font-extrabold tabular-nums lg:hidden">{won(orderedAmount)}</span>
 					</span>
-					<span class="hidden text-[20px] font-extrabold whitespace-nowrap tabular-nums lg:block">{won(c.amount)}</span>
+					<span class="hidden text-[20px] font-extrabold whitespace-nowrap tabular-nums lg:block">{won(orderedAmount)}</span>
 				</div>
 
 				<!-- 주문 · 배송 — 문의 상세와 같은 칸(요청이 걸린 줄 · 0080) -->

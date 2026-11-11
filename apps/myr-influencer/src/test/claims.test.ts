@@ -1,7 +1,7 @@
 // CS 관리 › 교환 · 환불(7번 · 0078) — apps/myr-influencer/src/lib/claims.ts (탭 · 기한 · 승인 버튼 · 메시지 칩 · 처리 내역)
 import { describe, expect, it } from 'vitest';
 import { claimFromJson, type Claim } from '@sellery/myr-core/claim-rules';
-import { approveLabel, claimShipping, claimTabCounts, consoleTimeline, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
+import { approveLabel, claimOrderedAmount, claimShipping, claimTabCounts, consoleTimeline, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
 
 const NOW = new Date('2026-11-06T12:00:00Z');
 const claim = (o: Record<string, unknown> = {}) =>
@@ -97,6 +97,8 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	it('상품 금액(그 줄 전체 수량) · 주문 배송비(0090) — 무료배송이면 "무료배송"', () => {
 		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }));
 		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000 (2개)');
+		// 제품 카드도 같은 값 — 요청 수량(1개)이 아니라 주문 수량 전체
+		expect(claimOrderedAmount(claim({ qty: 1, order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }))).toBe(64000);
 		expect(paid.rows.find((r) => r.k === '배송비')!.v).toBe('₩3,000');
 		const free = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING' }), shipping_fee: 0 } }));
 		expect(free.rows.find((r) => r.k === '배송비')!.v).toBe('무료배송');
