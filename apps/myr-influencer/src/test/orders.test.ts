@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { sellerOrderFromJson } from '@sellery/myr-core/seller-orders';
 import { orderMeta, orderShipNote, orderTracking } from '../lib/orders';
 
-const o = sellerOrderFromJson({ id: 'o', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T03:00:00Z', buyer: '김*은', items: [{ id: 'i', qty: 1, amount: 1, ship_status: 'SHIPPING', courier: 'CJ대한통운', tracking_no: '612300000001' }] })!;
+const o = sellerOrderFromJson({ id: 'o', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T03:00:00Z', buyer: '김*은', items: [{ id: 'i', qty: 1, amount: 1, left_qty: 1, live: true, ship_status: 'SHIPPING', courier: 'CJ대한통운', tracking_no: '612300000001' }] })!; // left_qty · live = 서버(0098) 값
 
 describe('주문 카드', () => {
 	it('결제일 · 가린 이름', () => {
@@ -17,7 +17,7 @@ describe('주문 카드', () => {
 		expect(t[0].href).toBeTruthy();
 	});
 	it('출고 안내 — 발주 전 · 배송 준비중 · 출고 뒤엔 없음', () => {
-		const mk = (ship: string) => sellerOrderFromJson({ id: 'o', code: 'c', items: [{ id: 'i', qty: 1, ship_status: ship }] })!;
+		const mk = (ship: string) => sellerOrderFromJson({ id: 'o', code: 'c', items: [{ id: 'i', qty: 1, left_qty: 1, live: true, ship_status: ship }] })!;
 		expect(orderShipNote(mk('PAID'))).toBe('발주 전 · 고객이 직접 취소할 수 있어요');
 		expect(orderShipNote(mk('PREPARING'))).toBe('MYR 물류센터에서 준비 중');
 		expect(orderShipNote(mk('SHIPPING'))).toBeNull();

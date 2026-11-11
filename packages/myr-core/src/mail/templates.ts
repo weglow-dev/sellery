@@ -22,7 +22,7 @@ import { mailIdempotencyKey, renderMailHtml, renderMailText, type MailDoc, type 
 export type MailCtx = { siteUrl: string };
 export type MailTemplate = { subject: string; html: string; text: string; idempotencyKey: string; tag: string };
 
-export type MailItem = { id: string; name: string; option: string; qty: number; unitPrice: number; amount: number; sellerId: string; sellerName: string; status: string; refundedQty: number };
+export type MailItem = { id: string; name: string; option: string; qty: number; unitPrice: number; amount: number; sellerId: string; sellerName: string; status: string; refundedQty: number; /** 남은 수량 · 살아 있는 줄 — DB myr_line_left · myr_line_live 값 */ leftQty: number; live: boolean };
 export type MailShipping = { recipient: string; phone: string; address1: string; address2?: string; postcode?: string; memo?: string } | null;
 export type MailDeposit = { bank: string; account: string; holder: string; due: string | null } | null;
 /** 메일이 보는 주문 — mail-events.ts 가 myr_orders + 줄 + 셀러로 채운다 */
@@ -132,7 +132,7 @@ export function orderPaidSellerMail(o: MailOrder, sellerId: string, _ctx: MailCt
 export type MailShipment = { courier: string; trackingNo: string; trackingUrl: string | null };
 export function orderShippedMail(o: MailOrder, s: MailShipment, ctx: MailCtx): MailTemplate {
 	const code = upper(o.code);
-	const live = o.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0).map((i) => ({ ...i, qty: i.qty - i.refundedQty }));
+	const live = o.items.filter((i) => i.live).map((i) => ({ ...i, qty: i.leftQty }));
 	const rows: MailRow[] = [
 		{ label: '주문번호', value: code },
 		{ label: '택배사', value: s.courier },

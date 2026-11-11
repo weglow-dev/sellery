@@ -12,8 +12,8 @@ const order = (over: Partial<MailOrder> = {}): MailOrder => ({
 	isMember: true,
 	shipping: { recipient: '김고객', phone: '010-0000-0000', address1: '부산시 해운대구 센텀중앙로 55', address2: '1203호', postcode: '48059' },
 	items: [
-		{ id: 'i-a', name: '지유 레시피 그래놀라', option: '2봉', qty: 2, unitPrice: 16000, amount: 32000, sellerId: 's-jiyu', sellerName: '지유', status: 'PAID', refundedQty: 0 },
-		{ id: 'i-b', name: '혜린 단백질 쉐이크', option: '', qty: 1, unitPrice: 29000, amount: 29000, sellerId: 's-hyerin', sellerName: '혜린', status: 'PAID', refundedQty: 0 }
+		{ id: 'i-a', name: '지유 레시피 그래놀라', option: '2봉', qty: 2, unitPrice: 16000, amount: 32000, sellerId: 's-jiyu', sellerName: '지유', status: 'PAID', refundedQty: 0, leftQty: 2, live: true },
+		{ id: 'i-b', name: '혜린 단백질 쉐이크', option: '', qty: 1, unitPrice: 29000, amount: 29000, sellerId: 's-hyerin', sellerName: '혜린', status: 'PAID', refundedQty: 0, leftQty: 1, live: true }
 	],
 	itemsAmount: 61000,
 	shippingFee: 0,
@@ -209,7 +209,7 @@ describe('고객 문의 메일 (S7)', () => {
 
 describe('배송 시작 메일 (0069)', () => {
 	it('택배사·운송장·남은 상품·받는 분 · 조회 버튼 · 멱등 키 = 주문 + 운송장 · 비회원 안내', () => {
-		const o = order({ items: [order().items[0], { ...order().items[1], status: 'REFUNDED', refundedQty: 1 }] });
+		const o = order({ items: [order().items[0], { ...order().items[1], status: 'REFUNDED', refundedQty: 1, leftQty: 0, live: false }] });
 		const m = orderShippedMail(o, { courier: 'CJ대한통운', trackingNo: '1234567890', trackingUrl: 'https://trace.cjlogistics.com/next/tracking.html?wblNo=1234567890' }, ctx);
 		expect(m.subject).toBe('[MYR] 상품이 출발했어요 · MYR1007');
 		expect(m.text).toContain('CJ대한통운');
