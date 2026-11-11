@@ -19,7 +19,6 @@
 		kindAllowed,
 		photoRequired,
 		refundPaid,
-		refundPaidNote,
 		type ClaimKind,
 		type ClaimReason
 	} from '@sellery/myr-core/claim-rules';
@@ -255,10 +254,7 @@
 			{#if estimate}
 				<!-- 요청 결제 금액(고른 수량) − 왕복 배송비 = 예상 환불 금액(서버 refundQuote 값 그대로) -->
 				<div class="mt-3.5 flex flex-col gap-2 border-t border-white/8 pt-3.5 text-[14px]">
-					<div class="flex justify-between gap-3 text-fg-soft">
-						<span>요청 결제 금액</span>
-						<span class="text-right"><span class="block text-fg tabular-nums">{won(refundPaid(estimate))}</span><span class="mt-0.5 block text-[12px] text-fg-faint">{refundPaidNote(estimate, order.shippingFee)}</span></span>
-					</div>
+					<div class="flex justify-between text-fg-soft"><span>요청 결제 금액</span><span class="text-fg tabular-nums">{won(refundPaid(estimate))}</span></div>
 					{#if estimate.deduction}<div class="flex justify-between text-fg-soft"><span>왕복 배송비 차감</span><span class="text-fg tabular-nums">−{won(estimate.deduction)}</span></div>{/if}
 				</div>
 			{/if}

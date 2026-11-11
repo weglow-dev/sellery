@@ -64,10 +64,9 @@ export function refundCalcText(v: RefundView): string {
 }
 /** 금액 + 식 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" */
 export const refundAmountText = (v: RefundView): string => [won(v.amount), refundCalcText(v)].filter(Boolean).join(' ');
-/** 요청 결제 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만.
- *  count(요청 한 줄의 단가 · 수량)를 주면 상품을 "₩32,000 × 1개"로 — 주문 수량과 헷갈리지 않게 */
-export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null, count?: { unitPrice: number; qty: number }): string {
-	const goods = count ? `상품 ${won(count.unitPrice)} × ${count.qty}개` : `상품 ${won(v.goods)}`;
+/** 샵 [바로 환불] 예상 금액 아래 한 줄 — 배송비를 함께 돌려주면 "상품 + 배송비" · 무료배송 주문 · 다른 상품이 남아 배송비는 나중(주문 전체 환불 때) · 배송비를 모르면(null) 상품만 */
+export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, shippingFee: number | null): string {
+	const goods = `상품 ${won(v.goods)}`;
 	if (v.shippingBack) return `${goods} + 배송비 ${won(v.shippingBack)}`;
 	if (shippingFee === null) return goods;
 	if (shippingFee <= 0) return `${goods} · 무료배송 주문`;
