@@ -31,6 +31,9 @@ export type OrderItem = {
 	deliveredAt: string | null;
 	/** 환불 길(0092 myr_line_refund_path) — instant = 바로 환불 · claim = 교환·환불 요청 · null = 불가. 화면은 이 값을 그대로 쓴다 */
 	refundPath: RefundPath;
+	/** 단순 변심 마지막 시각(0093 · 수령 다음 날부터 7일째 밤까지 · 수령 전이면 null) · 지금 받을 수 있나 — 서버 값 그대로(화면이 날짜를 계산하지 않는다) */
+	changeMindUntil: string | null;
+	changeMindOk: boolean;
 };
 export type RefundPath = 'instant' | 'claim' | null;
 export type OrderShipping = { recipient: string; phone: string; address1: string; address2: string; postcode: string; memo: string };
@@ -94,6 +97,8 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		creatorHandle: str(o, 'creator_handle'),
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
 		refundPath: o.refund_path === 'instant' || o.refund_path === 'claim' ? o.refund_path : null,
+		changeMindUntil: strOrNull(o, 'change_mind_until'),
+		changeMindOk: o.change_mind_ok !== false,
 		courier: strOrNull(o, 'courier'),
 		trackingNo: strOrNull(o, 'tracking_no'),
 		shippedAt: strOrNull(o, 'shipped_at'),

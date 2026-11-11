@@ -39,7 +39,9 @@ const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, statu
 	trackingNo: null,
 	shippedAt: null,
 	deliveredAt: null,
-	refundPath
+	refundPath,
+	changeMindUntil: null,
+	changeMindOk: true
 });
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';

@@ -11,6 +11,7 @@ import {
 	claimQtyText,
 	claimRefundedText,
 	claimRefundView,
+	changeMindNote,
 	claimShippingBack,
 	claimsFromJson,
 	claimStepText,
@@ -194,6 +195,17 @@ describe('처리 방법 이름 · 금액', () => {
 		expect(claimPolicy('파손 · 누액', 6000)).toEqual(['사진 확인 후 새 제품 재발송 또는 전액 환불']);
 		expect(claimPolicy('오배송', 6000)).toEqual(['잘못 간 제품은 택배 기사가 방문해 회수해요']);
 		expect(claimPolicy('???', 6000)).toEqual([]);
+	});
+});
+
+describe('단순 변심 기한(0093) — 서버 값 그대로 안내', () => {
+	it('지난 줄만 안내 · 날짜는 서버 기한(한국 시간)', () => {
+		expect(changeMindNote({ changeMindOk: true, changeMindUntil: '2026-11-10T14:59:59Z' })).toBeNull();
+		expect(changeMindNote({ changeMindOk: false, changeMindUntil: '2026-11-10T14:59:59Z' })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요 (11월 10일까지였어요)');
+		expect(changeMindNote({ changeMindOk: false, changeMindUntil: null })).toBe('수령 후 7일이 지나 단순 변심 환불은 어려워요');
+	});
+	it('서버 거절 CHANGE_MIND_EXPIRED → 안내 문구', () => {
+		expect(claimMessage('BAD_ITEMS', [{ reason: 'CHANGE_MIND_EXPIRED' }])).toBe('수령 후 7일이 지난 상품은 단순 변심 환불이 어려워요');
 	});
 });
 

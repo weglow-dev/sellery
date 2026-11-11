@@ -10,7 +10,7 @@ import { won } from './constants';
 import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
 import { cleanText } from './text';
-import type { OrderItem } from './order-view';
+import { shortDate, type OrderItem } from './order-view';
 
 export const CLAIM_KINDS = ['refund', 'exchange'] as const;
 export type ClaimKind = (typeof CLAIM_KINDS)[number];
@@ -284,6 +284,14 @@ export const claimRefundedText = (c: Pick<Claim, 'amount' | 'deduction' | 'refun
 	return v ? refundAmountText(v) : null;
 };
 
+/** 단순 변심 기한(0093 · 수령 후 7일 · 날짜 기준) 줄 아래 안내 — 서버 changeMindOk · changeMindUntil 그대로(화면이 날짜를 계산하지 않는다).
+ *  기한이 지났으면 "수령 후 7일이 지나 단순 변심 환불은 어려워요 (11월 10일까지였어요)" · 아니면 null */
+export function changeMindNote(i: Pick<OrderItem, 'changeMindOk' | 'changeMindUntil'>): string | null {
+	if (i.changeMindOk) return null;
+	const until = shortDate(i.changeMindUntil);
+	return `수령 후 7일이 지나 단순 변심 환불은 어려워요${until ? ` (${until}까지였어요)` : ''}`;
+}
+
 /** 요청할 수 있는 줄 — 서버 refundPath = claim(0092 myr_line_refund_path · myr_app_claim_open 이 같은 함수로 다시 막는다).
  *  열린 요청이 있는 주문은 신청 페이지 자체가 닫힌다(customerCanRefund · claimStatus) — 같은 줄 중복은 서버(OPEN_EXISTS)가 다시 막는다 */
 export const claimableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.refundPath === 'claim');
@@ -348,6 +356,7 @@ export const CLAIM_LINE_MESSAGES: Record<string, string> = {
 	BAD_QTY: '수량을 확인해주세요',
 	TOO_MANY: '남은 수량보다 많아요',
 	NOT_PREPARED: '아직 발주 전이라 바로 환불할 수 있어요',
+	CHANGE_MIND_EXPIRED: '수령 후 7일이 지난 상품은 단순 변심 환불이 어려워요',
 	OPEN_EXISTS: '이미 진행 중인 요청이 있어요',
 	PHOTO_REQUIRED: '사진을 1장 이상 올려주세요',
 	BAD_PHOTOS: '사진을 다시 올려주세요'
