@@ -266,6 +266,9 @@ describe('교환 · 환불 요청 메일 (0078)', () => {
 		expect(m.text).toContain('회수를 기다리고 있어요');
 		expect(m.text).toContain('회수 뒤 환불해드릴게요');
 		expect(m.text).toContain('https://myr-shop.vercel.app/orders/myr1007');
+		// 마지막 줄이라 처음 배송비도 함께 돌려주면(refundQuote shippingBack) 금액 옆에 적는다
+		const last = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refundTotal: 33000, deduction: 6000, shippingBack: 3000 }), ctx);
+		expect(last.text).toContain('₩33,000 (왕복 배송비 ₩6,000 차감 · 배송비 ₩3,000 포함)');
 	});
 	it('반려(고객) — 결과 반려 · 문의 안내 · 비회원 링크 · 승인과 키가 다르다', () => {
 		const m = claimDecidedMail(claim({ status: 'rejected', kind: 'exchange', isMember: false, message: '개봉 제품이라 어려워요' }), ctx);

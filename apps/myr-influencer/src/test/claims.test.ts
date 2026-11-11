@@ -47,6 +47,9 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 	it('선택지는 서버 options 순서 · 승인 라벨은 고른 방법(선택지 밖이면 안내)', () => {
 		const c = claim();
 		expect(resolutionOptions(c).map((o) => o.title)).toEqual(['부분 환불 (왕복 배송비 차감)', '전액 환불']);
+		// 금액은 서버 예상 금액(claimQuotes) — 처리 방법마다 그 칸의 금액
+		const quotes = { partial: { amount: 33000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false }, refund: { amount: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false } };
+		expect(resolutionOptions(c, quotes).map((o) => o.desc)).toEqual(['₩33,000 (배송비 ₩3,000 포함) · 회수 확인 뒤 환불', '₩39,000 (배송비 ₩3,000 포함) · 회수 확인 뒤 환불']);
 		expect(approveLabel(c, 'partial')).toBe('부분 환불 (왕복 배송비 차감) 승인');
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
 		expect(approveLabel(c, 'reship')).toBe('처리 방법을 선택하세요');

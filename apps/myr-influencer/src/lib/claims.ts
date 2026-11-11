@@ -1,7 +1,7 @@
 /** CS 관리 › 교환 · 환불(7번 · 0078) — 탭 · 칩 색 · 답변 기한 · 승인 버튼 · 메시지 템플릿 · 처리 내역 줄.
  *  판정(선택지 · 단계 · 차감)은 DB 가 정한 값(claim JSON)을 그대로 쓰고, 이름 · 문구는 `@sellery/myr-core/claim-rules` 를 쓴다. 여기는 콘솔 화면 모양만.
  *  순수 — $app · $env 를 import 하지 않는다(src/test/claims.test.ts). */
-import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
+import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimQuotes, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
 import { orderShipping, type OrderShipping } from './order-ship';
 import { relativeTime } from './product-row';
 
@@ -49,8 +49,9 @@ export const dueText = (c: Pick<Claim, 'createdAt'>, now?: Date): string => {
 /** 목록 카드 강조 테두리 — 기한이 하루 이하 남은 처리 대기 요청만 */
 export const isUrgentPending = (c: Pick<Claim, 'status' | 'createdAt'>, now?: Date): boolean => c.status === 'pending' && dueDays(c, now) <= 1;
 
-/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) */
-export const resolutionOptions = (c: Claim) => c.options.map((r) => resolutionOption(r, c));
+/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) · 금액은 서버 예상 금액(claimQuotes · 없으면 금액 없이) */
+export const resolutionOptions = (c: Claim, quotes: ClaimQuotes = {}) =>
+	c.options.map((r) => resolutionOption(r, c, r === 'refund' ? quotes.refund : r === 'partial' ? quotes.partial : null));
 export function approveLabel(c: Claim, resolution: Resolution | null): string {
 	return resolution && c.options.includes(resolution) ? `${resolutionOption(resolution, c).title} 승인` : '처리 방법을 선택하세요';
 }

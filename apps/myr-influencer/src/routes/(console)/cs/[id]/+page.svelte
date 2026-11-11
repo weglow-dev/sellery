@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { claimPolicy, claimRefundTotal, CLAIM_MESSAGE_MAX, canDecide, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
+	import { claimPolicy, claimShippingBack, CLAIM_MESSAGE_MAX, canDecide, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
 	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
@@ -23,6 +23,9 @@
 	 *  모바일: 한 줄로 쌓고 하단 버튼 줄 / PC(lg~): 왼쪽 정보 + 오른쪽 420px 고정(sticky) 처리 패널 (디자인 "MYR Influencer Admin PC"). */
 	let { data } = $props();
 	const c = $derived(data.claim);
+	// 처리 결과의 환불 금액 — 환불 뒤 = 기록된 금액 · 환불 전 = 서버 예상 금액(claimQuotes.current · 실제 환불과 같은 계산)
+	const refundShown = $derived(c.refundAmount ?? data.quotes.current?.amount ?? null);
+	const shippingBack = $derived(c.refundAmount !== null ? claimShippingBack(c) : (data.quotes.current?.shippingBack ?? 0));
 
 	let resolution = $state<Resolution | null>(null);
 	let reply = $state('');
@@ -66,7 +69,7 @@
 
 {#snippet options()}
 	<div class="flex flex-col gap-2" role="radiogroup" aria-label="처리 방법">
-		{#each resolutionOptions(c) as r (r.id)}
+		{#each resolutionOptions(c, data.quotes) as r (r.id)}
 			{@const on = resolution === r.id}
 			<button
 				type="button"
@@ -230,8 +233,9 @@
 					<dl class="mt-3.5 flex flex-col gap-2.5 text-[14px]">
 						<div class="flex justify-between text-white/60"><dt>처리 방법</dt><dd class="font-semibold text-fg">{c.resolution ? RESOLUTION_NAMES[c.resolution] : '반려'}</dd></div>
 						{#if c.needsRefund}
-							<div class="flex justify-between text-white/60"><dt>환불 금액</dt><dd class="font-semibold text-fg tabular-nums">{won(c.refundAmount ?? claimRefundTotal(c))}</dd></div>
+							<div class="flex justify-between text-white/60"><dt>환불 금액</dt><dd class="font-semibold text-fg tabular-nums">{refundShown === null ? '확인 중' : won(refundShown)}</dd></div>
 							{#if c.deduction}<div class="flex justify-between text-white/60"><dt>왕복 배송비 차감</dt><dd class="font-semibold text-fg tabular-nums">−{won(c.deduction)}</dd></div>{/if}
+							{#if shippingBack}<div class="flex justify-between text-white/60"><dt>배송비 환불</dt><dd class="font-semibold text-fg tabular-nums">+{won(shippingBack)}</dd></div>{/if}
 						{/if}
 						<div class="mt-1 flex items-baseline justify-between border-t border-white/8 pt-3"><dt class="font-bold">상태</dt><dd class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold {sm.cls}">{sm.label}</dd></div>
 					</dl>

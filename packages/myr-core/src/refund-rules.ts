@@ -83,26 +83,6 @@ export const refundableItems = (items: OrderItem[]): OrderItem[] => items.filter
 export const customerRefundableItems = (items: OrderItem[]): OrderItem[] => refundableItems(items).filter((i) => i.shipStatus === 'PAID');
 export const remainingQty = (i: OrderItem): number => Math.max(0, i.qty - i.refundedQty);
 
-/** 화면 추정 금액 — 서버(precheck)가 다시 계산한다. 전부 환불이면 배송비(아직 안 돌려준 만큼) 포함 */
-export function estimateRefund(
-	o: Pick<OrderView, 'items' | 'shippingFee' | 'refundAmount' | 'amount'>,
-	lines: RefundLine[]
-): { amount: number; full: boolean } {
-	const byId = new Map(o.items.map((i) => [i.id, i]));
-	let amount = 0;
-	let req = 0;
-	for (const l of lines) {
-		const it = byId.get(l.item_id);
-		if (!it) continue;
-		const q = Math.min(l.qty, remainingQty(it));
-		amount += it.unitPrice * q;
-		req += q;
-	}
-	const left = refundableItems(o.items).reduce((n, i) => n + remainingQty(i), 0);
-	const full = left > 0 && req >= left;
-	if (full && o.shippingFee > 0 && o.refundAmount + amount + o.shippingFee <= o.amount) amount += o.shippingFee;
-	return { amount, full };
-}
 
 /** 토스 Idempotency-Key — 같은 주문·같은 줄 묶음의 재시도는 같은 키(토스가 같은 응답) · 다른 묶음은 다른 키. ≤ 300자.
  *  tag = 교환·환불 요청 코드(0078) — 요청에서 나간 환불은 요청마다 키가 달라야 한다(같은 줄 · 같은 수량이라도 차감 금액이 다를 수 있다) */
@@ -119,6 +99,51 @@ export function deductedAmount(amount: number, deduction = 0): number | null {
 	if (!Number.isInteger(deduction) || deduction < 0) return null;
 	if (deduction === 0) return amount;
 	return deduction < amount ? amount - deduction : null;
+}
+
+/** 환불 금액 한 벌 — amount = 돌려줄 돈 · goods = 줄 합 · shippingBack = 이번에 함께 돌려주는 처음 배송비(마지막 줄일 때) · deduction = 뺀 왕복 배송비.
+ *  입금 전 취소(deposit)는 돈이 오가지 않아 amount 0 */
+export type RefundQuote = { amount: number; goods: number; shippingBack: number; deduction: number; full: boolean; deposit: boolean };
+
+/** precheck 결과 + 차감 → 환불 금액. 실제 환불(refundItems)과 화면 예상 금액(refundQuote → 샵 신청 화면 · 콘솔 · 승인 메일)이 이 함수 하나를 쓴다(백엔드 원칙 1).
+ *  차감이 금액 이상이거나 음수면 null(환불하지 않는다 — deductedAmount) */
+export function quoteFromPrecheck(pre: Pick<PrecheckOk, 'amount' | 'items' | 'deposit' | 'full'>, deduction = 0): RefundQuote | null {
+	const goods = pre.items.reduce((n, i) => n + i.amount, 0);
+	const shippingBack = Math.max(0, pre.amount - goods);
+	if (pre.deposit) return { amount: 0, goods, shippingBack, deduction: 0, full: pre.full, deposit: true };
+	const amount = deductedAmount(pre.amount, deduction);
+	if (amount === null) return null;
+	return { amount, goods, shippingBack, deduction, full: pre.full, deposit: false };
+}
+
+/** 예상 금액 API(샵 POST /api/refunds/quote) 본문 — mode instant = 바로 환불(결제완료 줄) · claim = 교환·환불 요청(배송준비중 이후 줄 · 사유로 차감이 정해진다) */
+export type RefundQuoteBody = { orderCode: string; mode: 'instant' | 'claim'; reason: string; items: RefundLine[] };
+export function parseRefundQuoteBody(body: unknown): RefundQuoteBody | null {
+	const b = obj(body);
+	if (!b) return null;
+	const orderCode = typeof b.orderCode === 'string' ? b.orderCode.trim().toLowerCase() : '';
+	if (!ORDER_CODE_RE.test(orderCode)) return null;
+	if (b.mode !== 'instant' && b.mode !== 'claim') return null;
+	if (!Array.isArray(b.items) || b.items.length === 0 || b.items.length > 50) return null;
+	const items: RefundLine[] = [];
+	for (const raw of b.items) {
+		const x = obj(raw);
+		const itemId = x && typeof x.itemId === 'string' ? x.itemId : '';
+		const qty = x ? x.qty : null;
+		if (!UUID_RE.test(itemId) || typeof qty !== 'number' || !Number.isInteger(qty) || qty < 1 || qty > 99) return null;
+		if (items.some((i) => i.item_id === itemId)) return null;
+		items.push({ item_id: itemId, qty });
+	}
+	return { orderCode, mode: b.mode, reason: typeof b.reason === 'string' ? b.reason.trim().slice(0, 40) : '', items };
+}
+/** 예상 금액 API 응답 → RefundQuote(형식이 다르면 null — 화면은 금액 대신 "확인 중") */
+export function parseRefundQuote(json: unknown): RefundQuote | null {
+	const o = obj(json);
+	if (!o || o.ok !== true) return null;
+	const n = (k: string) => (typeof o[k] === 'number' && Number.isFinite(o[k] as number) ? (o[k] as number) : null);
+	const amount = n('amount');
+	if (amount === null) return null;
+	return { amount, goods: n('goods') ?? 0, shippingBack: n('shippingBack') ?? 0, deduction: n('deduction') ?? 0, full: o.full === true, deposit: o.deposit === true };
 }
 
 /* ---- RPC 파서 ---- */

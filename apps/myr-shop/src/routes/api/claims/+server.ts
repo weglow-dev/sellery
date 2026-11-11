@@ -1,12 +1,11 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { guestTokenCookieName } from '@sellery/myr-core/checkout-rules';
 import { claimMessage, parseClaimOpenBody } from '@sellery/myr-core/claim-rules';
-import { admin, hasAdmin } from '$lib/server/admin';
+import { hasAdmin } from '$lib/server/admin';
 import { rejectCrossSite } from '$lib/server/checkout-sync';
 import { openClaims } from '$lib/server/claims';
-import { verifyGuestOrder } from '$lib/server/customers';
+import { orderActor } from '$lib/server/order-actor';
 import { rateLimit } from '$lib/server/rate-limit';
 
 /**
@@ -25,24 +24,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies, getClient
 	if (!body) return fail(400, 'BAD_REQUEST');
 	if (!hasAdmin()) return fail(503, 'NO_SERVICE_KEY');
 	if (!rateLimit(`claim:${getClientAddress()}`, 10)) return json({ ok: false, code: 'RATE_LIMITED', message: '요청이 많아요 — 잠시 후 다시 시도해주세요' }, { status: 429 });
-	const db = admin();
 
-	const { user } = await locals.safeGetSession();
-	let orderId: string | null = null;
-	let actorId: string | null = null;
-	if (user) {
-		const { data } = await db.from('myr_orders').select('id').eq('code', body.orderCode).eq('user_id', user.id).maybeSingle();
-		orderId = (data as { id: string } | null)?.id ?? null;
-		actorId = user.id;
-	} else {
-		const id = await verifyGuestOrder(body.orderCode, cookies.get(guestTokenCookieName(body.orderCode)));
-		if (!id) return fail(401, 'UNAUTHORIZED');
-		const { data } = await db.from('myr_orders').select('id, customer_id').eq('id', id).maybeSingle();
-		const row = data as { id: string; customer_id: string | null } | null;
-		orderId = row?.id ?? null;
-		actorId = row?.customer_id ?? null;
-	}
-	if (!orderId) return fail(404, 'NOT_FOUND');
+	const who = await orderActor(locals, cookies, body.orderCode);
+	if (!who.ok) return fail(who.code === 'UNAUTHORIZED' ? 401 : 404, who.code);
+	const { orderId, actorId } = who;
 
 	const r = await openClaims(orderId, actorId, body);
 	if (!r.ok) return fail(r.code === 'NOT_FOUND' ? 404 : r.code === 'DB_ERROR' ? 500 : 400, r.code, r.items);

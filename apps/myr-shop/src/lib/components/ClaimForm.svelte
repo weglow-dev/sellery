@@ -3,9 +3,12 @@
 	 *  PC: 왼쪽 제품 체크 카드(수량 · 상세 · 사진) · 요청 종류(환불/교환) · 사유 칩 · 처리 기준 / 오른쪽 요약 · [요청 보내기] → 인라인 확인.
 	 *  모바일: 같은 순서로 쌓고, 버튼은 요약 카드 안(요청은 즉시 결제 취소가 아니라 하단 고정 바를 두지 않는다).
 	 *  규칙은 claim-rules(순수): 단순 변심은 환불만 · 파손 · 오배송은 사진 필수 · 처리 기준 문구. 서버(myr_app_claim_open)가 같은 규칙으로 다시 막는다.
-	 *  사진은 환불 신청과 같은 API(/api/refunds/photos · 버킷 myr-refunds · 줄당 3장)로 올리고 경로만 보낸다. 보낸 뒤 주문 상세로. */
+	 *  사진은 환불 신청과 같은 API(/api/refunds/photos · 버킷 myr-refunds · 줄당 3장)로 올리고 경로만 보낸다. 보낸 뒤 주문 상세로.
+ *  예상 환불 금액은 서버(/api/refunds/quote · 실제 환불과 같은 refundQuote — 마지막 줄이면 배송비 포함 · 단순 변심은 왕복 배송비 차감)가 정한다. */
+	import { onDestroy, untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { won } from '$lib/data';
+	import { RefundQuoteState } from '$lib/refund-quote.svelte';
 	import { shop } from '$lib/state.svelte';
 	import type { OrderItem, OrderView } from '@sellery/myr-core/order-view';
 	import {
@@ -39,9 +42,17 @@
 	const needPhoto = $derived(photoRequired(reason));
 	const missingPhoto = $derived(needPhoto && chosen.some((l) => !(photosById[l.id]?.length)));
 	const busy = $derived(Object.values(uploading).some((n) => n > 0));
-	const goods = $derived(chosen.reduce((n, l) => n + l.unitPrice * (qtyById[l.id] ?? 0), 0));
-	// 예상 환불 — 단순 변심은 한 번에 보낸 요청에서 왕복 배송비 한 번(서버 myr_refund_request_fee_due 와 같다) · 최종 금액은 크리에이터 승인 뒤 정해진다
-	const estimate = $derived(kind === 'refund' ? Math.max(0, goods - (reason === '단순 변심' ? returnFee : 0)) : null);
+	// 예상 환불 — 서버가 실제 환불과 같은 계산으로 정한다(고른 줄 · 수량 · 사유가 바뀔 때만 묻는다) · 최종 금액은 크리에이터 승인 · 회수 뒤 정해진다
+	const quote = new RefundQuoteState();
+	onDestroy(() => quote.dispose());
+	const picksKey = $derived(JSON.stringify(chosen.map((l) => ({ itemId: l.id, qty: qtyById[l.id] ?? 0 }))));
+	$effect(() => {
+		const items = JSON.parse(picksKey) as { itemId: string; qty: number }[];
+		const why = reason;
+		const off = kind !== 'refund';
+		untrack(() => quote.ask(off ? null : { orderCode: order.code, mode: 'claim', reason: why, items }));
+	});
+	const estimate = $derived(kind === 'refund' ? quote.quote : null);
 	const ready = $derived(chosen.length > 0 && reason !== '' && kindAllowed(kind, reason) && !missingPhoto && !busy);
 	const ctaLabel = $derived(
 		chosen.length === 0 ? '제품을 선택하세요' : reason === '' ? '사유를 선택하세요' : missingPhoto ? '사진을 올려주세요' : busy ? '사진을 올리는 중…' : `${KIND_LABEL[kind]} 요청 보내기`
@@ -240,14 +251,19 @@
 				<div class="flex justify-between text-fg-soft"><span>사유</span><span class={reason ? 'text-fg' : 'text-fg-faint'}>{reason || '—'}</span></div>
 			</div>
 			<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
-				<span class="text-[14px] font-bold">{estimate === null ? '처리' : '예상 환불 금액'}</span>
-				{#if estimate === null}
+				<span class="text-[14px] font-bold">{kind === 'refund' ? '예상 환불 금액' : '처리'}</span>
+				{#if kind !== 'refund'}
 					<span class="text-[15px] font-extrabold text-accent">새 제품 재발송</span>
 				{:else}
-					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{won(estimate)}</span>
+					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{estimate ? won(estimate.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
 				{/if}
 			</div>
-			{#if estimate !== null && reason === '단순 변심' && goods > 0}<p class="mt-1.5 text-right text-[12px] text-fg-faint">왕복 배송비 {won(returnFee)} 차감</p>{/if}
+			{#if estimate && (estimate.deduction || estimate.shippingBack)}
+				<p class="mt-1.5 text-right text-[12px] text-fg-faint">
+					{[estimate.deduction ? `왕복 배송비 ${won(estimate.deduction)} 차감` : '', estimate.shippingBack ? `배송비 ${won(estimate.shippingBack)} 포함` : ''].filter(Boolean).join(' · ')}
+				</p>
+			{/if}
+			{#if kind === 'refund' && quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 요청은 보낼 수 있어요</p>{/if}
 			{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
 			<div class="mt-5">
 				{#if !confirming}

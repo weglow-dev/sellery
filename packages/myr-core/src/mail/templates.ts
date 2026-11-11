@@ -281,8 +281,11 @@ export type MailClaim = {
 	message: string | null;
 	/** 남은 할 일 안내(회수 · 환불 · 재발송) — claim-rules claimStepText */
 	stepText: string;
+	/** 환불 예정 금액 — 서버 refundQuote(실제 환불과 같은 계산) · 환불 없는 처리 · 계산 실패면 null */
 	refundTotal: number | null;
 	deduction: number;
+	/** 함께 돌려줄 처음 배송비(마지막 줄일 때 · refundQuote shippingBack) */
+	shippingBack?: number;
 };
 const claimKind = (c: Pick<MailClaim, 'kind'>): string => (c.kind === 'exchange' ? '교환' : '환불');
 
@@ -316,7 +319,10 @@ export function claimDecidedMail(c: MailClaim, ctx: MailCtx): MailTemplate {
 		{ label: '상품', value: itemLine({ name: c.productName, option: c.option, qty: c.qty }) },
 		{ label: '결과', value: rejected ? '반려' : `승인 · ${c.resolutionName ?? claimKind(c)}` }
 	];
-	if (!rejected && c.refundTotal != null) rows.push({ label: '환불 예정 금액', value: `${won(c.refundTotal)}${c.deduction ? ` (왕복 배송비 ${won(c.deduction)} 차감)` : ''}` });
+	if (!rejected && c.refundTotal != null) {
+		const parts = [c.deduction ? `왕복 배송비 ${won(c.deduction)} 차감` : '', c.shippingBack ? `배송비 ${won(c.shippingBack)} 포함` : ''].filter(Boolean);
+		rows.push({ label: '환불 예정 금액', value: `${won(c.refundTotal)}${parts.length ? ` (${parts.join(' · ')})` : ''}` });
+	}
 	if (!rejected && c.stepText) rows.push({ label: '다음 단계', value: c.stepText });
 	const notes: string[] = [];
 	if (rejected) notes.push('반려 사유가 궁금하면 주문 상세의 [문의]로 크리에이터에게 물어볼 수 있어요.');
