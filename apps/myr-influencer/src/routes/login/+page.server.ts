@@ -2,6 +2,7 @@ import { dev } from '$app/environment';
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { requestPasswordReset } from '$lib/server/password-reset';
+import { settlementUnit } from '$lib/server/settlement';
 import { EMAIL_RE, LINK_ERROR, SESSION_ONLY_COOKIE, authErrorMessage, consoleNext, parseLoginForm, resetOutcomeMessage } from '$lib/console-auth';
 
 /**
@@ -16,7 +17,9 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const { user } = await locals.safeGetSession();
 	if (user) redirect(303, next);
 	const err = url.searchParams.get('error');
-	return { next, linkError: err ? (LINK_ERROR[err] ?? LINK_ERROR.auth) : null, reset: url.searchParams.get('reset') === '1' };
+	// 소개 카드의 정산 비율 — 정산 회차와 같은 서버 설정(못 읽으면 null → '—')
+	const settlePct = (await settlementUnit(0))?.pct ?? null;
+	return { next, linkError: err ? (LINK_ERROR[err] ?? LINK_ERROR.auth) : null, reset: url.searchParams.get('reset') === '1', settlePct };
 };
 
 export const actions: Actions = {

@@ -7,8 +7,6 @@
 		GB_STATE_META,
 		groupbuyErrors,
 		groupbuyHref,
-		groupbuyPrice,
-		groupbuyStateAt,
 		isoToKstInput,
 		kstInputToIso,
 		kstShort,
@@ -39,7 +37,15 @@
 		return () => clearInterval(t);
 	});
 	const p = $derived(data.product);
-	const open = $derived(data.items.find((g) => groupbuyStateAt(g, now) !== 'ended') ?? null);
+	// 공구 상태(예정 · 진행 · 종료)는 서버 값 그대로 — 시작 · 끝 시각이 오면 다시 받는다(now 는 "N시간 남음" 글자만)
+	const open = $derived(data.items.find((g) => g.state !== 'ended') ?? null);
+	$effect(() => {
+		if (!open) return;
+		const at = Date.parse(open.state === 'scheduled' ? open.startsAt : open.endsAt);
+		if (!Number.isFinite(at)) return;
+		const t = setTimeout(() => void invalidateAll(), Math.min(Math.max(at - Date.now() + 1000, 0), 2_147_000_000));
+		return () => clearTimeout(t);
+	});
 	const past = $derived(data.items.filter((g) => g !== open));
 	const listed = $derived(p.status === 'listed');
 
@@ -57,7 +63,30 @@
 	const errs = $derived(groupbuyErrors(draft, now));
 	const show = (k: GroupbuyField) => (attempted ? errs[k] : undefined);
 	const pctNum = $derived(/^\d{1,2}$/.test(draft.pct.trim()) ? Number(draft.pct) : null);
-	const preview = $derived(pctNum && pctNum >= GB_PCT_MIN && pctNum <= GB_PCT_MAX ? groupbuyPrice(p.price, pctNum) : null);
+	// 공구가 미리보기 — 실제 공구와 같은 서버 계산(GET …/groupbuy/preview · 옵션 0번 단가) · 할인율이 바뀌면 잠깐 뒤 묻는다
+	let preview = $state<{ pct: number; price: number; basePrice: number } | null>(null);
+	$effect(() => {
+		const pct = pctNum && pctNum >= GB_PCT_MIN && pctNum <= GB_PCT_MAX ? pctNum : null;
+		const id = p.id;
+		if (pct === null) {
+			preview = null;
+			return;
+		}
+		let stale = false;
+		const t = setTimeout(async () => {
+			try {
+				const res = await fetch(`/api/products/${encodeURIComponent(id)}/groupbuy/preview?pct=${pct}`);
+				const r = (await res.json().catch(() => null)) as { ok?: boolean; price?: number; basePrice?: number } | null;
+				if (!stale) preview = r?.ok && typeof r.price === 'number' && typeof r.basePrice === 'number' ? { pct, price: r.price, basePrice: r.basePrice } : null;
+			} catch {
+				if (!stale) preview = null;
+			}
+		}, 200);
+		return () => {
+			stale = true;
+			clearTimeout(t);
+		};
+	});
 
 	async function create() {
 		attempted = true;
@@ -157,7 +186,7 @@
 			<div class={card}>{@render productCard()}</div>
 
 			{#if open}
-				{@const st = groupbuyStateAt(open, now)}
+				{@const st = open.state}
 				<section class={card} aria-label="진행 중인 공구">
 					<div class="flex items-center gap-2">
 						<span class="rounded-[7px] px-[9px] py-1 text-[12px] font-extrabold {stateChip(st)}">{GB_STATE_META[st].label}</span>
@@ -165,7 +194,7 @@
 					</div>
 					<div class="mt-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
 						<span class="text-[28px] font-extrabold tracking-[-.02em] text-accent lg:text-[32px]">{won(open.price)}</span>
-						<span class="text-[14px] font-bold text-white/40 line-through">{won(p.price)}</span>
+						<span class="text-[14px] font-bold text-white/40 line-through">{won(open.options[0]?.price ?? p.price)}</span>
 						<span class="text-[14px] font-extrabold text-white/80">{open.discountPct}% 할인</span>
 					</div>
 					<p class="mt-1.5 text-[13px] text-white/55 tabular-nums">{kstShort(open.startsAt)} ~ {kstShort(open.endsAt)} · 한국 시간</p>
@@ -218,7 +247,7 @@
 							<span class="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-[15px] font-bold text-white/55">%</span>
 						</span>
 						{#if show('pct')}<span class="text-[12px] font-semibold text-accent">{show('pct')}</span>
-						{:else if preview !== null}<span class="text-[13px] text-white/70">공구가 <b class="font-extrabold text-accent">{won(preview)}</b> <span class="text-white/45">(기본가 {won(p.price)})</span></span>{/if}
+						{:else if preview !== null && preview.pct === pctNum}<span class="text-[13px] text-white/70">공구가 <b class="font-extrabold text-accent">{won(preview.price)}</b> <span class="text-white/45">(기본가 {won(preview.basePrice)})</span></span>{/if}
 					</label>
 					<div class="grid gap-4 lg:grid-cols-2">
 						<label class="flex flex-col gap-1.5">

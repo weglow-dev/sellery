@@ -4,7 +4,6 @@
  *  에디터 "예상 정산" 은 정산 정책(docs/myr.md §9-6 · 판매가의 60%)을 `@sellery/myr-core/settlement-rules` 에서 읽는다(2026-11-09 · 디자인 값 10% 폐기).
  *    단순 변심 왕복 배송비는 0078 부터 서버 값(platform_settings 'myr_claim_return_fee' · claim JSON return_fee). */
 import { myrCategoryName } from '@sellery/myr-core/categories';
-import { settlementOf } from '@sellery/myr-core/settlement-rules';
 import { type Product, type ProductDraft, type ProductStatus } from './data';
 
 export const MAX_IMAGES = 6;
@@ -90,8 +89,6 @@ export const formatPriceInput = (v: string) => {
 	const n = parsePrice(v);
 	return n ? n.toLocaleString('ko-KR') : '';
 };
-/** 예상 정산(개당) — 판매가의 60%(§9-6 · 제조금액 상계 전) */
-export const marginText = (price: number) => (price ? `${won(settlementOf(price))} / 개` : '—');
 
 export type SectionKey = 'basics' | 'note' | 'story' | 'ingredients' | 'howto' | 'info' | 'faq';
 

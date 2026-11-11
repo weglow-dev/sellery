@@ -187,6 +187,9 @@ describe('처리 방법 이름 · 금액', () => {
 	});
 	it('처리 기준 문구 — 사유별 · 배송비 숫자는 설정값', () => {
 		expect(claimPolicy('단순 변심', 7000)[1]).toBe('왕복 배송비 ₩7,000은 고객 부담 — 환불 금액에서 빼요');
+		// 설정을 못 읽으면 숫자를 짐작하지 않는다(예전 6,000 기본값 대신)
+		expect(claimPolicy('단순 변심', null)[1]).toBe('왕복 배송비는 고객 부담 — 환불 금액에서 빼요');
+		expect(claimFromJson(json({ return_fee: undefined }))!.returnFee).toBeNull();
 		expect(claimPolicy('단순 변심', 6000)).toEqual(['수령 후 7일 이내 · 미개봉만 가능', '왕복 배송비 ₩6,000은 고객 부담 — 환불 금액에서 빼요', '식품 특성상 개봉 제품은 교환·환불이 어려워요']);
 		expect(claimPolicy('파손 · 누액', 6000)).toEqual(['사진 확인 후 새 제품 재발송 또는 전액 환불']);
 		expect(claimPolicy('오배송', 6000)).toEqual(['잘못 간 제품은 택배 기사가 방문해 회수해요']);
@@ -195,10 +198,10 @@ describe('처리 방법 이름 · 금액', () => {
 });
 
 describe('요청할 수 있는 줄', () => {
-	const it_ = (o: Partial<OrderItem>) => ({ id: 'i', status: 'PAID', qty: 1, refundedQty: 0, shipStatus: 'SHIPPING', ...o }) as OrderItem;
-	it('발주 이후 · 남은 수량 — 결제완료(바로 환불) · 취소 · 전부 환불 줄은 뺀다', () => {
-		const items = [it_({ id: 'a' }), it_({ id: 'b', shipStatus: 'PAID' }), it_({ id: 'c', status: 'CANCELED' }), it_({ id: 'd', refundedQty: 1, status: 'REFUNDED' }), it_({ id: 'e', shipStatus: 'DELIVERED' }), it_({ id: 'f', shipStatus: 'PREPARING' })];
-		expect(claimableItems(items).map((i) => i.id)).toEqual(['a', 'e', 'f']);
+	const it_ = (o: Partial<OrderItem>) => ({ id: 'i', status: 'PAID', qty: 1, refundedQty: 0, shipStatus: 'SHIPPING', refundPath: 'claim', ...o }) as OrderItem;
+	it('서버 refundPath = claim 인 줄만 — 화면이 배송 상태 · 수량으로 다시 판정하지 않는다(0092)', () => {
+		const items = [it_({ id: 'a' }), it_({ id: 'b', refundPath: 'instant' }), it_({ id: 'c', refundPath: null }), it_({ id: 'd', shipStatus: 'PAID', refundPath: 'claim' })];
+		expect(claimableItems(items).map((i) => i.id)).toEqual(['a', 'd']);
 	});
 });
 

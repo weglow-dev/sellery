@@ -3,8 +3,7 @@
 	import { MYR_CATEGORIES } from '@sellery/myr-core/categories';
 	import { PRODUCT_IMAGE_ACCEPT, PRODUCT_IMAGE_MAX_BYTES } from '@sellery/myr-core/product-images';
 	import { TILE_BG, TILE_KEYS, type ProductDraft } from '$lib/data';
-	import { SETTLEMENT_PCT } from '@sellery/myr-core/settlement-rules';
-	import { MAX_IMAGES, formatPriceInput, imageHelp, marginText, parsePrice } from '$lib/rules';
+	import { MAX_IMAGES, formatPriceInput, imageHelp, parsePrice, won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 	import { INPUT_LG, INPUT_SM, LABEL } from '$lib/ui';
 	import Icon from '../Icon.svelte';
@@ -12,6 +11,26 @@
 
 	/** 1단계 기본 정보 → 샵 구매 패널: 제품명 · 판매가 · 내용량 · 카테고리(MYR 6개 고정) · 이미지(최대 6장 · 첫 장이 대표) · 태그 3개 · 예상 정산 */
 	let { ed = $bindable() }: { ed: ProductDraft } = $props();
+
+	// 예상 정산 — 정산 회차와 같은 서버 계산(GET /api/settlement-unit · 비율 = 운영 설정 · 버림). 가격이 바뀌면 잠깐 뒤 묻는다
+	let unit = $state<{ price: number; pct: number; amount: number } | null>(null);
+	$effect(() => {
+		const price = parsePrice(ed.price);
+		let stale = false;
+		const t = setTimeout(async () => {
+			try {
+				const res = await fetch(`/api/settlement-unit?price=${price}`);
+				const r = (await res.json().catch(() => null)) as { ok?: boolean; pct?: number; amount?: number } | null;
+				if (!stale && r?.ok && typeof r.pct === 'number' && typeof r.amount === 'number') unit = { price, pct: r.pct, amount: r.amount };
+			} catch {
+				/* 표시만 비운다 — 저장 · 정산과는 상관없다 */
+			}
+		}, 250);
+		return () => {
+			stale = true;
+			clearTimeout(t);
+		};
+	});
 	const uid = $props.id();
 
 	const TAG_PH = ['짜먹는', '스틱포', '레몬맛'];
@@ -166,6 +185,6 @@
 
 <div class="mt-4 flex items-center gap-3 rounded-2xl border border-white/7 bg-white/3 px-4 py-3.5 lg:mt-[18px]">
 	<span class="shrink-0 text-[12px] text-white/50">예상 정산</span>
-	<span class="flex-1 text-[13px] text-white/75">판매가의 {SETTLEMENT_PCT}% · 제조금액 상계 전</span>
-	<span class="text-[15px] font-extrabold whitespace-nowrap text-accent">{marginText(parsePrice(ed.price))}</span>
+	<span class="flex-1 text-[13px] text-white/75">{unit ? `판매가의 ${unit.pct}% · ` : ''}제조금액 상계 전</span>
+	<span class="text-[15px] font-extrabold whitespace-nowrap text-accent">{unit && unit.price === parsePrice(ed.price) && unit.price > 0 ? `${won(unit.amount)} / 개` : '—'}</span>
 </div>

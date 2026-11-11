@@ -1,7 +1,6 @@
-// 장바구니 계산 — apps/myr-shop/src/lib/cart.ts (숫자는 data.ts FREE_SHIPPING 50,000 · SHIPPING_FEE 3,000 · MAX_QTY 9)
+// 장바구니 줄 다루기 · 서버 견적 읽기 — apps/myr-shop/src/lib/cart.ts (금액 · 배송비는 서버 견적 · MAX_QTY 9)
 import { describe, expect, it } from 'vitest';
 import {
-	cartTotals,
 	clampQty,
 	mergeLine,
 	pruneUnselected,
@@ -10,9 +9,15 @@ import {
 	selectedLines,
 	setAllSelected,
 	setLineQty,
-	setUnselected
+	parseCartQuote,
+	parseQuoteBody,
+	quoteKey,
+	quoteRequest,
+	nextGbBoundary,
+	setUnselected,
+	totalsFromQuote
 } from '../lib/cart';
-import { FREE_SHIPPING, MAX_QTY, MOCK_PRODUCTS, SHIPPING_FEE } from '../lib/data';
+import { MAX_QTY, MOCK_PRODUCTS } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS; // 32,000 · 28,000
 
@@ -45,22 +50,44 @@ describe('mergeLine · setLineQty · removeLine', () => {
 	});
 });
 
-describe('cartTotals — 배송비 규칙', () => {
-	it('비어 있으면 전부 0 · 무료배송 문구', () => {
-		expect(cartTotals([])).toMatchObject({ count: 0, subtotal: 0, shipping: 0, total: 0, shippingMsg: '무료배송으로 보내드려요' });
+describe('서버 견적(0092 myr_app_cart_quote) — 화면은 계산하지 않고 읽기만', () => {
+	const raw = {
+		ok: true,
+		lines: [{ code: a.code, option_index: 0, qty: 1, unit_price: 25600, base_price: 32000, line_amount: 25600, base_amount: 32000, groupbuy_state: 'active', groupbuy_code: 'ab12cd34' }],
+		items_amount: 25600,
+		shipping_fee: 3000,
+		free_over: 50000,
+		free_shipping_left: 24400
+	};
+	it('응답 → 견적 · 합계 줄은 서버 값 그대로(무료배송까지 남은 금액도 서버 값)', () => {
+		const q = parseCartQuote(raw)!;
+		expect(q.lines[0]).toEqual({ code: a.code, qty: 1, unitPrice: 25600, basePrice: 32000, lineAmount: 25600, baseAmount: 32000, gbState: 'active', gbCode: 'ab12cd34' });
+		expect(totalsFromQuote(q)).toEqual({ subtotal: 25600, shipping: 3000, total: 28600, shippingMsg: '₩24,400 더 담으면 무료배송이에요' });
+		expect(totalsFromQuote({ ...q, shippingFee: 0, freeShippingLeft: 0 }).shippingMsg).toBe('무료배송으로 보내드려요');
 	});
-	it('기준 미만이면 배송비 + "더 담으면" 문구', () => {
-		const t = cartTotals([{ product: a, qty: 1 }]); // 32,000 < 50,000
-		expect(t).toMatchObject({ count: 1, subtotal: 32000, shipping: SHIPPING_FEE, total: 32000 + SHIPPING_FEE });
-		expect(t.shippingMsg).toBe(`₩${(FREE_SHIPPING - 32000).toLocaleString('ko-KR')} 더 담으면 무료배송이에요`);
+	it('살 수 없는 줄 · 틀린 응답', () => {
+		expect(parseCartQuote({ ...raw, lines: [{ code: 'x', qty: 1, unit_price: null, line_amount: null }] })!.lines[0].unitPrice).toBeNull();
+		expect(parseCartQuote({ ok: false, code: 'BAD_LINES' })).toBeNull();
+		expect(parseCartQuote({ ok: true, lines: [] })).toBeNull();
 	});
-	it('기준 이상이면 배송비 0 (경계 포함)', () => {
-		const t = cartTotals([
-			{ product: a, qty: 1 },
-			{ product: b, qty: 1 }
-		]); // 60,000
-		expect(t).toMatchObject({ count: 2, subtotal: 60000, shipping: 0, total: 60000 });
-		expect(cartTotals([{ product: { ...a, price: FREE_SHIPPING }, qty: 1 }]).shipping).toBe(0);
+	it('견적 요청 · 본문 검사 — 공구 코드는 그대로 싣는다(끝났는지는 서버가 본다)', () => {
+		const gb = { code: 'ab12cd34', state: 'ended' as const, discountPct: 20, startsAt: '2026-11-10T00:00:00Z', endsAt: '2026-11-12T00:00:00Z', price: 25600, options: [] };
+		expect(quoteRequest([{ product: a, qty: 2, gb }, { product: b, qty: 1 }])).toEqual([
+			{ code: a.code, optionIndex: 0, qty: 2, gb: 'ab12cd34' },
+			{ code: b.code, optionIndex: 0, qty: 1 }
+		]);
+		expect(parseQuoteBody({ all: [{ code: a.code, qty: 1 }], selected: [] })).toEqual({ all: [{ code: a.code, optionIndex: 0, qty: 1 }], selected: [] });
+		expect(parseQuoteBody({ all: [{ code: a.code, qty: 0 }], selected: [] })).toBeNull();
+		expect(parseQuoteBody({ all: [{ code: a.code, qty: 1, gb: 'NOPE!' }], selected: [] })).toBeNull();
+		expect(parseQuoteBody({ all: [] })).toBeNull();
+	});
+	it('견적 지문(줄 · 수량 · 공구 · 살 수 있음) · 다음 공구 시각(그때 다시 묻는다)', () => {
+		expect(quoteKey([{ product: a, qty: 1 }])).not.toBe(quoteKey([{ product: a, qty: 2 }]));
+		const gb = { code: 'ab12cd34', state: 'scheduled' as const, discountPct: 20, startsAt: '2026-11-11T00:00:00Z', endsAt: '2026-11-12T00:00:00Z', price: 25600, options: [] };
+		const now = Date.parse('2026-11-10T00:00:00Z');
+		expect(nextGbBoundary([{ product: a, qty: 1, gb }], now)).toBe(Date.parse(gb.startsAt));
+		expect(nextGbBoundary([{ product: a, qty: 1, gb }], Date.parse('2026-11-11T12:00:00Z'))).toBe(Date.parse(gb.endsAt));
+		expect(nextGbBoundary([{ product: a, qty: 1 }], now)).toBeNull();
 	});
 });
 
@@ -97,7 +124,7 @@ describe('선택 주문 — selectedLines · setUnselected · setAllSelected · 
 		expect(setAllSelected(lines, true)).toEqual([]);
 		expect(pruneUnselected([a.code, 'gone'], lines)).toEqual([a.code]);
 	});
-	it('합계는 선택한 줄만', () => {
-		expect(cartTotals(selectedLines(lines, [b.code])).subtotal).toBe(a.price);
+	it('주문 줄(견적 selected 에 싣는 줄)은 선택한 줄만', () => {
+		expect(selectedLines(lines, [b.code]).map((l) => l.product.code)).toEqual([a.code]);
 	});
 });

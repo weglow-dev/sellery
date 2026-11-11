@@ -3,7 +3,7 @@
  * `userId` 는 라우트가 `locals.safeGetSession()` 에서 꺼낸 값만 넘긴다(요청 본문의 id 는 쓰지 않는다 — 규칙 1).
  * 응답 행 → 화면 타입 변환은 순수 모듈 `$lib/cart`(linesFromRows) · `$lib/product-row`(fromRow) — 테스트 src/test/cart.test.ts.
  */
-import { linesFromRows, type CartLine, type MergeLine } from '$lib/cart';
+import { linesFromRows, parseCartQuote, type CartLine, type CartQuote, type MergeLine, type QuoteRequestLine } from '$lib/cart';
 import { fromRow, type Row } from '$lib/product-row';
 import type { Product } from '$lib/data';
 import { admin } from './admin';
@@ -51,3 +51,7 @@ export const setLike = async (userId: string, code: string, liked: boolean): Pro
 
 export const mergeLikes = async (userId: string, codes: string[]): Promise<RpcResult> =>
 	asResult(await rpc('myr_likes_merge', { p_user_id: userId, p_codes: codes }));
+
+/** 장바구니 · 체크아웃 요약 견적(0092 myr_app_cart_quote) — 체크아웃과 같은 단가 · 공구 · 배송비 함수. 돈은 움직이지 않는다. 형식이 틀리면 null */
+export const quoteCart = async (lines: QuoteRequestLine[]): Promise<CartQuote | null> =>
+	parseCartQuote(await rpc('myr_app_cart_quote', { p_lines: lines.map((l) => ({ code: l.code, option_index: l.optionIndex, qty: l.qty, ...(l.gb ? { gb: l.gb } : {}) })) }));

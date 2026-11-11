@@ -2,7 +2,7 @@
  *  장바구니·찜의 **보관 위치**(docs/myr.md §6.2 · 0057):
  *    · 로그인 = 계정(서버 `/api/cart` `/api/likes`) — 폰에서 담고 PC 에서 본다. 화면은 먼저 바꾸고(낙관) 서버 응답의 전체 줄로 덮어쓴다(가격·available 도 서버 값).
  *    · 비회원 = 브라우저(localStorage · 상품 스냅샷) — 로그인하는 순간 hydrate() 가 계정에 합치고 브라우저 쪽은 비운다.
- *  계산은 전부 lib/cart.ts(순수 · 테스트됨). 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
+ *  줄 다루기는 lib/cart.ts(순수 · 테스트됨). **단가 · 공구 적용 · 합계 · 배송비는 서버 견적**(requote → POST /api/cart/quote · 체크아웃과 같은 함수) — 화면이 계산하지 않는다. 주문은 M4 에서 서버 주문으로 바뀌고 여기서는 "주문 완료" 화면용 목이다.
  *  상태 변경은 전부 이 모듈의 메서드로만. */
 import { browser } from '$app/environment';
 import type { Groupbuy } from '@sellery/myr-core/groupbuy';
@@ -10,21 +10,23 @@ import type { PriceChange } from '@sellery/myr-core/checkout-rules';
 import {
 	applyPriceChanges,
 	canBuy,
-	cartTotals,
-	gbCodeOf,
 	isProduct,
-	lineGbState,
 	mergeLine,
 	mergePayload,
+	nextGbBoundary,
+	parseQuoteResponse,
 	pruneUnselected,
+	quoteKey,
+	quoteRequest,
 	removeLine,
 	sanitizeLines,
 	selectedLines,
 	setAllSelected,
 	setLineQty,
 	setUnselected,
-	unitPrice,
-	type CartLine
+	totalsFromQuote,
+	type CartLine,
+	type CartQuote
 } from './cart';
 import type { Product } from './data';
 
@@ -123,35 +125,76 @@ class ShopState {
 		}
 	}
 
-	// ---- 장바구니 (계산은 전부 lib/cart.ts — 테스트 src/test/cart.test.ts) ----
-	/** 줄 보기 — unitPrice = 지금 단가(진행 중인 공구면 공구가) · gb = 공구(gbState: scheduled · active · ended) · gbCode = 결제에 싣는 공구 코드(끝났으면 없음).
-	 *  시각은 장바구니가 바뀔 때 다시 본다 — 열어 둔 채 공구가 끝나도 결제 직전 서버가 다시 확인한다(PRICE_CHANGED) */
+	// ---- 장바구니 (줄 다루기는 lib/cart.ts — 테스트 src/test/cart.test.ts · 금액은 서버 견적) ----
+	/** 서버 견적 — all = 살 수 있는 줄 전부(줄 단가 · 공구) · selected = 주문에 들어갈 줄(합계 · 배송비). 받기 전 · 실패면 null(화면은 "확인 중") */
+	quoteAll = $state<CartQuote | null>(null);
+	quoteSel = $state<CartQuote | null>(null);
+	quoteFailed = $state(false);
+	private quoteSeq = 0;
+	/** 견적이 바뀌어야 하는 지문(줄 · 수량 · 공구 · 선택) — 레이아웃이 바뀔 때마다 requote() */
+	quoteKeyNow = $derived(`${quoteKey(this.cart)}#${this.unselected.join(',')}`);
+	/** 다음 공구 시작 · 끝 시각 — 그때 견적을 다시 받는다(판정은 서버) */
+	nextQuoteAt = $derived(nextGbBoundary(this.cart));
+
+	/** 줄 보기 — unitPrice · lineAmount · gbState 는 서버 견적 값(받기 전 null) · gbCode = 결제에 싣는 공구 코드(서버가 끝났다고 한 공구는 빼고) */
 	cartItems = $derived(
-		this.cart.map((l) => ({
-			...l.product,
-			qty: l.qty,
-			available: canBuy(l),
-			selected: canBuy(l) && !this.unselected.includes(l.product.code),
-			unitPrice: unitPrice(l),
-			gb: l.gb ?? null,
-			gbState: lineGbState(l),
-			gbCode: gbCodeOf(l),
-			lineAmount: unitPrice(l) * l.qty
-		}))
+		this.cart.map((l) => {
+			const q = this.quoteAll?.lines.find((x) => x.code === l.product.code) ?? null;
+			return {
+				...l.product,
+				qty: l.qty,
+				available: canBuy(l) && (q === null || q.unitPrice !== null),
+				selected: canBuy(l) && !this.unselected.includes(l.product.code),
+				unitPrice: q?.unitPrice ?? null,
+				gb: l.gb ?? null,
+				gbState: q?.gbState ?? null,
+				gbCode: l.gb && q?.gbState !== 'ended' ? l.gb.code : undefined,
+				lineAmount: q?.lineAmount ?? null,
+				baseAmount: q?.baseAmount ?? null
+			};
+		})
 	);
 	/** 주문에 들어갈 줄(선택 + 살 수 있음) — 합계·배송비·체크아웃은 전부 이 줄 기준 */
 	orderLines = $derived(selectedLines(this.cart, this.unselected));
 	selectedItems = $derived(this.cartItems.filter((it) => it.selected));
 	allSelected = $derived(this.cartItems.filter((it) => it.available).every((it) => it.selected));
-	totals = $derived(cartTotals(this.orderLines));
-	/** 뱃지·"N개" 는 **상품 종류 수**(줄 수) — 같은 상품 수량을 올려도 늘지 않는다(2026-10-30 대표 결정). 수량 합은 totals.count */
+	/** 합계 — 서버 견적 그대로(받기 전 null) */
+	totals = $derived(this.quoteSel ? totalsFromQuote(this.quoteSel) : null);
+	/** 수량 합(주문 줄) */
+	orderQty = $derived(this.orderLines.reduce((n, l) => n + l.qty, 0));
+	/** 뱃지·"N개" 는 **상품 종류 수**(줄 수) — 같은 상품 수량을 올려도 늘지 않는다(2026-10-30 대표 결정). 수량 합은 orderQty */
 	cartCount = $derived(this.cart.length);
 	/** 뱃지 글자 — 9 를 넘으면 '9+' (두 자리가 들어가면 아이콘 버튼 위에서 알약이 아이콘을 가린다) */
 	cartBadge = $derived(this.cartCount > 9 ? '9+' : String(this.cartCount));
-	subtotal = $derived(this.totals.subtotal);
-	shipping = $derived(this.totals.shipping);
-	total = $derived(this.totals.total);
-	shippingMsg = $derived(this.totals.shippingMsg);
+	subtotal = $derived(this.totals?.subtotal ?? null);
+	shipping = $derived(this.totals?.shipping ?? null);
+	total = $derived(this.totals?.total ?? null);
+	shippingMsg = $derived(this.totals?.shippingMsg ?? '');
+
+	/** 서버 견적 다시 받기 — 빠른 연속 변경은 마지막 응답만 적용(seq). 실패하면 견적을 비우고 quoteFailed(결제 버튼은 막힌다) */
+	async requote() {
+		const seq = ++this.quoteSeq;
+		const buyable = this.cart.filter(canBuy);
+		if (!buyable.length) {
+			const empty: CartQuote = { lines: [], itemsAmount: 0, shippingFee: 0, freeOver: 0, freeShippingLeft: 0 };
+			this.quoteAll = empty;
+			this.quoteSel = empty;
+			this.quoteFailed = false;
+			return;
+		}
+		try {
+			const r = parseQuoteResponse(await api<unknown>('/api/cart/quote', 'POST', { all: quoteRequest(buyable), selected: quoteRequest(this.orderLines) }));
+			if (seq !== this.quoteSeq) return;
+			this.quoteAll = r?.all ?? null;
+			this.quoteSel = r?.selected ?? null;
+			this.quoteFailed = !r;
+		} catch {
+			if (seq !== this.quoteSeq) return;
+			this.quoteAll = null;
+			this.quoteSel = null;
+			this.quoteFailed = true;
+		}
+	}
 
 	/** 서버에 반영하고 응답의 전체 줄로 덮어쓴다. 빠른 연속 클릭은 마지막 응답만 적용(seq). 실패하면 토스트 + 서버 값으로 되돌린다. */
 	private syncCart(body: { code: string; qty: number; add?: boolean; gb?: string }) {
@@ -177,7 +220,7 @@ class ShopState {
 		this.showToast(`${product.name} ${qty}개를 담았어요`);
 		this.syncCart({ code: product.code, qty, add: true, ...(gb ? { gb: gb.code } : {}) });
 	}
-	/** 결제 직전 서버 단가로 맞추기(0086 PRICE_CHANGED) — 화면을 먼저 바꾸고, 로그인이면 계정 장바구니를 다시 읽는다 */
+	/** 결제 직전 서버 단가로 맞추기(0086 PRICE_CHANGED) — 줄의 공구 · 가격 스냅샷을 서버 값으로 바꾸고(견적이 다시 돈다), 로그인이면 계정 장바구니를 다시 읽는다 */
 	async applyPriceChanges(changes: PriceChange[]) {
 		const seq = ++this.cartSeq;
 		this.cart = applyPriceChanges(this.cart, changes);

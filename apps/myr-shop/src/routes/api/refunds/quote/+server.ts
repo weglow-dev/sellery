@@ -33,7 +33,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies, getClient
 
 	try {
 		const claim = body.mode === 'claim';
-		const deduction = claim ? claimOpenDeduction('refund', body.reason, await claimReturnFee()) : 0;
+		const fee = claim ? await claimReturnFee() : 0;
+		if (fee === null) return fail(500, 'DB_ERROR', '잠시 후 다시 시도해주세요');
+		const deduction = claim ? claimOpenDeduction('refund', body.reason, fee) : 0;
 		const r = await refundQuote({
 			actor: claim ? 'system' : 'customer',
 			actorId: claim ? null : who.actorId,
