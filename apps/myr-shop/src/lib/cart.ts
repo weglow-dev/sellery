@@ -17,7 +17,7 @@ export type QuoteRequestLine = { code: string; optionIndex: number; qty: number;
 export const quoteRequest = (lines: CartLine[]): QuoteRequestLine[] =>
 	lines.map((l) => ({ code: l.product.code, optionIndex: 0, qty: clampQty(l.qty), ...(l.gb ? { gb: l.gb.code } : {}) }));
 /** 견적 줄 — unitPrice null = 지금 살 수 없는 줄(샵에 없음 · 옵션 틀림) */
-export type QuoteLine = { code: string; qty: number; unitPrice: number | null; basePrice: number | null; lineAmount: number | null; baseAmount: number | null; gbState: GroupbuyState | null; gbCode: string | null };
+export type QuoteLine = { code: string; qty: number; unitPrice: number | null; basePrice: number | null; lineAmount: number | null; baseAmount: number | null; stockLeft: number | null; gbState: GroupbuyState | null; gbCode: string | null };
 export type CartQuote = { lines: QuoteLine[]; itemsAmount: number; shippingFee: number; freeOver: number; freeShippingLeft: number };
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const GB_STATES: readonly string[] = ['scheduled', 'active', 'ended'];
@@ -37,6 +37,7 @@ export function parseCartQuote(v: unknown): CartQuote | null {
 			basePrice: numOrNull(x.base_price),
 			lineAmount: numOrNull(x.line_amount),
 			baseAmount: numOrNull(x.base_amount),
+			stockLeft: numOrNull(x.stock_left),
 			gbState: typeof x.groupbuy_state === 'string' && GB_STATES.includes(x.groupbuy_state) ? (x.groupbuy_state as GroupbuyState) : null,
 			gbCode: typeof x.groupbuy_code === 'string' ? x.groupbuy_code : null
 		}));

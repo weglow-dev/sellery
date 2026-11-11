@@ -60,6 +60,9 @@ describe('fromRow', () => {
 		expect(p.ic).toBe('pill');
 		expect(p.soldOut).toBe(false);
 		expect(fromRow({ ...row, sold_out: true }).soldOut).toBe(true);
+		// 지금 살 수 있는 수량(0096) — 서버 값 그대로 · 없으면(옛 응답) null
+		expect(fromRow({ ...row, stock_left: 187 }).stockLeft).toBe(187);
+		expect(fromRow({ ...row, stock_left: undefined }).stockLeft).toBeNull();
 	});
 	it('이상한 타입은 안전한 기본값 — 숫자 아닌 price 0 · 배열 아닌 chips []', () => {
 		const p = fromRow({ ...row, price: '32000', chips: 'x', creator: null });

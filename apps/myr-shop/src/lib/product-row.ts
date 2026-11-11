@@ -45,6 +45,7 @@ export function fromRow(r: Row): Product {
 		note: str(r.note),
 		howto,
 		soldOut: r.sold_out === true,
+		stockLeft: typeof r.stock_left === 'number' && Number.isFinite(r.stock_left) ? r.stock_left : null,
 		shelfLife: str(r.shelf_life),
 		storageMethod: str(r.storage_method),
 		storyTitle: str(r.story_title) || fallback.storyTitle,

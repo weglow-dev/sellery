@@ -38,6 +38,8 @@ export type Product = {
 	note: string;
 	howto: string;
 	soldOut: boolean;
+	/** 지금 살 수 있는 수량(0096 myr_product_buyable · 결제 대기 중인 다른 고객 몫 제외) — 서버 값 그대로 · 모르면(목 데이터 · 옛 응답) null */
+	stockLeft: number | null;
 	/** 제품 정보 — 크리에이터 입력(0073). 비면 infoRowsOf 가 기본 문구 */
 	shelfLife?: string;
 	storageMethod?: string;
@@ -116,7 +118,7 @@ const T = {
 	plum: 'linear-gradient(145deg,#a05ac8,#3f1f57)',
 	slate: 'linear-gradient(145deg,#6b7280,#262a33)'
 };
-type Base = Omit<Product, keyof Detail | 'creator' | 'thumbUrl' | 'images' | 'soldOut'> & { creator: string };
+type Base = Omit<Product, keyof Detail | 'creator' | 'thumbUrl' | 'images' | 'soldOut' | 'stockLeft'> & { creator: string };
 const ig = (name: string, why: string, amount: string): IngredientRow => ({ name, why, amount });
 const st = (t: string, d: string): Step => ({ t, d });
 const qa = (q: string, a: string): Faq => ({ q, a });
@@ -168,5 +170,6 @@ export const MOCK_PRODUCTS: Product[] = BASE.map((p) => ({
 	thumbUrl: null,
 	images: [],
 	soldOut: false,
+	stockLeft: null,
 	...(DETAIL[p.id] ?? genericDetail(p))
 }));

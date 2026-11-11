@@ -54,7 +54,7 @@ describe('mergeLine · setLineQty · removeLine', () => {
 describe('서버 견적(0092 myr_app_cart_quote) — 화면은 계산하지 않고 읽기만', () => {
 	const raw = {
 		ok: true,
-		lines: [{ code: a.code, option_index: 0, qty: 1, unit_price: 25600, base_price: 32000, line_amount: 25600, base_amount: 32000, groupbuy_state: 'active', groupbuy_code: 'ab12cd34' }],
+		lines: [{ code: a.code, option_index: 0, qty: 1, unit_price: 25600, base_price: 32000, line_amount: 25600, base_amount: 32000, stock_left: 187, groupbuy_state: 'active', groupbuy_code: 'ab12cd34' }],
 		items_amount: 25600,
 		shipping_fee: 3000,
 		free_over: 50000,
@@ -62,7 +62,7 @@ describe('서버 견적(0092 myr_app_cart_quote) — 화면은 계산하지 않�
 	};
 	it('응답 → 견적 · 합계 줄은 서버 값 그대로(무료배송까지 남은 금액도 서버 값)', () => {
 		const q = parseCartQuote(raw)!;
-		expect(q.lines[0]).toEqual({ code: a.code, qty: 1, unitPrice: 25600, basePrice: 32000, lineAmount: 25600, baseAmount: 32000, gbState: 'active', gbCode: 'ab12cd34' });
+		expect(q.lines[0]).toEqual({ code: a.code, qty: 1, unitPrice: 25600, basePrice: 32000, lineAmount: 25600, baseAmount: 32000, stockLeft: 187, gbState: 'active', gbCode: 'ab12cd34' });
 		expect(totalsFromQuote(q)).toEqual({ subtotal: 25600, shipping: 3000, total: 28600, shippingMsg: '₩24,400 더 담으면 무료배송이에요' });
 		expect(totalsFromQuote({ ...q, shippingFee: 0, freeShippingLeft: 0 }).shippingMsg).toBe('무료배송으로 보내드려요');
 	});

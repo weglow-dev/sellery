@@ -65,12 +65,13 @@
 							{/if}
 							{#if it.available}
 								<div class="mt-1.5 flex items-center justify-between lg:mt-2 lg:flex-wrap lg:gap-3">
-									<QtyStepper qty={it.qty} size="sm" onchange={(q) => shop.setQty(it.code, q)} />
+									<QtyStepper qty={it.qty} size="sm" max={it.stockLeft ?? undefined} onchange={(q) => shop.setQty(it.code, q)} />
 									<span class="flex items-baseline gap-1.5">
 										{#if it.baseAmount !== null && it.lineAmount !== null && it.baseAmount !== it.lineAmount}<span class="text-[12px] font-semibold text-white/40 line-through lg:text-[13px]">{won(it.baseAmount)}</span>{/if}
 										<span class="text-[15px] font-extrabold lg:text-[17px]">{it.lineAmount === null ? '확인 중' : won(it.lineAmount)}</span>
 									</span>
 								</div>
+								{#if it.stockLeft !== null && it.qty > it.stockLeft}<p class="mt-1.5 text-[12px] font-bold text-[#ff8a8a] lg:text-[13px]">남은 수량 {it.stockLeft.toLocaleString('ko-KR')}개 — 수량을 줄여주세요</p>{/if}
 							{:else}
 								<!-- 계정 장바구니(0057)에서 담은 뒤 품절·판매중지된 줄 — 합계에서 빠지고 삭제만 된다 -->
 								<p class="mt-1.5 text-[12px] font-bold text-white/45 lg:mt-2 lg:text-[13px]">지금은 살 수 없어요 · 합계에서 뺐어요</p>
