@@ -122,7 +122,7 @@
 				const message = (r && r.ok === false && r.message) || '결제 준비에 실패했어요 — 잠시 후 다시 시도해주세요';
 				if (code === 'PRICE_CHANGED' && r && r.ok === false && r.changes?.length) changed = r.changes;
 				else if (code === 'LINES_REJECTED' && r && r.ok === false && r.items?.length) blocked = `${message}: ${rejectedItemsText(r.items, nameOf)}`;
-				else if (code === 'AMOUNT_TOO_SMALL' || code === 'NO_SERVICE_KEY') blocked = message;
+				else if (code === 'AMOUNT_TOO_SMALL' || code === 'AMOUNT_TOO_LARGE' || code === 'NO_SERVICE_KEY') blocked = message;
 				else shop.showToast(message);
 				submitting = false;
 				return;

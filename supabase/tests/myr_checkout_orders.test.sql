@@ -50,7 +50,7 @@ create temp table args as select
 select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, '{"name":""}'::jsonb, (select ship from args), '[{"code":"pgtap-co-a","qty":1}]', 'myr_t_000001') ->> 'code', 'NO_BUYER', '주문자 이름 없으면 NO_BUYER');
 select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args), '[]', 'myr_t_000001') ->> 'code', 'BAD_LINES', '빈 줄은 BAD_LINES');
 select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-a","qty":0}]', 'myr_t_000001') ->> 'code', 'BAD_LINES', 'qty 0 은 BAD_LINES');
-select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-a","qty":5},{"code":"pgtap-co-a","qty":5}]', 'myr_t_000001') ->> 'code', 'BAD_LINES', '합쳐서 9 넘으면 BAD_LINES');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-a","qty":5},{"code":"pgtap-co-a","qty":5}]', 'myr_t_000001') #>> '{items,0,reason}', 'SOLD_OUT', '합쳐서 10개 — 수량 상한은 없고 재고(5)가 막는다 SOLD_OUT(0095)');
 select is(public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-co-a","qty":1}]', 'bad id') ->> 'code', 'BAD_ORDER_ID', 'toss_order_id 형식');
 select is(
   public.myr_app_create_checkout('00000000-0000-4000-8000-0000000000c3', null, (select buyer from args), (select ship from args),

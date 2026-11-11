@@ -1,4 +1,4 @@
-// 장바구니 줄 다루기 · 서버 견적 읽기 — apps/myr-shop/src/lib/cart.ts (금액 · 배송비는 서버 견적 · MAX_QTY 9)
+// 장바구니 줄 다루기 · 서버 견적 읽기 — apps/myr-shop/src/lib/cart.ts (금액 · 배송비는 서버 견적 · 구매 수량 상한 없음 · 0095)
 import { describe, expect, it } from 'vitest';
 import {
 	clampQty,
@@ -17,28 +17,29 @@ import {
 	setUnselected,
 	totalsFromQuote
 } from '../lib/cart';
-import { MAX_QTY, MOCK_PRODUCTS } from '../lib/data';
+import { MOCK_PRODUCTS, QTY_FORMAT_MAX } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS; // 32,000 · 28,000
 
 describe('clampQty', () => {
-	it('1..MAX_QTY · 정수 아니면 1', () => {
+	it('1 이상 · 상한 없음(형식 범위만) · 정수 아니면 1', () => {
 		expect(clampQty(0)).toBe(1);
 		expect(clampQty(5)).toBe(5);
-		expect(clampQty(99)).toBe(MAX_QTY);
+		expect(clampQty(99)).toBe(99);
+		expect(clampQty(QTY_FORMAT_MAX + 5)).toBe(QTY_FORMAT_MAX);
 		expect(clampQty(1.5)).toBe(1);
 		expect(clampQty(NaN)).toBe(1);
 	});
 });
 
 describe('mergeLine · setLineQty · removeLine', () => {
-	it('새 줄 추가 · 같은 code 는 합산(상한) + 스냅샷 교체', () => {
+	it('새 줄 추가 · 같은 code 는 합산(상한 없음) + 스냅샷 교체', () => {
 		let lines = mergeLine([], a, 2);
 		expect(lines).toEqual([{ product: a, qty: 2 }]);
 		const newer = { ...a, price: 30000 };
 		lines = mergeLine(lines, newer, 8);
 		expect(lines).toHaveLength(1);
-		expect(lines[0].qty).toBe(MAX_QTY);
+		expect(lines[0].qty).toBe(10);
 		expect(lines[0].product.price).toBe(30000);
 	});
 	it('수량 변경은 그 줄만 · 삭제는 code 로', () => {
@@ -96,7 +97,7 @@ describe('sanitizeLines — localStorage 복원', () => {
 		const v = [{ product: a, qty: 2 }, { product: { code: 'x' }, qty: 1 }, { product: b, qty: 0 }, { product: b, qty: 50 }, null, 'junk'];
 		expect(sanitizeLines(v)).toEqual([
 			{ product: a, qty: 2 },
-			{ product: b, qty: MAX_QTY }
+			{ product: b, qty: 50 }
 		]);
 		expect(sanitizeLines(undefined)).toEqual([]);
 	});

@@ -1,6 +1,6 @@
 // 샵 주소 · 공용 상수 — packages/myr-core/src/{site,constants}.ts
 import { describe, expect, it } from 'vitest';
-import { MAX_QTY, won } from '../constants';
+import { QTY_FORMAT_MAX, won } from '../constants';
 import { SITE_URL_FALLBACK, siteOrigin } from '../site';
 
 describe('siteOrigin — 메일 링크 · canonical 이 같은 오리진', () => {
@@ -15,7 +15,7 @@ describe('siteOrigin — 메일 링크 · canonical 이 같은 오리진', () =>
 });
 
 describe('constants', () => {
-	it('MAX_QTY 는 RPC 상한(9)과 같다', () => expect(MAX_QTY).toBe(9));
+	it('QTY_FORMAT_MAX 는 RPC 숫자 형식 범위(999,999)와 같다 — 구매 수량 상한은 없다(0095)', () => expect(QTY_FORMAT_MAX).toBe(999999));
 	it('won — 원화 표시', () => {
 		expect(won(32000)).toBe('₩32,000');
 		expect(won(0)).toBe('₩0');

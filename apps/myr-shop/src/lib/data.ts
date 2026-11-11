@@ -78,8 +78,8 @@ export const DETAIL_ANCHORS = [
 ];
 
 /** 배송비 · 무료배송 기준은 화면에 두지 않는다 — 서버 견적(0092 myr_app_cart_quote · platform_settings 'myr_shipping')이 정한다.
- *  한 줄 최대 수량 · 원화 표시 — 체크아웃 규칙 · 메일 템플릿과 같은 값이라 공용 패키지에 있다 */
-export { MAX_QTY, won } from '@sellery/myr-core/constants';
+ *  수량 숫자 형식 범위(QTY_FORMAT_MAX · 구매 수량 상한은 없다) · 원화 표시 — 체크아웃 규칙 · 메일 템플릿과 같은 값이라 공용 패키지에 있다 */
+export { QTY_FORMAT_MAX, won } from '@sellery/myr-core/constants';
 
 export const catName = (id: string): string => CATS.find((c) => c.id === id)?.name ?? '전체';
 

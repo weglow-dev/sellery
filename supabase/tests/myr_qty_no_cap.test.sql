@@ -1,0 +1,29 @@
+-- pgTAP — 0095 구매 수량 상한 없음: 장바구니 · 견적 · 체크아웃이 9개를 넘어도 받고, 한도는 재고 · 합계가 20억을 넘으면 오류 대신 AMOUNT_TOO_LARGE
+begin;
+select plan(9);
+
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-4000-8000-00000000a701', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-qty@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
+insert into public.sellers (id, name, handle, platform, active) values ('00000000-0000-4000-8000-00000000a711', '민지 루틴', '@pgtap.qty', 'instagram', true);
+insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
+values ('00000000-0000-4000-8000-00000000a721', 'pgtap-qty-a', '00000000-0000-4000-8000-00000000a711', 'diet', '레몬 스틱', 36000, 100, 'listed', 'pill'),
+       ('00000000-0000-4000-8000-00000000a722', 'pgtap-qty-big', '00000000-0000-4000-8000-00000000a711', 'diet', '비싼 상품', 10000000, 1000, 'listed', 'pill');
+create temp table args as select '{"name":"김지은"}'::jsonb as buyer, '{"recipient":"김지은","address1":"서울"}'::jsonb as ship;
+
+-- 장바구니
+select is(public.myr_cart_set('00000000-0000-4000-8000-00000000a701', 'pgtap-qty-a', 0, 50) ->> 'qty', '50', '장바구니 50개 — 9개 상한 없음');
+select is(public.myr_cart_set('00000000-0000-4000-8000-00000000a701', 'pgtap-qty-a', 0, 30, true) ->> 'qty', '80', '더하기도 그대로(50 + 30)');
+
+-- 견적
+select is(public.myr_app_cart_quote('[{"code":"pgtap-qty-a","qty":80}]') ->> 'items_amount', '2880000', '견적 80개 = 288만 원');
+select is(public.myr_app_cart_quote('[{"code":"pgtap-qty-big","qty":300}]') ->> 'items_amount', '3000000000', '견적은 30억도 오류 없이 센다(bigint)');
+
+-- 체크아웃
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000a701', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-qty-a","qty":80}]', 'myr_t_qty_0001') ->> 'ok', 'true', '체크아웃 80개 — 재고(100) 안이면 된다');
+select is((select ci.qty from public.myr_checkout_items ci join public.myr_checkouts c on c.id = ci.checkout_id where c.toss_order_id = 'myr_t_qty_0001'), 80, '결제 줄 수량 80');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000a701', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-qty-a","qty":150}]', 'myr_t_qty_0002') #>> '{items,0,reason}', 'SOLD_OUT', '재고(100)보다 많으면 SOLD_OUT — 한도는 재고');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000a701', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-qty-big","qty":201}]', 'myr_t_qty_0003') ->> 'code', 'AMOUNT_TOO_LARGE', '합계 20억 1천만 → AMOUNT_TOO_LARGE(DB 오류 아님)');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000a701', null, (select buyer from args), (select ship from args), '[{"code":"pgtap-qty-big","qty":200}]', 'myr_t_qty_0004') ->> 'ok', 'true', '합계 20억 → 된다');
+
+select * from finish();
+rollback;

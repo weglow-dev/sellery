@@ -1,7 +1,7 @@
 // 계정 장바구니(0057) 입출력 — apps/myr-shop/src/lib/cart.ts 의 linesFromRows · mergePayload · parse* (API 라우트가 본문 검증에 쓴다)
 import { describe, expect, it } from 'vitest';
 import { canBuy, linesFromRows, quoteRequest, mergePayload, parseCodesBody, parseLikeBody, parseMergeBody, parseSetBody } from '../lib/cart';
-import { MAX_QTY, MOCK_PRODUCTS } from '../lib/data';
+import { MOCK_PRODUCTS, QTY_FORMAT_MAX } from '../lib/data';
 
 const [a, b] = MOCK_PRODUCTS;
 const row = (code: string, qty: number, available: boolean, price = 10000) => ({
@@ -22,7 +22,7 @@ describe('linesFromRows — myr_cart_get 응답', () => {
 		expect(lines).toHaveLength(2);
 		expect(lines[0]).toMatchObject({ qty: 2, available: true });
 		expect(lines[0].product).toMatchObject({ code: 'a', price: 10000, cat: 'diet' });
-		expect(lines[1]).toMatchObject({ qty: MAX_QTY, available: false });
+		expect(lines[1]).toMatchObject({ qty: 50, available: false }); // 구매 수량 상한 없음(0095)
 		expect(linesFromRows(null)).toEqual([]);
 		expect(linesFromRows({})).toEqual([]);
 	});
@@ -52,7 +52,7 @@ describe('mergePayload — 비회원 줄 → myr_cart_merge 입력', () => {
 			])
 		).toEqual([
 			{ code: a.code, qty: 2, option_index: 0 },
-			{ code: b.code, qty: MAX_QTY, option_index: 0 }
+			{ code: b.code, qty: 99, option_index: 0 }
 		]);
 	});
 });
@@ -64,7 +64,8 @@ describe('parseSetBody — PUT /api/cart', () => {
 	});
 	it('code 형식 · qty 범위·정수 · 본문 꼴이 틀리면 null', () => {
 		expect(parseSetBody({ code: 'Bad Code', qty: 1 })).toBeNull();
-		expect(parseSetBody({ code: 'a', qty: MAX_QTY + 1 })).toBeNull();
+		expect(parseSetBody({ code: 'a', qty: 10 })).toEqual({ code: 'a', qty: 10, add: false }); // 9 상한 없음(0095)
+		expect(parseSetBody({ code: 'a', qty: QTY_FORMAT_MAX + 1 })).toBeNull(); // 숫자 형식 범위만
 		expect(parseSetBody({ code: 'a', qty: -1 })).toBeNull();
 		expect(parseSetBody({ code: 'a', qty: 1.5 })).toBeNull();
 		expect(parseSetBody({ code: 'a', qty: '1' })).toBeNull();
@@ -74,9 +75,9 @@ describe('parseSetBody — PUT /api/cart', () => {
 });
 
 describe('parseMergeBody — POST /api/cart/merge', () => {
-	it('같은 code 는 합치고(상한) 잘못된 줄은 버린다 · 빈 배열은 []', () => {
+	it('같은 code 는 합치고(상한 없음 · 0095) 잘못된 줄은 버린다 · 빈 배열은 []', () => {
 		expect(parseMergeBody({ lines: [{ code: 'a', qty: 2 }, { code: 'b', qty: 0 }, { code: 'A', qty: 1 }, { code: 'a', qty: 8 }, null, { qty: 1 }] })).toEqual([
-			{ code: 'a', qty: MAX_QTY, option_index: 0 }
+			{ code: 'a', qty: 10, option_index: 0 }
 		]);
 		expect(parseMergeBody({ lines: [] })).toEqual([]);
 	});

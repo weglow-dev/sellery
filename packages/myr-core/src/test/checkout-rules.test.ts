@@ -21,7 +21,7 @@ import {
 	validateGuestBuyer,
 	validateShipping
 } from '../checkout-rules';
-import { MAX_QTY } from '../constants';
+import { QTY_FORMAT_MAX } from '../constants';
 import { cleanText, normalizePhone } from '../text';
 
 describe('text', () => {
@@ -54,16 +54,17 @@ describe('parseLines', () => {
 			{ code: 'b', qty: 1, option_index: 1 }
 		]);
 	});
-	it('빈 배열 · 형식 · 합계 상한 초과 · 21줄은 null', () => {
+	it('빈 배열 · 형식 · 숫자 형식 범위 초과 · 21줄은 null — 구매 수량 상한은 없다(0095)', () => {
 		expect(parseLines([])).toBeNull();
 		expect(parseLines([{ code: 'a', qty: 0 }])).toBeNull();
 		expect(parseLines([{ code: 'Bad Code', qty: 1 }])).toBeNull();
 		expect(
 			parseLines([
-				{ code: 'a', qty: MAX_QTY },
+				{ code: 'a', qty: QTY_FORMAT_MAX },
 				{ code: 'a', qty: 1 }
 			])
 		).toBeNull();
+		expect(parseLines([{ code: 'a', qty: 9 }, { code: 'a', qty: 5 }])?.[0].qty).toBe(14);
 		expect(parseLines([{ code: 'a', qty: 1, optionIndex: -1 }])).toBeNull();
 		expect(parseLines(Array.from({ length: 21 }, (_, i) => ({ code: `c${i}`, qty: 1 })))).toBeNull();
 	});
