@@ -2,10 +2,11 @@
  * 크리에이터 콘솔 "주문"(6번 · 0081 · 읽기 전용) — 순수 파서 · 판정. 서버는 `server/seller-orders`, 화면은 콘솔 `lib/orders.ts`.
  *   - 주문 1건 = 결제된 주문 중 **내 줄**만(다른 크리에이터 줄 · 금액 · 송장은 DB 가 싣지 않는다). 고객은 가린 이름만.
  *   - 상태 칩 판정: 내 줄에 진행 중인 교환·환불 요청 → 요청 상태(샵 주문 칩과 같은 CLAIM_LABELS) · 남은 줄이 없으면 환불 완료 ·
- *     그 밖엔 남은 줄의 가장 덜 진행된 배송 상태(SHIP_LABELS · 0077 myr_order_ship_status 와 같은 생각).
+ *     그 밖엔 내 줄의 배송 상태(SHIP_LABELS) — 서버 값 그대로(0099 myr_order_ship_status(주문, 크리에이터) · 화면이 줄을 훑어 다시 정하지 않는다).
+ *   - 금액(결제 · 환불 · 남은 금액)도 서버 값 그대로(amounts · 0099).
  *   - 탭: 교환·환불(진행 중 요청) → 환불(부분 포함) → 배송 상태 — 한 주문은 한 탭에만(sellerOrderTab).
  */
-import { CLAIM_LABELS, isShipStatus, SHIP_LABELS, type OpenClaimStatus, type ShipStatus, type StatusLabel } from './order-view';
+import { CLAIM_LABELS, isOpenClaimStatus, isShipStatus, SHIP_LABELS, type OpenClaimStatus, type ShipStatus, type StatusLabel } from './order-view';
 
 export type SellerOrderLine = {
 	id: string;
@@ -31,7 +32,19 @@ export type SellerOrderLine = {
 	/** 공구 링크로 산 줄(0086) */
 	groupbuy: boolean;
 };
-export type SellerOrder = { id: string; code: string; status: string; paidAt: string | null; buyer: string; items: SellerOrderLine[] };
+export type SellerOrderAmounts = { paid: number; refunded: number; net: number };
+export type SellerOrder = {
+	id: string;
+	code: string;
+	status: string;
+	paidAt: string | null;
+	buyer: string;
+	/** 내 줄의 배송 상태 — 살아 있는 줄 중 가장 덜 진행된 것 · 없으면 null (0099 서버 값) */
+	shipStatus: ShipStatus | null;
+	/** 내 줄 금액 — 결제 · 환불 · 남은 금액(0099 서버 값 · net = myr_line_net 합) */
+	amounts: SellerOrderAmounts;
+	items: SellerOrderLine[];
+};
 
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : null);
@@ -62,7 +75,7 @@ function lineFromJson(v: unknown): SellerOrderLine | null {
 		shippedAt: sn(o.shipped_at),
 		deliveredAt: sn(o.delivered_at),
 		product: p ? { code: s(p.code), tile: sn(p.tile), icon: s(p.icon, 'pill'), thumbUrl: sn(p.thumb_url) } : null,
-		claim: c && typeof c.code === 'string' && (c.status === 'pending' || c.status === 'progress') ? { code: c.code, status: c.status, kind: s(c.kind) } : null,
+		claim: c && typeof c.code === 'string' && isOpenClaimStatus(c.status) ? { code: c.code, status: c.status, kind: s(c.kind) } : null,
 		groupbuy: o.groupbuy === true
 	};
 }
@@ -71,30 +84,32 @@ export function sellerOrderFromJson(v: unknown): SellerOrder | null {
 	if (!o || typeof o.id !== 'string' || typeof o.code !== 'string') return null;
 	const items = (Array.isArray(o.items) ? o.items : []).map(lineFromJson).filter((l): l is SellerOrderLine => l !== null);
 	if (!items.length) return null;
-	return { id: o.id, code: o.code, status: s(o.status, 'PAID'), paidAt: sn(o.paid_at), buyer: s(o.buyer, '고객'), items };
+	const a = obj(o.amounts);
+	return {
+		id: o.id,
+		code: o.code,
+		status: s(o.status, 'PAID'),
+		paidAt: sn(o.paid_at),
+		buyer: s(o.buyer, '고객'),
+		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : null,
+		amounts: { paid: n(a?.paid), refunded: n(a?.refunded), net: n(a?.net) },
+		items
+	};
 }
 export const sellerOrdersFromJson = (v: unknown): SellerOrder[] => (Array.isArray(v) ? v.map(sellerOrderFromJson).filter((o): o is SellerOrder => o !== null) : []);
 
 /** 남은 줄 — 서버가 정한 살아 있는 줄(0098 myr_line_live · 발송 · 정산과 같은 함수) */
 export const liveLines = (o: Pick<SellerOrder, 'items'>): SellerOrderLine[] => o.items.filter((i) => i.live);
-const RANK: Record<ShipStatus, number> = { PAID: 1, PREPARING: 2, SHIPPING: 3, DELIVERED: 4 };
-/** 내 줄의 배송 상태 — 남은 줄 중 가장 덜 진행된 것 · 남은 줄이 없으면 null */
-export function sellerShipStatus(o: Pick<SellerOrder, 'items'>): ShipStatus | null {
-	const live = liveLines(o);
-	if (!live.length) return null;
-	return live.reduce<ShipStatus>((m, i) => (RANK[i.shipStatus] < RANK[m] ? i.shipStatus : m), 'DELIVERED');
-}
 /** 진행 중인 요청 상태 — 처리 대기가 하나라도 있으면 pending */
 export function sellerClaimStatus(o: Pick<SellerOrder, 'items'>): OpenClaimStatus | null {
 	const st = o.items.map((i) => i.claim?.status).filter(Boolean);
 	return st.includes('pending') ? 'pending' : st.includes('progress') ? 'progress' : null;
 }
 /** 상태 칩 — 요청 → 환불 완료 → 배송 상태 */
-export function sellerOrderLabel(o: Pick<SellerOrder, 'items'>): StatusLabel {
+export function sellerOrderLabel(o: Pick<SellerOrder, 'items' | 'shipStatus'>): StatusLabel {
 	const claim = sellerClaimStatus(o);
 	if (claim) return CLAIM_LABELS[claim];
-	const ship = sellerShipStatus(o);
-	return ship ? SHIP_LABELS[ship] : { text: '환불 완료', tone: 'muted' };
+	return o.shipStatus ? SHIP_LABELS[o.shipStatus] : { text: '환불 완료', tone: 'muted' };
 }
 
 /** 환불이 하나라도 있었나 — 내 줄 중 환불 수량이 있거나 취소된 줄(부분 환불 포함) */
@@ -111,22 +126,15 @@ export const SELLER_ORDER_TABS: { id: SellerOrderTab; name: string }[] = [
 	{ id: 'claim', name: '교환·환불' },
 	{ id: 'refunded', name: '환불' }
 ];
-export function sellerOrderTab(o: Pick<SellerOrder, 'items'>): Exclude<SellerOrderTab, 'all'> {
+export function sellerOrderTab(o: Pick<SellerOrder, 'items' | 'shipStatus'>): Exclude<SellerOrderTab, 'all'> {
 	if (sellerClaimStatus(o)) return 'claim';
 	if (hasSellerRefund(o)) return 'refunded';
-	const ship = sellerShipStatus(o);
-	if (!ship) return 'refunded';
-	return ship === 'SHIPPING' ? 'shipping' : ship === 'DELIVERED' ? 'delivered' : 'prep';
+	if (!o.shipStatus) return 'refunded';
+	return o.shipStatus === 'SHIPPING' ? 'shipping' : o.shipStatus === 'DELIVERED' ? 'delivered' : 'prep';
 }
-export const filterSellerOrders = <T extends Pick<SellerOrder, 'items'>>(list: T[], tab: SellerOrderTab): T[] => (tab === 'all' ? list : list.filter((o) => sellerOrderTab(o) === tab));
-export const sellerOrderTabCounts = (list: Pick<SellerOrder, 'items'>[]) => SELLER_ORDER_TABS.map((t) => ({ ...t, count: filterSellerOrders(list, t.id).length }));
+export const filterSellerOrders = <T extends Pick<SellerOrder, 'items' | 'shipStatus'>>(list: T[], tab: SellerOrderTab): T[] => (tab === 'all' ? list : list.filter((o) => sellerOrderTab(o) === tab));
+export const sellerOrderTabCounts = (list: Pick<SellerOrder, 'items' | 'shipStatus'>[]) => SELLER_ORDER_TABS.map((t) => ({ ...t, count: filterSellerOrders(list, t.id).length }));
 
-/** 내 줄 금액 — 결제 · 환불 · 남은 금액(실적 계산은 0076 이 한다 — 이건 이 주문 카드의 표시만) */
-export function sellerOrderAmounts(o: Pick<SellerOrder, 'items'>): { paid: number; refunded: number; net: number } {
-	const paid = o.items.reduce((t, i) => t + i.amount, 0);
-	const refunded = o.items.reduce((t, i) => t + i.refundAmount, 0);
-	return { paid, refunded, net: paid - refunded };
-}
 /** 내 줄의 송장(박스) — 같은 택배사 + 송장이면 한 박스 */
 export function sellerOrderBoxes(o: Pick<SellerOrder, 'items'>): { courier: string | null; trackingNo: string }[] {
 	const seen = new Map<string, { courier: string | null; trackingNo: string }>();

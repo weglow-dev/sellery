@@ -234,7 +234,18 @@ async function adminClaimByCode(code: string): Promise<Claim | null> {
 	return (await claimsForOrder((data as { order_id: string }).order_id)).find((c) => c.code === code) ?? null;
 }
 
-/** 단순 변심 왕복 배송비(platform_settings · 0078) — 신청 화면의 예상 금액 · 처리 기준 문구. 읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
+/** 새 요청의 예상 차감(0099 myr_claim_open_deduction) — 단순 변심 환불이면 왕복 배송비 · 그 밖은 0. 처리 방법 기본 · 차감 규칙은 DB 한 곳(승인 myr_app_claim_decide 와 같은 함수).
+ *  읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
+export async function claimOpenDeduction(kind: string, reason: string): Promise<number | null> {
+	const { data, error } = await admin().rpc('myr_claim_open_deduction', { p_kind: kind, p_reason: reason });
+	if (error) {
+		console.error('[claims] open deduction failed:', error.message);
+		return null;
+	}
+	return typeof data === 'number' ? data : null;
+}
+
+/** 단순 변심 왕복 배송비(platform_settings · 0078) — 신청 화면의 처리 기준 문구. 읽지 못하면 null(화면이 숫자를 짐작하지 않는다) */
 export async function claimReturnFee(): Promise<number | null> {
 	const { data, error } = await admin().rpc('myr_claim_return_fee');
 	if (error) {

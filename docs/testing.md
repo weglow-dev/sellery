@@ -39,6 +39,8 @@ CLAUDE.md "백엔드 변경 원칙" 7(2026-10-29). 두 층이 있고 둘 다 CI(
 4. **필터** — pending · paused · 삭제(`deleted_at`) · 셀러 비활성이 목록/카드에서 빠지는지.
 5. **상태 전이와 거부 코드 전부** — `{ ok:false, code }` 의 모든 코드(`NOT_FOUND` `BAD_DECISION` `REASON_REQUIRED` `WRONG_STATUS`)를 한 번씩, 성공 전이는 전후 행 값까지.
 
+6. **같은 식을 다시 쓰지 않았는지(MYR)** — `myr_single_source.test.sql` 맨 아래 `_rules` 표가 MYR 함수 본문(주석 제외)에서 판정 식(정규식)을 찾아, 주인 함수(`allowed`) 밖에서 나오면 실패한다(백엔드 원칙 1). 새 판정 함수를 만들면 이 표에 식과 주인 함수를 한 줄 더한다 — 마지막 검사("죽은 검사 없음")가 식이 주인 함수에 실제로 있는지도 본다. 화면 · 서버 TS 쪽 짝은 `scripts/check-boundaries.mjs` (h).
+
 pgTAP 함수 목록은 https://pgtap.org/documentation.html (`is` `ok` `has_table` `table_privs_are` `function_privs_are` `throws_ok` 정도면 충분).
 
 ## 3. 어떤 변경에 무엇을 쓰나

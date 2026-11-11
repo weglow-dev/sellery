@@ -40,10 +40,10 @@ const PRODUCT_TAB_STATUSES: Record<Exclude<ProductTab, 'all'>, ProductStatus[]> 
 /** 수정 심사 중인 판매 중 상품은 "판매 중" 과 "심사 중" 탭에 함께(시안) */
 export const filterProducts = (list: Product[], tab: ProductTab) =>
 	tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status) || (tab === 'review' && !!p.revision));
-/** 재고를 보여줄 상태 — 샵에서 팔리는 중이거나 잠깐 멈춘 것만(나머지는 "—") */
-export const showsStock = (s: ProductStatus) => s === 'live' || s === 'paused';
-/** 품절 — 판매 중인데 남은 재고 0(샵이 품절로 보여 준다 · 판매 상태는 그대로 · 재고가 들어오면 다시 팔린다 · §9-6) */
-export const isSoldOut = (p: { status: ProductStatus; stock: number }) => p.status === 'live' && p.stock <= 0;
+/** 재고를 보여줄 상품 — 심사를 통과한 것(판매 중 · 일시중지)만(나머지는 "—") · 서버 값 approved 그대로(0099 myr_product_status_approved) */
+export const showsStock = (p: Pick<Product, 'approved'>) => p.approved;
+/** 품절 칩 — 판매 중인 상품이 품절일 때(샵이 품절로 보여 준다 · 판매 상태는 그대로 · 재고가 들어오면 다시 팔린다 · §9-6). 품절 판정은 서버 값 soldOut(0099 myr_product_sold_out) */
+export const isSoldOut = (p: Pick<Product, 'status' | 'soldOut'>) => p.status === 'live' && p.soldOut;
 export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
 
 /* ---------- 상품 등록 에디터 ---------- */

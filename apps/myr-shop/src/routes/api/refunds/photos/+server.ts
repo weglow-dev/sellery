@@ -46,9 +46,10 @@ export const POST: RequestHandler = async ({ request, locals, cookies, getClient
 	const orderId = await ownedOrderId(locals, cookies, orderCode);
 	if (!orderId) return apiError(401, 'UNAUTHORIZED', refundMessage('FORBIDDEN'));
 	// 이 주문의 줄 · 남은 수량이 있어야(환불 대상)
-	const { data: line } = await admin().from('myr_order_items').select('id, qty, refunded_qty, status').eq('id', itemId).eq('order_id', orderId).maybeSingle();
-	const l = line as { id: string; qty: number; refunded_qty: number; status: string } | null;
-	if (!l || l.status === 'CANCELED' || l.qty - l.refunded_qty <= 0) return apiError(404, 'NOT_FOUND', refundMessage('NOT_FOUND'));
+	// 살아 있는 줄 판정은 DB myr_line_live 한 곳(0098 · PostgREST 계산 칸) — 여기서 상태 · 수량으로 다시 판정하지 않는다
+	const { data: line } = await admin().from('myr_order_items').select('id, myr_line_live').eq('id', itemId).eq('order_id', orderId).maybeSingle();
+	const l = line as { id: string; myr_line_live: boolean | null } | null;
+	if (!l || l.myr_line_live !== true) return apiError(404, 'NOT_FOUND', refundMessage('NOT_FOUND'));
 
 	const bytes = new Uint8Array(await file.arrayBuffer());
 	const r = await uploadRefundPhoto(orderId, itemId, { bytes, size: file.size });

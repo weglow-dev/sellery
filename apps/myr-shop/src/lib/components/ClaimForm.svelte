@@ -19,11 +19,10 @@
 		KIND_LABEL,
 		kindAllowed,
 		photoRequired,
-		refundPaid,
 		type ClaimKind,
 		type ClaimReason
 	} from '@sellery/myr-core/claim-rules';
-	import { REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, remainingQty } from '@sellery/myr-core/refund-rules';
+	import { REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, refundLineAmount, remainingQty } from '@sellery/myr-core/refund-rules';
 	import Tile from '$lib/components/Tile.svelte';
 
 	let { order, lines, returnFee, backHref }: { order: OrderView; lines: OrderItem[]; returnFee: number | null; backHref: string } = $props();
@@ -171,6 +170,7 @@
 			{@const max = remainingQty(it)}
 			{@const q = qtyById[it.id] ?? 0}
 			{@const on = q > 0}
+			{@const lineAmt = refundLineAmount(it, q, quote.quote)}
 			{@const photos = photosById[it.id] ?? []}
 			{@const up = uploading[it.id] ?? 0}
 			<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
@@ -180,7 +180,7 @@
 					<span class="min-w-0 flex-1">
 						{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
 						<span class="block truncate text-[14.5px] font-bold">{it.name}{it.option ? ` · ${it.option}` : ''}</span>
-						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
+						<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개{lineAmt === null ? '' : ` · ${won(lineAmt)}`}{shipText[it.shipStatus] ? ` · ${shipText[it.shipStatus]}` : ''}</span>
 						{#if changeMindNote(it)}<span class="mt-1 block text-[12px] font-semibold text-[#ff8a8a]">{changeMindNote(it)}</span>{/if}
 					</span>
 				</label>
@@ -262,7 +262,7 @@
 			{#if estimate}
 				<!-- 요청 결제 금액(고른 수량) − 왕복 배송비 = 예상 환불 금액(서버 refundQuote 값 그대로) -->
 				<div class="mt-3.5 flex flex-col gap-2 border-t border-white/8 pt-3.5 text-[14px]">
-					<div class="flex justify-between text-fg-soft"><span>요청 결제 금액</span><span class="text-fg tabular-nums">{won(refundPaid(estimate))}</span></div>
+					<div class="flex justify-between text-fg-soft"><span>요청 결제 금액</span><span class="text-fg tabular-nums">{won(estimate.paid)}</span></div>
 					{#if estimate.deduction}<div class="flex justify-between text-fg-soft"><span>왕복 배송비 차감</span><span class="text-fg tabular-nums">−{won(estimate.deduction)}</span></div>{/if}
 				</div>
 			{/if}

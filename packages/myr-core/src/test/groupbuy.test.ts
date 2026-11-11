@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	groupbuyErrorMessage,
 	groupbuyErrors,
 	groupbuyFromJson,
 	isoToKstInput,
@@ -7,6 +8,7 @@ import {
 	kstLabel,
 	kstShort,
 	parseGroupbuyBody,
+	pctRangeFromJson,
 	remainLabel,
 	sellerGroupbuyFromJson
 } from '../groupbuy';
@@ -52,13 +54,30 @@ describe('한국 시간 표시', () => {
 	});
 });
 
+describe('할인율 범위 — 서버 값(0099 myr_groupbuy_pct_min · max)', () => {
+	it('응답의 min · max 가 정수일 때만 범위 · 아니면 null(숫자를 짐작하지 않는다)', () => {
+		expect(pctRangeFromJson(1, 70)).toEqual({ min: 1, max: 70 });
+		expect(pctRangeFromJson(undefined, 70)).toBeNull();
+		expect(pctRangeFromJson('1', '70')).toBeNull();
+	});
+	it('BAD_PCT 문구는 서버가 준 범위로 · 범위가 없으면 숫자 없이 · 다른 코드는 그대로', () => {
+		expect(groupbuyErrorMessage('BAD_PCT', { min: 1, max: 70 })).toBe('할인율은 1~70% 사이로 넣어주세요');
+		expect(groupbuyErrorMessage('BAD_PCT', { min: 5, max: 50 })).toBe('할인율은 5~50% 사이로 넣어주세요');
+		expect(groupbuyErrorMessage('BAD_PCT')).toBe('할인율을 다시 확인해주세요');
+		expect(groupbuyErrorMessage('SOLD_OUT', { min: 1, max: 70 })).toContain('품절');
+		expect(groupbuyErrorMessage('???')).toContain('잠시 후');
+	});
+});
+
 describe('groupbuyErrors · parseGroupbuyBody', () => {
-	it('할인율 1~70 정수 · 종료는 지금과 시작 뒤', () => {
+	it('할인율은 숫자 형식만(범위는 서버) · 종료는 지금과 시작 뒤', () => {
 		const ok = { pct: '20', startsAt: '2026-11-10T12:00', endsAt: '2026-11-12T23:59' };
 		expect(groupbuyErrors(ok, NOW)).toEqual({});
-		expect(groupbuyErrors({ ...ok, pct: '0' }, NOW).pct).toBeTruthy();
-		expect(groupbuyErrors({ ...ok, pct: '71' }, NOW).pct).toBeTruthy();
+		// 할인율은 숫자 형식만 — 범위(0 · 71)는 서버가 정한다(0099 myr_groupbuy_pct_ok · 미리보기 · 만들기의 BAD_PCT)
+		expect(groupbuyErrors({ ...ok, pct: '0' }, NOW).pct).toBeUndefined();
+		expect(groupbuyErrors({ ...ok, pct: '71' }, NOW).pct).toBeUndefined();
 		expect(groupbuyErrors({ ...ok, pct: '12.5' }, NOW).pct).toBeTruthy();
+		expect(groupbuyErrors({ ...ok, pct: '' }, NOW).pct).toBeTruthy();
 		expect(groupbuyErrors({ ...ok, startsAt: '' }, NOW).startsAt).toBeTruthy();
 		expect(groupbuyErrors({ ...ok, endsAt: '2026-11-10T11:00' }, NOW).endsAt).toBe('종료 일시는 지금 이후여야 해요');
 		expect(groupbuyErrors({ ...ok, startsAt: '2026-11-13T00:00' }, NOW).endsAt).toBe('종료 일시는 시작 일시 뒤여야 해요');
@@ -71,7 +90,9 @@ describe('groupbuyErrors · parseGroupbuyBody', () => {
 			startsAt: '2026-11-10T03:00:00.000Z',
 			endsAt: '2026-11-12T14:59:00.000Z'
 		});
-		expect(parseGroupbuyBody({ pct: 71, startsAt: '2026-11-10T03:00:00Z', endsAt: '2026-11-12T14:59:00Z' })).toBeNull();
+		expect(parseGroupbuyBody({ pct: 71, startsAt: '2026-11-10T03:00:00Z', endsAt: '2026-11-12T14:59:00Z' })?.pct).toBe(71); // 범위는 서버가 거절한다(BAD_PCT)
+		expect(parseGroupbuyBody({ pct: 12.5, startsAt: '2026-11-10T03:00:00Z', endsAt: '2026-11-12T14:59:00Z' })).toBeNull();
+		expect(parseGroupbuyBody({ pct: 3e9, startsAt: '2026-11-10T03:00:00Z', endsAt: '2026-11-12T14:59:00Z' })).toBeNull();
 		expect(parseGroupbuyBody({ pct: '20', startsAt: '2026-11-10T03:00:00Z', endsAt: '2026-11-12T14:59:00Z' })).toBeNull();
 		expect(parseGroupbuyBody({ pct: 20, startsAt: 'nope', endsAt: '2026-11-12T14:59:00Z' })).toBeNull();
 	});

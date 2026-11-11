@@ -52,9 +52,7 @@ export type ClaimQuotes = { refund?: RefundQuote | null; partial?: RefundQuote |
 
 /** 환불 금액을 결제 기준으로 펼친 한 벌(표시용) — 결제 금액(상품 + 함께 돌려줄 배송비) − 왕복 배송비 = 환불 금액.
  *  값은 서버가 정한 그대로(환불 전 = refundQuote · 환불 뒤 = claimRefundView) — 여기서 금액을 다시 계산하지 않는다. RefundQuote 도 이 모양이다 */
-export type RefundView = Pick<RefundQuote, 'goods' | 'shippingBack' | 'deduction' | 'amount'>;
-/** 이번 환불의 결제 금액 — 상품 + 함께 돌려줄 처음 배송비 */
-export const refundPaid = (v: Pick<RefundView, 'goods' | 'shippingBack'>): number => v.goods + v.shippingBack;
+export type RefundView = Pick<RefundQuote, 'paid' | 'goods' | 'shippingBack' | 'deduction' | 'amount'>;
 /** 식 — "(상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" · 더하거나 뺄 게 없으면 '' */
 export function refundCalcText(v: RefundView): string {
 	const parts = [`상품 ${won(v.goods)}`];
@@ -74,10 +72,6 @@ export function refundPaidNote(v: Pick<RefundView, 'goods' | 'shippingBack'>, sh
 }
 /** 처리 결과 "환불 요청" 줄 — 주문한 수량 중 일부만 요청했을 때만 "1개 (주문 2개 중)" · 전부면 null(줄을 그리지 않는다) */
 export const claimQtyText = (c: Pick<Claim, 'qty' | 'order'>): string | null => (c.qty < c.order.item.qty ? `${c.qty}개 (주문 ${c.order.item.qty}개 중)` : null);
-
-/** 새 요청의 예상 차감 — 단순 변심 환불은 처리 방법 기본(myr_refund_request_options 첫 값 = 부분 환불)대로 왕복 배송비. 그 밖은 0.
- *  한 번에 보낸 요청은 묶음에서 한 번만(서버 myr_refund_request_fee_due) — 샵 예상 금액은 고른 줄 전체를 한 번에 계산하므로 한 번 */
-export const claimOpenDeduction = (kind: ClaimKind, reason: string, returnFee: number): number => (kind === 'refund' && reason === '단순 변심' ? returnFee : 0);
 
 /** 처리 방법 이름 — 요청 종류에 따라 다르다(환불 요청의 재발송 = "교환으로 전환") · desc 는 금액(서버 예상 금액 · 없으면 빼고) · 회수 안내 */
 export function resolutionOption(r: Resolution, c: Pick<Claim, 'kind' | 'reason'>, quote?: RefundView | null): { id: Resolution; title: string; desc: string } {
@@ -174,10 +168,16 @@ export type Claim = {
 	/** 왕복 배송비(서버 myr_refund_request_fee_due) — 응답에 없으면 null(숫자를 짐작하지 않는다) */
 	returnFee: number | null;
 	refundAmount: number | null;
+	/** 환불이 끝난 요청의 결제 기준 금액(환불액 + 차감 = 상품 + 함께 돌려준 처음 배송비) · 환불 전이면 null — 서버 값(0099) */
+	refundPaid: number | null;
+	/** 함께 돌려준 처음 배송비 · 환불 전이면 0 — 서버 값(0099 · 화면이 거꾸로 계산하지 않는다) */
+	shippingBack: number;
 	refundedAt: string | null;
 	doneAt: string | null;
 	createdAt: string;
-	/** 단가 × 요청 수량 */
+	/** 열린 요청인가(처리 대기 · 진행 중) — 서버 값(0099 myr_claim_status_open) */
+	open: boolean;
+	/** 단가 × 요청 수량(서버 값) */
 	amount: number;
 	buyerName: string;
 	/** 가린 연락처(010-****-1234) · 없으면 null */
@@ -191,7 +191,8 @@ export type Claim = {
 		isMember: boolean;
 		/** 주문 배송비(0090 · 무료배송이면 0) — 주문 전체에 한 번. 옛 응답(0090 전)이면 null → 배송비 칸을 그리지 않는다 */
 		shippingFee: number | null;
-		item: { id: string; name: string; option: string; qty: number; unitPrice: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
+		/** amount = 그 줄 주문 수량 전체의 금액(서버 값 · 0099) */
+		item: { id: string; name: string; option: string; qty: number; unitPrice: number; amount: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
 	};
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
 	seller: { id: string; name: string; handle: string } | null;
@@ -233,6 +234,9 @@ export function claimFromJson(v: unknown): Claim | null {
 		deduction: n(o.deduction),
 		returnFee: typeof o.return_fee === 'number' && Number.isFinite(o.return_fee) ? o.return_fee : null,
 		refundAmount: typeof o.refund_amount === 'number' ? o.refund_amount : null,
+		refundPaid: typeof o.refund_paid === 'number' ? o.refund_paid : null,
+		shippingBack: n(o.shipping_back),
+		open: o.open === true,
 		refundedAt: sn(o.refunded_at),
 		doneAt: sn(o.done_at),
 		createdAt: s(o.created_at),
@@ -252,6 +256,7 @@ export function claimFromJson(v: unknown): Claim | null {
 				option: s(it.option),
 				qty: n(it.qty, 1),
 				unitPrice: n(it.unit_price),
+				amount: n(it.amount),
 				refundedQty: n(it.refunded_qty),
 				status: s(it.status),
 				shipStatus: s(it.ship_status, 'PAID'),
@@ -267,19 +272,16 @@ export function claimFromJson(v: unknown): Claim | null {
 }
 export const claimsFromJson = (v: unknown): Claim[] => (Array.isArray(v) ? v.map(claimFromJson).filter((c): c is Claim => c !== null) : []);
 
-/** 진행 중인 요청(처리 대기 · 진행 중) */
-export const isOpenClaim = (c: Pick<Claim, 'status'>): boolean => c.status === 'pending' || c.status === 'progress';
-/** 환불이 끝난 요청에서 함께 돌려준 처음 배송비 — 기록된 환불액(refund_amount) = 줄 금액 − 차감 + 배송비(마지막 줄일 때)에서 거꾸로. 환불 전이면 0
- *  금액 자체는 계산하지 않는다(환불 전 예상은 서버 refundQuote · 환불 뒤는 refund_amount) */
-export const claimShippingBack = (c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): number =>
-	c.refundAmount === null ? 0 : Math.max(0, c.refundAmount + c.deduction - c.amount);
-/** 환불이 끝난 요청을 결제 기준으로 — 기록된 refund_amount · deduction 그대로 · 환불 전이면 null */
-export function claimRefundView(c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): RefundView | null {
-	if (c.refundAmount === null) return null;
-	return { goods: c.amount, shippingBack: claimShippingBack(c), deduction: c.deduction, amount: c.refundAmount };
+/** 진행 중인 요청(처리 대기 · 진행 중) — 서버 값 그대로(0099 myr_claim_status_open) */
+export const isOpenClaim = (c: Pick<Claim, 'open'>): boolean => c.open;
+/** 환불이 끝난 요청을 결제 기준으로 — 서버가 준 값 그대로(refund_amount · refund_paid · shipping_back · deduction) · 환불 전이면 null. 여기서 금액을 계산하지 않는다 */
+export type ClaimRefundFields = Pick<Claim, 'amount' | 'deduction' | 'refundAmount' | 'refundPaid' | 'shippingBack'>;
+export function claimRefundView(c: ClaimRefundFields): RefundView | null {
+	if (c.refundAmount === null || c.refundPaid === null) return null;
+	return { paid: c.refundPaid, goods: c.amount, shippingBack: c.shippingBack, deduction: c.deduction, amount: c.refundAmount };
 }
 /** 처리 내역 "환불 완료" 한 줄 — "₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)" · 환불 전이면 null */
-export const claimRefundedText = (c: Pick<Claim, 'amount' | 'deduction' | 'refundAmount'>): string | null => {
+export const claimRefundedText = (c: ClaimRefundFields): string | null => {
 	const v = claimRefundView(c);
 	return v ? refundAmountText(v) : null;
 };

@@ -80,14 +80,17 @@ export function detailToDraft(d: SellerProductDetail): ProductDraft {
 	};
 }
 
-/** 저장 실패 → 안내 · 돌아갈 단계(있으면) */
-export function saveFailure(code: string, field?: string | null): { message: string; step?: number } {
+/** 금액 상한을 읽기 좋게 — 10,000,000 → "1,000만 원" · 만 단위가 아니면 "12,345원" */
+export const wonLimitText = (n: number): string => (n >= 10000 && n % 10000 === 0 ? `${(n / 10000).toLocaleString('ko-KR')}만 원` : `${n.toLocaleString('ko-KR')}원`);
+
+/** 저장 실패 → 안내 · 돌아갈 단계(있으면). priceMax = 서버가 거절 응답에 실어 준 판매가 상한(0099 myr_product_price_max) — 화면에 상한 숫자를 두지 않는다 */
+export function saveFailure(code: string, field?: string | null, priceMax?: number | null): { message: string; step?: number } {
 	if (code === 'INVALID_INPUT') {
 		switch (field) {
 			case 'name':
 				return { message: '제품명을 입력해주세요', step: 1 };
 			case 'price':
-				return { message: '판매가는 1,000만 원까지 입력할 수 있어요', step: 1 };
+				return { message: priceMax ? `판매가는 ${wonLimitText(priceMax)}까지 입력할 수 있어요` : '판매가를 다시 확인해주세요', step: 1 };
 			case 'category':
 				return { message: '카테고리를 골라주세요', step: 1 };
 			case 'images':
@@ -106,11 +109,6 @@ export function saveFailure(code: string, field?: string | null): { message: str
 	if (code === 'NOT_FOUND') return { message: '상품을 찾을 수 없어요' };
 	return { message: '저장하지 못했어요. 잠시 후 다시 시도해주세요' };
 }
-
-/** 에디터로 바로 고치는 상태(4-1) — 임시저장 · 반려 */
-export const isEditableStatus = (s: ProductStatus) => s === 'draft' || s === 'rejected';
-/** 수정 심사로 고치는 상태(4-2) — 판매 중 · 일시중지(샵은 승인 전까지 지금 내용) */
-export const isRevisableStatus = (s: ProductStatus) => s === 'live' || s === 'paused';
 
 /** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 일시중지 상품의 수정 반려(2026-11-09 수정 반려도 반려와 같게).
  *  판매 중 상품의 수정 반려는 메뉴(심사 결과 보기 · 공구 링크) — 판매 중이라 공구 링크를 만들 수 있다(2026-11-10) */

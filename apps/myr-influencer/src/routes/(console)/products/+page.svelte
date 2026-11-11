@@ -86,7 +86,7 @@
 						<span class="flex min-w-0 items-center gap-1.5"><Badge cls={m.cls}>{m.label}</Badge>{#if isSoldOut(p)}<Badge cls="bg-[#ff6b6b]/16 text-[#ff8a8a]">품절</Badge>{/if}{#if p.revision}<Badge cls={PRODUCT_STATUS_META[p.revision.state].cls}>{p.revision.state === 'review' ? '수정 심사 중' : '수정 반려'}</Badge>{/if}<span class="truncate text-[11px] text-white/45 lg:text-[12px]">{p.revision ? p.revision.meta : p.meta}</span></span>
 						<span class="text-[14px] leading-[1.3] font-bold lg:text-[16px]">{p.name}</span>
 						<span class="text-[12px] text-white/55 lg:text-[13px]">
-							{p.price ? won(p.price) : '가격 미정'} · 재고 {showsStock(p.status) ? `${p.stock.toLocaleString('ko-KR')}개` : '—'}<span class="hidden lg:inline">{' · '}누적 판매 {p.sold ? `${p.sold.toLocaleString('ko-KR')}개` : '—'}</span>
+							{p.price ? won(p.price) : '가격 미정'} · 재고 {showsStock(p) ? `${p.stock.toLocaleString('ko-KR')}개` : '—'}<span class="hidden lg:inline">{' · '}누적 판매 {p.sold ? `${p.sold.toLocaleString('ko-KR')}개` : '—'}</span>
 						</span>
 					</span>
 					<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />

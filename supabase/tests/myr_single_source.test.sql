@@ -1,0 +1,244 @@
+-- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
+--   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
+begin;
+select plan(98);
+
+-- ---------- 1. 권한 ----------
+select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
+select function_privs_are('public', 'myr_order_status_open', '{text}'::text[], 'anon', '{}'::text[], 'anon 은 order_status_open 불가');
+select function_privs_are('public', 'myr_order_owned_by', '{myr_orders,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 order_owned_by 불가');
+select function_privs_are('public', 'myr_line_amount', '{integer,integer}'::text[], 'anon', '{}'::text[], 'anon 은 line_amount 불가');
+select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open_deduction 불가');
+select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 claim_open_deduction 불가');
+select function_privs_are('public', 'myr_claim_open_deduction', '{text,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 claim_open_deduction 가능');
+select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 order_refresh_payment 불가');
+select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 order_refresh_payment 불가');
+select function_privs_are('public', 'myr_app_order_refresh_payment', '{uuid,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 order_refresh_payment 가능');
+select function_privs_are('public', 'myr_order_ship_status', '{uuid,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 order_ship_status 불가(다시 만든 뒤에도)');
+select function_privs_are('public', 'myr_sales_lines', '{}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 sales_lines 불가(다시 만든 뒤에도)');
+select hasnt_function('public', 'myr_order_ship_status', '{uuid}'::text[], '옛 myr_order_ship_status(uuid) 는 없다 — 인자 둘짜리 하나만');
+
+-- ---------- 2. 상태 묶음 ----------
+select is((select jsonb_object_agg(st, jsonb_build_array(public.myr_order_status_paid(st), public.myr_order_status_alive(st), public.myr_order_status_open(st)))
+             from unnest(array['WAITING_DEPOSIT','PAID','PARTIAL_REFUNDED','REFUNDED','CANCELED']) st),
+          '{"WAITING_DEPOSIT": [false, true, false], "PAID": [true, true, true], "PARTIAL_REFUNDED": [true, true, true], "REFUNDED": [true, false, false], "CANCELED": [false, false, false]}'::jsonb,
+          '주문 상태 — [결제됨, 끝나지 않음, 결제됐고 끝나지 않음]');
+select is((select jsonb_object_agg(st, public.myr_claim_status_open(st)) from unnest(array['pending','progress','done','rejected']) st),
+          '{"pending": true, "progress": true, "done": false, "rejected": false}'::jsonb, '열린 요청 = pending · progress');
+select is((select jsonb_object_agg(st, jsonb_build_array(public.myr_product_status_approved(st), public.myr_product_status_editable(st)))
+             from unnest(array['draft','pending','listed','paused','rejected','ended']) st),
+          '{"draft": [false, true], "pending": [false, false], "listed": [true, false], "paused": [true, false], "rejected": [false, true], "ended": [false, false]}'::jsonb,
+          '상품 상태 — [심사 통과(수정본 · 판매 종료 가능), 직접 수정 가능]');
+select is((select jsonb_object_agg(st, public.myr_revision_status_open(st)) from unnest(array['pending','approved','rejected','canceled']) st),
+          '{"pending": true, "approved": false, "rejected": true, "canceled": false}'::jsonb, '열린 수정본 = pending · rejected');
+select is((select jsonb_object_agg(st, public.myr_ship_status_unshipped(st)) from unnest(array['PAID','PREPARING','SHIPPING','DELIVERED']) st),
+          '{"PAID": true, "PREPARING": true, "SHIPPING": false, "DELIVERED": false}'::jsonb, '출고 전 = 결제완료 · 배송준비중');
+select is((select jsonb_object_agg(coalesce(r, 'null'), public.myr_claim_resolution_deducts(r)) from unnest(array['partial','refund','reship','reship_collect',null]) r),
+          '{"partial": true, "refund": false, "reship": false, "reship_collect": false, "null": false}'::jsonb, '왕복 배송비를 빼는 처리 방법 = partial');
+
+-- ---------- 3. 금액 ----------
+select is(public.myr_line_amount(10000000, 999999), 9999990000000::bigint, '단가 × 수량 — bigint(정수 범위를 넘어도 오류 없음)');
+select is(public.myr_product_price_max(), 10000000, '판매가 상한 1,000만');
+update public.platform_settings set value = '{"pct": 60, "deposit_pct": 25}'::jsonb where key = 'myr_settlement';
+insert into public.platform_settings (key, value) select 'myr_settlement', '{"pct": 60, "deposit_pct": 25}'::jsonb where not exists (select 1 from public.platform_settings where key = 'myr_settlement');
+select is(public.myr_deposit_amount(1000001), 250000, '보증금 = 제조비 × 보증금 비율(버림)');
+
+-- 새 요청의 예상 차감 — 단순 변심 환불만 왕복 배송비
+select is(public.myr_claim_open_deduction('refund', '단순 변심'), public.myr_claim_return_fee(), '단순 변심 환불 → 왕복 배송비');
+select is(public.myr_claim_open_deduction('refund', '파손 · 누액'), 0, '파손 · 누액 환불 → 0');
+select is(public.myr_claim_open_deduction('refund', '오배송'), 0, '오배송 환불 → 0');
+select is(public.myr_claim_open_deduction('exchange', '단순 변심'), 0, '교환 → 0');
+select is(public.myr_claim_open_deduction('refund', '모르는 사유'), 0, '모르는 사유 → 0');
+select is(public.myr_claim_open_deduction(null, null), 0, 'null → 0');
+
+-- ---------- 4. 공구 할인율 범위 ----------
+select is((select jsonb_agg(public.myr_groupbuy_pct_ok(v) order by o) from unnest(array[0, 1, 70, 71, null]::int[]) with ordinality t(v, o)),
+          '[false, true, true, false, false]'::jsonb, '할인율 범위 = min~max(0 · 71 · null 은 거절)');
+select is(jsonb_build_array(public.myr_groupbuy_pct_min(), public.myr_groupbuy_pct_max()), '[1, 70]'::jsonb, '할인율 범위 1~70');
+
+-- ---------- 픽스처 ----------
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-4000-8000-00000000e9c1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-ss1@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
+insert into public.customers (id, guest, name, phone, phone_norm) values ('00000000-0000-4000-8000-00000000e9e1', true, '김비회원', '01099997777', '01099997777');
+insert into public.sellers (id, name, handle, platform, active)
+values ('00000000-0000-4000-8000-00000000e911', '셀러 A', '@pgtap.ss.a', 'instagram', true),
+       ('00000000-0000-4000-8000-00000000e912', '셀러 B(비활성)', '@pgtap.ss.b', 'instagram', false),
+       ('00000000-0000-4000-8000-00000000e913', '셀러 C', '@pgtap.ss.c', 'instagram', true);
+insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon, deleted_at)
+values ('00000000-0000-4000-8000-00000000e921', 'pgtap-ss-listed', '00000000-0000-4000-8000-00000000e911', 'diet', '판매 중', 10000, 5, 'listed', 'pill', null),
+       ('00000000-0000-4000-8000-00000000e922', 'pgtap-ss-paused', '00000000-0000-4000-8000-00000000e911', 'diet', '일시 중지', 10000, 5, 'paused', 'pill', null),
+       ('00000000-0000-4000-8000-00000000e923', 'pgtap-ss-deleted', '00000000-0000-4000-8000-00000000e911', 'diet', '삭제', 10000, 5, 'listed', 'pill', now()),
+       ('00000000-0000-4000-8000-00000000e924', 'pgtap-ss-inactive', '00000000-0000-4000-8000-00000000e912', 'diet', '비활성 크리에이터', 10000, 5, 'listed', 'pill', null),
+       ('00000000-0000-4000-8000-00000000e925', 'pgtap-ss-soldout', '00000000-0000-4000-8000-00000000e913', 'diet', '품절', 20000, 0, 'listed', 'pill', null),
+       ('00000000-0000-4000-8000-00000000e926', 'pgtap-ss-draft', '00000000-0000-4000-8000-00000000e911', 'diet', '임시 저장', 10000, 0, 'draft', 'pill', null);
+
+-- ---------- 5. 상품이 샵에 보이는가 ----------
+select is((select jsonb_object_agg(p.code, jsonb_build_array(public.myr_product_listed(p), public.myr_product_visible(p, s), public.myr_product_sold_out(p), public.myr_product_available(p, s)))
+             from public.myr_products p join public.sellers s on s.id = p.seller_id where p.code like 'pgtap-ss-%'),
+          '{"pgtap-ss-listed": [true, true, false, true], "pgtap-ss-paused": [false, false, false, false], "pgtap-ss-deleted": [false, false, false, false],
+            "pgtap-ss-inactive": [true, false, false, false], "pgtap-ss-soldout": [true, true, true, false], "pgtap-ss-draft": [false, false, true, false]}'::jsonb,
+          '상품 — [판매 중, 샵에 보임, 품절, 살 수 있음]');
+select is((select jsonb_agg(e ->> 'code' order by e ->> 'code') from jsonb_array_elements(public.myr_home_products()) e where e ->> 'code' like 'pgtap-ss-%'),
+          '["pgtap-ss-listed", "pgtap-ss-soldout"]'::jsonb, '홈 = 샵에 보이는 상품만(일시 중지 · 삭제 · 비활성 크리에이터 제외 · 품절은 보인다)');
+select is((select jsonb_object_agg(c, public.myr_product_card(c) is not null) from unnest(array['pgtap-ss-listed','pgtap-ss-paused','pgtap-ss-deleted','pgtap-ss-inactive','pgtap-ss-soldout']) c),
+          '{"pgtap-ss-listed": true, "pgtap-ss-paused": false, "pgtap-ss-deleted": false, "pgtap-ss-inactive": false, "pgtap-ss-soldout": true}'::jsonb, '상품 페이지 = 같은 판정');
+select is((select jsonb_object_agg(l ->> 'code', (l ->> 'unit_price') is not null)
+             from jsonb_array_elements(public.myr_app_cart_quote('[{"code":"pgtap-ss-listed","qty":1},{"code":"pgtap-ss-paused","qty":1},{"code":"pgtap-ss-inactive","qty":1}]') -> 'lines') l),
+          '{"pgtap-ss-listed": true, "pgtap-ss-paused": false, "pgtap-ss-inactive": false}'::jsonb, '장바구니 견적 = 같은 판정(안 보이는 상품은 단가 없음)');
+
+-- 내 상품 JSON — editable · approved · sold_out
+select is((select jsonb_object_agg(e ->> 'code', jsonb_build_array(e -> 'editable', e -> 'approved', e -> 'sold_out'))
+             from jsonb_array_elements(public.myr_app_seller_products('00000000-0000-4000-8000-00000000e911')) e),
+          '{"pgtap-ss-listed": [false, true, false], "pgtap-ss-paused": [false, true, false], "pgtap-ss-draft": [true, false, true]}'::jsonb,
+          '내 제품 목록 — [직접 수정, 심사 통과, 품절] = 판정 함수 값');
+select is((select jsonb_build_array(j -> 'product' -> 'editable', j -> 'product' -> 'approved') from (select public.myr_app_seller_product('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e926') as j) x),
+          '[true, false]'::jsonb, '내 제품 상세(임시 저장) — editable · approved');
+select is(public.myr_app_seller_submit_revision('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e926', '{}') ->> 'code', 'NOT_REVISABLE', '임시 저장 상품은 수정본 불가(approved 와 같은 판정)');
+select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', '{}', false) ->> 'code', 'NOT_EDITABLE', '판매 중 상품은 직접 수정 불가(editable 과 같은 판정)');
+
+-- 판매가 상한 — 거절 응답이 상한을 준다(콘솔 안내 문구가 이 값을 쓴다)
+select is(public.myr_product_fields('00000000-0000-4000-8000-00000000e911', '{"price": 10000001}', false, '{}') - 'code',
+          '{"ok": false, "field": "price", "max": 10000000}'::jsonb, '상한을 넘으면 거절 · 응답에 상한');
+select isnt(public.myr_product_fields('00000000-0000-4000-8000-00000000e911', '{"price": 10000000}', false, '{}') ->> 'field', 'price', '상한까지는 판매가로 거절하지 않는다');
+
+-- ---------- 6. 공구 — 만들기 · 미리보기 · 표가 같은 범위 ----------
+select is(public.myr_app_seller_groupbuy_create('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 71, now(), now() + interval '1 day'),
+          '{"ok": false, "code": "BAD_PCT", "min": 1, "max": 70}'::jsonb, '만들기 71% → BAD_PCT · 범위');
+select is(public.myr_app_groupbuy_preview('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 71),
+          '{"ok": false, "code": "BAD_PCT", "min": 1, "max": 70}'::jsonb, '미리보기 71% → 만들기와 같은 거절(전에는 가격을 줬다)');
+select is(public.myr_app_groupbuy_preview('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 0) ->> 'code', 'BAD_PCT', '미리보기 0% → BAD_PCT');
+select is(public.myr_app_groupbuy_preview('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 70) ->> 'ok', 'true', '미리보기 70% → ok');
+select throws_ok($$insert into public.myr_groupbuys (code, product_id, seller_id, discount_pct, starts_at, ends_at)
+                   values ('pgtapss071', '00000000-0000-4000-8000-00000000e921', '00000000-0000-4000-8000-00000000e911', 71, now(), now() + interval '1 day')$$,
+                 '23514', null, '표 CHECK 도 같은 함수 — 71% 는 넣을 수 없다');
+select is(public.myr_app_seller_groupbuy_create('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e922', 10, now(), now() + interval '1 day') ->> 'code', 'NOT_LISTED', '일시 중지 상품 → NOT_LISTED');
+select is(public.myr_app_seller_groupbuy_create('00000000-0000-4000-8000-00000000e913', '00000000-0000-4000-8000-00000000e925', 10, now(), now() + interval '1 day') ->> 'code', 'SOLD_OUT', '품절 상품 → SOLD_OUT');
+select is((select jsonb_build_array(j -> 'pct_min', j -> 'pct_max', j -> 'product' -> 'listed', j -> 'product' -> 'sold_out')
+             from (select public.myr_app_seller_groupbuys('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921') as j) x),
+          '[1, 70, true, false]'::jsonb, '공구 화면 응답 — 범위 · 판매 중 · 품절(콘솔 폼이 그대로 쓴다)');
+select is((select j -> 'product' -> 'listed' from (select public.myr_app_seller_groupbuys('00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e922') as j) x),
+          'false'::jsonb, '일시 중지 상품 → product.listed false');
+
+-- ---------- 7. 주문 ----------
+-- o1 회원 · 부분 환불(A 줄 3개 중 1개 환불 · 배송중 / C 줄 1개 · 배송준비중)  o2 비회원 · 전액 환불  o3 입금 대기  o4 주인 없음
+insert into public.myr_orders (id, code, user_id, customer_id, status, buyer_name, shipping, order_name, items_amount, shipping_fee, payment_key, payment_method, paid_at, refund_amount)
+values ('00000000-0000-4000-8000-00000000e931', 'pgtap-ss-1', '00000000-0000-4000-8000-00000000e9c1', null, 'PARTIAL_REFUNDED', '홍길동', '{}', '판매 중 외 1건', 50000, 3000, 'pk-ss1', '카드', now(), 10000),
+       ('00000000-0000-4000-8000-00000000e932', 'pgtap-ss-2', null, '00000000-0000-4000-8000-00000000e9e1', 'REFUNDED', '김비회원', '{}', '판매 중', 10000, 3000, 'pk-ss2', '카드', now(), 13000),
+       ('00000000-0000-4000-8000-00000000e933', 'pgtap-ss-3', '00000000-0000-4000-8000-00000000e9c1', null, 'WAITING_DEPOSIT', '홍길동', '{}', '판매 중', 10000, 3000, 'pk-ss3', '가상계좌', null, 0),
+       ('00000000-0000-4000-8000-00000000e934', 'pgtap-ss-4', null, null, 'PAID', '주인 없음', '{}', '판매 중', 10000, 0, 'pk-ss4', '카드', now(), 0);
+insert into public.myr_order_items (id, order_id, product_id, seller_id, product_name, option_name, qty, unit_price, ship_status, refunded_qty, refund_amount, status)
+values ('00000000-0000-4000-8000-00000000e941', '00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e921', '00000000-0000-4000-8000-00000000e911', '줄 a', '', 3, 10000, 'SHIPPING', 1, 10000, 'PARTIAL_REFUNDED'),
+       ('00000000-0000-4000-8000-00000000e942', '00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e925', '00000000-0000-4000-8000-00000000e913', '줄 b', '', 1, 20000, 'PREPARING', 0, 0, 'PAID'),
+       ('00000000-0000-4000-8000-00000000e943', '00000000-0000-4000-8000-00000000e932', '00000000-0000-4000-8000-00000000e921', '00000000-0000-4000-8000-00000000e911', '줄 c', '', 1, 10000, 'DELIVERED', 1, 10000, 'REFUNDED'),
+       ('00000000-0000-4000-8000-00000000e944', '00000000-0000-4000-8000-00000000e933', '00000000-0000-4000-8000-00000000e921', '00000000-0000-4000-8000-00000000e911', '줄 d', '', 1, 10000, 'PAID', 0, 0, 'PAID'),
+       ('00000000-0000-4000-8000-00000000e945', '00000000-0000-4000-8000-00000000e934', '00000000-0000-4000-8000-00000000e921', '00000000-0000-4000-8000-00000000e911', '줄 e', '', 1, 10000, 'PAID', 0, 0, 'PAID');
+-- 요청: 줄 a 끝난 부분 환불(1개 · 차감 6,000 · 환불 4,000) · 줄 b 처리 대기 · 줄 c 전액 환불 진행 중(배송비 3,000 함께 13,000 환불됨)
+insert into public.myr_refund_requests (id, code, order_id, order_item_id, seller_id, product_id, kind, qty, reason, status, resolution, decided_at, needs_refund, deduction, refund_amount, refunded_at, done_at)
+values ('00000000-0000-4000-8000-00000000e951', 'pgss01', '00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e941', '00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 'refund', 1, '단순 변심', 'done', 'partial', now(), true, 6000, 4000, now(), now()),
+       ('00000000-0000-4000-8000-00000000e952', 'pgss02', '00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e942', '00000000-0000-4000-8000-00000000e913', '00000000-0000-4000-8000-00000000e925', 'refund', 1, '파손 · 누액', 'pending', null, null, false, 0, null, null, null),
+       ('00000000-0000-4000-8000-00000000e953', 'pgss03', '00000000-0000-4000-8000-00000000e932', '00000000-0000-4000-8000-00000000e943', '00000000-0000-4000-8000-00000000e911', '00000000-0000-4000-8000-00000000e921', 'refund', 1, '오배송', 'progress', 'refund', now(), true, 0, 13000, now(), null);
+
+-- 주인
+select is((select jsonb_object_agg(o.code, jsonb_build_array(public.myr_order_owned_by(o, '00000000-0000-4000-8000-00000000e9c1'), public.myr_order_owned_by(o, '00000000-0000-4000-8000-00000000e9e1'), public.myr_order_owned_by(o, null)))
+             from public.myr_orders o where o.code like 'pgtap-ss-%'),
+          '{"pgtap-ss-1": [true, false, false], "pgtap-ss-2": [false, true, false], "pgtap-ss-3": [true, false, false], "pgtap-ss-4": [false, false, false]}'::jsonb,
+          '주문 주인 — [회원, 비회원 고객, actor 없음] · 주인 없는 주문은 누구 것도 아니다');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000e934', '[]', 'customer', '00000000-0000-4000-8000-00000000e9c1') ->> 'code', 'NOT_FOUND', '환불 precheck — 주인 없는 주문은 NOT_FOUND');
+select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e934', '00000000-0000-4000-8000-00000000e9c1', 'refund', '오배송', '[]') ->> 'code', 'NOT_FOUND', '요청 접수 — 같은 판정');
+
+-- 줄
+select is((select jsonb_object_agg(i.product_name, jsonb_build_array(public.myr_line_valid(i), public.myr_line_live(i), public.myr_line_net(i))) from public.myr_order_items i where i.order_id in (select id from public.myr_orders where code like 'pgtap-ss-%')),
+          '{"줄 a": [true, true, 20000], "줄 b": [true, true, 20000], "줄 c": [true, false, 0], "줄 d": [true, true, 10000], "줄 e": [true, true, 10000]}'::jsonb, '줄 — [취소 아님, 살아 있음, 금액 − 환불]');
+update public.myr_order_items set status = 'CANCELED' where id = '00000000-0000-4000-8000-00000000e944';
+select is((select jsonb_build_array(public.myr_line_valid(i), public.myr_line_live(i)) from public.myr_order_items i where i.id = '00000000-0000-4000-8000-00000000e944'), '[false, false]'::jsonb, '취소 줄 — 취소 아님 false · 살아 있음 false');
+update public.myr_order_items set status = 'PAID' where id = '00000000-0000-4000-8000-00000000e944';
+
+-- 샵 주문 응답 — net_amount · alive · 줄 live · claim_status
+select is((select jsonb_object_agg(o.code, jsonb_build_array(j -> 'net_amount', j -> 'alive', j -> 'claim_status'))
+             from public.myr_orders o, lateral (select public.myr_order_json(o, true) as j) x where o.code in ('pgtap-ss-1', 'pgtap-ss-2', 'pgtap-ss-3')),
+          '{"pgtap-ss-1": [43000, true, "pending"], "pgtap-ss-2": [0, false, null], "pgtap-ss-3": [13000, true, null]}'::jsonb,
+          '주문 응답 — [결제 − 환불, 끝나지 않음, 요청 상태] · 전액 환불 주문은 열린 요청이 있어도 claim_status null');
+select is(public.myr_order_claim_status('00000000-0000-4000-8000-00000000e932'), 'progress', '(요청 자체는 진행 중 — 주문 응답에서만 가린다)');
+select is((select jsonb_object_agg(l ->> 'name', l -> 'live') from public.myr_orders o, lateral jsonb_array_elements(public.myr_order_json(o, true) -> 'items') l where o.code in ('pgtap-ss-1', 'pgtap-ss-2')),
+          '{"줄 a": true, "줄 b": true, "줄 c": false}'::jsonb, '주문 응답 줄 live = myr_line_live');
+select is(public.myr_order_net((select o from public.myr_orders o where o.code = 'pgtap-ss-2')), 0, '결제 − 환불은 0 아래로 내려가지 않는다');
+select is((select jsonb_object_agg(l ->> 'name', l -> 'left_amount') from public.myr_orders o, lateral jsonb_array_elements(public.myr_order_json(o, true) -> 'items') l where o.code in ('pgtap-ss-1', 'pgtap-ss-2')),
+          '{"줄 a": 20000, "줄 b": 20000, "줄 c": 0}'::jsonb, '주문 응답 줄 left_amount = 단가 × 남은 수량(신청 화면이 곱하지 않는다)');
+
+-- 결제 원문 갱신 — 결제됐고 끝나지 않은 주문만(샵 서버가 상태 묶음을 직접 쓰지 않는다)
+select is((select jsonb_object_agg(o.code, public.myr_app_order_refresh_payment(o.id, '{"method": "간편결제", "status": "DONE"}')) from public.myr_orders o where o.code in ('pgtap-ss-1', 'pgtap-ss-2', 'pgtap-ss-3')),
+          '{"pgtap-ss-1": true, "pgtap-ss-2": false, "pgtap-ss-3": false}'::jsonb, '갱신 — 부분 환불 주문만 true · 전액 환불 · 입금 대기는 false');
+select is((select jsonb_object_agg(o.code, jsonb_build_array(o.payment_method, o.raw_payment ->> 'status')) from public.myr_orders o where o.code in ('pgtap-ss-1', 'pgtap-ss-2', 'pgtap-ss-3')),
+          '{"pgtap-ss-1": ["간편결제", "DONE"], "pgtap-ss-2": ["카드", null], "pgtap-ss-3": ["가상계좌", null]}'::jsonb, '갱신된 주문만 결제 수단 · 원문이 바뀐다');
+select is(public.myr_app_order_refresh_payment('00000000-0000-4000-8000-00000000ffff', '{"method": "카드"}'), false, '없는 주문 → false');
+select is(public.myr_app_order_refresh_payment('00000000-0000-4000-8000-00000000e931', null), false, '원문이 없으면 → false(지우지 않는다)');
+
+-- 콘솔 주문 응답 — 내 줄의 배송 상태 · 금액
+select is(public.myr_order_ship_status('00000000-0000-4000-8000-00000000e931'), 'PREPARING', '주문 배송 상태(전체) = 가장 덜 진행된 줄');
+select is(public.myr_order_ship_status('00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e911'), 'SHIPPING', '크리에이터 A 줄만 = 배송중');
+select is(public.myr_order_ship_status('00000000-0000-4000-8000-00000000e932', '00000000-0000-4000-8000-00000000e911'), null, '살아 있는 줄이 없으면 null');
+select is((select jsonb_object_agg(e ->> 'code', jsonb_build_array(e -> 'ship_status', e -> 'amounts')) from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000e911', 50)) e where e ->> 'code' in ('pgtap-ss-1', 'pgtap-ss-2')),
+          '{"pgtap-ss-1": ["SHIPPING", {"paid": 30000, "refunded": 10000, "net": 20000}], "pgtap-ss-2": [null, {"paid": 10000, "refunded": 10000, "net": 0}]}'::jsonb,
+          '콘솔 주문(A) — 내 줄 배송 상태 · 결제 · 환불 · 남은 금액');
+select is((select jsonb_build_array(e -> 'ship_status', e -> 'amounts') from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000e913', 50)) e where e ->> 'code' = 'pgtap-ss-1'),
+          '["PREPARING", {"paid": 20000, "refunded": 0, "net": 20000}]'::jsonb, '콘솔 주문(C) — 같은 주문이라도 내 줄 기준');
+select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000e911', 50)) e where e ->> 'code' = 'pgtap-ss-3'), 0, '입금 대기 주문은 콘솔 주문에 없다(결제된 주문만)');
+
+-- 요청 응답 — open · refund_paid · shipping_back
+select is((select jsonb_object_agg(r.code, jsonb_build_array(j -> 'open', j -> 'amount', j -> 'refund_paid', j -> 'shipping_back'))
+             from public.myr_refund_requests r, lateral (select public.myr_refund_request_json(r) as j) x where r.code like 'pgss0%'),
+          '{"pgss01": [false, 10000, 10000, 0], "pgss02": [true, 20000, null, 0], "pgss03": [true, 10000, 13000, 3000]}'::jsonb,
+          '요청 응답 — [열림, 요청 상품 금액, 결제 기준 금액(환불 + 차감), 함께 돌려준 배송비]');
+select is((select (public.myr_refund_request_json(r) #>> '{order,item,amount}')::int from public.myr_refund_requests r where r.code = 'pgss01'), 30000, '요청 응답 줄 amount = 주문 수량 전체 금액(3 × 10,000)');
+select is(public.myr_app_claim_open('00000000-0000-4000-8000-00000000e931', '00000000-0000-4000-8000-00000000e9c1', 'refund', '오배송',
+            '[{"item_id":"00000000-0000-4000-8000-00000000e942","qty":1,"photos":["00000000-0000-4000-8000-00000000e931/00000000-0000-4000-8000-00000000e942/00000000-0000-4000-8000-0000000000aa.jpg"]}]') -> 'items' -> 0 ->> 'reason',
+          'OPEN_EXISTS', '열린 요청이 있는 줄은 새 요청 불가(같은 판정)');
+
+-- 환불 precheck — goods · shipping_back(화면이 금액을 다시 나누지 않는다)
+select is((select jsonb_build_array(j -> 'amount', j -> 'goods', j -> 'shipping_back', j -> 'full') from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000e934', '[]', 'admin', null) as j) x),
+          '[10000, 10000, 0, true]'::jsonb, '무료배송 주문 전체 환불 — 상품 10,000 · 배송비 0');
+update public.myr_orders set shipping_fee = 3000 where id = '00000000-0000-4000-8000-00000000e934';
+select is((select jsonb_build_array(j -> 'amount', j -> 'goods', j -> 'shipping_back', j -> 'full') from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-00000000e934', '[]', 'admin', null) as j) x),
+          '[13000, 10000, 3000, true]'::jsonb, '배송비 낸 주문 전체 환불 — 상품 10,000 + 배송비 3,000');
+
+-- 실적 줄 — net 칸 · 옛 마진율 칸 없음
+select is((select jsonb_build_array(sum(net)::int, sum(left_qty)::int) from public.myr_sales_lines() where order_id = '00000000-0000-4000-8000-00000000e931'), '[40000, 3]'::jsonb, 'myr_sales_lines — net 합 · 남은 수량 합');
+select ok((select not ('seller_margin_rate' = any (p.proargnames)) and 'net' = any (p.proargnames) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = 'myr_sales_lines'), 'myr_sales_lines — net 칸이 있고 seller_margin_rate 칸은 없다');
+
+-- ---------- 8. 식이 지정한 함수 밖에 없다 ----------
+--   MYR 함수 본문(주석 제외)에서 판정 식을 찾는다. 지정한 함수(allowed) 밖에서 나오면 실패 — 새 함수는 식을 다시 쓰지 말고 그 함수를 부른다.
+--   allowed 의 첫 함수가 그 판정의 주인이다. 상태를 "쓰는" 전이 함수(입금 만료 · 환불 기록)는 allowed 에 같이 적는다.
+create temp table _fn as
+  select p.proname, regexp_replace(p.prosrc, '--[^\n]*', '', 'g') as src
+    from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'myr%';
+create temp table _rules (ord serial, label text, pat text, allowed text[]);
+insert into _rules (label, pat, allowed) values
+  ('줄의 남은 수량(수량 − 환불 수량)',        $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty$p$,        '{myr_line_left}'),
+  ('살아 있는 줄(남은 수량 > 0)',             $p$myr_line_left\(\w+\)\s*>\s*0$p$,                                '{myr_line_live}'),
+  ('취소 줄 비교',                            $p$status\s*<>\s*'CANCELED'|\.status\s*=\s*'CANCELED'|'REFUNDED'\s*,\s*'CANCELED'$p$, '{myr_line_valid,myr_app_deposit_expire,myr_app_refund_record}'),
+  ('금액 − 환불',                             $p$amount\s*-\s*(\w+\.)?refund_amount$p$,                          '{myr_line_net,myr_order_net}'),
+  ('단가 × 수량',                             $p$unit_price(::bigint)?\s*\*|v_unit(::bigint)?\s*\*|\*\s*(\w+\.)?qty\M|\*\s*v_qty$p$, '{myr_line_amount}'),
+  ('상품 남은 재고(입고 − 판매)',             $p$-\s*(coalesce\()?(\w+\.)?sold_qty$p$,                           '{myr_product_left}'),
+  ('품절(남은 재고 0)',                       $p$myr_product_left\(\w+\)\s*(<=|>|<|=)$p$,                        '{myr_product_sold_out}'),
+  ('판매 중 상태',                            $p$status\s*(=|<>)\s*'listed'|'listed'\s*,\s*'paused'$p$,          '{myr_product_listed,myr_product_status_approved}'),
+  ('직접 수정 상태 묶음',                     $p$'draft'\s*,\s*'rejected'$p$,                                    '{myr_product_status_editable}'),
+  ('열린 수정본 상태 묶음',                   $p$'pending'\s*,\s*'rejected'$p$,                                  '{myr_revision_status_open}'),
+  ('주문 상태 묶음',                          $p$'PAID'\s*,\s*'PARTIAL_REFUNDED'$p$,                             '{myr_order_status_paid,myr_order_status_alive}'),
+  ('출고 전 상태 묶음',                       $p$'PAID'\s*,\s*'PREPARING'$p$,                                    '{myr_ship_status_unshipped}'),
+  ('열린 요청 상태 묶음',                     $p$'pending'\s*,\s*'progress'$p$,                                  '{myr_claim_status_open}'),
+  ('주문 주인',                               $p$user_id is null and (\w+\.)?customer_id$p$,                     '{myr_order_owned_by}'),
+  ('판매가 상한',                             $p$10000000$p$,                                                    '{myr_product_price_max}'),
+  ('수량 형식 상한',                          $p$999999$p$,                                                      '{myr_qty_max}'),
+  ('공구 할인율 범위',                        $p$pct\s*(<|>|between|not between)$p$,                             '{myr_groupbuy_pct_ok}'),
+  ('공구가 식',                               $p$\(100\s*-\s*\w+\)$p$,                                           '{myr_groupbuy_price}'),
+  ('비율 나누기(정산 · 보증금)',              $p$/\s*100\M$p$,                                                   '{myr_settlement_amount,myr_deposit_amount}'),
+  ('보증금 식',                               $p$myr_deposit_pct\(\)\s*[*/]$p$,                                  '{myr_deposit_amount}'),
+  ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
+
+select is(coalesce((select string_agg(f.proname, ', ' order by f.proname) from _fn f where f.src ~ r.pat and not (f.proname = any (r.allowed))), ''), '',
+          r.label || ' — 지정한 함수 밖에 이 식이 없다') from _rules r order by r.ord;
+-- 검사가 살아 있는지 — 식이 판정의 주인 함수에는 있어야 한다(패턴이 틀려 아무것도 못 잡는 검사를 막는다)
+select is((select count(*)::int from _rules r where not exists (select 1 from _fn f where f.proname = r.allowed[1] and f.src ~ r.pat)), 0, '모든 검사 식이 주인 함수에는 있다(죽은 검사 없음)');
+
+select * from finish();
+rollback;

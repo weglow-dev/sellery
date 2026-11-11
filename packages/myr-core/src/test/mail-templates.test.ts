@@ -258,7 +258,7 @@ describe('교환 · 환불 요청 메일 (0078)', () => {
 		expect(m.text).not.toContain('010-');
 	});
 	it('승인(고객) — 처리 방법 · 환불 예정(차감) · 다음 단계 · 크리에이터 메시지 · 주문 링크', () => {
-		const m = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refund: { goods: 32000, shippingBack: 0, deduction: 6000, amount: 26000 } }), ctx);
+		const m = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refund: { paid: 32000, goods: 32000, shippingBack: 0, deduction: 6000, amount: 26000 } }), ctx);
 		expect(m.subject).toBe('[MYR] 환불 요청이 승인되었어요 · RQ2001');
 		expect(m.text).toContain('승인 · 부분 환불 (왕복 배송비 차감)');
 		expect(m.text).toContain('₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)');
@@ -266,7 +266,7 @@ describe('교환 · 환불 요청 메일 (0078)', () => {
 		expect(m.text).toContain('회수 뒤 환불해드릴게요');
 		expect(m.text).toContain('https://myr-shop.vercel.app/orders/myr1007');
 		// 마지막 줄이라 처음 배송비도 함께 돌려주면(refundQuote shippingBack) 결제 금액에 넣어 식으로 적는다
-		const last = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refund: { goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 } }), ctx);
+		const last = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refund: { paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 } }), ctx);
 		expect(last.text).toContain('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
 	});
 	it('반려(고객) — 결과 반려 · 문의 안내 · 비회원 링크 · 승인과 키가 다르다', () => {

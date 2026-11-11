@@ -29,7 +29,7 @@ describe('changedSections', () => {
 
 describe('운영팀 상품(콘솔 색 밖 비주얼)', () => {
 	it('열자마자는 바뀐 게 없다 · 색을 고르면 basics 만 바뀜', () => {
-		const d = { id: 'p1', code: 'jun', status: 'listed' as const, rejectReason: null, rejectItems: [], reviewedAt: null, name: '멀티', price: 30000, unit: '30정', category: 'mens', tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill',
+		const d = { id: 'p1', code: 'jun', status: 'listed' as const, editable: false, approved: true, rejectReason: null, rejectItems: [], reviewedAt: null, name: '멀티', price: 30000, unit: '30정', category: 'mens', tile: 'linear-gradient(145deg,#4f7fe8,#1c2f6b)', icon: 'pill',
 			image_urls: [], chips: [], note: '노트', story_title: '', story: '', ingredient_rows: [], howto_steps: [], faq: [], form: '', pack: '', shelf_life: '', storage_method: '' };
 		const orig = detailToDraft(d);
 		expect(anyChanged(changedSections(detailToDraft(d), orig))).toBe(false);

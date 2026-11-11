@@ -11,6 +11,11 @@
 //   (c) packages/{db,payments}/src 의 `.server.ts` 가 아닌 파일이 `server/` 모듈을 import → 실패 (테스트 파일 포함 — 순수 규칙만 테스트한다)
 //   (d) packages/ui/src/site/** 가 `@sellery/core` 를 bare 로 import → 실패 (폴더가 아직 없으면 건너뛴다)
 //   (e) 서버 파일(`*.server.ts` · `+server.ts` · `src/lib/server/**`)이 `@sellery/db/browser` 를 import → 실패 (브라우저 클라이언트는 브라우저에서만)
+//   (f) MYR 앱 · `@sellery/myr-core` 가 셀러리 패키지(`@sellery/{db,payments,core,ui}`)를 import → 실패 · (g) `@sellery/myr-core` 가 SvelteKit 별칭을 import → 실패
+//   (h) MYR 코드(`apps/myr*/src` · `packages/myr-core/src` · 테스트 제외)가 **서버 판정 식을 다시 쓰면** 실패 — 백엔드 원칙 1 · 2(CLAUDE.md).
+//       줄의 남은 수량 · 살아 있는 줄 · 금액 − 환불 · 단가 × 수량 · 주문/요청/상품 상태 묶음 · 품절 · 할인율 범위 · 판매가 상한은 DB 함수 하나가 정하고(0097~0099),
+//       화면 · 서버 TS 는 그 값을 응답에서 읽는다. 아래 MYR_MIRROR_RULES 의 식이 나오면 "서버 값을 쓰라"는 안내와 함께 막는다.
+//       DB 함수끼리 같은 식을 다시 쓰는 것은 pgTAP `supabase/tests/myr_single_source.test.sql` 이 막는다(짝).
 //
 // 의존성 0 · Node 22. 위반은 `파일:줄 — 사유` 로 출력, error 가 하나라도 있으면 exit 1.
 
@@ -139,6 +144,68 @@ for (const file of walk(join(ROOT, "packages", "myr-core", "src"))) {
     }
     if (/^\$(env|app|lib)(\/|$)/.test(spec)) {
       report("error", file, line, `(g) @sellery/myr-core 가 SvelteKit 별칭을 import: '${spec}' — 설정은 configureMyrCore 로 주입한다`);
+    }
+  }
+}
+
+// ---------- (h) MYR — 서버 판정 식을 화면 · TS 에서 다시 쓰지 않는다 ----------
+// 식 하나 = 규칙 하나. allow 는 그 식이 "형식(서버가 보내는 값의 종류)"으로만 쓰이는 파일. 새 예외를 넣기 전에 서버 응답에 값을 더하는 쪽을 먼저 본다.
+const MYR_MIRROR_RULES = [
+  { re: /\bqty\s*-\s*[\w.]*refunded_?[qQ]ty\b/, why: "줄의 남은 수량(수량 − 환불 수량)을 다시 계산 — 서버 값 leftQty(myr_line_left)를 쓴다" },
+  { re: /['"]CANCELED['"]\s*&&[^\n]*\bleftQty\b|\bleftQty\s*(>|<=|===)\s*0\b/, why: "살아 있는 줄을 다시 판정 — 서버 값 live(myr_line_live)를 쓴다" },
+  { re: /\b[aA]mount\s*-\s*[\w.]*refund_?[aA]mount\b/, why: "금액 − 환불을 다시 계산 — 서버 값(netAmount · amounts.net · myr_line_net)을 쓴다" },
+  { re: /\b[uU]nit_?[pP]rice\s*\*|\*\s*[\w.]*[uU]nit_?[pP]rice\b/, why: "단가 × 수량을 다시 계산 — 서버 값(줄 amount · leftAmount · 예상 금액 lines · myr_line_amount)을 쓴다" },
+  { re: /\bgoods\s*\+\s*[\w.]*shippingBack\b|\bshippingBack\s*\+\s*[\w.]*goods\b/, why: "결제 금액(상품 + 배송비)을 다시 계산 — 서버 값 paid 를 쓴다" },
+  { re: /['"]PAID['"]\s*(,|\|\|)[^\n]*['"]PARTIAL_REFUNDED['"]/, why: "주문 상태 묶음을 다시 씀 — 서버 값(alive · claimStatus) 또는 DB 함수(myr_order_status_*)를 쓴다" },
+  {
+    re: /===\s*['"]pending['"]\s*\|\|[^\n]*===\s*['"]progress['"]|\[\s*['"]pending['"]\s*,\s*['"]progress['"]\s*\]/,
+    why: "열린 요청 상태 묶음을 다시 씀 — 서버 값 open(myr_claim_status_open)을 쓴다",
+    allow: ["packages/myr-core/src/order-view.ts"], // OPEN_CLAIM_STATUSES — 서버가 보내는 값의 형식(타입 가드)
+  },
+  {
+    re: /===\s*['"](listed|live)['"]\s*\|\|[^\n]*===\s*['"]paused['"]|===\s*['"]draft['"]\s*\|\|[^\n]*===\s*['"]rejected['"]/,
+    why: "상품 상태 묶음을 다시 씀 — 서버 값 approved · editable(myr_product_status_*)을 쓴다",
+  },
+  { re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/, why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다" },
+  { re: /\bGB_PCT_(MIN|MAX)\b|\b10_?000_?000\b/, why: "공구 할인율 범위 · 판매가 상한 숫자를 화면에 둠 — 서버 값(pctRange · 거절 응답 max)을 쓴다" },
+];
+/** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
+function codeLines(file) {
+  let block = false;
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .map((raw, i) => {
+      let t = raw;
+      if (block) {
+        const end = t.indexOf("*/");
+        if (end < 0) return { line: i + 1, text: "" };
+        t = t.slice(end + 2);
+        block = false;
+      }
+      t = t.replace(/\/\*.*?\*\//g, "").replace(/<!--.*?-->/g, "");
+      const start = t.indexOf("/*");
+      if (start >= 0) {
+        block = true;
+        t = t.slice(0, start);
+      }
+      return { line: i + 1, text: t.replace(/(^|[^:'"`\\])\/\/.*$/, "$1") };
+    });
+}
+const isTestFile = (r) => /\/src\/test\//.test(r) || /\.test\.(ts|js)$/.test(r);
+const myrSrcDirs = [
+  ...(existsSync(appsDir) ? readdirSync(appsDir).filter(isMyrApp).map((app) => join(appsDir, app, "src")) : []),
+  join(ROOT, "packages", "myr-core", "src"),
+];
+for (const dir of myrSrcDirs) {
+  for (const file of walk(dir)) {
+    const r = rel(file);
+    if (isTestFile(r)) continue;
+    for (const { line, text } of codeLines(file)) {
+      if (!text.trim()) continue;
+      for (const rule of MYR_MIRROR_RULES) {
+        if (rule.allow?.includes(r)) continue;
+        if (rule.re.test(text)) report("error", file, line, `(h) ${rule.why} — 백엔드 원칙 1(CLAUDE.md)`);
+      }
     }
   }
 }

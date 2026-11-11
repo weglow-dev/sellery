@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, refundPaid, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
+	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
 	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimOrderedAmount, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
@@ -241,7 +241,7 @@
 						{#if c.needsRefund}
 							{#if refundShown}
 								{#if claimQtyText(c)}<div class="flex justify-between text-white/60"><dt>{KIND_LABEL[c.kind]} 요청</dt><dd class="font-semibold text-fg">{claimQtyText(c)}</dd></div>{/if}
-								<div class="flex justify-between text-white/60"><dt>요청 결제 금액</dt><dd class="font-semibold text-fg tabular-nums">{won(refundPaid(refundShown))}</dd></div>
+								<div class="flex justify-between text-white/60"><dt>요청 결제 금액</dt><dd class="font-semibold text-fg tabular-nums">{won(refundShown.paid)}</dd></div>
 								{#if refundShown.deduction}<div class="flex justify-between text-white/60"><dt>왕복 배송비 차감</dt><dd class="font-semibold text-fg tabular-nums">−{won(refundShown.deduction)}</dd></div>{/if}
 								<div class="flex justify-between text-white/60"><dt class="font-bold text-fg">환불 금액</dt><dd class="font-extrabold text-fg tabular-nums">{won(refundShown.amount)}</dd></div>
 							{:else}

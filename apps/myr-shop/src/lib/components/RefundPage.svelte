@@ -17,7 +17,7 @@
 	import ClaimForm from '$lib/components/ClaimForm.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 	import { claimableItems, refundPaidNote } from '@sellery/myr-core/claim-rules';
-	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
+	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, refundLineAmount, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
 	let { order, returnFee, backHref }: { order: OrderView; returnFee: number | null; backHref: string } = $props();
 	const can = $derived(customerCanRefund(order));
@@ -229,6 +229,7 @@
 							{@const max = remainingQty(it)}
 							{@const q = qtyById[it.id] ?? 0}
 							{@const on = q > 0}
+							{@const lineAmt = refundLineAmount(it, q, est)}
 							{@const noteId = `rf-note-${it.id}`}
 							<div class="rounded-[18px] border p-3 transition-colors lg:rounded-[20px] lg:p-4 {on ? 'border-accent bg-accent/5' : 'border-white/8 bg-white/3'}">
 								<label class="flex min-w-0 cursor-pointer items-center gap-3 lg:gap-4">
@@ -237,7 +238,7 @@
 									<span class="min-w-0 flex-1">
 										{#if it.creator}<span class="block text-[12px] font-bold text-accent">{it.creator}</span>{/if}
 										<span class="block truncate text-[14.5px] font-bold">{it.name}{#if it.option} · {it.option}{/if}</span>
-										<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개 · {won(it.unitPrice * (on ? q : max))}</span>
+										<span class="mt-0.5 block text-[12.5px] text-fg-faint">{on ? q : max}개{lineAmt === null ? '' : ` · ${won(lineAmt)}`}</span>
 									</span>
 								</label>
 								{#if on}

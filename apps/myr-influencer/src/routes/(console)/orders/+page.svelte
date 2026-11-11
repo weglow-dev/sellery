@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CLAIM_LABELS, SHIP_LABELS } from '@sellery/myr-core/order-view';
-	import { filterSellerOrders, liveLines, SELLER_ORDER_TABS, sellerOrderAmounts, sellerOrderLabel, sellerOrderTabCounts, type SellerOrderTab } from '@sellery/myr-core/seller-orders';
+	import { filterSellerOrders, liveLines, SELLER_ORDER_TABS, sellerOrderLabel, sellerOrderTabCounts, type SellerOrderTab } from '@sellery/myr-core/seller-orders';
 	import { ORDER_EMPTY, ORDER_TONE_CLS, orderMeta, orderShipNote, orderTracking } from '$lib/orders';
 	import { won } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
@@ -29,7 +29,7 @@
 		<div class="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3">
 			{#each orders as o (o.id)}
 				{@const st = sellerOrderLabel(o)}
-				{@const amt = sellerOrderAmounts(o)}
+				{@const amt = o.amounts}
 				{@const live = liveLines(o)}
 				{@const mixed = new Set(live.map((i) => i.shipStatus)).size > 1}
 				{@const boxes = orderTracking(o)}

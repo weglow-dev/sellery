@@ -17,7 +17,8 @@ describe('주문 카드', () => {
 		expect(t[0].href).toBeTruthy();
 	});
 	it('출고 안내 — 발주 전 · 배송 준비중 · 출고 뒤엔 없음', () => {
-		const mk = (ship: string) => sellerOrderFromJson({ id: 'o', code: 'c', items: [{ id: 'i', qty: 1, left_qty: 1, live: true, ship_status: ship }] })!;
+		// 주문 배송 상태는 서버 값(0099 ship_status · 내 줄 기준)
+		const mk = (ship: string) => sellerOrderFromJson({ id: 'o', code: 'c', ship_status: ship, items: [{ id: 'i', qty: 1, left_qty: 1, live: true, ship_status: ship }] })!;
 		expect(orderShipNote(mk('PAID'))).toBe('발주 전 · 고객이 직접 취소할 수 있어요');
 		expect(orderShipNote(mk('PREPARING'))).toBe('MYR 물류센터에서 준비 중');
 		expect(orderShipNote(mk('SHIPPING'))).toBeNull();

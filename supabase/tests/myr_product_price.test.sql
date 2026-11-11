@@ -10,7 +10,7 @@ values ('00000000-0000-4000-8000-00000000b921', 'pgtap-price-a', '00000000-0000-
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","price":10000000,"category":"diet"}', false) ->> 'ok', 'true', '1,000만 원 → 저장');
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","price":10000001,"category":"diet"}', false) ->> 'field', 'price', '1,000만 1원 → field price');
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","price":2147483648,"category":"diet"}', false) - 'status',
-          '{"ok": false, "code": "INVALID_INPUT", "field": "price"}'::jsonb, '정수 범위 밖(2,147,483,648) → DB 오류 없이 INVALID_INPUT · price');
+          '{"ok": false, "code": "INVALID_INPUT", "field": "price", "max": 10000000}'::jsonb, '정수 범위 밖(2,147,483,648) → DB 오류 없이 INVALID_INPUT · price');
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","price":12345678900,"category":"diet"}', false) ->> 'field', 'price', '123억 → field price');
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","price":-1,"category":"diet"}', false) ->> 'field', 'price', '음수 → field price(그대로)');
 select is(public.myr_app_seller_save_product('00000000-0000-4000-8000-00000000b911', null, '{"name":"테스트","category":"diet"}', false) ->> 'ok', 'true', '판매가 없음 → 임시저장은 된다(그대로)');

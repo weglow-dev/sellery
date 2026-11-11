@@ -44,7 +44,13 @@ export async function getSellerProduct(sellerId: string, productId: string): Pro
 	return product ? { product, revision: parseSellerProductRevision(r?.revision) } : null;
 }
 
-export type SaveProductResult = { ok: true; id: string; code: string; status: string } | { ok: false; code: SaveProductCode; field?: string; status?: string };
+/** max = 판매가 상한(0099 myr_product_price_max) — 판매가로 거절됐을 때만 실린다. 콘솔 안내 문구가 이 값을 쓴다(화면에 숫자를 두지 않는다) */
+export type SaveProductResult = { ok: true; id: string; code: string; status: string } | { ok: false; code: SaveProductCode; field?: string; status?: string; max?: number };
+const rejectExtra = (r: Record<string, unknown>) => ({
+	...(r.field ? { field: String(r.field) } : {}),
+	...(r.status ? { status: String(r.status) } : {}),
+	...(typeof r.max === 'number' ? { max: r.max } : {})
+});
 
 /** 임시저장(submit=false) · 심사 요청(submit=true). id 없으면 새 상품 */
 export async function saveSellerProduct(sellerId: string, productId: string | null, payload: SellerProductPayload, submit: boolean): Promise<SaveProductResult> {
@@ -55,10 +61,10 @@ export async function saveSellerProduct(sellerId: string, productId: string | nu
 	}
 	const r = (data ?? {}) as Record<string, unknown>;
 	if (r.ok) return { ok: true, id: String(r.id), code: String(r.code), status: String(r.status) };
-	return { ok: false, code: (r.code as SaveProductCode) ?? 'DB_ERROR', ...(r.field ? { field: String(r.field) } : {}), ...(r.status ? { status: String(r.status) } : {}) };
+	return { ok: false, code: (r.code as SaveProductCode) ?? 'DB_ERROR', ...rejectExtra(r) };
 }
 
-export type SubmitRevisionResult = { ok: true; revisionId: string } | { ok: false; code: SubmitRevisionCode; field?: string; status?: string };
+export type SubmitRevisionResult = { ok: true; revisionId: string } | { ok: false; code: SubmitRevisionCode; field?: string; status?: string; max?: number };
 
 /** 판매 중 · 일시중지 상품의 수정 심사 요청(0074) — 승인되면 샵에 반영. 대상 · 필수 칸 · 바뀐 게 없음 · 이미지 판정은 RPC 가 정답 */
 export async function submitSellerProductRevision(sellerId: string, productId: string, payload: SellerProductPayload): Promise<SubmitRevisionResult> {
@@ -69,7 +75,7 @@ export async function submitSellerProductRevision(sellerId: string, productId: s
 	}
 	const r = (data ?? {}) as Record<string, unknown>;
 	if (r.ok) return { ok: true, revisionId: String(r.revision_id) };
-	return { ok: false, code: (r.code as SubmitRevisionCode) ?? 'DB_ERROR', ...(r.field ? { field: String(r.field) } : {}), ...(r.status ? { status: String(r.status) } : {}) };
+	return { ok: false, code: (r.code as SubmitRevisionCode) ?? 'DB_ERROR', ...rejectExtra(r) };
 }
 
 export type SetStatusResult = { ok: true; status: string } | { ok: false; code: 'NOT_FOUND' | 'BAD_ACTION' | 'WRONG_STATUS' | 'DB_ERROR'; status?: string };

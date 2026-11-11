@@ -72,6 +72,8 @@ export function productFromRow(r: SellerProductRow, now: Date = new Date()): Pro
 		price: r.price,
 		stock: r.stockLeft,
 		status: STATUS_FROM_DB[r.status],
+		approved: r.approved,
+		soldOut: r.soldOut,
 		tile: 'slate',
 		bg: r.tile,
 		iconId: r.icon,
