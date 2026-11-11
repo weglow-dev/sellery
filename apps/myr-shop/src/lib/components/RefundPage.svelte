@@ -16,7 +16,7 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import ClaimForm from '$lib/components/ClaimForm.svelte';
 	import Tile from '$lib/components/Tile.svelte';
-	import { claimableItems } from '@sellery/myr-core/claim-rules';
+	import { claimableItems, refundPaidNote } from '@sellery/myr-core/claim-rules';
 	import { customerCanRefund, customerRefundableItems, refundMessage, REFUND_NOTE_MAX, REFUND_PHOTO_ACCEPT, REFUND_PHOTO_MAX, REFUND_PHOTO_MAX_BYTES, REFUND_PHOTO_TYPES, REFUND_REASONS, remainingQty, type RefundLine } from '@sellery/myr-core/refund-rules';
 
 	let { order, returnFee = 6000, backHref }: { order: OrderView; returnFee?: number; backHref: string } = $props();
@@ -343,7 +343,7 @@
 								<span class="text-[14px] font-bold">예상 환불 금액</span>
 								<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{est ? won(est.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
 							</div>
-							{#if est?.shippingBack}<p class="mt-1.5 text-right text-[12px] text-fg-faint">배송비 {won(est.shippingBack)} 포함</p>{/if}
+							{#if est}<p class="mt-1.5 text-right text-[12px] text-fg-faint">{refundPaidNote(est, order.shippingFee)}</p>{/if}
 							{#if quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 잠시 후 다시 골라주세요</p>{/if}
 						{/if}
 						{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}

@@ -4,6 +4,7 @@
  * 크리에이터는 출고 일정을 정하지 않는다(MYR 물류 발송) — 이 표는 지금 기록만 보여 준다. 순수(src/test/inquiry.test.ts · claims.test.ts).
  */
 import { isShipStatus, shortDate, statusLabel, type ShipStatus } from '@sellery/myr-core/order-view';
+import { won } from './rules';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 type ShipFields = { courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
@@ -11,6 +12,8 @@ type ShipFields = { courier: string | null; trackingNo: string | null; shippedAt
 export type ShipOrder = Partial<ShipFields> & {
 	status: string;
 	paidAt: string | null;
+	/** 교환·환불 요청 상세만(0090) — 그 줄 상품 금액 · 주문 배송비(무료배송이면 0). 다른 줄 금액 · 주문 합계는 싣지 않는다 */
+	money?: { goods: number; shippingFee: number } | null;
 	item: (ShipFields & { name: string; option: string; qty: number; shipStatus: string | null }) | null;
 };
 export type OrderShipping = { label: string; cls: string; rows: { k: string; v: string; href?: string | null }[] };
@@ -25,6 +28,10 @@ export function orderShipping(o: ShipOrder): OrderShipping {
 	const st = statusLabel({ status: o.status, ...ship });
 	const rows: OrderShipping['rows'] = [];
 	if (it) rows.push({ k: '주문 상품', v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
+	if (o.money) {
+		rows.push({ k: '상품 금액', v: won(o.money.goods) });
+		rows.push({ k: '배송비', v: o.money.shippingFee > 0 ? won(o.money.shippingFee) : '무료배송' });
+	}
 	if (o.paidAt) rows.push({ k: '결제일', v: shortDate(o.paidAt) });
 	if (ship.trackingNo) rows.push({ k: '운송장', v: `${ship.courier ?? '택배'} ${ship.trackingNo}`, href: ship.courier ? trackingUrl(ship.courier, ship.trackingNo) : null });
 	if (ship.shippedAt) rows.push({ k: '발송일', v: shortDate(ship.shippedAt) });

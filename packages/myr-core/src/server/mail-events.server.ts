@@ -11,8 +11,7 @@
  * 받는 사람: 고객 = buyer_email → customers.email → 회원 auth 계정 이메일(없으면 조용히 건너뜀 · 카카오 계정은 이메일이 없을 수 있다) · 셀러 = sellers.email(없으면 건너뜀 — 시드 크리에이터는 비어 있다).
  * 멱등: 템플릿 idempotencyKey(Resend Idempotency-Key + 프로세스 24시간 가드).
  */
-import { claimStepText, RESOLUTION_NAMES, type Claim } from '../claim-rules';
-import type { RefundQuote } from '../refund-rules';
+import { claimStepText, RESOLUTION_NAMES, type Claim, type RefundView } from '../claim-rules';
 import { isEmailAddress } from '../mail/resend';
 import { trackingUrl } from '../ship-rules';
 import { claimDecidedMail, claimOpenedSellerMail, claimReshippedMail, csOpenedSellerMail, csRepliedMail, depositPendingMail, orderPaidCustomerMail, orderPaidSellerMail, orderRefundedMail, orderRefundedSellerMail, type MailClaim, type MailCs, type MailItem, type MailOrder, type MailRefund, type MailTemplate, orderShippedMail } from '../mail/templates';
@@ -232,7 +231,7 @@ export async function notifyCsReplied(conversationId: string, reply: { messageId
 
 /* ---------------- 교환·환불 요청 (0078) ---------------- */
 /** refund = 환불 예정 금액(승인 메일 · 서버 refundQuote) — 다른 메일은 없음 */
-function mailClaim(c: Claim, loaded: Loaded, refund: Pick<RefundQuote, 'amount' | 'shippingBack'> | null = null): MailClaim {
+function mailClaim(c: Claim, loaded: Loaded, refund: RefundView | null = null): MailClaim {
 	return {
 		code: c.code,
 		kind: c.kind,
@@ -250,9 +249,7 @@ function mailClaim(c: Claim, loaded: Loaded, refund: Pick<RefundQuote, 'amount' 
 		resolutionName: c.resolution ? RESOLUTION_NAMES[c.resolution] : null,
 		message: c.message,
 		stepText: claimStepText(c),
-		refundTotal: c.needsRefund && refund ? refund.amount : null,
-		deduction: c.deduction,
-		shippingBack: refund?.shippingBack ?? 0
+		refund: c.needsRefund ? refund : null
 	};
 }
 
@@ -270,7 +267,7 @@ export async function notifyClaimOpened(c: Claim): Promise<MailSendResult | null
 }
 
 /** 승인 · 반려 → 고객 */
-export async function notifyClaimDecided(c: Claim, refund: Pick<RefundQuote, 'amount' | 'shippingBack'> | null = null): Promise<MailSendResult | null> {
+export async function notifyClaimDecided(c: Claim, refund: RefundView | null = null): Promise<MailSendResult | null> {
 	try {
 		const loaded = await loadOrder(c.order.id);
 		if (!loaded) return null;

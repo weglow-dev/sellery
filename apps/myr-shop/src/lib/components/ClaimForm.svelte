@@ -18,6 +18,8 @@
 		KIND_LABEL,
 		kindAllowed,
 		photoRequired,
+		refundPaid,
+		refundPaidNote,
 		type ClaimKind,
 		type ClaimReason
 	} from '@sellery/myr-core/claim-rules';
@@ -250,6 +252,16 @@
 				<div class="flex justify-between text-fg-soft"><span>종류</span><span class="text-fg">{KIND_LABEL[kind]}</span></div>
 				<div class="flex justify-between text-fg-soft"><span>사유</span><span class={reason ? 'text-fg' : 'text-fg-faint'}>{reason || '—'}</span></div>
 			</div>
+			{#if estimate}
+				<!-- 결제 금액 − 왕복 배송비 = 예상 환불 금액(서버 refundQuote 값 그대로) -->
+				<div class="mt-3.5 flex flex-col gap-2 border-t border-white/8 pt-3.5 text-[14px]">
+					<div class="flex justify-between gap-3 text-fg-soft">
+						<span>결제 금액</span>
+						<span class="text-right"><span class="block text-fg tabular-nums">{won(refundPaid(estimate))}</span><span class="mt-0.5 block text-[12px] text-fg-faint">{refundPaidNote(estimate, order.shippingFee)}</span></span>
+					</div>
+					{#if estimate.deduction}<div class="flex justify-between text-fg-soft"><span>왕복 배송비 차감</span><span class="text-fg tabular-nums">−{won(estimate.deduction)}</span></div>{/if}
+				</div>
+			{/if}
 			<div class="mt-3.5 flex items-baseline justify-between border-t border-white/8 pt-3.5">
 				<span class="text-[14px] font-bold">{kind === 'refund' ? '예상 환불 금액' : '처리'}</span>
 				{#if kind !== 'refund'}
@@ -258,11 +270,6 @@
 					<span class="text-[22px] font-extrabold tracking-[-.02em] text-accent lg:text-[24px]">{estimate ? won(estimate.amount) : chosen.length && quote.loading ? '확인 중' : '₩0'}</span>
 				{/if}
 			</div>
-			{#if estimate && (estimate.deduction || estimate.shippingBack)}
-				<p class="mt-1.5 text-right text-[12px] text-fg-faint">
-					{[estimate.deduction ? `왕복 배송비 ${won(estimate.deduction)} 차감` : '', estimate.shippingBack ? `배송비 ${won(estimate.shippingBack)} 포함` : ''].filter(Boolean).join(' · ')}
-				</p>
-			{/if}
 			{#if kind === 'refund' && quote.failed}<p class="mt-1.5 text-right text-[12px] text-[#ff8a8a]">금액을 확인하지 못했어요 — 요청은 보낼 수 있어요</p>{/if}
 			{#if error}<p role="alert" class="mt-3 rounded-[12px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-3 py-2.5 text-[13px] text-white/85">{error}</p>{/if}
 			<div class="mt-5">

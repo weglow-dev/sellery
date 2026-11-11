@@ -3,7 +3,7 @@
 --   여기서는 요청 줄(배송준비중 이후)을 actor system 으로 precheck 했을 때: 마지막 줄이면 배송비 포함 · 아니면 줄만 · 고객 actor 는 셀프 환불 가드로 막힘 · 금액 계산은 읽기만.
 --   MYR2087 재현: 36,000 줄 하나 + 배송비 3,000 → precheck 39,000 → 단순 변심 차감 6,000 → 33,000.
 begin;
-select plan(9);
+select plan(11);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-000000000e01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-quote-cust@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
@@ -37,6 +37,9 @@ select isnt(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31
 -- 읽기만 — 예상 금액을 몇 번 계산해도 주문 · 줄은 그대로
 select is((select refund_amount from public.myr_orders where id = '00000000-0000-4000-8000-000000000e31'), 0, 'precheck 는 주문 환불액을 바꾸지 않는다');
 select is((select refunded_qty from public.myr_order_items where id = '00000000-0000-4000-8000-000000000e41'), 0, 'precheck 는 줄 환불 수량을 바꾸지 않는다');
+-- 0090 — 요청 JSON 에 주문 배송비(콘솔 "결제 금액 − 왕복 배송비 = 환불 금액" · 주문 카드 배송비/무료배송)
+select is(public.myr_app_claim_open('00000000-0000-4000-8000-000000000e31', '00000000-0000-4000-8000-000000000e01', 'refund', '단순 변심', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]') ->> 'ok', 'true', '요청 접수');
+select is((select public.myr_refund_request_json(r) #>> '{order,shipping_fee}' from public.myr_refund_requests r where r.order_id = '00000000-0000-4000-8000-000000000e31'), '3000', '요청 JSON order.shipping_fee = 주문 배송비');
 -- 권한 — precheck 는 서버(service role) 전용
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 precheck 불가');
 

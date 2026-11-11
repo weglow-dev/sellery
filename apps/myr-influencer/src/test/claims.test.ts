@@ -49,7 +49,7 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 		expect(resolutionOptions(c).map((o) => o.title)).toEqual(['부분 환불 (왕복 배송비 차감)', '전액 환불']);
 		// 금액은 서버 예상 금액(claimQuotes) — 처리 방법마다 그 칸의 금액
 		const quotes = { partial: { amount: 33000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false }, refund: { amount: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false } };
-		expect(resolutionOptions(c, quotes).map((o) => o.desc)).toEqual(['₩33,000 (배송비 ₩3,000 포함) · 회수 확인 뒤 환불', '₩39,000 (배송비 ₩3,000 포함) · 회수 확인 뒤 환불']);
+		expect(resolutionOptions(c, quotes).map((o) => o.desc)).toEqual(['₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불', '₩39,000 (상품 ₩36,000 + 배송비 ₩3,000) · 회수 확인 뒤 환불']);
 		expect(approveLabel(c, 'partial')).toBe('부분 환불 (왕복 배송비 차감) 승인');
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
 		expect(approveLabel(c, 'reship')).toBe('처리 방법을 선택하세요');
@@ -75,7 +75,7 @@ describe('처리 내역', () => {
 			NOW
 		);
 		expect(rows[1].when).toBe('1시간 전 · 확인했어요');
-		expect(rows[3]).toEqual({ title: '환불 완료', when: '방금 · ₩26,000 (왕복 배송비 ₩6,000 차감)', done: true, last: true });
+		expect(rows[3]).toEqual({ title: '환불 완료', when: '방금 · ₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000)', done: true, last: true });
 	});
 });
 
@@ -84,7 +84,7 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	it('배송 완료 줄 → 운송장(조회 링크) · 발송일 · 배송 완료', () => {
 		const s = claimShipping(claim({ order: ord('PAID', { ship_status: 'DELIVERED', courier: 'CJ대한통운', tracking_no: '612300000010', shipped_at: '2026-11-02T00:00:00Z', delivered_at: '2026-11-03T00:00:00Z' }) }));
 		expect(s.label).toBe('배송 완료');
-		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '결제일', '운송장', '발송일', '배송 완료']);
+		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '상품 금액', '배송비', '결제일', '운송장', '발송일', '배송 완료']);
 		expect(s.rows.find((r) => r.k === '운송장')).toMatchObject({ v: 'CJ대한통운 612300000010' });
 		expect(s.rows.find((r) => r.k === '운송장')!.href).toBeTruthy();
 	});
@@ -93,6 +93,13 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 		expect(s.label).toBe('부분 환불');
 		expect(s.rows.find((r) => r.k === '출고')!.v).toBe('MYR 물류센터에서 준비 중');
 		expect(s.rows.some((r) => r.k === '운송장')).toBe(false);
+	});
+	it('상품 금액(그 줄 전체 수량) · 주문 배송비(0090) — 무료배송이면 "무료배송"', () => {
+		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2 }), shipping_fee: 3000 } }));
+		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000');
+		expect(paid.rows.find((r) => r.k === '배송비')!.v).toBe('₩3,000');
+		const free = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING' }), shipping_fee: 0 } }));
+		expect(free.rows.find((r) => r.k === '배송비')!.v).toBe('무료배송');
 	});
 	it('옛 응답(주문 상태 · 송장 없음) → 결제 완료 주문 · 줄 배송 상태로', () => {
 		const c = claim();
