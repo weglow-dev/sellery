@@ -1,7 +1,7 @@
 /** 환불 순수 규칙 — 입력 검증 · 화면 판정 · RPC 파서 · 토스 Idempotency-Key (테스트 src/test/refund-rules.test.ts). docs/myr.md §6.3. */
 import { ORDER_CODE_RE } from './checkout-rules';
 import { QTY_INT_MAX } from './constants';
-import { cleanText } from './text';
+import { cleanMultiline, cleanText, sliceChars } from './text';
 import type { OrderItem, OrderView } from './order-view';
 
 /** note = 제품별 상세 내용(선택 · 크리에이터에게 전달 · 0067 줄 refund_reason 에 "사유 — 상세") · photos = 올린 사진 경로(0068 · 줄당 3장) — 금액·Idempotency-Key 에는 쓰지 않는다 */
@@ -50,7 +50,8 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 			if (!l || typeof l.itemId !== 'string' || !UUID_RE.test(l.itemId) || !Number.isInteger(l.qty) || (l.qty as number) < 1 || (l.qty as number) > QTY_INT_MAX)
 				return null;
 			if (l.note !== undefined && l.note !== null && typeof l.note !== 'string') return null;
-			const note = cleanText(typeof l.note === 'string' ? l.note : '').slice(0, REFUND_NOTE_MAX);
+			// 상세 내용은 여러 줄 글 — 줄바꿈 · 이모지를 지우지 않는다
+			const note = sliceChars(cleanMultiline(l.note), REFUND_NOTE_MAX);
 			const line: RefundLine = { item_id: l.itemId, qty: l.qty as number };
 			if (note) line.note = note;
 			if (l.photos !== undefined && l.photos !== null) {

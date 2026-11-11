@@ -17,6 +17,7 @@
  */
 import { refundAmountText, type RefundView } from '../claim-rules';
 import { won } from '../constants';
+import { charLength, cleanMultiline, sliceChars } from '../text';
 import { mailIdempotencyKey, renderMailHtml, renderMailText, type MailDoc, type MailRow } from './layout';
 
 export type MailCtx = { siteUrl: string };
@@ -203,7 +204,7 @@ export function orderRefundedSellerMail(o: MailOrder, r: MailRefund, sellerId: s
 			{ label: r.deposit ? '취소된 내 상품' : '환불된 내 상품', value: itemsText(lines) },
 			...(r.deposit ? [] : [{ label: '내 상품 환불 금액', value: won(amount) }]),
 			...(r.reason ? [{ label: '사유', value: r.reason }] : []),
-			...mine.filter((p) => p.x.note).map((p) => ({ label: `상세 · ${p.i.name}`, value: previewOf(p.x.note as string, 300) })),
+			...mine.filter((p) => p.x.note).map((p) => ({ label: `상세 · ${p.i.name}`, value: previewLinesOf(p.x.note as string, 300) })),
 			...mine.filter((p) => p.x.photoUrls?.length).map((p) => ({ label: `사진 · ${p.i.name}`, value: (p.x.photoUrls as string[]).map((u, i) => `${i + 1}) ${u}`).join('\n') }))
 		],
 		notes: mine.some((p) => p.x.photoUrls?.length) ? ['사진 링크는 7일 동안 열려요. 그 뒤에는 콘솔의 환불 내역에서 보세요.'] : undefined
@@ -218,7 +219,12 @@ export type MailCs = { conversationId: string; code: string; type: string; buyer
 const PREVIEW_MAX = 200;
 export function previewOf(body: string | null | undefined, max = PREVIEW_MAX): string {
 	const s = (body ?? '').replace(/\s+/g, ' ').trim();
-	return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+	return charLength(s) > max ? `${sliceChars(s, max - 1)}…` : s;
+}
+/** 여러 줄 글 미리보기 — 줄바꿈은 그대로(메일 HTML 은 textToHtml 이 <br> 로) · 길면 자르고 … */
+export function previewLinesOf(body: string | null | undefined, max = PREVIEW_MAX): string {
+	const s = cleanMultiline(body ?? '');
+	return charLength(s) > max ? `${sliceChars(s, max - 1)}…` : s;
 }
 const csGuestNote = '비회원 문의는 접수한 기기(브라우저)에서 90일간 열려요. 다른 기기에서는 주문 조회 뒤 주문 상세의 문의 목록에서 여세요.';
 
@@ -328,7 +334,7 @@ export function claimDecidedMail(c: MailClaim, ctx: MailCtx): MailTemplate {
 		preheader: `${code} · ${c.productName}`,
 		intro: `${c.buyerName}님, ${c.sellerName}님이 ${claimKind(c)} 요청(${code})을 ${rejected ? '반려' : '승인'}했어요.`,
 		rows,
-		quote: c.message ? previewOf(c.message, 500) : undefined,
+		quote: c.message ? previewLinesOf(c.message, 500) : undefined,
 		button: { label: '주문 확인하기', url: orderPageUrl({ code: c.orderCode, isMember: c.isMember }, ctx) },
 		notes: notes.length ? notes : undefined
 	};

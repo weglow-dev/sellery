@@ -2,7 +2,7 @@
  * 고객 문의(CS) 순수 규칙 — 접수 폼 · 스레드 파서 · 문구 · 쿠키 이름 (packages/db/src/cs/cs-rules.ts 복사 · MYR 은 상품 단위 · brand → seller).
  * 브라우저 `.svelte` 와 서버 양쪽. DB 호출은 `./server/cs.ts`. 테스트 src/test/cs-rules.test.ts.
  */
-import { cleanText } from './text';
+import { cleanMultiline, cleanText } from './text';
 
 /** 0063 myr_cs_conversations.type 제약과 같은 4개 */
 export const CS_TYPES = ['배송 문의', '교환·반품', '상품 문의', '기타'] as const;
@@ -30,14 +30,8 @@ function formToObj(raw: unknown): Obj | null {
 	return obj(raw);
 }
 
-/** 본문 정규화 — 0063 myr_cs_normalize_body 와 같은 결과(제어문자 제거 · 개행 유지 · 빈 줄 3개 이상 → 2개 · 앞뒤 공백) */
-export function normalizeCsBody(raw: string | null | undefined): string {
-	return String(raw ?? '')
-		.replace(/\r\n?/g, '\n')
-		.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-		.replace(/\n{3,}/g, '\n\n')
-		.trim();
-}
+/** 본문 정규화 — 0063 myr_cs_normalize_body 와 같은 결과(제어문자 제거 · 개행 유지 · 빈 줄 3개 이상 → 2개 · 앞뒤 공백) — 여러 줄 글 공용 cleanMultiline */
+export const normalizeCsBody = (raw: string | null | undefined): string => cleanMultiline(raw ?? '');
 
 /* ---------------- 폼 ---------------- */
 export type CsOpenField = 'type' | 'body' | 'buyer_name' | 'order_code';

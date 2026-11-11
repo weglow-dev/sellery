@@ -165,10 +165,11 @@ describe('환불(셀러) — 자기 줄만', () => {
 	it('셀러 환불 메일 — 내 줄의 상세(note)만 "상세 · 상품명" 행으로 (0067)', () => {
 		const o = order();
 		const mine = o.items[0];
-		const r = { items: [{ itemId: mine.id, qty: 1, amount: mine.unitPrice, note: '포장이 찢어졌어요' }], amount: mine.unitPrice, full: false, reason: '상품 불량·파손', deposit: false };
+		const r = { items: [{ itemId: mine.id, qty: 1, amount: mine.unitPrice, note: '포장이 찢어졌어요 \u{1F622}\n상자도 젖었어요' }], amount: mine.unitPrice, full: false, reason: '상품 불량·파손', deposit: false };
 		const m = orderRefundedSellerMail(o, r, mine.sellerId, ctx)!;
 		expect(m.text).toContain(`상세 · ${mine.name}`);
-		expect(m.text).toContain('포장이 찢어졌어요');
+		expect(m.text).toContain('포장이 찢어졌어요 \u{1F622}\n상자도 젖었어요'); // 여러 줄 글 — 줄바꿈 · 이모지 그대로
+		expect(m.html).toContain('포장이 찢어졌어요 \u{1F622}<br>상자도 젖었어요');
 		expect(orderRefundedMail(o, r, ctx).text).not.toContain('포장이 찢어졌어요');
 	});
 	it('셀러 환불 메일 — 사진 서명 URL 행 + 7일 안내 · 고객 메일엔 없음 (0068)', () => {
@@ -268,6 +269,11 @@ describe('교환 · 환불 요청 메일 (0078)', () => {
 		// 마지막 줄이라 처음 배송비도 함께 돌려주면(refundQuote shippingBack) 결제 금액에 넣어 식으로 적는다
 		const last = claimDecidedMail(claim({ status: 'progress', resolutionName: '부분 환불 (왕복 배송비 차감)', message: '회수 뒤 환불해드릴게요', stepText: '회수를 기다리고 있어요', refund: { paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, amount: 33000 } }), ctx);
 		expect(last.text).toContain('₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000)');
+	});
+	it('크리에이터 메시지 — 줄바꿈 · 이모지 그대로(텍스트는 줄마다 인용 "> " · HTML 은 <br>)', () => {
+		const m = claimDecidedMail(claim({ status: 'rejected', kind: 'exchange', message: '개봉 제품이라 어려워요 \u{1F64F}\n문의 주시면 다시 볼게요' }), ctx);
+		expect(m.text).toContain('> 개봉 제품이라 어려워요 \u{1F64F}\n> 문의 주시면 다시 볼게요');
+		expect(m.html).toContain('개봉 제품이라 어려워요 \u{1F64F}<br>문의 주시면 다시 볼게요');
 	});
 	it('반려(고객) — 결과 반려 · 문의 안내 · 비회원 링크 · 승인과 키가 다르다', () => {
 		const m = claimDecidedMail(claim({ status: 'rejected', kind: 'exchange', isMember: false, message: '개봉 제품이라 어려워요' }), ctx);

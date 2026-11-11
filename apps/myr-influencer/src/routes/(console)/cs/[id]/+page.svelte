@@ -115,7 +115,7 @@
 				</div>
 				<div class="pb-3.5">
 					<p class="mt-px text-[14px] font-bold {tl.done ? 'text-fg' : 'text-white/60'}">{tl.title}</p>
-					{#if tl.when}<p class="mt-[3px] text-[12px] text-white/50">{tl.when}</p>{/if}
+					{#if tl.when}<p class="mt-[3px] text-[12px] break-words whitespace-pre-line text-white/50">{tl.when}</p>{/if}
 				</div>
 			</li>
 		{/each}
@@ -189,7 +189,7 @@
 						<span class="rounded-lg bg-white/6 px-[9px] py-1 text-[12px] font-bold">{c.reason}</span>
 					</div>
 					{#if c.note}
-						<p class="mt-3 text-[14px] leading-[1.65] text-pretty text-white/85 lg:mt-4 lg:text-[15px] lg:leading-[1.7]">"{c.note}"</p>
+						<p class="mt-3 text-[14px] leading-[1.65] text-pretty break-words whitespace-pre-line text-white/85 lg:mt-4 lg:text-[15px] lg:leading-[1.7]">"{c.note}"</p>
 					{/if}
 					{#if data.photoUrls.length}
 						<div class="mt-3 flex gap-1.5 lg:mt-4 lg:gap-2">
