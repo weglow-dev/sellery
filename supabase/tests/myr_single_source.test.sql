@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(113);
+select plan(115);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -66,6 +66,15 @@ select is((select jsonb_object_agg(k || '/' || r, public.myr_claim_kind_allowed(
           '요청 종류 — 단순 변심 교환만 안 된다');
 select is(jsonb_build_array(public.myr_claim_kind_allowed('exchange', null), public.myr_claim_kind_allowed(null, '오배송'), public.myr_claim_kind_allowed('gift', '오배송'), public.myr_claim_photo_required(null), public.myr_claim_reason_change_mind(null)),
           '[true, false, false, false, false]'::jsonb, 'null · 모르는 값 — 종류 없음 · 모르는 종류는 거절 · 사진 · 기한은 false(사유 자체는 BAD_REASON 이 먼저 막는다)');
+
+-- 처리 방법 선택지(myr_refund_request_options)는 사유 이름으로 고른다 — 사유 목록(myr_claim_reasons)과 이름이 어긋나면 빈 배열이 되어 콘솔에서 처리 방법을 고를 수 없다.
+--   사유 목록에서 꺼낸 이름으로 물어, 받는 사유 · 요청 종류마다 선택지가 있는지 본다(사유 이름을 한쪽만 바꾸면 여기서 실패한다)
+select is((select count(*)::int from unnest(public.myr_claim_reasons()) rn, unnest(public.myr_claim_kinds(rn)) k where cardinality(public.myr_refund_request_options(k, rn)) = 0), 0,
+          '받는 사유 · 요청 종류마다 처리 방법 선택지가 하나 이상(사유 이름이 어긋나지 않았다)');
+select is((select jsonb_object_agg(rn || '/' || k, to_jsonb(public.myr_refund_request_options(k, rn))) from unnest(public.myr_claim_reasons()) rn, unnest(public.myr_claim_kinds(rn)) k),
+          '{"단순 변심/refund": ["partial", "refund"], "파손 · 누액/refund": ["refund", "reship"], "파손 · 누액/exchange": ["reship", "refund"],
+            "오배송/refund": ["refund", "reship_collect"], "오배송/exchange": ["reship_collect", "refund"]}'::jsonb,
+          '사유 · 요청 종류별 선택지(첫 값이 기본 — 새 요청의 예상 차감이 이 값을 쓴다)');
 
 -- 처리 방법마다 회수 여부 — 승인(needs_collect)과 콘솔 안내(option_collects)가 같은 함수
 select is((select jsonb_object_agg(rs || '/' || rn, public.myr_claim_resolution_collects(rs, rn)) from unnest(array['refund','partial','reship','reship_collect']) rs, unnest(public.myr_claim_reasons()) rn),
