@@ -99,9 +99,12 @@ describe('입력 — 승인 · 반려 · 운영', () => {
 		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'partial', message: ' 확인했어요 ' })).toEqual({ decision: 'approve', resolution: 'partial', message: '확인했어요' });
 		expect(parseClaimDecideBody({ decision: 'reject', resolution: 'refund', message: '어려워요' })).toEqual({ decision: 'reject', resolution: null, message: '어려워요' });
 		expect(parseClaimDecideBody({ decision: 'approve', message: '확인' })).toBeNull();
-		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund', message: '   ' })).toBeNull();
+		// 승인은 메시지 선택(0091) · 반려는 필수
+		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund', message: '   ' })).toEqual({ decision: 'approve', resolution: 'refund', message: '' });
+		expect(parseClaimDecideBody({ decision: 'approve', resolution: 'refund' })).toEqual({ decision: 'approve', resolution: 'refund', message: '' });
+		expect(parseClaimDecideBody({ decision: 'reject', message: '   ' })).toBeNull();
 		expect(parseClaimDecideBody({ decision: 'reject', message: '가'.repeat(1001) })).toBeNull();
-		expect([canDecide(null, '안내'), canDecide('refund', ' '), canDecide('refund', '안내')]).toEqual([false, false, true]);
+		expect([canDecide(null, '안내'), canDecide('refund', ' '), canDecide('refund', '안내'), canDecide('refund', '가'.repeat(1001))]).toEqual([false, true, true, false]);
 	});
 	it('운영 — 요청번호 대문자 · 택배사 별칭 · 운송장 숫자만', () => {
 		expect(parseClaimOpsInput({ code: 'RQ2001', action: 'collected' })).toEqual({ ok: true, input: { code: 'rq2001', action: 'collected' } });

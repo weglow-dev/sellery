@@ -139,12 +139,14 @@ export function parseClaimDecideBody(v: unknown): ClaimDecideBody | null {
 	const b = obj(v);
 	if (!b) return null;
 	const message = cleanText(typeof b.message === 'string' ? b.message : '');
-	if (!message || message.length > CLAIM_MESSAGE_MAX) return null;
-	if (b.decision === 'reject') return { decision: 'reject', resolution: null, message };
+	if (message.length > CLAIM_MESSAGE_MAX) return null;
+	// 반려는 사유를 고객에게 알려야 하니 메시지 필수 · 승인은 선택(0091 — 비면 null)
+	if (b.decision === 'reject') return message ? { decision: 'reject', resolution: null, message } : null;
 	if (b.decision === 'approve' && isResolution(b.resolution)) return { decision: 'approve', resolution: b.resolution, message };
 	return null;
 }
-export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && cleanText(message).length > 0 && cleanText(message).length <= CLAIM_MESSAGE_MAX;
+/** 승인 버튼 — 처리 방법만 고르면 된다(메시지는 선택 · 0091) · 메시지를 적었으면 길이만 본다 */
+export const canDecide = (resolution: Resolution | null, message: string): boolean => !!resolution && cleanText(message).length <= CLAIM_MESSAGE_MAX;
 
 /* ---------------- 파서 — myr_refund_request_json ---------------- */
 export type Claim = {

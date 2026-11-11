@@ -3,7 +3,7 @@
 --   여기서는 요청 줄(배송준비중 이후)을 actor system 으로 precheck 했을 때: 마지막 줄이면 배송비 포함 · 아니면 줄만 · 고객 actor 는 셀프 환불 가드로 막힘 · 금액 계산은 읽기만.
 --   MYR2087 재현: 36,000 줄 하나 + 배송비 3,000 → precheck 39,000 → 단순 변심 차감 6,000 → 33,000.
 begin;
-select plan(11);
+select plan(15);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-000000000e01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-quote-cust@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
@@ -40,6 +40,14 @@ select is((select refunded_qty from public.myr_order_items where id = '00000000-
 -- 0090 — 요청 JSON 에 주문 배송비(콘솔 "결제 금액 − 왕복 배송비 = 환불 금액" · 주문 카드 배송비/무료배송)
 select is(public.myr_app_claim_open('00000000-0000-4000-8000-000000000e31', '00000000-0000-4000-8000-000000000e01', 'refund', '단순 변심', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]') ->> 'ok', 'true', '요청 접수');
 select is((select public.myr_refund_request_json(r) #>> '{order,shipping_fee}' from public.myr_refund_requests r where r.order_id = '00000000-0000-4000-8000-000000000e31'), '3000', '요청 JSON order.shipping_fee = 주문 배송비');
+-- 0091 — 승인은 메시지 없이 된다(null 저장) · 반려는 필수 · 1000자 초과는 둘 다 거부
+-- 크리에이터 계정(픽스처를 짧게 — 고객 계정을 크리에이터 계정으로도 쓴다)
+update public.sellers set user_id = '00000000-0000-4000-8000-000000000e01' where id = '00000000-0000-4000-8000-000000000e11';
+select is(public.myr_app_claim_decide((select code from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'), '00000000-0000-4000-8000-000000000e01', 'reject', null, '  ') ->> 'code', 'BAD_MESSAGE', '반려 · 빈 메시지 → BAD_MESSAGE');
+select is(public.myr_app_claim_decide((select code from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'), '00000000-0000-4000-8000-000000000e01', 'approve', 'partial', repeat('가', 1001)) ->> 'code', 'BAD_MESSAGE', '승인 · 1000자 초과 → BAD_MESSAGE');
+select is(public.myr_app_claim_decide((select code from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'), '00000000-0000-4000-8000-000000000e01', 'approve', 'partial', '   ') ->> 'ok', 'true', '승인 · 빈 메시지 → 승인된다');
+select is((select jsonb_build_object('status', status, 'message', message, 'deduction', deduction) from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'),
+  '{"status": "progress", "message": null, "deduction": 6000}'::jsonb, '메시지는 null · 처리 진행 · 차감 그대로');
 -- 권한 — precheck 는 서버(service role) 전용
 select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 precheck 불가');
 

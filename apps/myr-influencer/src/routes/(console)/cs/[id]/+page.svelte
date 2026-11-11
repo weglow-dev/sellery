@@ -101,7 +101,7 @@
 			<button type="button" onclick={() => (reply = rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
 		{/each}
 	</div>
-	<textarea class={TEXTAREA} rows="4" bind:value={reply} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구를 적어주세요 (승인 · 반려 메일에 들어가요)"></textarea>
+	<textarea class={TEXTAREA} rows="4" bind:value={reply} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
 	{#if error}<p role="alert" class="mt-2 text-[13px] text-accent">{error}</p>{/if}
 {/snippet}
 
