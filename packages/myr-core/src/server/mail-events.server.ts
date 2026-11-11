@@ -33,17 +33,18 @@ type Raw = {
 	refund_amount: number;
 	payment_method: string | null;
 	raw_payment: { virtualAccount?: { bankCode?: string; accountNumber?: string; customerName?: string; dueDate?: string } | null } | null;
-	myr_order_items: { id: string; product_name: string; option_name: string; qty: number; unit_price: number; amount: number; status: string; refunded_qty: number; seller_id: string; sellers: { name: string; email: string | null } | { name: string; email: string | null }[] | null }[] | null;
+	myr_order_items: { id: string; product_name: string; option_name: string; qty: number; unit_price: number; amount: number; status: string; refunded_qty: number; myr_line_left: number; myr_line_live: boolean; seller_id: string; sellers: { name: string; email: string | null } | { name: string; email: string | null }[] | null }[] | null;
 };
 const one = <T>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 type Loaded = { order: MailOrder; customerEmail: string | null; sellers: Map<string, { name: string; email: string | null }> };
 
+/** myr_line_left · myr_line_live = 줄의 남은 수량 · 살아 있는 줄(0097 · 0098) — PostgREST 계산 칸으로 DB 함수를 그대로 읽는다(메일이 다시 계산하지 않는다) */
 async function loadOrder(orderId: string): Promise<Loaded | null> {
 	const db = admin();
 	const { data, error } = await db
 		.from('myr_orders')
-		.select('id, code, status, user_id, customer_id, buyer_name, buyer_email, shipping, items_amount, shipping_fee, amount, refund_amount, payment_method, raw_payment, myr_order_items(id, product_name, option_name, qty, unit_price, amount, status, refunded_qty, seller_id, sellers(name, email))')
+		.select('id, code, status, user_id, customer_id, buyer_name, buyer_email, shipping, items_amount, shipping_fee, amount, refund_amount, payment_method, raw_payment, myr_order_items(id, product_name, option_name, qty, unit_price, amount, status, refunded_qty, myr_line_left, myr_line_live, seller_id, sellers(name, email))')
 		.eq('id', orderId)
 		.maybeSingle();
 	if (error) {
@@ -56,7 +57,7 @@ async function loadOrder(orderId: string): Promise<Loaded | null> {
 	const items: MailItem[] = (d.myr_order_items ?? []).map((i) => {
 		const s = one(i.sellers);
 		if (s && !sellers.has(i.seller_id)) sellers.set(i.seller_id, { name: s.name, email: isEmailAddress(s.email) ? s.email!.trim() : null });
-		return { id: i.id, name: i.product_name, option: i.option_name ?? '', qty: i.qty, unitPrice: i.unit_price, amount: i.amount, sellerId: i.seller_id, sellerName: s?.name ?? '크리에이터', status: i.status, refundedQty: i.refunded_qty };
+		return { id: i.id, name: i.product_name, option: i.option_name ?? '', qty: i.qty, unitPrice: i.unit_price, amount: i.amount, sellerId: i.seller_id, sellerName: s?.name ?? '크리에이터', status: i.status, refundedQty: i.refunded_qty, leftQty: i.myr_line_left, live: i.myr_line_live === true };
 	});
 	const va = d.raw_payment?.virtualAccount;
 	const ship = d.shipping;

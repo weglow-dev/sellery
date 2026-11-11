@@ -45,7 +45,7 @@
 
 					<ul class="flex flex-col gap-2.5 border-t border-white/8 pt-3">
 						{#each o.items as it (it.id)}
-							{@const gone = it.status === 'CANCELED' || it.qty - it.refundedQty <= 0}
+							{@const gone = !it.live}
 							<li class="flex items-center gap-3">
 								<Tile tile="slate" bg={it.product?.tile} iconId={it.product?.icon} thumbUrl={it.product?.thumbUrl} icon={24} class="h-11 w-11 shrink-0 rounded-xl {gone ? 'opacity-50' : ''}" />
 								<span class="flex min-w-0 flex-1 flex-col gap-0.5">

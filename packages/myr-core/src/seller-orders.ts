@@ -17,6 +17,9 @@ export type SellerOrderLine = {
 	status: string;
 	refundedQty: number;
 	refundAmount: number;
+	/** 남은 수량 · 살아 있는 줄(취소 아님 · 남은 수량 있음) — 서버 값(0098 myr_line_left · myr_line_live) 그대로. 화면이 다시 계산하지 않는다 */
+	leftQty: number;
+	live: boolean;
 	shipStatus: ShipStatus;
 	courier: string | null;
 	trackingNo: string | null;
@@ -51,6 +54,8 @@ function lineFromJson(v: unknown): SellerOrderLine | null {
 		status: s(o.status, 'PAID'),
 		refundedQty: n(o.refunded_qty),
 		refundAmount: n(o.refund_amount),
+		leftQty: n(o.left_qty),
+		live: o.live === true,
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
 		courier: sn(o.courier),
 		trackingNo: sn(o.tracking_no),
@@ -70,8 +75,8 @@ export function sellerOrderFromJson(v: unknown): SellerOrder | null {
 }
 export const sellerOrdersFromJson = (v: unknown): SellerOrder[] => (Array.isArray(v) ? v.map(sellerOrderFromJson).filter((o): o is SellerOrder => o !== null) : []);
 
-/** 남은 줄 — 취소 아님 · 남은 수량 있음 */
-export const liveLines = (o: Pick<SellerOrder, 'items'>): SellerOrderLine[] => o.items.filter((i) => i.status !== 'CANCELED' && i.qty - i.refundedQty > 0);
+/** 남은 줄 — 서버가 정한 살아 있는 줄(0098 myr_line_live · 발송 · 정산과 같은 함수) */
+export const liveLines = (o: Pick<SellerOrder, 'items'>): SellerOrderLine[] => o.items.filter((i) => i.live);
 const RANK: Record<ShipStatus, number> = { PAID: 1, PREPARING: 2, SHIPPING: 3, DELIVERED: 4 };
 /** 내 줄의 배송 상태 — 남은 줄 중 가장 덜 진행된 것 · 남은 줄이 없으면 null */
 export function sellerShipStatus(o: Pick<SellerOrder, 'items'>): ShipStatus | null {

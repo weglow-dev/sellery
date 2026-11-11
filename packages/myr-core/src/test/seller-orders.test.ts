@@ -2,7 +2,12 @@
 import { describe, expect, it } from 'vitest';
 import { filterSellerOrders, liveLines, sellerOrderAmounts, sellerOrderBoxes, sellerOrderFromJson, sellerOrderLabel, sellerOrdersFromJson, sellerOrderTab, sellerOrderTabCounts, sellerShipStatus } from '../seller-orders';
 
-const line = (o: Record<string, unknown> = {}) => ({ id: 'i1', name: '포도 젤리', option: '', qty: 1, unit_price: 32000, amount: 32000, status: 'PAID', refunded_qty: 0, refund_amount: 0, ship_status: 'DELIVERED', courier: null, tracking_no: null, product: { code: 'p', tile: null, icon: 'grape', thumb_url: null }, claim: null, ...o });
+// left_qty · live 는 서버(0098 myr_line_left · myr_line_live)가 주는 값 — 테스트 줄은 서버가 줄 법한 값으로 채운다(화면은 그 값을 읽기만 한다)
+const line = (o: Record<string, unknown> = {}) => {
+	const r = { id: 'i1', name: '포도 젤리', option: '', qty: 1, unit_price: 32000, amount: 32000, status: 'PAID', refunded_qty: 0, refund_amount: 0, ship_status: 'DELIVERED', courier: null, tracking_no: null, product: { code: 'p', tile: null, icon: 'grape', thumb_url: null }, claim: null, ...o };
+	const left = Math.max(0, Number(r.qty) - Number(r.refunded_qty));
+	return { left_qty: left, live: r.status !== 'CANCELED' && left > 0, ...r };
+};
 const order = (items: unknown[], o: Record<string, unknown> = {}) => sellerOrderFromJson({ id: 'o1', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T00:00:00Z', buyer: '김*은', items, ...o })!;
 
 describe('파서', () => {
@@ -29,6 +34,8 @@ describe('상태 칩 · 탭', () => {
 		expect(sellerOrderLabel(part).text).toBe('배송 중');
 		expect(sellerOrderTab(part)).toBe('refunded');
 		expect(sellerOrderTab(order([line({ qty: 2, refunded_qty: 1, status: 'PARTIAL_REFUNDED' })]))).toBe('refunded');
+		// 화면은 서버가 준 live 를 그대로 쓴다 — 수량으로 다시 판정하지 않는다(0098)
+		expect(liveLines(order([line({ qty: 2, refunded_qty: 0, live: false })]))).toEqual([]);
 		const all = order([line({ status: 'REFUNDED', refunded_qty: 1, refund_amount: 32000 })]);
 		expect(sellerOrderLabel(all)).toEqual({ text: '환불 완료', tone: 'muted' });
 		expect(sellerOrderTab(all)).toBe('refunded');
