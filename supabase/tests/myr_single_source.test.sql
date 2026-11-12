@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(131);
+select plan(141);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -276,7 +276,16 @@ insert into _rules (label, pat, allowed) values
   ('정산 탭 카드 줄(지급 건 회차 비교)',       $p$run_id\s*<>$p$,                                                 '{myr_settlement_card_rows}'),
   ('제조금액 합',                              $p$sum\(\s*(\w+\.)?amount\)\s+from\s+public\.myr_mfg_batches$p$,   '{myr_mfg_total}'),
   ('상계 합',                                  $p$sum\(\s*(\w+\.)?offset_amount\)(,\s*0\)\s*into\s+\w+)?\s+from\s+public\.myr_settlement_rows$p$, '{myr_mfg_offset_total}'),
-  ('맡긴 보증금 차수(입금 · 환급 전)',         $p$deposit_refund_row_id\s+is\s+null$p$,                           '{myr_mfg_batch_deposit_held,myr_mfg_deposits}'),
+  ('살아 있는 차수(무효 아님)',                $p$voided_at\s+is\s+(not\s+)?null$p$,                            '{myr_mfg_batch_live}'),
+  ('보증금 입금 확인',                         $p$deposit_paid_at\s+is\s+(not\s+)?null$p$,                      '{myr_mfg_batch_deposit_paid}'),
+  ('보증금 환급됨',                            $p$deposit_refund_row_id\s+is\s+(not\s+)?null$p$,                '{myr_mfg_batch_deposit_refunded}'),
+  ('맡긴 보증금 차수(입금 · 환급 전)',         $p$myr_mfg_batch_deposit_paid\(\w+\)\s+and\s+not\s+public\.myr_mfg_batch_deposit_refunded$p$, '{myr_mfg_batch_deposit_held}'),
+  ('보증금 상태(환급 완료 · 입금 확인 전)',     $p$(held|unpaid|refunded)\s*(=|>)\s*0$p$,                           '{myr_mfg_deposits}'),
+  ('상환 끝(남은 제조금액 0)',                 $p$(mfg_after|remaining\w*|after)\s*=\s*0|-\s*least\([^)]*\)\s*=\s*0$p$, '{myr_mfg_paid_off}'),
+  ('차수 바꾼 뒤 상계 부족',                   $p$myr_mfg_total\([^)]*\)\s*-\s*case|<\s*v_offset|id\s*<>\s*b\.id$p$,     '{myr_mfg_change_shortfall}'),
+  ('회차 마감(다음 달 1일)',                   $p$myr_month_start\(\([^;]*interval\s+'1 month'$p$,                '{myr_settlement_month_end}'),
+  ('지급 시각(마감 + 13시간)',                 $p$interval\s+'13 hours'$p$,                                       '{myr_settlement_pay_at}'),
+  ('그 회차의 크리에이터 지급 건 찾기',        $p$run_id\s*=\s*[\w.]+\s+and\s+(\w+\.)?seller_id\s*=$p$,             '{myr_payout_of}'),
   ('보증금 합',                                $p$sum\(\s*(\w+\.)?deposit_amount\)$p$,                           '{myr_mfg_deposits}'),
   ('줄에 환불이 있었나',                      $p$refunded_qty\s*>\s*0$p$,                                        '{myr_line_has_refund}'),
   ('줄의 열린 요청 찾기',                      $p$order_item_id\s*=\s*[\w.]+\s+and\s+public\.myr_claim_status_open$p$,     '{myr_line_open_claim}'),
@@ -294,6 +303,8 @@ insert into _rules (label, pat, allowed) values
   ('보증금 식',                               $p$myr_deposit_pct\(\)\s*[*/]$p$,                                  '{myr_deposit_amount}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
 
+-- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)
+select is((select count(*)::int from _fn f, regexp_matches(f.src, 'not\s+p_past_run', 'g') where f.proname = 'myr_payout_collect'), 1, '지급 건 만들기 — 담을 줄 조건은 한 번만');
 select is(coalesce((select string_agg(f.proname, ', ' order by f.proname) from _fn f where f.src ~ r.pat and not (f.proname = any (r.allowed))), ''), '',
           r.label || ' — 지정한 함수 밖에 이 식이 없다') from _rules r order by r.ord;
 -- 검사가 살아 있는지 — 식이 판정의 주인 함수에는 있어야 한다(패턴이 틀려 아무것도 못 잡는 검사를 막는다)

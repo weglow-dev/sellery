@@ -183,6 +183,11 @@ const MYR_MIRROR_RULES = [
     re: /\.reduce\([^\n]*\.(remaining|depositPaid|depositHeld|depositTotal|nextOffset|offset|payout|netSales)\b/,
     why: "정산 합계를 화면에서 더함 — 서버 값(ledgerTotal · 달 total · 지급 건 금액 myr_payout_amount)을 쓴다",
   },
+  { re: /\bremaining\s*===?\s*0\b/, why: "상환 완료를 다시 판정 — 서버 값 paidOff(myr_mfg_paid_off)를 쓴다" },
+  { re: /\bdeposit(Held|Unpaid|Refunded)\s*(===?|!==|>|<=)\s*0\b/, why: "보증금 상태를 다시 판정 — 서버 값 depositState(myr_mfg_deposits)를 쓴다" },
+  { re: /\breleasedIn\s*\|\||\|\|\s*[\w.]*nextPayout\b/, why: "이 달 합계에서 빠진 줄을 다시 판정 — 서버 값 counted(myr_settlement_card_rows)를 쓴다" },
+  { re: /\.some\([^\n]*\.hasLedger\b/, why: "보류 해제 예정을 다시 판정 — 서버 값 releasable(myr_settlement_row_releasable)을 쓴다" },
+  { re: /Date\.UTC\([^)\n]*,\s*1\s*,\s*4\s*[,)]/, why: "정산 지급 시각(다음 달 1일 오후 1시)을 화면에서 계산 — 서버 값 payAt · settleAt(myr_settlement_pay_at)을 쓴다" },
 ];
 /** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
 function codeLines(file) {

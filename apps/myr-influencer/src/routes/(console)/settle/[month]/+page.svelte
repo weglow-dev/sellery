@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, settleAtOfMonth, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import SettleHold from '$lib/components/SettleHold.svelte';
@@ -16,14 +16,13 @@
 	const upcoming = $derived(data.key === 'next');
 	const src = $derived(upcoming ? st.preview : st.months.find((m) => m.month === data.key)!);
 	const month = $derived(upcoming ? st.preview.month : data.key);
-	const payAt = $derived(upcoming ? (st.preview.settleAt ?? settleAtOfMonth(month)) : settleAtOfMonth(month));
+	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
+	const payAt = $derived(upcoming ? st.preview.settleAt : (st.months.find((m) => m.month === data.key)?.payAt ?? null));
 	const status = $derived(monthStatus({ upcoming, held: src.total.held, settleStatus: st.settleStatus }));
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
 	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
 	const byProduct = $derived(itemsByProduct(data.items));
-	// 보류 줄인데 제조금액이 이미 들어왔으면 — 다음 정산 크론이 먼저 해제해 그때 지급한다(0089)
-	const hasLedger = (id: string) => st.ledgers.some((l) => l.product.id === id && l.hasLedger);
-	const nextPay = $derived(shortDate(st.preview.settleAt ?? settleAtOfMonth(st.preview.month)));
+	const nextPay = $derived(shortDate(st.preview.settleAt));
 
 	// 판매 내역(주문 줄) — 상품마다 기본 닫힘(2026-11-10) · 펼친 것만 기억
 	let opened = $state<Record<string, boolean>>({});
@@ -118,14 +117,15 @@
 								{#if r.status === 'held'}
 									<span class="mt-0.5 block text-[15px] font-extrabold text-white/35 lg:text-[18px]">—</span>
 								{:else}
-									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px] {r.releasedIn || r.nextPayout ? 'text-white/40' : ''}">{won(r.payout ?? 0)}</span>
+									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px] {r.counted ? '' : 'text-white/40'}">{won(r.payout ?? 0)}</span>
 								{/if}
 							</span>
 						</div>
 						{#if r.status === 'held'}
 							<!-- 보류(제조금액 확인 중 · 입력됐으면 보류 해제 예정) — 머리 아래 한 줄로(2026-11-10) -->
 							<div class="mt-3 flex items-center gap-2 rounded-xl py-1 lg:mt-3.5 lg:gap-2.5">
-								{#if hasLedger(r.product.id)}
+								<!-- 보류 줄인데 제조금액이 이미 들어왔으면 — 다음 정산 크론이 먼저 해제해 그때 지급한다(서버 releasable · myr_settlement_row_releasable) -->
+								{#if r.releasable}
 									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.plan}">보류 해제 예정</span>
 									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 ({nextPay} 정산에서 지급돼요)</span>
 								{:else}

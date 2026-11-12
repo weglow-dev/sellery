@@ -98,6 +98,73 @@ as $$
 $$;
 revoke all on function public.myr_payout_status_auto(public.myr_payouts) from public, anon, authenticated;
 
+-- 제조 차수 상태 — 살아 있음(무효 아님) · 보증금 입금 확인 · 보증금 환급됨. 차수를 다루는 함수가 전부 이 셋을 부른다
+create or replace function public.myr_mfg_batch_live(b public.myr_mfg_batches)
+returns boolean
+language sql
+immutable
+as $$
+  select b.voided_at is null
+$$;
+revoke all on function public.myr_mfg_batch_live(public.myr_mfg_batches) from public, anon, authenticated;
+
+create or replace function public.myr_mfg_batch_deposit_paid(b public.myr_mfg_batches)
+returns boolean
+language sql
+immutable
+as $$
+  select b.deposit_paid_at is not null
+$$;
+revoke all on function public.myr_mfg_batch_deposit_paid(public.myr_mfg_batches) from public, anon, authenticated;
+
+create or replace function public.myr_mfg_batch_deposit_refunded(b public.myr_mfg_batches)
+returns boolean
+language sql
+immutable
+as $$
+  select b.deposit_refund_row_id is not null
+$$;
+revoke all on function public.myr_mfg_batch_deposit_refunded(public.myr_mfg_batches) from public, anon, authenticated;
+
+-- 제조금액을 다 갚았나(남은 제조금액 0) — 상계 계산(보증금 환급) · 확정 · 다음 정산 예상 · 원장 "상환 완료"가 같이 쓴다
+create or replace function public.myr_mfg_paid_off(p_remaining integer)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p_remaining = 0, false)
+$$;
+revoke all on function public.myr_mfg_paid_off(integer) from public, anon, authenticated;
+
+-- 정산월 회차 마감(다음 달 1일 0시 KST) · 지급 시각(마감 + 13시간 = 다음 달 1일 오후 1시) — 회차 · 다음 정산 예상 · 정산 탭이 같이 쓴다
+create or replace function public.myr_settlement_month_end(p_month date)
+returns timestamptz
+language sql
+stable
+as $$
+  select public.myr_month_start((date_trunc('month', p_month)::date + interval '1 month')::date)
+$$;
+revoke all on function public.myr_settlement_month_end(date) from public, anon, authenticated;
+
+create or replace function public.myr_settlement_pay_at(p_month date)
+returns timestamptz
+language sql
+stable
+as $$
+  select public.myr_settlement_month_end(p_month) + interval '13 hours'
+$$;
+revoke all on function public.myr_settlement_pay_at(date) from public, anon, authenticated;
+
+-- 그 회차의 크리에이터 지급 건(없으면 빈 행) — 지급 건 만들기 · 정산 탭이 같이 쓴다
+create or replace function public.myr_payout_of(p_run_id uuid, p_seller_id uuid)
+returns public.myr_payouts
+language sql
+stable
+as $$
+  select p.* from public.myr_payouts p where p.run_id = p_run_id and p.seller_id = p_seller_id
+$$;
+revoke all on function public.myr_payout_of(uuid, uuid) from public, anon, authenticated;
+
 -- 정산 줄의 판매 줄 수 — 보고 · 다음 정산 예상이 같이 쓴다
 create or replace function public.myr_settlement_row_lines(r public.myr_settlement_rows)
 returns integer
@@ -140,7 +207,7 @@ returns integer
 language sql
 stable
 as $$
-  select coalesce((select sum(b.amount) from public.myr_mfg_batches b where b.product_id = p_product_id and b.voided_at is null), 0)::integer
+  select coalesce((select sum(b.amount) from public.myr_mfg_batches b where b.product_id = p_product_id and public.myr_mfg_batch_live(b)), 0)::integer
 $$;
 revoke all on function public.myr_mfg_total(uuid) from public, anon, authenticated;
 
@@ -159,24 +226,42 @@ returns boolean
 language sql
 immutable
 as $$
-  select coalesce(b.voided_at is null and b.deposit_paid_at is not null and b.deposit_refund_row_id is null, false)
+  select public.myr_mfg_batch_live(b) and public.myr_mfg_batch_deposit_paid(b) and not public.myr_mfg_batch_deposit_refunded(b)
 $$;
 revoke all on function public.myr_mfg_batch_deposit_held(public.myr_mfg_batches) from public, anon, authenticated;
 
--- 상품 보증금 합 — 입금 확인 · 입금 전 · 환급 완료 · 맡김(환급 전) · 전체(환급 전 · 입금 전 포함). 원장 · 정산 탭 · 상계 계산이 같이 쓴다
+-- 상품 보증금 합 — 입금 확인 · 입금 전 · 환급 완료 · 맡김(환급 전) · 전체(환급 전 · 입금 전 포함) + 보증금 상태(환급 완료 · 입금 확인 전 · 맡김).
+--   원장 · 정산 탭 · 상계 계산이 같이 쓴다. 화면은 state 로 문구만 고른다
 create or replace function public.myr_mfg_deposits(p_product_id uuid)
-returns table (paid integer, unpaid integer, refunded integer, held integer, total integer)
+returns table (paid integer, unpaid integer, refunded integer, held integer, total integer, state text)
 language sql
 stable
 as $$
-  select coalesce(sum(b.deposit_amount) filter (where b.voided_at is null and b.deposit_paid_at is not null), 0)::integer,
-         coalesce(sum(b.deposit_amount) filter (where b.voided_at is null and b.deposit_paid_at is null), 0)::integer,
-         coalesce(sum(b.deposit_amount) filter (where b.deposit_refund_row_id is not null), 0)::integer,
-         coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_deposit_held(b)), 0)::integer,
-         coalesce(sum(b.deposit_amount) filter (where b.voided_at is null and b.deposit_refund_row_id is null), 0)::integer
-    from public.myr_mfg_batches b where b.product_id = p_product_id
+  with d as (
+    select coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_live(b) and public.myr_mfg_batch_deposit_paid(b)), 0)::integer as paid,
+           coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_live(b) and not public.myr_mfg_batch_deposit_paid(b)), 0)::integer as unpaid,
+           coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_deposit_refunded(b)), 0)::integer as refunded,
+           coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_deposit_held(b)), 0)::integer as held,
+           coalesce(sum(b.deposit_amount) filter (where public.myr_mfg_batch_live(b) and not public.myr_mfg_batch_deposit_refunded(b)), 0)::integer as total
+      from public.myr_mfg_batches b where b.product_id = p_product_id
+  )
+  select d.paid, d.unpaid, d.refunded, d.held, d.total,
+         case when d.refunded > 0 and d.held = 0 and d.unpaid = 0 then 'refunded' when d.unpaid > 0 then 'unpaid' else 'held' end
+    from d
 $$;
 revoke all on function public.myr_mfg_deposits(uuid) from public, anon, authenticated;
+
+-- 이 차수를 무효로 하거나(새 금액 0) 금액을 바꾸면 이미 상계에 쓴 금액보다 제조금액 합이 작아지나 — 모자라는 금액(괜찮으면 null).
+--   차수 무효(myr_mfg_void) · 정정(myr_mfg_fix)이 같이 쓴다
+create or replace function public.myr_mfg_change_shortfall(b public.myr_mfg_batches, p_new_amount integer)
+returns integer
+language sql
+stable
+as $$
+  select nullif(greatest(public.myr_mfg_offset_total(b.product_id)
+                         - (public.myr_mfg_total(b.product_id) - case when public.myr_mfg_batch_live(b) then b.amount else 0 end + coalesce(p_new_amount, 0)), 0), 0)::integer
+$$;
+revoke all on function public.myr_mfg_change_shortfall(public.myr_mfg_batches, integer) from public, anon, authenticated;
 
 -- 회차 지급 건 만들기 — 크리에이터마다 1건 · 지급 건에 담을 줄을 담는다 · 금액으로 지급 대기 / 지급 없음 · 멱등
 --   p_past_run = true 면 그 회차에 지급된 줄(myr_settlement_row_pay_run)만 — 이미 돈 회차를 채울 때(마이그레이션)
@@ -187,22 +272,22 @@ volatile
 security definer set search_path = public
 as $$
 declare
-  sr  record;
-  v_p public.myr_payouts%rowtype;
-  v_n integer := 0;
+  v_ids uuid[];
+  sr    record;
+  v_p   public.myr_payouts;
+  v_n   integer := 0;
 begin
-  for sr in
-    select distinct r.seller_id from public.myr_settlement_rows r
-     where public.myr_settlement_row_payable(r) and (not p_past_run or public.myr_settlement_row_pay_run(r) = p_run_id)
-     order by r.seller_id
+  -- 담을 줄 — 한 번만 고른다(지난 회차를 채울 때는 그 회차에 지급된 줄만)
+  select coalesce(array_agg(r.id), '{}') into v_ids from public.myr_settlement_rows r
+   where public.myr_settlement_row_payable(r) and (not p_past_run or public.myr_settlement_row_pay_run(r) = p_run_id);
+  for sr in select distinct r.seller_id from public.myr_settlement_rows r where r.id = any (v_ids) order by r.seller_id
   loop
     insert into public.myr_payouts (run_id, seller_id, status)
     values (p_run_id, sr.seller_id, 'pending')
     on conflict (run_id, seller_id) do nothing;
-    select * into v_p from public.myr_payouts where run_id = p_run_id and seller_id = sr.seller_id for update;
-    update public.myr_settlement_rows r set payout_id = v_p.id
-     where r.seller_id = sr.seller_id and public.myr_settlement_row_payable(r)
-       and (not p_past_run or public.myr_settlement_row_pay_run(r) = p_run_id);
+    perform 1 from public.myr_payouts p where p.id = (public.myr_payout_of(p_run_id, sr.seller_id)).id for update;
+    v_p := public.myr_payout_of(p_run_id, sr.seller_id);
+    update public.myr_settlement_rows r set payout_id = v_p.id where r.id = any (v_ids) and r.seller_id = sr.seller_id;
     if public.myr_payout_status_auto(v_p) then
       update public.myr_payouts p
          set status = case when public.myr_payout_has_amount(p) then 'pending' else 'none' end, updated_at = now()
@@ -233,7 +318,7 @@ declare
   v_released integer := 0;
 begin
   if p_month is null then return jsonb_build_object('ok', false, 'code', 'BAD_MONTH'); end if;
-  v_end := public.myr_month_start((v_month + interval '1 month')::date);
+  v_end := public.myr_settlement_month_end(v_month);
   if v_end > p_now then return jsonb_build_object('ok', false, 'code', 'NOT_CLOSED'); end if;
   perform pg_advisory_xact_lock(hashtext('myr_settlement_run'));
   select * into v_run from public.myr_settlement_runs where month = v_month;
@@ -391,7 +476,7 @@ begin
   select * into r from public.myr_settlement_rows where id = p_row_id for update;
   perform 1 from public.myr_mfg_batches where product_id = r.product_id for update;
   select * into c from public.myr_settlement_offset_calc(r.product_id, r.settle);
-  if c.mfg_after = 0 then
+  if c.paid_off then
     update public.myr_mfg_batches m set deposit_refund_row_id = r.id
      where m.product_id = r.product_id and public.myr_mfg_batch_deposit_held(m);
   end if;
@@ -438,7 +523,7 @@ begin
       'product', (select jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url) from public.myr_products p where p.id = hr.product_id),
       'status', 'estimated', 'origin', to_char(hr.origin, 'YYYY-MM'), 'lines', hr.lines, 'pct', hr.pct,
       'sales', hr.sales, 'refund_adj', hr.refund_adj, 'carry_in', hr.carry_in, 'settle', hr.settle,
-      'offset', hr.offset_amount, 'deposit_refund', hr.deposit_refund, 'payout', hr.payout);
+      'offset', hr.offset_amount, 'deposit_refund', hr.deposit_refund, 'payout', hr.payout, 'counted', true, 'releasable', false);
   end loop;
   -- 1) 보류 해제 예정 — 제조금액이 들어온 지난 보류 줄(정산월 순서 · 다음 회차가 먼저 확정한다)
   for hr in
@@ -450,12 +535,13 @@ begin
     v_po := coalesce((v_prior -> hr.product_id::text ->> 'offset')::int, 0);
     v_pr := coalesce((v_prior -> hr.product_id::text ->> 'refunded')::boolean, false);
     select * into oc from public.myr_settlement_offset_calc(hr.product_id, hr.settle, v_po, v_pr);
-    v_prior := v_prior || jsonb_build_object(hr.product_id::text, jsonb_build_object('offset', v_po + oc.offset_amount, 'refunded', v_pr or oc.mfg_after = 0));
+    v_prior := v_prior || jsonb_build_object(hr.product_id::text, jsonb_build_object('offset', v_po + oc.offset_amount, 'refunded', v_pr or oc.paid_off));
     v_rows := v_rows || jsonb_build_object(
       'product', (select jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url) from public.myr_products p where p.id = hr.product_id),
       'status', 'estimated', 'origin', to_char(hr.origin, 'YYYY-MM'), 'lines', hr.lines, 'pct', hr.pct,
       'sales', hr.sales, 'refund_adj', hr.refund_adj, 'carry_in', hr.carry_in, 'settle', hr.settle,
-      'offset', oc.offset_amount, 'deposit_refund', oc.deposit_refund, 'payout', public.myr_settlement_row_payout(hr.settle, oc.offset_amount, oc.deposit_refund));
+      'offset', oc.offset_amount, 'deposit_refund', oc.deposit_refund, 'payout', public.myr_settlement_row_payout(hr.settle, oc.offset_amount, oc.deposit_refund),
+      'counted', true, 'releasable', false);
   end loop;
   -- 2) 이번 회차 줄 — 같은 상품이면 앞선 줄의 상계 · 환급 뒤로 이어서
   for pr in
@@ -478,11 +564,11 @@ begin
       'product', (select jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url) from public.myr_products p where p.id = pr.product_id),
       'status', case when pc.held then 'held' else 'estimated' end, 'origin', null, 'lines', pr.lines, 'pct', pc.pct,
       'sales', pr.sales, 'refund_adj', pr.refund_adj, 'carry_in', pc.carry_in, 'settle', pc.settle,
-      'offset', v_offset, 'deposit_refund', v_refund, 'payout', v_payout);
+      'offset', v_offset, 'deposit_refund', v_refund, 'payout', v_payout, 'counted', not pc.held, 'releasable', false);
   end loop;
   return jsonb_build_object(
     'month', to_char(v_month, 'YYYY-MM'),
-    'settle_at', public.myr_month_start((v_month + interval '1 month')::date) + interval '13 hours',
+    'settle_at', public.myr_settlement_pay_at(v_month),
     'rows', v_rows,
     'total', jsonb_build_object(
       'sales', coalesce((select sum((e ->> 'sales')::int) from jsonb_array_elements(v_rows) e), 0),
@@ -526,17 +612,19 @@ as $$
                  select u.month, jsonb_build_object(
                    'month', to_char(u.month, 'YYYY-MM'),
                    'settled_at', u.cutoff_at,
-                   'payout_status', (select p.status from public.myr_payouts p where p.run_id = u.id and p.seller_id = s.id),
+                   'pay_at', public.myr_settlement_pay_at(u.month),
+                   'payout_status', (public.myr_payout_of(u.id, s.id)).status,
                    'total', jsonb_build_object(
                      'sales', coalesce(sum(x.sales) filter (where x.counted), 0), 'refund_adj', coalesce(sum(x.refund_adj) filter (where x.counted), 0),
                      'net_sales', public.myr_settlement_net_sales(coalesce(sum(x.sales) filter (where x.counted), 0)::int, coalesce(sum(x.refund_adj) filter (where x.counted), 0)::int),
                      'settle', coalesce(sum(x.settle) filter (where x.counted), 0),
                      'offset', coalesce(sum(x.offset_amount) filter (where x.counted), 0), 'deposit_refund', coalesce(sum(x.deposit_refund) filter (where x.counted), 0),
-                     'payout', coalesce((select public.myr_payout_amount(p) from public.myr_payouts p where p.run_id = u.id and p.seller_id = s.id), 0),
+                     'payout', public.myr_payout_amount(public.myr_payout_of(u.id, s.id)),
                      'held', count(*) filter (where x.status = 'held')),
                    'rows', jsonb_agg(jsonb_build_object(
                      'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
                      'status', x.status, 'origin', to_char(x.origin, 'YYYY-MM'), 'released_in', to_char(x.released_in, 'YYYY-MM'), 'next_payout', x.next_payout,
+                     'counted', x.counted, 'releasable', x.releasable,
                      'pct', x.pct, 'sales', x.sales, 'refund_adj', x.refund_adj, 'carry_in', x.carry_in, 'carry_out', x.carry_out,
                      'settle', x.settle, 'offset', x.offset_amount, 'mfg_after', x.mfg_after, 'deposit_refund', x.deposit_refund, 'payout', x.payout)
                      order by x.origin nulls first, p.name)) as j
@@ -545,7 +633,7 @@ as $$
                      -- 카드 줄 = myr_settlement_card_rows(그 회차의 내 줄 + 그 회차 지급 건에 담긴 지난 달 줄)
                      select r.product_id, r.status, case when c.origin then ro.month end as origin,
                             (select l.month from public.myr_settlement_runs l where l.id = c.paid_later_run) as released_in,
-                            public.myr_settlement_row_payable(r) as next_payout, c.counted,
+                            public.myr_settlement_row_payable(r) as next_payout, c.counted, public.myr_settlement_row_releasable(r) as releasable,
                             r.pct, r.sales, r.refund_adj, r.carry_in, r.carry_out, r.settle, r.offset_amount, r.mfg_after, r.deposit_refund, r.payout
                        from public.myr_settlement_card_rows(s.id, u.id) c
                        join public.myr_settlement_rows r on r.id = c.row_id
@@ -561,14 +649,16 @@ as $$
                  'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name, 'tile', p.tile, 'icon', p.icon, 'thumb_url', p.thumb_url),
                  'has_ledger', public.myr_mfg_has_ledger(p.id),
                  'batches', coalesce((select jsonb_agg(jsonb_build_object('seq', b.seq, 'amount', b.amount, 'deposit_amount', b.deposit_amount,
-                                                                          'deposit_paid', b.deposit_paid_at is not null, 'deposit_refunded', b.deposit_refund_row_id is not null)
+                                                                          'deposit_paid', public.myr_mfg_batch_deposit_paid(b), 'deposit_refunded', public.myr_mfg_batch_deposit_refunded(b))
                                                        order by b.seq)
-                                        from public.myr_mfg_batches b where b.product_id = p.id and b.voided_at is null), '[]'::jsonb),
+                                        from public.myr_mfg_batches b where b.product_id = p.id and public.myr_mfg_batch_live(b)), '[]'::jsonb),
                  'total', public.myr_mfg_total(p.id),
                  'offset', public.myr_mfg_offset_total(p.id),
                  'remaining', public.myr_mfg_remaining(p.id),
+                 -- 상환 완료 = 원장이 있고 남은 제조금액 0(myr_mfg_paid_off) — 화면이 remaining 을 비교하지 않는다
+                 'paid_off', public.myr_mfg_has_ledger(p.id) and public.myr_mfg_paid_off(public.myr_mfg_remaining(p.id)),
                  -- 보증금 합 — myr_mfg_deposits 하나(맡김 = 입금 확인 · 환급 전 · 전체 = 환급 전 · 입금 전 포함) · 화면이 빼고 더하지 않는다
-                 'deposit_paid', d.paid, 'deposit_unpaid', d.unpaid, 'deposit_refunded', d.refunded, 'deposit_held', d.held, 'deposit_total', d.total,
+                 'deposit_paid', d.paid, 'deposit_unpaid', d.unpaid, 'deposit_refunded', d.refunded, 'deposit_held', d.held, 'deposit_total', d.total, 'deposit_state', d.state,
                  -- 다음 정산 상환 예정 = 다음 정산 예상 줄(보류 해제분 포함)의 그 상품 상계 합
                  'next_offset', coalesce((select sum((e ->> 'offset')::int) from jsonb_array_elements(pv.v -> 'rows') e where e #>> '{product,id}' = p.id::text), 0))
                order by p.created_at)
@@ -619,22 +709,26 @@ $$;
 revoke all on function public.myr_mfg_ledger(uuid) from public, anon, authenticated;
 grant execute on function public.myr_mfg_ledger(uuid) to service_role;
 
--- 0089 정의 — 환급할 보증금 = myr_mfg_deposits 의 맡김(held)
-create or replace function public.myr_settlement_offset_calc(p_product_id uuid, p_settle integer, p_prior_offset integer default 0, p_prior_refunded boolean default false)
-returns table (mfg_before integer, offset_amount integer, mfg_after integer, deposit_refund integer)
+-- 0089 정의 — 환급할 보증금 = myr_mfg_deposits 의 맡김(held) · 다 갚았나 = myr_mfg_paid_off(칸 paid_off 추가 — 확정 · 다음 정산 예상이 이 값을 읽는다)
+drop function if exists public.myr_settlement_offset_calc(uuid, integer, integer, boolean);
+create function public.myr_settlement_offset_calc(p_product_id uuid, p_settle integer, p_prior_offset integer default 0, p_prior_refunded boolean default false)
+returns table (mfg_before integer, offset_amount integer, mfg_after integer, deposit_refund integer, paid_off boolean)
 language sql
 stable
 as $$
-  with b as (select greatest(public.myr_mfg_remaining(p_product_id) - coalesce(p_prior_offset, 0), 0) as before)
-  select b.before, least(p_settle, b.before), b.before - least(p_settle, b.before),
-         case when b.before - least(p_settle, b.before) = 0 and not coalesce(p_prior_refunded, false)
+  with b as (select greatest(public.myr_mfg_remaining(p_product_id) - coalesce(p_prior_offset, 0), 0) as before),
+  o as (select b.before, least(p_settle, b.before) as off from b),
+  a as (select o.before, o.off, o.before - o.off as after, public.myr_mfg_paid_off(o.before - o.off) as paid_off from o)
+  select a.before, a.off, a.after,
+         case when a.paid_off and not coalesce(p_prior_refunded, false)
               then (select d.held from public.myr_mfg_deposits(p_product_id) d)
-              else 0 end
-    from b
+              else 0 end,
+         a.paid_off
+    from a
 $$;
 revoke all on function public.myr_settlement_offset_calc(uuid, integer, integer, boolean) from public, anon, authenticated;
 
--- 0087 정의 — 상계 합은 myr_mfg_offset_total
+-- 0087 정의 — 차수 상태(myr_mfg_batch_*) · 모자라는 금액(myr_mfg_change_shortfall)
 create or replace function public.myr_mfg_void(p_product_id uuid, p_seq integer, p_reason text, p_actor text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -643,23 +737,21 @@ create or replace function public.myr_mfg_void(p_product_id uuid, p_seq integer,
 AS $function$
 declare
   b public.myr_mfg_batches%rowtype;
-  v_total integer;
-  v_offset integer;
+  v_short  integer;
 begin
   perform 1 from public.myr_products where id = p_product_id for update;
   select * into b from public.myr_mfg_batches where product_id = p_product_id and seq = p_seq for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
-  if b.voided_at is not null then return jsonb_build_object('ok', false, 'code', 'ALREADY_VOIDED'); end if;
+  if not public.myr_mfg_batch_live(b) then return jsonb_build_object('ok', false, 'code', 'ALREADY_VOIDED'); end if;
   if coalesce(btrim(p_reason), '') = '' then return jsonb_build_object('ok', false, 'code', 'REASON_REQUIRED'); end if;
-  if b.deposit_refund_row_id is not null then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
-  select coalesce(sum(amount), 0) into v_total from public.myr_mfg_batches where product_id = p_product_id and voided_at is null and id <> b.id;
-  v_offset := public.myr_mfg_offset_total(p_product_id);
-  if v_total < v_offset then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_offset - v_total); end if;
+  if public.myr_mfg_batch_deposit_refunded(b) then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
+  v_short := public.myr_mfg_change_shortfall(b, 0);
+  if v_short is not null then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_short); end if;
   update public.myr_mfg_batches set voided_at = now(), voided_by = coalesce(p_actor, 'script'), void_reason = btrim(p_reason) where id = b.id;
   return jsonb_build_object('ok', true, 'remaining', public.myr_mfg_remaining(p_product_id));
 end;
 $function$;
--- 0087 정의 — 상계 합은 myr_mfg_offset_total
+-- 0087 정의 — 차수 상태(myr_mfg_batch_*) · 모자라는 금액(myr_mfg_change_shortfall)
 create or replace function public.myr_mfg_fix(p_product_id uuid, p_seq integer, p_amount integer, p_reason text, p_actor text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -669,20 +761,18 @@ AS $function$
 declare
   b        public.myr_mfg_batches%rowtype;
   n        public.myr_mfg_batches%rowtype;
-  v_total  integer;
-  v_offset integer;
+  v_short  integer;
 begin
   perform 1 from public.myr_products where id = p_product_id for update;
   select * into b from public.myr_mfg_batches where product_id = p_product_id and seq = p_seq for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
-  if b.voided_at is not null then return jsonb_build_object('ok', false, 'code', 'ALREADY_VOIDED'); end if;
+  if not public.myr_mfg_batch_live(b) then return jsonb_build_object('ok', false, 'code', 'ALREADY_VOIDED'); end if;
   if coalesce(btrim(p_reason), '') = '' then return jsonb_build_object('ok', false, 'code', 'REASON_REQUIRED'); end if;
   if p_amount is null or p_amount < 0 then return jsonb_build_object('ok', false, 'code', 'BAD_AMOUNT'); end if;
   if p_amount = b.amount then return jsonb_build_object('ok', false, 'code', 'SAME_AMOUNT'); end if;
-  if b.deposit_refund_row_id is not null then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
-  select coalesce(sum(amount), 0) into v_total from public.myr_mfg_batches where product_id = p_product_id and voided_at is null and id <> b.id;
-  v_offset := public.myr_mfg_offset_total(p_product_id);
-  if v_total + p_amount < v_offset then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_offset - (v_total + p_amount)); end if;
+  if public.myr_mfg_batch_deposit_refunded(b) then return jsonb_build_object('ok', false, 'code', 'REFUNDED'); end if;
+  v_short := public.myr_mfg_change_shortfall(b, p_amount);
+  if v_short is not null then return jsonb_build_object('ok', false, 'code', 'USED', 'shortfall', v_short); end if;
   insert into public.myr_mfg_batches (product_id, seller_id, seq, amount, deposit_amount, deposit_paid_at, note, created_by)
   values (b.product_id, b.seller_id, (select max(seq) from public.myr_mfg_batches where product_id = p_product_id) + 1,
           p_amount, public.myr_deposit_amount(p_amount), b.deposit_paid_at,
@@ -691,7 +781,7 @@ begin
   update public.myr_mfg_batches set voided_at = now(), voided_by = coalesce(p_actor, 'script'), void_reason = format('%s차로 정정 · %s', n.seq, btrim(p_reason))
    where id = b.id;
   return jsonb_build_object('ok', true, 'voided_seq', b.seq, 'batch', public.myr_mfg_batch_json(n), 'remaining', public.myr_mfg_remaining(p_product_id),
-                            'deposit_diff', case when b.deposit_paid_at is not null then b.deposit_amount - n.deposit_amount else 0 end);
+                            'deposit_diff', case when public.myr_mfg_batch_deposit_paid(b) then b.deposit_amount - n.deposit_amount else 0 end);
 end;
 $function$;
 revoke all on function public.myr_mfg_void(uuid, integer, text, text) from public, anon, authenticated;
@@ -757,3 +847,45 @@ as $$
 $$;
 revoke all on function public.myr_app_seller_settle_preview_items_of_user(uuid, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_settle_preview_items_of_user(uuid, timestamptz) to service_role;
+
+-- 0087 정의 — 차수 상태는 myr_mfg_batch_*
+create or replace function public.myr_mfg_has_ledger(p_product_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE
+AS $function$
+  select exists (select 1 from public.myr_mfg_batches b where b.product_id = p_product_id and public.myr_mfg_batch_live(b))
+$function$;
+revoke all on function public.myr_mfg_has_ledger(uuid) from public, anon, authenticated;
+
+-- 0087 정의 — 환급됨은 myr_mfg_batch_deposit_refunded
+create or replace function public.myr_mfg_batch_json(b myr_mfg_batches)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+AS $function$
+  select jsonb_build_object('seq', b.seq, 'amount', b.amount, 'deposit_amount', b.deposit_amount, 'deposit_paid_at', b.deposit_paid_at,
+                            'deposit_refunded', public.myr_mfg_batch_deposit_refunded(b), 'note', b.note, 'created_by', b.created_by, 'created_at', b.created_at,
+                            'voided_at', b.voided_at, 'void_reason', b.void_reason)
+$function$;
+revoke all on function public.myr_mfg_batch_json(public.myr_mfg_batches) from public, anon, authenticated;
+
+-- 0087 정의 — 차수 상태는 myr_mfg_batch_*
+create or replace function public.myr_mfg_deposit(p_product_id uuid, p_seq integer, p_paid_at timestamp with time zone DEFAULT now())
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  b public.myr_mfg_batches%rowtype;
+begin
+  select * into b from public.myr_mfg_batches where product_id = p_product_id and seq = p_seq for update;
+  if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if not public.myr_mfg_batch_live(b) then return jsonb_build_object('ok', false, 'code', 'VOIDED'); end if;
+  if public.myr_mfg_batch_deposit_paid(b) then return jsonb_build_object('ok', false, 'code', 'ALREADY_PAID'); end if;
+  update public.myr_mfg_batches set deposit_paid_at = coalesce(p_paid_at, now()) where id = b.id returning * into b;
+  return jsonb_build_object('ok', true, 'batch', public.myr_mfg_batch_json(b));
+end;
+$function$;
+revoke all on function public.myr_mfg_deposit(uuid, integer, timestamptz) from public, anon, authenticated;

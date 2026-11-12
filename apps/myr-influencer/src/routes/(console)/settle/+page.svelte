@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, settleAtOfMonth, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import Icon from '$lib/components/Icon.svelte';
@@ -18,7 +18,8 @@
 	let view = $state<'pay' | 'mfg'>(readParam('view', ['pay', 'mfg'] as const, 'pay'));
 	$effect(() => syncParam('view', view, 'pay'));
 
-	const nextAt = $derived(pv.settleAt ?? settleAtOfMonth(pv.month));
+	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
+	const nextAt = $derived(pv.settleAt);
 	const next = $derived({
 		href: '/settle/next',
 		title: `${monthShort(pv.month)} 정산`,
@@ -38,7 +39,7 @@
 			href: `/settle/${m.month}`,
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
-			payShort: `${shortDate(settleAtOfMonth(m.month))} 지급`,
+			payShort: `${shortDate(m.payAt)} 지급`,
 			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
 			held: 0,
 			sales: m.total.netSales,

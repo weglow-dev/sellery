@@ -2,7 +2,7 @@
 --   보류 줄은 풀린 회차 지급 건에 · 운영이 먼저 확정한 보류 줄은 다음 회차 지급 건에 · 다시 돌려도 지급 건이 늘지 않는다
 -- 2031년 회차를 쓴다(로컬 DB 의 실제 회차 · 다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(29);
+select plan(38);
 
 -- ---------- 권한 ----------
 select table_privs_are('public', 'myr_payouts', 'anon', '{}'::text[], 'anon 은 지급 건 표 직접 권한 없음');
@@ -13,6 +13,8 @@ select function_privs_are('public', 'myr_settlement_row_payable', '{myr_settleme
 select function_privs_are('public', 'myr_payout_amount', '{myr_payouts}'::text[], 'anon', '{}'::text[], 'anon 은 payout_amount 불가');
 select function_privs_are('public', 'myr_settlement_card_rows', '{uuid,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 card_rows 불가');
 select function_privs_are('public', 'myr_mfg_deposits', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 mfg_deposits 불가');
+select function_privs_are('public', 'myr_payout_of', '{uuid,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 payout_of 불가');
+select function_privs_are('public', 'myr_mfg_change_shortfall', '{myr_mfg_batches,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 change_shortfall 불가');
 
 -- ---------- 픽스처 ----------
 -- 셀러 1: A(제조금액 0원 명시 → 전부 지급) · B(제조 원장 없음 → 보류) / 셀러 2: C(제조금액 100만 · 1월 정산금이 전부 상계 → 0원)
@@ -82,6 +84,24 @@ select is(pg_temp.card('2031-02-01'), '[["pgtap-po-a", false, true, null], ["pgt
           '2월 카드 — 2월 A + 2월 지급 건에 담긴 1월 B(지난 달 줄 · 합계 포함)');
 select is((select jsonb_object_agg(to_char(u.month, 'MM'), public.myr_settlement_row_lines(r)) from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id where r.product_id = '00000000-0000-4000-8000-0000000b7a01'),
           '{"01": 1, "02": 1}'::jsonb, '정산 줄 판매 줄 수 — A 1월 · 2월 각 1줄');
+
+-- 그 회차의 크리에이터 지급 건 · 없으면 빈 행(금액 0)
+select is((select (public.myr_payout_of(u.id, '00000000-0000-4000-8000-0000000b7001')).status from public.myr_settlement_runs u where u.month = '2031-01-01'), 'pending', 'payout_of — 셀러 1 · 1월 지급 건');
+select is((select public.myr_payout_amount(public.myr_payout_of(u.id, '00000000-0000-4000-8000-0000000b7002')) from public.myr_settlement_runs u where u.month = '2031-02-01'), 0, 'payout_of — 지급 건이 없으면 금액 0');
+-- 회차 마감 · 지급 시각
+select is(jsonb_build_array(public.myr_settlement_month_end('2031-01-15'), public.myr_settlement_pay_at('2031-12-01')),
+          jsonb_build_array('2031-02-01 00:00+09'::timestamptz, '2032-01-01 13:00+09'::timestamptz), '마감 = 다음 달 1일 0시 · 지급 = 다음 달 1일 오후 1시(KST)');
+-- 다 갚았나
+select is(jsonb_build_array(public.myr_mfg_paid_off(0), public.myr_mfg_paid_off(5), public.myr_mfg_paid_off(null)), '[true, false, false]'::jsonb, 'paid_off — 남은 제조금액 0 만');
+-- 차수 상태 · 보증금 합 · 상태 — C(제조금액 100만 · 보증금 25만 입금 전)
+select is((select jsonb_build_array(public.myr_mfg_batch_live(b), public.myr_mfg_batch_deposit_paid(b), public.myr_mfg_batch_deposit_refunded(b), public.myr_mfg_batch_deposit_held(b))
+             from public.myr_mfg_batches b where b.product_id = '00000000-0000-4000-8000-0000000b7a03'), '[true, false, false, false]'::jsonb, 'C 1차 — 살아 있음 · 입금 전 · 환급 전 · 맡김 아님');
+select is((select to_jsonb(d) from public.myr_mfg_deposits('00000000-0000-4000-8000-0000000b7a03') d),
+          '{"paid": 0, "unpaid": 250000, "refunded": 0, "held": 0, "total": 250000, "state": "unpaid"}'::jsonb, 'C 보증금 — 입금 전 25만 · 상태 unpaid');
+-- 차수를 바꾸면 상계보다 작아지나 — C 는 1월에 1.8만 상계
+select is((select jsonb_build_array(public.myr_mfg_change_shortfall(b, 0), public.myr_mfg_change_shortfall(b, 10000), public.myr_mfg_change_shortfall(b, 20000))
+             from public.myr_mfg_batches b where b.product_id = '00000000-0000-4000-8000-0000000b7a03'), '[18000, 8000, null]'::jsonb,
+          '무효면 1.8만 모자람 · 1만으로 정정하면 8천 모자람 · 2만이면 괜찮음(null)');
 
 -- 보고 — 지급 건 · 합계(스크립트가 줄을 더하지 않는다)
 select is((select jsonb_agg(jsonb_build_array(e #>> '{seller,handle}', e ->> 'status', (e ->> 'amount')::int, (e ->> 'rows')::int) order by e #>> '{seller,handle}') from jsonb_array_elements(public.myr_settlement_report('2031-02-01') -> 'payouts') e where e #>> '{seller,handle}' like '@pgtap.po%'),
