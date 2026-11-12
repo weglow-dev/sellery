@@ -82,7 +82,12 @@
 		{/if}
 		<span class="{at === 'pc' ? 'text-[14px]' : 'text-[13px]'} text-white/45">{p.unit}</span>
 	</div>
-	{#if left !== null && left > 0}<p class="mt-1.5 text-[13px] font-semibold text-white/60">남은 수량 <b class="font-extrabold text-fg tabular-nums">{left.toLocaleString('ko-KR')}개</b></p>{/if}
+	<!-- 재고 — 초록 점 + "재고 N개" · 품절이면 회색 점 + "품절" · 모르면(null) 안 보인다 -->
+	{#if p.soldOut}
+		<p class="mt-2 flex items-center gap-2 text-[13px] font-semibold text-white/45"><span class="h-1.5 w-1.5 rounded-full bg-white/45" aria-hidden="true"></span>품절</p>
+	{:else if left !== null && left > 0}
+		<p class="mt-2 flex items-center gap-2 text-[13px] font-semibold text-white/70"><span class="h-1.5 w-1.5 rounded-full bg-[#4ade80]" aria-hidden="true"></span><span class="tabular-nums">재고 {left.toLocaleString('ko-KR')}개</span></p>
+	{/if}
 	{#if gb && gbState === 'active'}
 		<span class="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-accent/14 px-3 py-1.5 text-[12px] font-extrabold text-accent">공구 · {gb.discountPct}% 할인 · {remainLabel(gb.endsAt, now)}</span>
 	{:else if gb && gbState === 'scheduled'}
