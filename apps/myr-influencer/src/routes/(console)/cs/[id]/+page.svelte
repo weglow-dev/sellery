@@ -114,7 +114,7 @@
 			<button type="button" onclick={() => setReply(rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
 		{/each}
 	</div>
-	<textarea class={TEXTAREA} rows="4" value={reply} oninput={(e) => setReply(e.currentTarget.value)} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
+	<textarea class="{TEXTAREA} block" rows="4" value={reply} oninput={(e) => setReply(e.currentTarget.value)} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
 	{#if error}<p role="alert" class="mt-2 text-[13px] text-accent">{error}</p>{/if}
 {/snippet}
 
@@ -137,9 +137,10 @@
 {/snippet}
 
 {#snippet actions(cls: string)}
-	<div class="flex w-full flex-col gap-2.5">
+	<!-- 확인 문구는 메시지 칸과 버튼 사이 위아래 가운데 — 문구 py-2(메시지 칩과 같은 값) · 위 16px(mt-4) + 8 = 아래 8 + gap 16 -->
+	<div class="flex w-full flex-col gap-4">
 		{#if confirmView}
-			<p role="alert" class="text-[13px] leading-[1.55] break-words {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
+			<p role="alert" class="py-2 text-[13px] leading-[1.55] break-words {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
 		{/if}
 		<div class="flex gap-2.5">
 			{#if confirmView}
