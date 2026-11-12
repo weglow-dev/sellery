@@ -41,6 +41,9 @@ describe('파서', () => {
 			{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, 'held', '지급 보류', { code: 'manual', label: '운영팀 확인 중' }
 		]);
 		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].hold]).toEqual([null, null, null]);
+		// 이체한 날(서버 paid_on · 0103) — 지급 완료일 때만
+		expect(sellerSettlementsFromJson({ months: [{ month: '2026-11', payout_status: 'paid', paid_on: '2026-12-02', rows: [], total: {} }] }).months[0].paidOn).toBe('2026-12-02');
+		expect(t.months[0].paidOn).toBeNull();
 		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
 	});
 	it('줄 내역', () => {

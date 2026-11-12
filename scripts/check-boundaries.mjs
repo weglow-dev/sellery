@@ -187,6 +187,8 @@ const MYR_MIRROR_RULES = [
   { re: /\bdeposit(Held|Unpaid|Refunded)\s*(===?|!==|>|<=)\s*0\b/, why: "보증금 상태를 다시 판정 — 서버 값 depositState(myr_mfg_deposits)를 쓴다" },
   { re: /\breleasedIn\s*\|\||\|\|\s*[\w.]*nextPayout\b/, why: "이 달 합계에서 빠진 줄을 다시 판정 — 서버 값 counted(myr_settlement_card_rows)를 쓴다" },
   { re: /\.some\([^\n]*\.hasLedger\b/, why: "보류 해제 예정을 다시 판정 — 서버 값 releasable(myr_settlement_row_releasable)을 쓴다" },
+  { re: /['"]\*\*\*\*['"]\s*\+/, why: "계좌번호를 화면에서 가림 — 서버 값 account_masked(myr_mask_account)를 쓴다" },
+  { re: /\bpayout_?[sS]tatus\s*(===|!==)\s*['"]paid['"]/, why: "지급 완료를 다시 판정 — 서버 값 payoutLabel · paidOn(myr_payout_is_paid · 0103)을 쓴다" },
   { re: /\bsettleStatus\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 nextHold · hold(myr_seller_hold_reason · 0102)를 쓴다" },
   { re: /\bsettle_status\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 hold_reason · payable(0102)을 쓴다" },
   { re: /Date\.UTC\([^)\n]*,\s*1\s*,\s*4\s*[,)]/, why: "정산 지급 시각(다음 달 1일 오후 1시)을 화면에서 계산 — 서버 값 payAt · settleAt(myr_settlement_pay_at)을 쓴다" },

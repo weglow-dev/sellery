@@ -41,7 +41,7 @@ export type SettlePreview = { month: string; settleAt: string | null; rows: Sett
 /** 지급 보류 이유(서버 0102 — code settle_info · manual · label = myr_payout_hold_label) */
 export type SettleHold = { code: string; label: string };
 /** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
- *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 */
+ *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 · paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103) */
 export type SettleMonth = {
 	month: string;
 	settledAt: string | null;
@@ -49,6 +49,7 @@ export type SettleMonth = {
 	payoutStatus: string | null;
 	payoutLabel: string;
 	hold: SettleHold | null;
+	paidOn: string | null;
 	rows: SettleRow[];
 	total: SettleTotal;
 };
@@ -175,6 +176,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				payoutStatus: typeof x.payout_status === 'string' ? x.payout_status : null,
 				payoutLabel: s(x.payout_label),
 				hold: holdFrom(x.hold),
+				paidOn: typeof x.paid_on === 'string' ? x.paid_on : null,
 				rows: rows(x.rows),
 				total: totalFrom(x.total)
 			}))

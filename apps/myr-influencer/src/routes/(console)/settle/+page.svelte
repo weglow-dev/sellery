@@ -39,7 +39,8 @@
 			href: `/settle/${m.month}`,
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
-			payShort: `${shortDate(m.payAt)} 지급`,
+			// 지급 완료면 이체한 날(서버 paid_on · 0103) · 아니면 지급 예정일
+			payShort: `${shortDate(m.paidOn ?? m.payAt)} 지급`,
 			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel }),
 			held: m.total.held,
 			sales: m.total.netSales,

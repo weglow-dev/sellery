@@ -73,7 +73,7 @@ select is((select hold_note from public.myr_payouts where id = (public.myr_payou
 select is(public.myr_payout_release('2032-01-01', '@pgtap.ph1', 'test') ->> 'code', 'NOT_MANUAL', '운영 보류가 아니면 해제할 것이 없다');
 
 -- ---------- 지급 완료는 보류 · 자동 갱신 대상이 아니다 ----------
-update public.myr_payouts set status = 'paid', paid_at = now(), paid_amount = 12000 where id = (public.myr_payout_find('2032-01-01', '@pgtap.ph2')).id;
+update public.myr_payouts set status = 'paid', paid_at = now(), paid_on = '2032-02-03', paid_amount = 12000 where id = (public.myr_payout_find('2032-01-01', '@pgtap.ph2')).id;
 select is(public.myr_payout_hold('2032-01-01', '@pgtap.ph2', '메모', 'test') ->> 'code', 'ALREADY_PAID', '지급 완료는 보류 불가');
 update public.sellers set myr_settle_status = 'pending' where id = '00000000-0000-4000-8000-0000000c7002';
 select is(pg_temp.st('@pgtap.ph2'), '["paid", null, false]'::jsonb, '지급 완료는 사업자 정보가 바뀌어도 그대로 · 지급 가능 아님');
