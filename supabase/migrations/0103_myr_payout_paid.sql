@@ -82,14 +82,15 @@ as $$
 $$;
 revoke all on function public.myr_payout_bank_snapshot(uuid) from public, anon, authenticated;
 
--- 제조금액 갚은 비율(0~100 · 정수) — 원장이 없거나 0원이면 100. 정산 탭 원장 카드가 글자로 보여 준다(화면이 나누지 않는다)
+-- 제조금액 갚은 비율(0~100 · 정수 · 내림) — 원장이 없거나 0원이면 100. 정산 탭 원장 카드가 글자로 보여 준다(화면이 나누지 않는다)
+--   내림 — 다 갚기 전에는 100% 가 나오지 않는다(99.6% → 99). 100% 는 남은 제조금액 0(myr_mfg_paid_off · "상환 완료" 칩)일 때만
 create or replace function public.myr_mfg_repaid_pct(p_product_id uuid)
 returns integer
 language sql
 stable
 as $$
   select case when public.myr_mfg_total(p_product_id) <= 0 then 100
-              else round(public.myr_mfg_offset_total(p_product_id) * 100.0 / public.myr_mfg_total(p_product_id))::integer end
+              else floor(public.myr_mfg_offset_total(p_product_id) * 100.0 / public.myr_mfg_total(p_product_id))::integer end
 $$;
 revoke all on function public.myr_mfg_repaid_pct(uuid) from public, anon, authenticated;
 

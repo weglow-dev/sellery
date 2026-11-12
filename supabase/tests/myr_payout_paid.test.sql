@@ -2,7 +2,7 @@
 --   지급 완료 취소(사유 필수 · 자동 상태로 · 이력 남김) · 보고 · 정산 탭 이체한 날 · 한국 날짜 · 계좌 가리기
 -- 2033년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(41);
+select plan(45);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_payout_to_pay', '{date}'::text[], 'anon', '{}'::text[], 'anon 은 payout_to_pay 불가');
@@ -43,6 +43,25 @@ create function pg_temp.po(p_handle text) returns public.myr_payouts language sq
 -- ---------- 한국 날짜 · 계좌 가리기 ----------
 select is(jsonb_build_array(public.myr_kst_date('2033-01-31 16:00+00'), public.myr_kst_date('2033-01-31 14:59+00')), '["2033-02-01", "2033-01-31"]'::jsonb, '한국 날짜 — UTC 15시부터 다음 날');
 select is(jsonb_build_array(public.myr_mask_account('1234567890'), public.myr_mask_account(''), public.myr_mask_account(null)), '["****7890", null, null]'::jsonb, '계좌 가리기 — 뒤 4자리 · 없으면 null');
+
+-- ---------- 제조금액 갚은 비율(내림) ----------
+-- Q3: 제조금액 15만 · 확정 줄 상계로 갚은 금액을 바꿔 가며 본다(1월 회차 줄에 붙인다)
+insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
+values ('00000000-0000-4000-8000-0000000d7a03', 'pgtap-pp-3', '00000000-0000-4000-8000-0000000d7001', 'diet', 'Q3', 10000, 1000, 'listed', 'jelly');
+select public.myr_mfg_add('00000000-0000-4000-8000-0000000d7a03', 150000, '1차', 'test');
+insert into public.myr_settlement_rows (id, run_id, product_id, seller_id, pct, sales, refund_adj, carry_in, base, carry_out, settle, status,
+                                        mfg_before, offset_amount, mfg_after, deposit_refund, payout, confirmed_at)
+values ('00000000-0000-4000-8000-0000000d7e03', (public.myr_settlement_run_of('2033-01-01')).id, '00000000-0000-4000-8000-0000000d7a03', '00000000-0000-4000-8000-0000000d7001',
+        60, 0, 0, 0, 0, 0, 0, 'confirmed', 150000, 108000, 42000, 0, 0, now());
+select is(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0000000d7a03'), 72, '갚은 비율 — 10.8만 / 15만 = 72%');
+update public.myr_settlement_rows set offset_amount = 149400, mfg_after = 600 where id = '00000000-0000-4000-8000-0000000d7e03';
+select is(jsonb_build_array(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0000000d7a03'), public.myr_mfg_paid_off(public.myr_mfg_remaining('00000000-0000-4000-8000-0000000d7a03'))),
+          '[99, false]'::jsonb, '99.6% 는 내림으로 99 — 상환 중인데 100% 로 보이지 않는다');
+update public.myr_settlement_rows set offset_amount = 150000, mfg_after = 0 where id = '00000000-0000-4000-8000-0000000d7e03';
+select is(jsonb_build_array(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0000000d7a03'), public.myr_mfg_paid_off(public.myr_mfg_remaining('00000000-0000-4000-8000-0000000d7a03'))),
+          '[100, true]'::jsonb, '100% 는 다 갚았을 때만(상환 완료와 같이)');
+select is(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0000000d7a01'), 100, '제조금액 0원 원장 → 100');
+delete from public.myr_settlement_rows where id = '00000000-0000-4000-8000-0000000d7e03';
 
 -- ---------- 지급 목록 ----------
 select is((select jsonb_agg(jsonb_build_array(e #>> '{seller,handle}', (e ->> 'amount')::int, e #>> '{bank,account}')) from jsonb_array_elements(public.myr_payout_to_pay('2033-01-01')) e where e #>> '{seller,handle}' like '@pgtap.pp%'),
