@@ -56,6 +56,16 @@ export function approveLabel(c: Claim, resolution: Resolution | null): string {
 	return resolution && c.options.includes(resolution) ? `${resolutionOption(resolution, c).title} 승인` : '처리 방법을 선택하세요';
 }
 
+/** 승인 · 반려 전 한 번 더 확인(공구 종료 · 판매 종료와 같은 방식) — 둘 다 고객 메일이 바로 나가고 되돌릴 수 없다(서버는 처리 대기 요청만 받는다 · NOT_PENDING).
+ *  승인 문구는 고른 처리 방법의 이름 · 안내(서버 예상 금액이 있으면 금액까지 — 처리 방법 선택지와 같은 resolutionOptions) */
+export type DecideConfirm = { text: string; button: string };
+export function decideConfirm(c: Claim, decision: 'approve' | 'reject', resolution: Resolution | null, quotes: ClaimQuotes = {}): DecideConfirm | null {
+	if (decision === 'reject') return { text: '반려하면 고객에게 반려 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 반려하기' };
+	const opt = resolution ? resolutionOptions(c, quotes).find((o) => o.id === resolution) : undefined;
+	if (!opt) return null;
+	return { text: `${opt.title} · ${opt.desc}\n승인하면 고객에게 메일이 바로 가고, 되돌릴 수 없어요`, button: '정말 승인하기' };
+}
+
 /** 고객에게 보낼 메시지 칩 — 고른 처리 방법에 맞는 문구 + 반려 안내. 크리에이터 이름을 넣지 않는다(메일에 크리에이터 이름이 붙는다) */
 export const REPLY_TEMPLATES: Record<Resolution | 'reject', string> = {
 	refund: '불편을 드려 죄송해요. 환불을 승인했어요. 회수가 필요하면 택배 기사가 방문하고, 확인 뒤 결제수단으로 돌려드릴게요.',

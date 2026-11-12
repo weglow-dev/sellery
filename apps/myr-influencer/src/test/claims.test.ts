@@ -1,7 +1,7 @@
 // CS 관리 › 교환 · 환불(7번 · 0078) — apps/myr-influencer/src/lib/claims.ts (탭 · 기한 · 승인 버튼 · 메시지 칩 · 처리 내역)
 import { describe, expect, it } from 'vitest';
 import { claimFromJson, type Claim } from '@sellery/myr-core/claim-rules';
-import { approveLabel, claimOrderedAmount, claimShipping, claimTabCounts, consoleTimeline, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
+import { approveLabel, claimOrderedAmount, claimShipping, claimTabCounts, consoleTimeline, decideConfirm, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
 
 const NOW = new Date('2026-11-06T12:00:00Z');
 const claim = (o: Record<string, unknown> = {}) =>
@@ -53,6 +53,17 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 		expect(approveLabel(c, 'partial')).toBe('부분 환불 (왕복 배송비 차감) 승인');
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
 		expect(approveLabel(c, 'reship')).toBe('처리 방법을 선택하세요');
+	});
+	it('승인 · 반려 전 한 번 더 확인 — 되돌릴 수 없다는 안내 · 승인은 고른 처리 방법과 서버 예상 금액', () => {
+		const c = claim();
+		expect(decideConfirm(c, 'reject', null)).toEqual({ text: '반려하면 고객에게 반려 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 반려하기' });
+		const quotes = { partial: { amount: 26000, paid: 32000, goods: 32000, shippingBack: 0, deduction: 6000, full: false, deposit: false, lines: [] } };
+		expect(decideConfirm(c, 'approve', 'partial', quotes)).toEqual({
+			text: '부분 환불 (왕복 배송비 차감) · ₩26,000 (상품 ₩32,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불\n승인하면 고객에게 메일이 바로 가고, 되돌릴 수 없어요',
+			button: '정말 승인하기'
+		});
+		// 처리 방법을 안 골랐거나 선택지 밖이면 확인 단계로 가지 않는다
+		expect([decideConfirm(c, 'approve', null), decideConfirm(c, 'approve', 'reship')]).toEqual([null, null]);
 	});
 	it('메시지 칩 — 고른 방법 안내 + 반려 안내', () => {
 		expect(replyChips(null).map((r) => r.name)).toEqual(['반려 안내']);

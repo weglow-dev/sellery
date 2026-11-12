@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { claimPolicy, claimQtyText, claimRefundView, CLAIM_MESSAGE_MAX, canDecide, KIND_LABEL, RESOLUTION_NAMES, type Resolution } from '@sellery/myr-core/claim-rules';
-	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimOrderedAmount, claimShipping, consoleTimeline, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
+	import { CS_STATUS_META, CS_TYPE_META, STEP_TEXT, approveLabel, claimOrderedAmount, claimShipping, consoleTimeline, decideConfirm, dueText, isUrgentPending, replyChips, resolutionOptions } from '$lib/claims';
 	import { goBack } from '$lib/nav';
 	import { relativeTime } from '$lib/product-row';
 	import { won } from '$lib/rules';
@@ -34,10 +34,20 @@
 	let error = $state<string | null>(null);
 	const ok = $derived(canDecide(resolution, reply) && !busy);
 	const canReject = $derived(reply.trim().length > 0 && reply.trim().length <= CLAIM_MESSAGE_MAX && !busy);
+	// 한 번 더 확인 — 승인 · 반려는 고객 메일이 바로 나가고 되돌릴 수 없다(공구 종료와 같은 방식). 처리 방법 · 메시지를 바꾸면 확인을 다시 받는다
+	let confirming = $state<'approve' | 'reject' | null>(null);
+	const confirmView = $derived(confirming ? decideConfirm(c, confirming, resolution, data.quotes) : null);
+	const pickResolution = (r: Resolution) => ((resolution = r), (confirming = null));
+	const setReply = (v: string) => ((reply = v), (confirming = null));
 
 	async function send(decision: 'approve' | 'reject') {
 		if (busy || (decision === 'approve' ? !ok : !canReject)) {
 			if (decision === 'reject' && !reply.trim()) error = '반려 사유를 고객에게 보낼 메시지로 적어주세요';
+			return;
+		}
+		if (confirming !== decision) {
+			confirming = decision;
+			error = null;
 			return;
 		}
 		busy = true;
@@ -51,6 +61,7 @@
 			const r = (await res.json().catch(() => null)) as { ok: boolean; message?: string } | null;
 			if (!res.ok || !r?.ok) {
 				error = r?.message ?? '처리하지 못했어요 — 잠시 후 다시 시도해주세요';
+				confirming = null;
 				busy = false;
 				return;
 			}
@@ -60,9 +71,11 @@
 			);
 			resolution = null;
 			reply = '';
+			confirming = null;
 			await invalidateAll();
 		} catch {
 			error = '처리하지 못했어요 — 잠시 후 다시 시도해주세요';
+			confirming = null;
 		}
 		busy = false;
 	}
@@ -80,7 +93,7 @@
 				type="button"
 				role="radio"
 				aria-checked={on}
-				onclick={() => (resolution = r.id)}
+				onclick={() => pickResolution(r.id)}
 				class="flex items-center gap-3 rounded-2xl border-[1.5px] px-4 py-3.5 text-left transition-all {on ? 'border-accent bg-accent/10' : 'border-white/10 bg-white/3 lg:hover:border-white/25'}"
 			>
 				<span class="box-border flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 {on ? 'border-accent bg-accent' : 'border-white/30'}">
@@ -98,10 +111,10 @@
 {#snippet replyBox()}
 	<div class="mb-2 flex flex-wrap gap-1.5">
 		{#each replyChips(resolution) as rc (rc.name)}
-			<button type="button" onclick={() => (reply = rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
+			<button type="button" onclick={() => setReply(rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
 		{/each}
 	</div>
-	<textarea class={TEXTAREA} rows="4" bind:value={reply} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
+	<textarea class={TEXTAREA} rows="4" value={reply} oninput={(e) => setReply(e.currentTarget.value)} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
 	{#if error}<p role="alert" class="mt-2 text-[13px] text-accent">{error}</p>{/if}
 {/snippet}
 
@@ -124,8 +137,20 @@
 {/snippet}
 
 {#snippet actions(cls: string)}
-	<button type="button" onclick={() => send('reject')} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">반려</button>
-	<button type="button" onclick={() => send('approve')} disabled={!ok} class="flex-1 rounded-2xl font-extrabold transition-colors duration-250 {ok ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'} {cls}">{busy ? '처리 중…' : approveLabel(c, resolution)}</button>
+	<div class="flex w-full flex-col gap-2.5">
+		{#if confirmView}
+			<p role="alert" class="text-[13px] leading-[1.55] break-words whitespace-pre-line {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
+		{/if}
+		<div class="flex gap-2.5">
+			{#if confirmView}
+				<button type="button" onclick={() => (confirming = null)} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">취소</button>
+				<button type="button" onclick={() => confirming && send(confirming)} disabled={busy} class="flex-1 rounded-2xl font-extrabold transition-colors disabled:opacity-60 {confirming === 'reject' ? 'bg-[#ff6b6b] text-white' : 'bg-accent text-bg'} {cls}">{busy ? '처리 중…' : confirmView.button}</button>
+			{:else}
+				<button type="button" onclick={() => send('reject')} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">반려</button>
+				<button type="button" onclick={() => send('approve')} disabled={!ok} class="flex-1 rounded-2xl font-extrabold transition-colors duration-250 {ok ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'} {cls}">{busy ? '처리 중…' : approveLabel(c, resolution)}</button>
+			{/if}
+		</div>
+	</div>
 {/snippet}
 
 {#key c.id}
