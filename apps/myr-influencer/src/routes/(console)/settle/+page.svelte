@@ -24,7 +24,8 @@
 		href: '/settle/next',
 		title: `${monthShort(pv.month)} 정산`,
 		short: monthShort(pv.month),
-		payShort: `${shortDate(nextAt)} 지급 예정`,
+		payShort: `${shortDate(nextAt)} 정산 예정`,
+		invoiceTodo: null as { overdue: boolean } | null,
 		status: monthStatus({ upcoming: true, nextHold: st.nextHold }),
 		held: pv.total.held,
 		sales: pv.total.netSales,
@@ -39,8 +40,10 @@
 			href: `/settle/${m.month}`,
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
-			// 지급 완료면 이체한 날(서버 paid_on · 0103) · 아니면 지급 예정일
-			payShort: `${shortDate(m.paidOn ?? m.payAt)} 지급`,
+			// 지급 완료면 이체한 날(서버 paid_on · 0103) · 아니면 정산일(지급은 세금계산서 확인 뒤 · 0104)
+			payShort: m.paidOn ? `${shortDate(m.paidOn)} 지급` : `${shortDate(m.payAt)} 정산`,
+			// 세금계산서를 낼 차례(서버 todo · 기한 지남 overdue · 0104)
+			invoiceTodo: m.invoice?.todo ? { overdue: m.invoice.overdue } : null,
 			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel }),
 			held: m.total.held,
 			sales: m.total.netSales,
@@ -51,7 +54,7 @@
 		}))
 	]);
 	// 남은 제조금액 합 · 돌려받을 보증금 합 · 다음 정산 상환 예정은 서버 값(0101) — 화면이 더하지 않는다
-	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 오후 1시 지급']);
+	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 정산 · 세금계산서 확인 뒤 지급']);
 	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.month, won) })));
 
 	const CHIP: Record<SettleTone, string> = {
@@ -123,6 +126,7 @@
 							<span class="flex items-center gap-1.5">
 								<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP[mo.status.tone]}">{mo.status.label}</span>
 								{#if mo.held}<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중 {mo.held}</span>{/if}
+								{#if mo.invoiceTodo}<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11px] font-bold whitespace-nowrap {mo.invoiceTodo.overdue ? CHIP.hold : CHIP.warn}">세금계산서 {mo.invoiceTodo.overdue ? '기한 지남' : '발행 필요'}</span>{/if}
 							</span>
 							<span class="text-[11px] text-white/45 lg:text-[12px]">{mo.payShort}</span>
 						</span>

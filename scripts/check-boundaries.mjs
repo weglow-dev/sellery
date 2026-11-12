@@ -194,6 +194,12 @@ const MYR_MIRROR_RULES = [
   { re: /\bsettleStatus\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 nextHold · hold(myr_seller_hold_reason · 0102)를 쓴다" },
   { re: /\bsettle_status\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 hold_reason · payable(0102)을 쓴다" },
   { re: /Date\.UTC\([^)\n]*,\s*1\s*,\s*4\s*[,)]/, why: "정산 지급 시각(다음 달 1일 오후 1시)을 화면에서 계산 — 서버 값 payAt · settleAt(myr_settlement_pay_at)을 쓴다" },
+  // 세금계산서(0104)
+  { re: /\/\s*1\.1\b|\/\s*11\b|\bsupply\s*\*\s*0\.1\b|\*\s*10\s*\/\s*11\b/, why: "세금계산서 공급가액 · 세액을 화면에서 나눔 — 서버 값 supply · tax(myr_tax_invoice_amounts · 0104)를 쓴다" },
+  { re: /\bsupply\s*\+\s*[\w.]*tax\b|\btax\s*\+\s*[\w.]*supply\b/, why: "세금계산서 합계를 화면에서 더함 — 서버 값 total(myr_payout_invoice_total · 0104)을 쓴다" },
+  { re: /\b(payout|amount)\s*-\s*[\w.]*depositRefund\b/, why: "세금계산서 합계(지급액 − 보증금 환급)를 다시 계산 — 서버 값 invoice.total(myr_payout_invoice_total · 0104)을 쓴다" },
+  { re: /\binv(oice)?\??\.status\s*(===|!==)/, why: "세금계산서 상태로 버튼 · 안내를 다시 판정 — 서버 값 canSubmit · todo · overdue(myr_payout_invoice_json · 0104)와 상태별 문구 표를 쓴다" },
+  { re: /\bdueDate\s*(<|>|<=|>=)|(<|>|<=|>=)\s*[\w.]*dueDate\b/, why: "발행 기한 지남을 화면에서 판정 — 서버 값 overdue(myr_tax_invoice_overdue · 0104)를 쓴다" },
 ];
 /** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
 function codeLines(file) {

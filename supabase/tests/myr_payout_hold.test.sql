@@ -35,6 +35,16 @@ values ('00000000-0000-4000-8000-0000000c7d01', '00000000-0000-4000-8000-0000000
        ('00000000-0000-4000-8000-0000000c7d03', '00000000-0000-4000-8000-0000000c7b01', '00000000-0000-4000-8000-0000000c7a03', '00000000-0000-4000-8000-0000000c7003', '줄', 1, 10000, 'DELIVERED', '2032-01-12 12:00+09');
 select is(public.myr_settlement_run('2032-01-01', 'test', '2032-02-01 13:00+09') ->> 'ok', 'true', '1월 회차');
 
+-- 세금계산서 확인 완료(0104) — 이 파일은 사업자 정보 보류 · 운영 보류을 보므로 세금계산서는 먼저 확인해 둔다(세금계산서 자체는 myr_tax_invoice.test.sql)
+create function pg_temp.invoice_ok(p_month date, p_handle text) returns void language sql as $$
+  insert into public.myr_tax_invoices (payout_id, approval_no, total, status, checked_at, checked_by)
+  select p.id, public.myr_tax_invoice_no(to_char(p_month, 'YYYYMMDD') || left(md5(p.id::text), 16)), public.myr_payout_invoice_total(p), 'accepted', now(), 'test'
+    from public.myr_payout_find(p_month, p_handle) p;
+  select public.myr_payout_refresh((public.myr_payout_find(p_month, p_handle)).id);
+$$;
+select pg_temp.invoice_ok('2032-01-01', '@pgtap.ph1');
+select pg_temp.invoice_ok('2032-01-01', '@pgtap.ph2');
+
 create function pg_temp.st(p_handle text) returns jsonb language sql as $$
   select jsonb_build_array(p.status, p.hold_reason, public.myr_payout_payable(p)) from public.myr_payouts p where p.id = (public.myr_payout_find('2032-01-01', p_handle)).id
 $$;

@@ -48,8 +48,8 @@ select pg_temp.line('00000000-0000-4000-8000-0000000b7d03', '00000000-0000-4000-
 select is(public.myr_settlement_run('2031-01-01', 'test', '2031-02-01 13:00+09') ->> 'ok', 'true', '1월 회차');
 -- 로컬 DB 의 실제 미정산 줄도 이 회차에 들어올 수 있어 테스트 셀러만 센다
 select is((select count(*)::int from public.myr_payouts p join public.myr_settlement_runs u on u.id = p.run_id join public.sellers s on s.id = p.seller_id where u.month = '2031-01-01' and s.handle like '@pgtap.po%'), 2, '크리에이터마다 지급 건 1건(셀러 1 · 셀러 2)');
-select is(pg_temp.payouts('2031-01-01'), '{"@pgtap.po1": ["pending", 30000, 1], "@pgtap.po2": ["none", 0, 1]}'::jsonb,
-          '셀러 1 — 확정된 A 만 담아 3만 · 지급 대기(B 는 보류라 안 담김) / 셀러 2 — 전부 상계 0원 · 지급 없음');
+select is(pg_temp.payouts('2031-01-01'), '{"@pgtap.po1": ["held", 30000, 1], "@pgtap.po2": ["none", 0, 1]}'::jsonb,
+          '셀러 1 — 확정된 A 만 담아 3만 · 지급 보류(세금계산서 확인 전 · 0104 · B 는 보류라 안 담김) / 셀러 2 — 전부 상계 0원 · 지급 없음');
 select is((select payout_id from public.myr_settlement_rows where product_id = '00000000-0000-4000-8000-0000000b7a02'), null, '보류 줄(B)은 아직 어느 지급 건에도 없다');
 select is((public.myr_settlement_run('2031-01-01', 'test', '2031-02-02 13:00+09') ->> 'already')::boolean, true, '같은 달 다시 돌려도');
 select is((select count(*)::int from public.myr_payouts p join public.myr_settlement_runs u on u.id = p.run_id join public.sellers s on s.id = p.seller_id where u.month = '2031-01-01' and s.handle like '@pgtap.po%'), 2, '지급 건이 늘지 않는다');
@@ -61,7 +61,7 @@ select is((public.myr_settlement_confirm_held('00000000-0000-4000-8000-0000000b7
 -- ---------- 2월 ----------
 select pg_temp.line('00000000-0000-4000-8000-0000000b7d04', '00000000-0000-4000-8000-0000000b7a01', '00000000-0000-4000-8000-0000000b7001', 1, '2031-02-10 12:00+09');   -- A 1만 → 정산 6천
 select is((public.myr_settlement_run('2031-02-01', 'test', '2031-03-01 13:00+09') ->> 'payout')::int, 18000, '2월 회차 지급 합계 = 지급 건 금액 합(A 6천 + 먼저 확정한 B 1.2만)');
-select is(pg_temp.payouts('2031-02-01'), '{"@pgtap.po1": ["pending", 18000, 2]}'::jsonb, '셀러 1 — 2월 A 줄 + 먼저 확정한 1월 B 줄 · 셀러 2 는 2월에 확정된 줄이 없어 지급 건 없음');
+select is(pg_temp.payouts('2031-02-01'), '{"@pgtap.po1": ["held", 18000, 2]}'::jsonb, '셀러 1(세금계산서 확인 전) — 2월 A 줄 + 먼저 확정한 1월 B 줄 · 셀러 2 는 2월에 확정된 줄이 없어 지급 건 없음');
 
 -- 판정 함수 — 지급 건에 담을 줄 · 지급된 회차 · 0원 초과 · 자동 상태
 select is((select jsonb_object_agg(p.code, public.myr_settlement_row_payable(r)) from public.myr_settlement_rows r join public.myr_products p on p.id = r.product_id where p.code like 'pgtap-po-%'),
@@ -89,7 +89,7 @@ select is((select jsonb_object_agg(to_char(u.month, 'MM'), public.myr_settlement
           '{"01": 1, "02": 1}'::jsonb, '정산 줄 판매 줄 수 — A 1월 · 2월 각 1줄');
 
 -- 그 회차의 크리에이터 지급 건 · 없으면 빈 행(금액 0)
-select is((select (public.myr_payout_of(u.id, '00000000-0000-4000-8000-0000000b7001')).status from public.myr_settlement_runs u where u.month = '2031-01-01'), 'pending', 'payout_of — 셀러 1 · 1월 지급 건');
+select is((select (public.myr_payout_of(u.id, '00000000-0000-4000-8000-0000000b7001')).status from public.myr_settlement_runs u where u.month = '2031-01-01'), 'held', 'payout_of — 셀러 1 · 1월 지급 건(세금계산서 확인 전)');
 select is((select public.myr_payout_amount(public.myr_payout_of(u.id, '00000000-0000-4000-8000-0000000b7002')) from public.myr_settlement_runs u where u.month = '2031-02-01'), 0, 'payout_of — 지급 건이 없으면 금액 0');
 -- 회차 마감 · 지급 시각
 select is(jsonb_build_array(public.myr_settlement_month_end('2031-01-15'), public.myr_settlement_pay_at('2031-12-01')),
@@ -108,7 +108,7 @@ select is((select jsonb_build_array(public.myr_mfg_change_shortfall(b, 0), publi
 
 -- 보고 — 지급 건 · 합계(스크립트가 줄을 더하지 않는다)
 select is((select jsonb_agg(jsonb_build_array(e #>> '{seller,handle}', e ->> 'status', (e ->> 'amount')::int, (e ->> 'rows')::int) order by e #>> '{seller,handle}') from jsonb_array_elements(public.myr_settlement_report('2031-02-01') -> 'payouts') e where e #>> '{seller,handle}' like '@pgtap.po%'),
-          '[["@pgtap.po1", "pending", 18000, 2]]'::jsonb, '2월 보고 지급 건 = 지급 건 표 값');
+          '[["@pgtap.po1", "held", 18000, 2]]'::jsonb, '2월 보고 지급 건 = 지급 건 표 값');
 select ok((public.myr_settlement_report('2031-02-01') ->> 'payout_total')::int >= 18000, '보고 지급 합계 = 지급 건 금액 합(로컬 실제 데이터가 섞일 수 있어 하한만)');
 
 select * from finish();

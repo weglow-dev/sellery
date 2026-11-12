@@ -3,6 +3,8 @@
  * 테스트 src/test/seller-settlement.test.ts.
  */
 
+import { taxInvoiceFromJson, type TaxInvoice } from './tax-invoice';
+
 type Obj = Record<string, unknown>;
 const obj = (v: unknown): Obj | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Obj) : null);
 const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
@@ -38,10 +40,11 @@ export type SettleRow = {
 /** netSales = 판매 − 정산 뒤 환불(서버 myr_settlement_net_sales) · payout = 지급 건 금액(서버 myr_payout_amount · 다음 정산은 예상 합) */
 export type SettleTotal = { sales: number; refundAdj: number; netSales: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
 export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
-/** 지급 보류 이유(서버 0102 — code settle_info · manual · label = myr_payout_hold_label) */
+/** 지급 보류 이유(서버 0102 · 0104 — code settle_info · tax_invoice · manual · label = myr_payout_hold_label) */
 export type SettleHold = { code: string; label: string };
 /** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
- *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 · paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103) */
+ *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 · paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103)
+ *  invoice = 세금계산서(서버 myr_payout_invoice_json · 0104 — 지급 건이 없으면 null) */
 export type SettleMonth = {
 	month: string;
 	settledAt: string | null;
@@ -50,6 +53,7 @@ export type SettleMonth = {
 	payoutLabel: string;
 	hold: SettleHold | null;
 	paidOn: string | null;
+	invoice: TaxInvoice | null;
 	rows: SettleRow[];
 	total: SettleTotal;
 };
@@ -180,6 +184,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				payoutLabel: s(x.payout_label),
 				hold: holdFrom(x.hold),
 				paidOn: typeof x.paid_on === 'string' ? x.paid_on : null,
+				invoice: taxInvoiceFromJson(x.invoice),
 				rows: rows(x.rows),
 				total: totalFrom(x.total)
 			}))
