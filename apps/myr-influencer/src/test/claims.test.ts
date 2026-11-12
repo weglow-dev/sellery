@@ -91,7 +91,8 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	it('배송 완료 줄 → 운송장(조회 링크) · 발송일 · 배송 완료', () => {
 		const s = claimShipping(claim({ order: ord('PAID', { ship_status: 'DELIVERED', courier: 'CJ대한통운', tracking_no: '612300000010', shipped_at: '2026-11-02T00:00:00Z', delivered_at: '2026-11-03T00:00:00Z' }) }));
 		expect(s.label).toBe('배송 완료');
-		expect(s.rows.map((r) => r.k)).toEqual(['주문 상품', '결제일', '운송장', '발송일', '배송 완료']);
+		// 이 칸은 요청이 걸린 줄 하나 — "주문 상품" 이 아니라 "요청 상품"(같은 주문의 다른 상품은 없다)
+		expect(s.rows.map((r) => r.k)).toEqual(['요청 상품', '결제일', '운송장', '발송일', '배송 완료']);
 		expect(s.rows.find((r) => r.k === '운송장')).toMatchObject({ v: 'CJ대한통운 612300000010' });
 		expect(s.rows.find((r) => r.k === '운송장')!.href).toBeTruthy();
 	});

@@ -96,7 +96,7 @@ export function consoleTimeline(c: Claim, now?: Date): { title: string; when: st
 export const claimOrderedAmount = (c: Pick<Claim, 'order'>): number => c.order.item.amount;
 /** 요청 상세 "주문 · 배송" — 그 줄 송장 · 상품 금액(그 줄 전체 수량) · 주문 배송비(0090) */
 export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping =>
-	orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } });
+	orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } }, '요청 상품');
 
 /** 지금 단계 — 진행 중 요청에서 크리에이터가 볼 한 줄(실행은 운영 · 서버) */
 export const STEP_TEXT: Record<string, string> = {
