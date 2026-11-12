@@ -1,4 +1,4 @@
-// MYR 정산 운영 스크립트(0087) — 운영 콘솔 myr-admin 의 "제조 원장 · 정산"(docs/myr-admin-screens.md §8) 이 생기기 전까지 터미널에서.
+// MYR 정산 운영 스크립트(0087) — 운영 콘솔 myr-admin 의 "제조 원장 · 정산 · 지급"(docs/myr-admin-screens.md §10 · §11 · 만들 것 docs/myr-admin-plan.md §8 · §9) 이 생기기 전까지 터미널에서.
 // 계산 · 확정은 DB 함수(myr_settlement_run · myr_settlement_confirm_held)가 한다 — 이 스크립트는 부르고 표로 보여 줄 뿐이다. 콘솔이 생기면 지운다.
 //
 //   node packages/db/scripts/myr-settle.mjs <cmd> [args]   (저장소 루트에서 · .env.local 의 PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY)
