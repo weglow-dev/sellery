@@ -19,6 +19,8 @@
 	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
 	const mon = $derived(upcoming ? null : (st.months.find((m) => m.month === data.key) ?? null));
 	const payAt = $derived(upcoming ? st.preview.settleAt : (mon?.payAt ?? null));
+	// 지급 완료면 이체한 날(서버 paid_on · 0103) — 시각 없이 날짜만
+	const paidOn = $derived(mon?.paidOn ?? null);
 	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · hold — 0102)
 	const hold = $derived(upcoming ? st.nextHold : (mon?.hold ?? null));
 	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '' }));
@@ -89,7 +91,7 @@
 			<!-- 모바일 상태 줄 -->
 			<div class="flex items-center gap-2 lg:hidden">
 				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
-				<span class="ml-auto text-[12px] text-white/50">{settleAtLabel(payAt)} {upcoming ? '지급 예정' : '지급'}</span>
+				<span class="ml-auto text-[12px] text-white/50">{paidOn ? `${shortDate(paidOn)} 지급` : `${settleAtLabel(payAt)} ${upcoming ? '지급 예정' : '지급'}`}</span>
 			</div>
 			{#if hold && hold.code !== 'settle_info'}<p class="mt-2 text-[12px] text-white/55 lg:hidden">보류 사유 · {hold.label}</p>{/if}
 			{#if hold?.code === 'settle_info'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
@@ -188,7 +190,7 @@
 				{@render calcRows(true)}
 				<p class="mt-[22px] mb-3 text-[14px] font-extrabold text-white/70">지급 정보</p>
 				<div class="flex flex-col gap-2.5 text-[14px]">
-					<div class="flex justify-between text-white/60"><span>지급일</span><span class="font-semibold text-fg tabular-nums">{settleAtLabel(payAt)}</span></div>
+					<div class="flex justify-between text-white/60"><span>지급일</span><span class="font-semibold text-fg tabular-nums">{paidOn ? shortDate(paidOn) : settleAtLabel(payAt)}</span></div>
 					<div class="flex justify-between text-white/60"><span>정산 대상</span><span class="font-semibold text-fg">{target}</span></div>
 					<div class="flex items-center justify-between text-white/60"><span>상태</span><span class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span></div>
 					{#if hold}<div class="flex justify-between text-white/60"><span>보류 사유</span><span class="font-semibold text-fg">{hold.label}</span></div>{/if}

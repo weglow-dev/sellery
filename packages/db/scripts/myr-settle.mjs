@@ -20,6 +20,11 @@
 //                                             + 지급 건(상태 · 보류 이유 · 운영 메모 · 지급 가능 — 0102 서버 값 그대로)
 //   hold <YYYY-MM> <@핸들> "<메모>"             지급 건 운영 보류(메모 필수 · 지급 완료 · 0원은 거절) — 사람이 건 보류는 자동으로 풀리지 않는다
 //   release <YYYY-MM> <@핸들>                  운영 보류 해제 — 자동 상태로(사업자 정보 확인 전이면 다시 지급 보류)
+//   to-pay <YYYY-MM>                          지급 목록 — 지급 가능한 지급 건 · 금액 · 이체할 계좌(원문 · 터미널에만)
+//   paid <YYYY-MM> <@핸들> <금액> --date YYYY-MM-DD ["메모"]
+//                                             지급 완료 기록(0103) — 직접 이체한 뒤. 금액은 to-pay 의 금액과 같아야 · 이체한 날은 오늘 이후 · 회차 계산일 전이면 거절
+//                                             세금계산서를 받았는지는 운영이 확인하고 기록한다(7-4 전까지)
+//   unpaid <YYYY-MM> <@핸들> "<사유>"            지급 완료 취소(잘못 기록했을 때 · 사유 필수 · 이력은 남는다)
 //
 // 크론: 샵 /api/cron/settle — 매월 1일 13:00(KST)에 지난달 회차를 계산하고 바로 확정(원장 없는 상품만 보류).
 // 키는 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등 · 거절 코드).
@@ -82,9 +87,20 @@ const PAYOUT_MESSAGES = {
   ALREADY_HELD: "이미 운영 보류 중입니다",
   NOTHING_TO_PAY: "0원 지급 건(지급 없음)이라 보류할 것이 없습니다",
   NOT_MANUAL: "운영 보류가 아닙니다(사업자 정보 보류는 정보가 확인되면 자동으로 풀립니다)",
+  NOT_PAYABLE: "지급 가능한 지급 건이 아닙니다",
+  AMOUNT_MISMATCH: "적은 금액이 지급 건 금액과 다릅니다",
+  BAD_DATE: "--date YYYY-MM-DD 로 이체한 날을 적어 주세요",
+  FUTURE_DATE: "이체한 날이 오늘(KST) 뒤입니다",
+  BEFORE_RUN: "이체한 날이 회차 계산일 전입니다",
+  REASON_REQUIRED: "취소 사유를 적어 주세요",
+  NOT_PAID: "지급 완료가 아닙니다",
 };
 function checkPayout(r) {
-  if (!r || r.ok === false) fail(`${r?.code ?? "실패"} — ${PAYOUT_MESSAGES[r?.code] ?? ""}`);
+  if (!r || r.ok === false) {
+    // 서버가 같이 준 값(맞는 금액 · 보류 이유 · 이미 기록된 날 · 회차 계산일)을 그대로 덧붙인다
+    const extra = r?.amount != null ? ` (지급 건 금액 ${won(r.amount)})` : r?.hold_label ? ` (${r.status} · ${r.hold_label})` : r?.paid_on ? ` (이체한 날 ${r.paid_on})` : r?.run_on ? ` (회차 계산일 ${r.run_on})` : "";
+    fail(`${r?.code ?? "실패"} — ${PAYOUT_MESSAGES[r?.code] ?? ""}${extra}`);
+  }
   return r;
 }
 async function rpc(fn, params) {
@@ -204,7 +220,8 @@ async function cmdReport() {
   console.log("  지급 건");
   for (const p of r.payouts ?? []) {
     const why = p.hold_label ? ` (${p.hold_label}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
-    console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}`);
+    const paid = p.paid_on ? ` | 이체 ${p.paid_on} ${won(p.paid_amount)}${p.paid_note ? ` · ${p.paid_note}` : ""}` : "";
+    console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}${paid}`);
   }
   console.log(`  지급 합계 ${won(r.payout_total ?? 0)}`);
 }
@@ -219,6 +236,26 @@ async function cmdRelease() {
   const r = checkPayout(await rpc("myr_payout_release", { p_month: m, p_handle: args[1] ?? "", p_actor: "script" }));
   console.log(`[${where}] ${args[0]} ${args[1]} 운영 보류 해제 — 지금 상태 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""} · report ${args[0]} 로 확인`);
 }
+async function cmdToPay() {
+  const m = month(args[0]);
+  const list = (await rpc("myr_payout_to_pay", { p_month: m })) ?? [];
+  console.log(`[${where}] ${args[0]} 지급 목록 — ${list.length}건 (계좌 원문이 보입니다 · 화면 공유 주의)`);
+  for (const p of list) console.log(`  ${p.seller.handle} | ${p.seller.name} | ${won(p.amount)} | ${p.bank.bank ?? "-"} ${p.bank.account ?? "-"} (${p.bank.holder ?? "-"})`);
+  if (list.length) console.log(`  이체한 뒤: paid ${args[0]} <@핸들> <금액> --date YYYY-MM-DD "메모"`);
+}
+async function cmdPaid() {
+  const m = month(args[0]);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(flags.date ?? ""))) fail(PAYOUT_MESSAGES.BAD_DATE);
+  const amount = Number(args[2]);
+  if (!Number.isInteger(amount)) fail("금액은 원 단위 정수(to-pay 의 금액)");
+  const r = checkPayout(await rpc("myr_payout_mark_paid", { p_month: m, p_handle: args[1] ?? "", p_amount: amount, p_paid_on: flags.date, p_note: args[3] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 지급 완료 — ${won(r.amount)} · 이체한 날 ${r.paid_on} · ${r.bank.bank ?? "-"} ${r.bank.account_masked ?? "-"}`);
+}
+async function cmdUnpaid() {
+  const m = month(args[0]);
+  const r = checkPayout(await rpc("myr_payout_unmark_paid", { p_month: m, p_handle: args[1] ?? "", p_reason: args[2] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 지급 완료 취소 — 지금 상태 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""}`);
+}
 
 const COMMANDS = {
   pending: cmdPending,
@@ -232,10 +269,13 @@ const COMMANDS = {
   report: cmdReport,
   hold: cmdHold,
   release: cmdRelease,
+  "to-pay": cmdToPay,
+  paid: cmdPaid,
+  unpaid: cmdUnpaid,
 };
 const fn = COMMANDS[cmd];
 if (!fn) {
-  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release> … (파일 머리말 참고)");
+  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release|to-pay|paid|unpaid> … (파일 머리말 참고)");
   process.exit(2);
 }
 await fn();

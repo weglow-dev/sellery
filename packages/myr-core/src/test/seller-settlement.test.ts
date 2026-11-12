@@ -1,6 +1,6 @@
 // 크리에이터 정산 탭(0089) — packages/myr-core/src/seller-settlement.ts
 import { describe, expect, it } from 'vitest';
-import { monthLabel, repaidPct, sellerSettlementsFromJson, settleAtLabel, settleItemsFromJson, settlePreviewFromJson, settleRowText } from '../seller-settlement';
+import { monthLabel, sellerSettlementsFromJson, settleAtLabel, settleItemsFromJson, settlePreviewFromJson, settleRowText } from '../seller-settlement';
 
 const won = (x: number) => `₩${x.toLocaleString('ko-KR')}`;
 const product = { id: 'p', code: 'minji-grape-jelly', name: '포도', tile: null, icon: 'grape', thumb_url: null };
@@ -25,6 +25,7 @@ describe('파서', () => {
 		});
 		expect([t.settleStatus, t.ledgers[0].batches[0].depositRefunded, t.months.length, t.months[0].rows[0].payout]).toEqual(['verified', true, 1, 15900]);
 		expect([t.ledgers[0].depositHeld, t.ledgers[0].nextOffset, t.ledgerTotal, t.months[0].rows[0].nextPayout, t.months[0].total.netSales]).toEqual([0, 0, { remaining: 0, depositHeld: 0 }, false, 0]);
+		expect(sellerSettlementsFromJson({ ledgers: [{ product, repaid_pct: 72 }] }).ledgers[0].repaidPct).toBe(72);
 		expect([t.ledgers[0].paidOff, t.ledgers[0].depositState, t.months[0].payAt, t.months[0].rows[0].counted, t.months[0].rows[0].releasable]).toEqual([false, 'held', null, false, false]);
 		const u = sellerSettlementsFromJson({
 			ledgers: [{ product, has_ledger: true, total: 150000, remaining: 150000, deposit_held: 37500, deposit_total: 37500, next_offset: 108000, paid_off: false, deposit_state: 'unpaid' }],
@@ -41,12 +42,17 @@ describe('파서', () => {
 			{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, 'held', '지급 보류', { code: 'manual', label: '운영팀 확인 중' }
 		]);
 		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].hold]).toEqual([null, null, null]);
+		// 이체한 날(서버 paid_on · 0103) — 지급 완료일 때만
+		expect(sellerSettlementsFromJson({ months: [{ month: '2026-11', payout_status: 'paid', paid_on: '2026-12-02', rows: [], total: {} }] }).months[0].paidOn).toBe('2026-12-02');
+		expect(t.months[0].paidOn).toBeNull();
 		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
 	});
 	it('줄 내역', () => {
 		const [i] = settleItemsFromJson([{ order_code: 'myr1501', buyer: '김*은', delivered_at: '2026-10-27T03:00:00Z', product: '포도', qty: 2, unit_price: 32000, groupbuy: true, kind: 'refund_adj', amount: 32000 }, null]);
 		expect([i.orderCode, i.kind, i.groupbuy, i.amount, i.refunded]).toEqual(['myr1501', 'refund_adj', true, 32000, 0]);
 		expect(settleItemsFromJson([{ order_code: 'myr1501', kind: 'sale', amount: 32000, refund_snapshot: 32000 }])[0].refunded).toBe(32000);
+		// 정산 뒤 환불 줄도 서버 값 그대로 — 문구는 화면이 kind 로 고른다
+		expect(settleItemsFromJson([{ order_code: 'myr1501', kind: 'refund_adj', amount: 32000, refund_snapshot: 32000 }])[0].refunded).toBe(32000);
 		expect(settleItemsFromJson([{ order_code: 'myr1501', origin: '2026-10' }])[0].origin).toBe('2026-10');
 	});
 });
@@ -61,8 +67,6 @@ describe('라벨', () => {
 	it('지급 보류 · 갚은 비율 · 보증금', () => {
 		expect(settleRowText({ sales: 64000, refundAdj: 0, carryIn: 0, settle: 38400, offset: 30000, depositRefund: 7500 }, won)).toBe('판매 ₩64,000 · 정산금 ₩38,400 · 상계 −₩30,000 · 보증금 +₩7,500');
 		expect(settleRowText({ sales: 0, refundAdj: 25600, carryIn: -1000, settle: 0, offset: null, depositRefund: null }, won)).toBe('판매 ₩0 · 정산 뒤 환불 −₩25,600 · 지난 이월 −₩1,000 · 정산금 ₩0');
-		// 갚은 금액 · 맡긴 보증금은 서버 값(offset · deposit_held — 0101) — 여기서는 비율 · 문구만
-		expect([repaidPct({ total: 200000, offset: 50000 }), repaidPct({ total: 0, offset: 0 })]).toEqual([25, 100]);
 	});
 });
 
@@ -94,13 +98,15 @@ describe('시안 라벨', () => {
 	it('원장 카드', async () => {
 		const { ledgerCard } = await import('../seller-settlement');
 		// 상환 완료(paid_off) · 다음 정산 상환 예정(next_offset) · 보증금 금액과 상태(deposit_held · deposit_total · deposit_state)는 서버 값(0101)
-		const base = { product: { id: 'p', code: 'c', name: 'n', tile: null, icon: 'pill', thumbUrl: null }, hasLedger: true, batches: [], offset: 0, depositPaid: 0, depositUnpaid: 0, depositRefunded: 0, depositHeld: 0, depositTotal: 0, nextOffset: 0, paidOff: false, depositState: 'held' as const };
+		const base = { product: { id: 'p', code: 'c', name: 'n', tile: null, icon: 'pill', thumbUrl: null }, hasLedger: true, batches: [], offset: 0, depositPaid: 0, depositUnpaid: 0, depositRefunded: 0, depositHeld: 0, depositTotal: 0, nextOffset: 0, paidOff: false, repaidPct: 0, depositState: 'held' as const };
 		const lemon = ledgerCard({ ...base, total: 150000, remaining: 150000, depositPaid: 37500, depositHeld: 37500, depositTotal: 37500, nextOffset: 108000 }, '2026-11', won);
 		expect([lemon.chip, lemon.paidPct, lemon.planPct, lemon.planText, lemon.depositText]).toEqual(['상환 중', 0, 72, '11월 정산에서 ₩108,000 상환 예정', '보증금 ₩37,500']);
-		const grape = ledgerCard({ ...base, total: 30000, remaining: 0, offset: 30000, depositPaid: 7500, depositRefunded: 7500, paidOff: true, depositState: 'refunded' }, '2026-11', won);
+		const grape = ledgerCard({ ...base, total: 30000, remaining: 0, offset: 30000, depositPaid: 7500, depositRefunded: 7500, paidOff: true, repaidPct: 100, depositState: 'refunded' }, '2026-11', won);
 		expect([grape.chip, grape.paidPct, grape.planText, grape.depositText]).toEqual(['상환 완료', 100, '', '보증금 ₩7,500 · 환급 완료']);
 		const unpaid = ledgerCard({ ...base, total: 100000, remaining: 100000, depositPaid: 5000, depositUnpaid: 20000, depositHeld: 5000, depositTotal: 25000, depositState: 'unpaid' }, '2026-11', won);
 		expect(unpaid.depositText).toBe('보증금 ₩25,000 · 입금 확인 전 ₩20,000');
 		expect(ledgerCard({ ...base, hasLedger: false, total: 0, remaining: 0 }, '2026-11', won).chip).toBe('제조금액 확인 중');
+		// 갚은 비율은 서버 값 그대로(repaid_pct · 0103)
+		expect(ledgerCard({ ...base, total: 200000, remaining: 150000, offset: 50000, repaidPct: 25, nextOffset: 30000 }, '2026-11', won)).toMatchObject({ paidPct: 25, planPct: 15 });
 	});
 });
