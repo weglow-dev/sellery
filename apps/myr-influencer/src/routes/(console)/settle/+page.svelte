@@ -10,7 +10,7 @@
 	 *  [정산 내역 | 제조금액 · 보증금] 전환(주소 ?view=mfg — 상세에 갔다 와도 그대로).
 	 *  정산 내역: 보류 배너(사업자 정보 확인 전) · 다음 정산 카드(D-day · 예상 지급액 · 상태 · 판매 · 정산금 · 상계 · 보증금 → 상세) · 월별 정산(다음 정산 + 지난 회차 → /settle/<월>).
 	 *  제조금액 · 보증금: 안내 · 제품별 카드(상환 중/완료 · 남은 금액 · 막대(갚은 % + 다음 정산 상환 예정) · 보증금).
-	 *  지난 회차 상태는 시안대로 "지급 완료"(실제 입금 기록은 작업 순서 7). 모바일: 한 줄 · PC(lg~): 1240px · 카드 2단 */
+	 *  지난 회차 상태 · 보류 사유는 지급 건 서버 값(지급 대기 · 지급 보류 · 지급 완료 · 지급 없음 — 0102). 모바일: 한 줄 · PC(lg~): 1240px · 카드 2단 */
 	let { data } = $props();
 	const st = $derived(data.settle);
 	const pv = $derived(st.preview);
@@ -25,7 +25,7 @@
 		title: `${monthShort(pv.month)} 정산`,
 		short: monthShort(pv.month),
 		payShort: `${shortDate(nextAt)} 지급 예정`,
-		status: monthStatus({ upcoming: true, held: pv.total.held, settleStatus: st.settleStatus }),
+		status: monthStatus({ upcoming: true, nextHold: st.nextHold }),
 		held: pv.total.held,
 		sales: pv.total.netSales,
 		settle: pv.total.settle,
@@ -40,8 +40,8 @@
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
 			payShort: `${shortDate(m.payAt)} 지급`,
-			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
-			held: 0,
+			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel }),
+			held: m.total.held,
 			sales: m.total.netSales,
 			settle: m.total.settle,
 			offset: m.total.offset,
@@ -86,7 +86,7 @@
 
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 lg:overflow-visible lg:p-0">
 		{#if view === 'pay'}
-			{#if st.settleStatus !== 'verified'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
+			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
 
 			<!-- 다음 정산 -->
 			<a href={next.href} class="relative block overflow-hidden rounded-3xl bg-panel p-5 text-fg lg:mt-5 lg:flex lg:items-center lg:gap-10 lg:px-7 lg:py-[26px]">

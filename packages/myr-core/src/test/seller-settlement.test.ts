@@ -1,6 +1,6 @@
 // 크리에이터 정산 탭(0089) — packages/myr-core/src/seller-settlement.ts
 import { describe, expect, it } from 'vitest';
-import { monthLabel, payoutHold, repaidPct, sellerSettlementsFromJson, settleAtLabel, settleItemsFromJson, settlePreviewFromJson, settleRowText } from '../seller-settlement';
+import { monthLabel, repaidPct, sellerSettlementsFromJson, settleAtLabel, settleItemsFromJson, settlePreviewFromJson, settleRowText } from '../seller-settlement';
 
 const won = (x: number) => `₩${x.toLocaleString('ko-KR')}`;
 const product = { id: 'p', code: 'minji-grape-jelly', name: '포도', tile: null, icon: 'grape', thumb_url: null };
@@ -33,6 +33,14 @@ describe('파서', () => {
 		});
 		expect([u.ledgers[0].depositHeld, u.ledgers[0].depositTotal, u.ledgers[0].nextOffset, u.ledgerTotal, u.months[0].rows[0].nextPayout, u.months[0].total.netSales]).toEqual([37500, 37500, 108000, { remaining: 150000, depositHeld: 37500 }, true, 64000]);
 		expect([u.ledgers[0].depositState, u.months[0].payAt, u.months[0].rows[0].counted, u.months[0].rows[1].releasable]).toEqual(['unpaid', '2026-12-01T04:00:00+00:00', false, true]);
+		const h = sellerSettlementsFromJson({
+			next_hold: { code: 'settle_info', label: '사업자 · 정산 정보 확인 전' },
+			months: [{ month: '2026-11', payout_status: 'held', payout_label: '지급 보류', hold: { code: 'manual', label: '운영팀 확인 중' }, rows: [], total: {} }]
+		});
+		expect([h.nextHold, h.months[0].payoutStatus, h.months[0].payoutLabel, h.months[0].hold]).toEqual([
+			{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, 'held', '지급 보류', { code: 'manual', label: '운영팀 확인 중' }
+		]);
+		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].hold]).toEqual([null, null, null]);
 		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
 	});
 	it('줄 내역', () => {
@@ -53,8 +61,6 @@ describe('라벨', () => {
 	it('지급 보류 · 갚은 비율 · 보증금', () => {
 		expect(settleRowText({ sales: 64000, refundAdj: 0, carryIn: 0, settle: 38400, offset: 30000, depositRefund: 7500 }, won)).toBe('판매 ₩64,000 · 정산금 ₩38,400 · 상계 −₩30,000 · 보증금 +₩7,500');
 		expect(settleRowText({ sales: 0, refundAdj: 25600, carryIn: -1000, settle: 0, offset: null, depositRefund: null }, won)).toBe('판매 ₩0 · 정산 뒤 환불 −₩25,600 · 지난 이월 −₩1,000 · 정산금 ₩0');
-		expect(payoutHold('verified')).toBeNull();
-		expect(payoutHold('pending')).toContain('보류');
 		// 갚은 금액 · 맡긴 보증금은 서버 값(offset · deposit_held — 0101) — 여기서는 비율 · 문구만
 		expect([repaidPct({ total: 200000, offset: 50000 }), repaidPct({ total: 0, offset: 0 })]).toEqual([25, 100]);
 	});
@@ -70,11 +76,12 @@ describe('시안 라벨', () => {
 	});
 	it('상태 · 배너', async () => {
 		const { monthStatus, holdBanner } = await import('../seller-settlement');
-		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'none' })).toEqual({ label: '지급 보류', tone: 'hold' });
-		expect(monthStatus({ upcoming: true, held: 0, settleStatus: 'verified' })).toEqual({ label: '지급 예정', tone: 'plan' });
-		expect(monthStatus({ upcoming: false, held: 1, settleStatus: 'verified' }).label).toBe('일부 보류');
-		expect(monthStatus({ upcoming: false, held: 0, settleStatus: 'none' }).label).toBe('지급 완료');
-		expect(holdBanner('verified', '12월 1일')).toBeNull();
+		// 보류 여부 · 지급 상태 문구는 서버 값(next_hold · payout_status · payout_label — 0102) — 여기서는 색만
+		expect(monthStatus({ upcoming: true, nextHold: { code: 'settle_info', label: '사업자 · 정산 정보 확인 전' } })).toEqual({ label: '지급 보류', tone: 'hold' });
+		expect(monthStatus({ upcoming: true, nextHold: null })).toEqual({ label: '지급 예정', tone: 'plan' });
+		expect(monthStatus({ upcoming: false, payoutStatus: 'held', payoutLabel: '지급 보류' })).toEqual({ label: '지급 보류', tone: 'hold' });
+		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 대기' })).toEqual({ label: '지급 대기', tone: 'plan' });
+		expect(monthStatus({ upcoming: false, payoutStatus: null, payoutLabel: '지급 없음' })).toEqual({ label: '지급 없음', tone: 'done' });
 		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
 		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
 	});

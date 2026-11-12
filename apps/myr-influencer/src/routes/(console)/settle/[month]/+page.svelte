@@ -17,8 +17,11 @@
 	const src = $derived(upcoming ? st.preview : st.months.find((m) => m.month === data.key)!);
 	const month = $derived(upcoming ? st.preview.month : data.key);
 	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
-	const payAt = $derived(upcoming ? st.preview.settleAt : (st.months.find((m) => m.month === data.key)?.payAt ?? null));
-	const status = $derived(monthStatus({ upcoming, held: src.total.held, settleStatus: st.settleStatus }));
+	const mon = $derived(upcoming ? null : (st.months.find((m) => m.month === data.key) ?? null));
+	const payAt = $derived(upcoming ? st.preview.settleAt : (mon?.payAt ?? null));
+	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · hold — 0102)
+	const hold = $derived(upcoming ? st.nextHold : (mon?.hold ?? null));
+	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '' }));
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
 	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
 	const byProduct = $derived(itemsByProduct(data.items));
@@ -88,7 +91,8 @@
 				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
 				<span class="ml-auto text-[12px] text-white/50">{settleAtLabel(payAt)} {upcoming ? '지급 예정' : '지급'}</span>
 			</div>
-			{#if upcoming && st.settleStatus !== 'verified'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
+			{#if hold && hold.code !== 'settle_info'}<p class="mt-2 text-[12px] text-white/55 lg:hidden">보류 사유 · {hold.label}</p>{/if}
+			{#if hold?.code === 'settle_info'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
 
 			<!-- 모바일 정산 계산 -->
 			<div class="lg:hidden">
@@ -187,6 +191,7 @@
 					<div class="flex justify-between text-white/60"><span>지급일</span><span class="font-semibold text-fg tabular-nums">{settleAtLabel(payAt)}</span></div>
 					<div class="flex justify-between text-white/60"><span>정산 대상</span><span class="font-semibold text-fg">{target}</span></div>
 					<div class="flex items-center justify-between text-white/60"><span>상태</span><span class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span></div>
+					{#if hold}<div class="flex justify-between text-white/60"><span>보류 사유</span><span class="font-semibold text-fg">{hold.label}</span></div>{/if}
 				</div>
 				{@render upcomingNote('mt-4')}
 				<button type="button" onclick={() => goto('/settle')} class="mt-5 h-[54px] w-full rounded-2xl border-[1.5px] border-white/14 text-[15px] font-bold text-fg transition-colors hover:border-white/35">목록으로</button>

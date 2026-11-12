@@ -17,6 +17,9 @@
 //   confirm-held <code>                       보류된 정산 확정(그 상품의 보류 줄을 달 순서로) — 원장이 있어야 한다
 //   run <YYYY-MM>                             회차 수동 실행(크론이 실패했을 때 — 크론과 같은 함수 · 이미 돌았으면 already)
 //   report <YYYY-MM>                          회차 보고(크리에이터 · 상품별 판매 · 정산 뒤 환불 · 이월 · 정산금 · 상계 · 보증금 환급 · 지급)
+//                                             + 지급 건(상태 · 보류 이유 · 운영 메모 · 지급 가능 — 0102 서버 값 그대로)
+//   hold <YYYY-MM> <@핸들> "<메모>"             지급 건 운영 보류(메모 필수 · 지급 완료 · 0원은 거절) — 사람이 건 보류는 자동으로 풀리지 않는다
+//   release <YYYY-MM> <@핸들>                  운영 보류 해제 — 자동 상태로(사업자 정보 확인 전이면 다시 지급 보류)
 //
 // 크론: 샵 /api/cron/settle — 매월 1일 13:00(KST)에 지난달 회차를 계산하고 바로 확정(원장 없는 상품만 보류).
 // 키는 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등 · 거절 코드).
@@ -71,6 +74,19 @@ const MESSAGES = {
   OUT_OF_ORDER: "더 늦은 회차가 이미 있습니다",
   BAD_MONTH: "달 형식은 YYYY-MM",
 };
+// 지급 건 보류 · 해제(0102) — ALREADY_PAID 처럼 차수 명령과 코드가 겹쳐 따로 둔다
+const PAYOUT_MESSAGES = {
+  NOT_FOUND: "그 달 · 핸들의 지급 건이 없습니다(report 로 확인 · 핸들은 @ 포함)",
+  NOTE_REQUIRED: "보류 메모를 적어 주세요",
+  ALREADY_PAID: "이미 지급 완료된 지급 건입니다",
+  ALREADY_HELD: "이미 운영 보류 중입니다",
+  NOTHING_TO_PAY: "0원 지급 건(지급 없음)이라 보류할 것이 없습니다",
+  NOT_MANUAL: "운영 보류가 아닙니다(사업자 정보 보류는 정보가 확인되면 자동으로 풀립니다)",
+};
+function checkPayout(r) {
+  if (!r || r.ok === false) fail(`${r?.code ?? "실패"} — ${PAYOUT_MESSAGES[r?.code] ?? ""}`);
+  return r;
+}
 async function rpc(fn, params) {
   const { data, error } = await db.rpc(fn, params);
   if (error) fail(`${fn} 실패: ${error.message}`);
@@ -181,14 +197,27 @@ async function cmdReport() {
           won(x.mfg_after),
           won(x.deposit_refund),
           won(x.payout),
-        ].join(" | ") + (x.seller.settle_status !== "verified" ? "  (사업자 정보 미확인 — 지급 보류)" : ""),
+        ].join(" | "),
     );
   }
-  // 지급 건(0101) — 금액 · 합계는 서버(myr_payout_amount) 값 그대로. 보류 해제 줄이 풀린 회차에 들어가 위 줄 합과 다를 수 있다
-  const status = { pending: "지급 대기", held: "지급 보류", paid: "지급 완료", none: "지급 없음" };
+  // 지급 건(0101 · 0102) — 금액 · 합계 · 상태 문구 · 보류 이유 · 지급 가능은 서버 값 그대로. 보류 해제 줄이 풀린 회차에 들어가 위 줄 합과 다를 수 있다
   console.log("  지급 건");
-  for (const p of r.payouts ?? []) console.log(`  ${p.seller.handle} | ${status[p.status] ?? p.status} | 줄 ${p.rows}개 | ${won(p.amount)}`);
+  for (const p of r.payouts ?? []) {
+    const why = p.hold_label ? ` (${p.hold_label}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
+    console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}`);
+  }
   console.log(`  지급 합계 ${won(r.payout_total ?? 0)}`);
+}
+async function cmdHold() {
+  const m = month(args[0]);
+  const r = checkPayout(await rpc("myr_payout_hold", { p_month: m, p_handle: args[1] ?? "", p_note: args[2] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 지급 건 운영 보류 — 풀 때 release ${args[0]} ${args[1]}`);
+  return r;
+}
+async function cmdRelease() {
+  const m = month(args[0]);
+  const r = checkPayout(await rpc("myr_payout_release", { p_month: m, p_handle: args[1] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 운영 보류 해제 — 지금 상태 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""} · report ${args[0]} 로 확인`);
 }
 
 const COMMANDS = {
@@ -201,10 +230,12 @@ const COMMANDS = {
   "confirm-held": cmdConfirmHeld,
   run: cmdRun,
   report: cmdReport,
+  hold: cmdHold,
+  release: cmdRelease,
 };
 const fn = COMMANDS[cmd];
 if (!fn) {
-  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report> … (파일 머리말 참고)");
+  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release> … (파일 머리말 참고)");
   process.exit(2);
 }
 await fn();
