@@ -58,7 +58,7 @@ select is(jsonb_array_length(public.myr_settlement_preview('00000000-0000-4000-8
 -- ---------- 정산 탭 ----------
 create temp table st as select public.myr_app_seller_settlements_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-15 10:00+09') as v;
 select is((select e #> '{total}' from st, jsonb_array_elements(v -> 'months') e where e ->> 'month' = '2030-01') - 'refund_adj' - 'sales' - 'settle',
-          '{"held": 1, "offset": 100000, "payout": 45000, "deposit_refund": 25000}'::jsonb, '1월 합계 — 상계 10만 · 보증금 2.5만 · 지급 4.5만 · 보류 1');
+          '{"held": 1, "offset": 100000, "payout": 45000, "net_sales": 200000, "deposit_refund": 25000}'::jsonb, '1월 합계 — 상계 10만 · 보증금 2.5만 · 지급 4.5만(지급 건) · 보류 1 · 정산 기준 매출 20만(서버)');
 select is((select array[(e ->> 'remaining')::int, (e ->> 'deposit_refunded')::int, (e ->> 'has_ledger')::boolean::int] from st, jsonb_array_elements(v -> 'ledgers') e where e #>> '{product,code}' = 'pgtap-ss-p'),
           array[0, 25000, 1], 'P 원장 — 남은 제조금액 0 · 보증금 환급 2.5만');
 select is((select (e ->> 'has_ledger')::boolean from st, jsonb_array_elements(v -> 'ledgers') e where e #>> '{product,code}' = 'pgtap-ss-q'), false, 'Q 원장 — 없음(보류 안내용)');
@@ -101,9 +101,9 @@ select is(public.myr_settlement_confirm_held('00000000-0000-4000-8000-0000000a9a
 create temp table pv3 as select public.myr_settlement_preview('00000000-0000-4000-8000-0000000a9001', '2030-04-01 10:00+09') as v;
 select is((select jsonb_agg(jsonb_build_array(e #>> '{product,code}', e ->> 'origin', (e ->> 'offset')::int, (e ->> 'deposit_refund')::int, (e ->> 'payout')::int) order by e ->> 'origin' nulls last, e #>> '{product,code}')
              from pv3, jsonb_array_elements(v -> 'rows') e),
-          '[["pgtap-ss-x", "2030-02", 60000, 0, 0], ["pgtap-ss-y", "2030-02", 20000, 0, 10000], ["pgtap-ss-x", null, 40000, 25000, 45000]]'::jsonb,
-          '예상 — X 2월분 6만 상계 → X 3월분 남은 4만 상계 · 보증금 2.5만 · Y 2월분(3월 판매 없음) 2만 상계 · Z 는 원장 없어 빠짐');
-select is((select (v #>> '{total,payout}')::int from pv3), 55000, '예상 지급 합계 5.5만(X 0 + X 4.5만 + Y 1만)');
+          '[["pgtap-ss-w", "2030-02", 0, 0, 24000], ["pgtap-ss-x", "2030-02", 60000, 0, 0], ["pgtap-ss-y", "2030-02", 20000, 0, 10000], ["pgtap-ss-x", null, 40000, 25000, 45000]]'::jsonb,
+          '예상 — W 2월분(운영이 먼저 확정 · 다음 회차 지급 건에 들어간다 · 0101) 2.4만 · X 2월분 6만 상계 → X 3월분 남은 4만 상계 · 보증금 2.5만 · Y 2월분 2만 상계 · Z 는 원장 없어 빠짐');
+select is((select (v #>> '{total,payout}')::int from pv3), 79000, '예상 지급 합계 7.9만(W 2.4만 + X 0 + X 4.5만 + Y 1만)');
 
 -- 실제 3월 회차 = 예상
 select is(public.myr_settlement_run('2030-03-01', 'test', '2030-04-01 13:00+09') ->> 'released', '2', '3월 회차 — 보류 2개(X · Y) 자동 해제 · W(이미 확정) · Z(원장 없음)는 아님');
@@ -123,15 +123,15 @@ select is((select count(*)::int from public.myr_mfg_batches where product_id = '
 create temp table st3 as select public.myr_app_seller_settlements_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-04-02 10:00+09') as v;
 select is((select jsonb_agg(jsonb_build_array(r #>> '{product,code}', r ->> 'origin') order by r ->> 'origin' nulls first, r #>> '{product,code}')
              from st3, jsonb_array_elements(v -> 'months') m, jsonb_array_elements(m -> 'rows') r where m ->> 'month' = '2030-03'),
-          '[["pgtap-ss-x", null], ["pgtap-ss-x", "2030-02"], ["pgtap-ss-y", "2030-02"]]'::jsonb, '3월 카드 — X 3월분 + X 2월분 + Y 2월분(같은 상품 X 가 두 줄)');
-select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-03'), 55000, '3월 카드 지급 합계 5.5만(보류 해제분 포함)');
+          '[["pgtap-ss-x", null], ["pgtap-ss-w", "2030-02"], ["pgtap-ss-x", "2030-02"], ["pgtap-ss-y", "2030-02"]]'::jsonb, '3월 카드 — X 3월분 + 3월 지급 건에 담긴 2월분(W 먼저 확정 · X · Y 보류 해제)');
+select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-03'), 79000, '3월 카드 지급 합계 = 3월 지급 건 7.9만(예상과 같다)');
 select is((select jsonb_agg(jsonb_build_array(r #>> '{product,code}', r ->> 'released_in') order by r #>> '{product,code}')
              from st3, jsonb_array_elements(v -> 'months') m, jsonb_array_elements(m -> 'rows') r
-            where m ->> 'month' = '2030-02' and r #>> '{product,code}' in ('pgtap-ss-x', 'pgtap-ss-y')),
-          '[["pgtap-ss-x", "2030-03"], ["pgtap-ss-y", "2030-03"]]'::jsonb, '2월 카드 — X · Y 는 "3월 정산에서 지급"으로 남는다');
-select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-02'), 24000, '2월 카드 합계 = W 2.4만만(운영이 먼저 확정 · 제조금액 0원) — X · Y 해제분은 빼고(같은 돈을 두 번 더하지 않게)');
-select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-03-01')) e where e ->> 'origin' = '2030-02'), 2,
-          '3월 줄 내역 — 2월분 주문 줄(X · Y)도 origin 과 함께');
+            where m ->> 'month' = '2030-02' and r #>> '{product,code}' in ('pgtap-ss-w', 'pgtap-ss-x', 'pgtap-ss-y')),
+          '[["pgtap-ss-w", "2030-03"], ["pgtap-ss-x", "2030-03"], ["pgtap-ss-y", "2030-03"]]'::jsonb, '2월 카드 — W · X · Y 는 "3월 정산에서 지급"으로 남는다');
+select is((select (m #>> '{total,payout}')::int from st3, jsonb_array_elements(v -> 'months') m where m ->> 'month' = '2030-02'), 0, '2월 카드 합계 0 — 2월 회차 때 확정된 줄이 없어 2월 지급 건이 없다(같은 돈을 두 번 더하지 않게)');
+select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settlement_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-03-01')) e where e ->> 'origin' = '2030-02'), 3,
+          '3월 줄 내역 — 3월 지급 건에 담긴 2월분 주문 줄(운영이 먼저 확정한 W · 풀린 X · Y)도 origin 과 함께 — 카드와 같은 줄(myr_settlement_card_rows)');
 
 select is((select month from public.myr_settlement_next('2030-03-20 10:00+09')), '2030-04-01'::date, '이번 달 회차가 이미 있으면(수동 실행) 다음 회차는 그 다음 달 — 이미 돈 달을 다시 예상하지 않는다');
 

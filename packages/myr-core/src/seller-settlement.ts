@@ -26,12 +26,22 @@ export type SettleRow = {
 	payout: number | null;
 	/** 보류였다가 이 정산에서 해제되어 지급되는 지난 달('YYYY-MM') — 그 달 상품 줄이 따로 한 줄 더 생긴다 */
 	origin: string | null;
-	/** 이 줄이 나중에 보류 해제되어 지급된 정산 달('YYYY-MM') — 이 달 합계에서는 빠져 있다 */
+	/** 이 줄이 다른 정산(지급 건)에서 지급된 달('YYYY-MM') — 이 달 합계에서는 빠져 있다(서버 0101 · 지급 건 기준) */
 	releasedIn: string | null;
+	/** 확정됐지만 아직 지급 건이 없다 — 다음 정산에서 지급(이 달 합계에서는 빠져 있다 · 0101) */
+	nextPayout: boolean;
+	/** 이 달(회차) 합계에 들어간 줄 — 서버 myr_settlement_card_rows(다음 정산 예상은 보류가 아니면 true) · 화면은 아닌 줄의 금액을 흐리게만 */
+	counted: boolean;
+	/** 보류 줄인데 다음 회차가 풀 줄(제조금액이 들어옴) — 서버 myr_settlement_row_releasable */
+	releasable: boolean;
 };
-export type SettleTotal = { sales: number; refundAdj: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
+/** netSales = 판매 − 정산 뒤 환불(서버 myr_settlement_net_sales) · payout = 지급 건 금액(서버 myr_payout_amount · 다음 정산은 예상 합) */
+export type SettleTotal = { sales: number; refundAdj: number; netSales: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
 export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
-export type SettleMonth = { month: string; settledAt: string | null; rows: SettleRow[]; total: SettleTotal };
+/** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) */
+export type SettleMonth = { month: string; settledAt: string | null; payAt: string | null; rows: SettleRow[]; total: SettleTotal };
+/** 보증금 상태(서버 myr_mfg_deposits.state) — 환급 완료 · 입금 확인 전 · 맡김 */
+export type DepositState = 'refunded' | 'unpaid' | 'held';
 export type SettleLedger = {
 	product: SettleProduct;
 	hasLedger: boolean;
@@ -42,8 +52,17 @@ export type SettleLedger = {
 	depositPaid: number;
 	depositUnpaid: number;
 	depositRefunded: number;
+	/** 돌려받을 보증금(입금 확인 · 환급 전) · 보증금 전체(환급 전 · 입금 확인 전 포함) · 다음 정산 상환 예정 — 서버 값(0101 · 화면이 빼고 더하지 않는다) */
+	depositHeld: number;
+	depositTotal: number;
+	nextOffset: number;
+	/** 상환 완료(원장이 있고 남은 제조금액 0 — 서버 myr_mfg_paid_off) */
+	paidOff: boolean;
+	depositState: DepositState;
 };
-export type SellerSettlements = { settleStatus: string; preview: SettlePreview; ledgers: SettleLedger[]; months: SettleMonth[] };
+/** 제조금액 · 보증금 탭 머리 — 남은 제조금액 합 · 돌려받을 보증금 합(서버 0101) */
+export type SettleLedgerTotal = { remaining: number; depositHeld: number };
+export type SellerSettlements = { settleStatus: string; preview: SettlePreview; ledgers: SettleLedger[]; ledgerTotal: SettleLedgerTotal; months: SettleMonth[] };
 export type SettleItem = {
 	orderCode: string;
 	buyer: string;
@@ -81,12 +100,15 @@ function rowFrom(v: unknown): SettleRow | null {
 		depositRefund: nn(o.deposit_refund),
 		payout: nn(o.payout),
 		origin: typeof o.origin === 'string' ? o.origin : null,
-		releasedIn: typeof o.released_in === 'string' ? o.released_in : null
+		releasedIn: typeof o.released_in === 'string' ? o.released_in : null,
+		nextPayout: o.next_payout === true,
+		counted: o.counted === true,
+		releasable: o.releasable === true
 	};
 }
 function totalFrom(v: unknown): SettleTotal {
 	const o = obj(v) ?? {};
-	return { sales: n(o.sales), refundAdj: n(o.refund_adj), settle: n(o.settle), offset: n(o.offset), depositRefund: n(o.deposit_refund), payout: n(o.payout), held: n(o.held) };
+	return { sales: n(o.sales), refundAdj: n(o.refund_adj), netSales: n(o.net_sales), settle: n(o.settle), offset: n(o.offset), depositRefund: n(o.deposit_refund), payout: n(o.payout), held: n(o.held) };
 }
 const rows = (v: unknown): SettleRow[] => arr(v).map(rowFrom).filter((r): r is SettleRow => !!r);
 
@@ -116,12 +138,18 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				remaining: n(x.remaining),
 				depositPaid: n(x.deposit_paid),
 				depositUnpaid: n(x.deposit_unpaid),
-				depositRefunded: n(x.deposit_refunded)
+				depositRefunded: n(x.deposit_refunded),
+				depositHeld: n(x.deposit_held),
+				depositTotal: n(x.deposit_total),
+				nextOffset: n(x.next_offset),
+				paidOff: x.paid_off === true,
+				depositState: (x.deposit_state === 'refunded' || x.deposit_state === 'unpaid' ? x.deposit_state : 'held') as DepositState
 			})),
+		ledgerTotal: { remaining: n(obj(o.ledger_total)?.remaining), depositHeld: n(obj(o.ledger_total)?.deposit_held) },
 		months: arr(o.months)
 			.map(obj)
 			.filter((x): x is Obj => !!x && typeof x.month === 'string')
-			.map((x) => ({ month: s(x.month), settledAt: typeof x.settled_at === 'string' ? x.settled_at : null, rows: rows(x.rows), total: totalFrom(x.total) }))
+			.map((x) => ({ month: s(x.month), settledAt: typeof x.settled_at === 'string' ? x.settled_at : null, payAt: typeof x.pay_at === 'string' ? x.pay_at : null, rows: rows(x.rows), total: totalFrom(x.total) }))
 	};
 }
 
@@ -189,32 +217,13 @@ export function settleAtLabel(iso: string | null): string {
 /** 지급 보류 안내 — 사업자 · 정산 정보 확인 전이면(0085 verified 아님) 계산 · 확정은 되고 지급만 보류 */
 export const payoutHold = (settleStatus: string): string | null => (settleStatus === 'verified' ? null : '사업자 · 정산 정보 확인 전이라 지급은 보류돼요');
 
-/** 제조금액 갚은 비율(0~100) — 원장이 없거나 0원이면 100 */
-export const repaidPct = (l: Pick<SettleLedger, 'total' | 'remaining'>): number => (l.total <= 0 ? 100 : Math.round(((l.total - l.remaining) / l.total) * 100));
-
-/** 보증금 상태 한 줄 */
-export function depositLabel(l: Pick<SettleLedger, 'depositPaid' | 'depositUnpaid' | 'depositRefunded' | 'remaining'>, won: (n: number) => string): string {
-	const parts: string[] = [];
-	const pending = l.depositPaid - l.depositRefunded;
-	if (l.depositRefunded > 0) parts.push(`${won(l.depositRefunded)} 환급 완료`);
-	if (pending > 0) parts.push(`${won(pending)} 제조금액을 다 갚으면 환급`);
-	if (l.depositUnpaid > 0) parts.push(`${won(l.depositUnpaid)} 입금 확인 전`);
-	return parts.join(' · ') || '없음';
-}
+/** 제조금액 갚은 비율(0~100 · 막대 너비) — 갚은 금액은 서버 offset(확정된 상계 합) · 원장이 없거나 0원이면 100 */
+export const repaidPct = (l: Pick<SettleLedger, 'total' | 'offset'>): number => (l.total <= 0 ? 100 : Math.round((l.offset / l.total) * 100));
 
 /* ---------------- 시안("MYR Influencer Admin" 정산 · 2026-11-10) 라벨 ---------------- */
 
 const KST = 9 * 3600 * 1000;
 const kst = (t: number) => new Date(t + KST);
-
-/** 정산월 'YYYY-MM' → 정산(지급) 시각 = 다음 달 1일 13:00 KST (ISO) */
-export function settleAtOfMonth(month: string): string | null {
-	const m = /^(\d{4})-(\d{2})$/.exec(month);
-	if (!m) return null;
-	const y = Number(m[1]) + (Number(m[2]) === 12 ? 1 : 0);
-	const mo = Number(m[2]) === 12 ? 1 : Number(m[2]) + 1;
-	return new Date(Date.UTC(y, mo - 1, 1, 4, 0, 0)).toISOString();
-}
 
 /** 'D-21' · 'D-DAY' (한국 날짜 기준) · 지났으면 '' */
 export function dDay(settleAt: string | null, now: number = Date.now()): string {
@@ -263,11 +272,12 @@ export function itemsByProduct(items: SettleItem[]): Map<string, SettleItem[]> {
 }
 
 /** 제조 원장 카드(시안 "제조금액 · 보증금") — 칩 · 막대(갚은 % · 다음 정산 상환 예정 %) · 보증금 문구 */
-export function ledgerCard(l: SettleLedger, nextOffset: number | null, nextMonth: string, won: (n: number) => string) {
-	const done = l.hasLedger && l.remaining === 0;
+/** 상환 완료 · 다음 정산 상환 예정 · 보증금 금액과 상태는 서버 값(paidOff · nextOffset · depositHeld · depositTotal · depositState · 0101) — 여기서는 막대 너비 % 와 문구만 만든다 */
+export function ledgerCard(l: SettleLedger, nextMonth: string, won: (n: number) => string) {
+	const done = l.paidOff;
 	const paidPct = repaidPct(l);
+	const nextOffset = l.nextOffset || null;
 	const planPct = !done && l.total > 0 && nextOffset ? Math.min(100 - paidPct, (nextOffset / l.total) * 100) : 0;
-	const pendingDeposit = l.depositPaid - l.depositRefunded;
 	return {
 		chip: !l.hasLedger ? '제조금액 확인 중' : done ? '상환 완료' : '상환 중',
 		// 시안: 상환 중 = 주황 · 상환 완료 = 회색 · 제조금액 확인 중 = 빨강
@@ -276,10 +286,10 @@ export function ledgerCard(l: SettleLedger, nextOffset: number | null, nextMonth
 		planPct,
 		planText: !done && nextOffset ? `${monthShort(nextMonth)} 정산에서 ${won(nextOffset)} 상환 예정` : '',
 		depositText:
-			l.depositRefunded > 0 && pendingDeposit === 0 && l.depositUnpaid === 0
+			l.depositState === 'refunded'
 				? `보증금 ${won(l.depositRefunded)} · 환급 완료`
-				: l.depositUnpaid > 0
-					? `보증금 ${won(l.depositPaid + l.depositUnpaid - l.depositRefunded)} · 입금 확인 전 ${won(l.depositUnpaid)}`
-					: `보증금 ${won(pendingDeposit)}`
+				: l.depositState === 'unpaid'
+					? `보증금 ${won(l.depositTotal)} · 입금 확인 전 ${won(l.depositUnpaid)}`
+					: `보증금 ${won(l.depositHeld)}`
 	};
 }

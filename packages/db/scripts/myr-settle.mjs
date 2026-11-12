@@ -157,7 +157,7 @@ async function cmdRun() {
   const m = month(args[0]);
   const r = check(await rpc("myr_settlement_run", { p_month: m, p_actor: "script" }));
   if (r.already) console.log(`[${where}] ${r.month} 회차는 이미 있습니다 — report ${r.month}`);
-  else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 합계 ${won(r.payout)}`);
+  else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 건 ${r.payouts ?? 0}건 · 지급 합계 ${won(r.payout)}`);
 }
 async function cmdReport() {
   const m = month(args[0]);
@@ -166,9 +166,7 @@ async function cmdReport() {
   console.log(`[${where}] ${r.month} 회차 · 계산 ${new Date(Date.parse(r.cutoff_at) + 9 * 3600 * 1000).toISOString().slice(0, 16).replace('T', ' ')}(KST) · ${r.created_by}`);
   const head = ["크리에이터", "상품", "상태", "판매", "정산뒤환불", "이월", "정산금", "상계", "남은제조", "보증금환급", "지급"];
   console.log("  " + head.join(" | "));
-  let sum = 0;
   for (const x of r.rows) {
-    sum += x.payout ?? 0;
     console.log(
       "  " +
         [
@@ -186,7 +184,11 @@ async function cmdReport() {
         ].join(" | ") + (x.seller.settle_status !== "verified" ? "  (사업자 정보 미확인 — 지급 보류)" : ""),
     );
   }
-  console.log(`  지급 합계(확정) ${won(sum)}`);
+  // 지급 건(0101) — 금액 · 합계는 서버(myr_payout_amount) 값 그대로. 보류 해제 줄이 풀린 회차에 들어가 위 줄 합과 다를 수 있다
+  const status = { pending: "지급 대기", held: "지급 보류", paid: "지급 완료", none: "지급 없음" };
+  console.log("  지급 건");
+  for (const p of r.payouts ?? []) console.log(`  ${p.seller.handle} | ${status[p.status] ?? p.status} | 줄 ${p.rows}개 | ${won(p.amount)}`);
+  console.log(`  지급 합계 ${won(r.payout_total ?? 0)}`);
 }
 
 const COMMANDS = {
