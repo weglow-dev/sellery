@@ -124,36 +124,42 @@
 				<h2 class="text-[17px] font-extrabold tracking-[-0.02em] lg:text-[20px]">오늘 처리할 일</h2>
 				<a href="/cs" class="text-[13px] font-semibold text-white/50 transition-colors lg:text-[14px] lg:hover:text-fg">전체 보기</a>
 			</div>
-			<div class="mt-3 flex flex-col gap-2 lg:mt-3.5 lg:flex-1 lg:gap-2.5">
-				{#each todayClaims as c (c.code)}
-					{@const tm = CS_TYPE_META[c.kind]}
-					<a href="/cs/{c.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
-						<Tile tile="slate" bg={c.product?.tile} iconId={c.product?.icon} thumbUrl={c.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
-						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-							<span class="flex items-center gap-1.5"><Badge cls={tm.cls}>{tm.label}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]"><span class="hidden lg:inline">{c.code.toUpperCase()} · </span>{relativeTime(c.createdAt)}</span></span>
-							<span class="truncate text-[14px] font-bold lg:text-[15px]">{c.name} × {c.qty}</span>
-							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{c.buyerName} · {c.reason}</span>
-						</span>
-						{#if isUrgentPending({ status: 'pending', createdAt: c.createdAt })}
-							<span class="hidden shrink-0 items-center gap-1.5 text-[12px] font-bold whitespace-nowrap text-accent lg:flex"><Icon id="clock" size={14} sw={2.2} />{dueText(c)}</span>
-						{/if}
-						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
-					</a>
-				{/each}
-				{#each todayInq as q (q.code)}
-					<a href="/cs/inquiry/{q.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:flex-1 lg:gap-3.5 lg:rounded-[20px] lg:p-4 lg:hover:border-white/28">
-						<Tile tile="slate" bg={q.product?.tile} iconId={q.product?.icon} thumbUrl={q.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
-						<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
-							<span class="flex items-center gap-1.5"><Badge cls={inqTypeCls(q.type)}>{q.type}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]">{relativeTime(q.createdAt)}</span></span>
-							<span class="truncate text-[14px] font-bold lg:text-[15px]">{q.product?.name ?? '상품'}</span>
-							<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{q.buyerName} · {q.question}</span>
-						</span>
-						<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
-					</a>
-				{/each}
-				{#if !todayInq.length && !todayClaims.length}
-					<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-white/50 lg:flex lg:flex-1 lg:items-center lg:justify-center lg:rounded-[20px] lg:py-9">대기 중인 CS가 없어요. 수고했어요!</div>
-				{/if}
+			<!-- 모바일은 카드 따로 · PC 는 박스 하나(시안 "MYR Influencer Admin PC") — 줄은 박스의 1/3 높이 고정 · 위 구분선(첫 줄 선은 -1px 로 박스 테두리 밑에 숨김) · 3건보다 적으면 남은 칸을 빈 칸으로 채운다 -->
+			<div class="mt-3 flex flex-col lg:mt-3.5 lg:min-h-[332px] lg:flex-1 lg:overflow-hidden lg:rounded-3xl lg:border lg:border-white/8 lg:bg-white/3">
+				<div class="flex flex-col gap-2 lg:-mt-px lg:min-h-0 lg:flex-1 lg:gap-0">
+					{#each todayClaims as c (c.code)}
+						{@const tm = CS_TYPE_META[c.kind]}
+						<a href="/cs/{c.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:shrink-0 lg:grow-0 lg:basis-1/3 lg:gap-3.5 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:border-white/6 lg:bg-transparent lg:px-5 lg:py-0 lg:hover:bg-white/4">
+							<Tile tile="slate" bg={c.product?.tile} iconId={c.product?.icon} thumbUrl={c.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
+							<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
+								<span class="flex items-center gap-1.5"><Badge cls={tm.cls}>{tm.label}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]"><span class="hidden lg:inline">{c.code.toUpperCase()} · </span>{relativeTime(c.createdAt)}</span></span>
+								<span class="truncate text-[14px] font-bold lg:text-[15px]">{c.name} × {c.qty}</span>
+								<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{c.buyerName} · {c.reason}</span>
+							</span>
+							{#if isUrgentPending({ status: 'pending', createdAt: c.createdAt })}
+								<span class="hidden shrink-0 items-center gap-1.5 text-[12px] font-bold whitespace-nowrap text-accent lg:flex"><Icon id="clock" size={14} sw={2.2} />{dueText(c)}</span>
+							{/if}
+							<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
+						</a>
+					{/each}
+					{#each todayInq as q (q.code)}
+						<a href="/cs/inquiry/{q.code}" class="flex items-center gap-3 rounded-[18px] border border-white/8 bg-white/3 p-3.5 text-left transition-colors lg:shrink-0 lg:grow-0 lg:basis-1/3 lg:gap-3.5 lg:rounded-none lg:border-x-0 lg:border-b-0 lg:border-white/6 lg:bg-transparent lg:px-5 lg:py-0 lg:hover:bg-white/4">
+							<Tile tile="slate" bg={q.product?.tile} iconId={q.product?.icon} thumbUrl={q.product?.thumbUrl} icon={36} class="h-12 w-12 rounded-[14px] lg:h-14 lg:w-14 lg:rounded-2xl" />
+							<span class="flex min-w-0 flex-1 flex-col gap-[3px] lg:gap-1">
+								<span class="flex items-center gap-1.5"><Badge cls={inqTypeCls(q.type)}>{q.type}</Badge><span class="text-[11px] text-white/45 lg:text-[12px]">{relativeTime(q.createdAt)}</span></span>
+								<span class="truncate text-[14px] font-bold lg:text-[15px]">{q.product?.name ?? '상품'}</span>
+								<span class="truncate text-[12px] text-white/55 lg:text-[13px]">{q.buyerName} · {q.question}</span>
+							</span>
+							<Icon id="chev" size={18} sw={2.2} class="shrink-0 text-white/35" />
+						</a>
+					{/each}
+					{#if !todayInq.length && !todayClaims.length}
+						<div class="rounded-[18px] border border-dashed border-white/14 px-4 py-7 text-center text-[14px] text-white/50 lg:hidden">처리할 일이 없어요</div>
+					{/if}
+					{#if todayClaims.length + todayInq.length < 3}
+						<div class="hidden min-h-0 flex-1 items-center justify-center border-t border-white/6 p-4 text-center text-[14px] text-white/45 lg:flex">{todayClaims.length + todayInq.length === 0 ? '처리할 일이 없어요' : ''}</div>
+					{/if}
+				</div>
 			</div>
 		</section>
 
