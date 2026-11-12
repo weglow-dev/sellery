@@ -157,7 +157,7 @@ async function cmdRun() {
   const m = month(args[0]);
   const r = check(await rpc("myr_settlement_run", { p_month: m, p_actor: "script" }));
   if (r.already) console.log(`[${where}] ${r.month} 회차는 이미 있습니다 — report ${r.month}`);
-  else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 합계 ${won(r.payout)}`);
+  else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 건 ${r.payouts ?? 0}건 · 지급 합계 ${won(r.payout)}`);
 }
 async function cmdReport() {
   const m = month(args[0]);
