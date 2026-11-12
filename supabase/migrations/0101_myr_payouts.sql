@@ -5,14 +5,19 @@
 --
 --   표 myr_payouts     회차 × 크리에이터 지급 건(1건) — 상태 · 보류 이유 · 지급 기록 칸(상태 전이는 작업 순서 7-2 ~ 7-6)
 --   칸 myr_settlement_rows.payout_id   이 줄이 어느 지급 건에서 나가나 — 지급 건이 줄을 담을 때 한 번 정해진다
---   함수
---     myr_payout_collect(run)    회차 크론 끝에 — 크리에이터마다 지급 건 1건 + 확정됐지만 아직 지급 건에 안 들어간 줄 전부를 담는다
+--   함수(판정 하나에 함수 하나 — 백엔드 원칙 1)
+--     myr_settlement_row_payable(줄)      지급 건에 담을 줄 = 확정됐고 아직 지급 건이 없다
+--     myr_settlement_row_pay_run(줄)      이 줄이 (지급 건 이전 기록으로) 지급된 회차 = 풀린 회차, 없으면 자기 회차 — 이미 돈 회차를 채울 때만 쓴다
+--     myr_payout_amount(지급 건)          금액 = 담긴 줄 payout 합 — 표에 숫자를 따로 두지 않는다(지급 완료 때만 paid_amount 로 그때 금액을 남긴다)
+--     myr_payout_has_amount(지급 건)      0원보다 큰가(지급 대기 · 지급 없음을 가른다 · 작업 순서 7-3 지급 가능 판정도 이것을 쓴다)
+--     myr_payout_status_auto(지급 건)     상태를 금액으로 다시 정해도 되는 지급 건(지급 대기 · 지급 없음 — 보류 · 완료는 손대지 않는다)
+--     myr_payout_collect(run, 지난 회차?)  크리에이터마다 지급 건 1건 + 지급 건에 담을 줄 전부(크론) · 지난 회차를 채울 때는 그 회차에 지급된 줄만
 --                                (이번 달 줄 · 이번에 풀린 보류 줄 · 운영이 먼저 확정한 보류 줄이 한 규칙으로 들어간다 · 결정 2026-11-12)
---     myr_payout_amount(지급 건)  금액 = 담긴 줄 payout 합 — 표에 숫자를 따로 두지 않는다(지급 완료 때만 paid_amount 로 그때 금액을 남긴다)
 --   0원 지급 건(정산금이 전부 상계로 빠진 달)도 만든다 — 상태 none("지급 없음" · 결정 2026-11-12). 0원보다 크면 pending(지급 대기).
 --   myr_settlement_run 은 끝에 myr_payout_collect 를 부르고, 돌려주는 payout 합계는 이 회차 지급 건 금액 합(myr_payout_amount)이다.
---   이미 돈 회차는 달 순서로 지급 건을 만든다(그 회차 줄 + 그 회차에 풀린 줄 — 지금 크리에이터 정산 탭의 달 합계와 같은 묶음).
---   크리에이터 정산 탭(작업 순서 7-7)은 아직 run_id · released_run_id 로 센다 — 7-7 에서 payout_id 를 읽게 바꾼다.
+--   이미 돈 회차는 달 순서로 myr_payout_collect(run, true) — 그 회차에 지급된 줄(myr_settlement_row_pay_run)만 담는다.
+--   myr_settlement_report 는 지급 건(크리에이터 · 상태 · 금액)과 지급 합계를 같이 돌려준다 — 운영 스크립트가 줄을 직접 더하지 않게.
+--   크리에이터 정산 탭(작업 순서 7-6)은 아직 run_id · released_run_id 로 달 합계를 센다 — 7-6 에서 지급 건을 읽게 바꾸고 "지급액 합" 을 검사 표에 넣는다.
 --   권한: 표 RLS · anon · authenticated 권한 없음 · 새 함수는 EXECUTE 회수(service role 만 · 크론 안에서 부른다).
 --   테스트: supabase/tests/myr_payouts.test.sql + 기존 정산 테스트 그대로.
 -- ============================================================
@@ -39,6 +44,26 @@ create index if not exists myr_payouts_seller_idx on public.myr_payouts (seller_
 alter table public.myr_settlement_rows add column if not exists payout_id uuid references public.myr_payouts (id) on delete restrict;
 create index if not exists myr_settlement_rows_payout_idx on public.myr_settlement_rows (payout_id);
 
+-- 지급 건에 담을 줄 — 확정됐고 아직 지급 건이 없다
+create or replace function public.myr_settlement_row_payable(r public.myr_settlement_rows)
+returns boolean
+language sql
+stable
+as $$
+  select coalesce(r.status = 'confirmed' and r.payout_id is null, false)
+$$;
+revoke all on function public.myr_settlement_row_payable(public.myr_settlement_rows) from public, anon, authenticated;
+
+-- 이 줄이 지급된 회차(지급 건 이전 기록) — 보류가 풀렸으면 풀린 회차, 아니면 자기 회차. 이미 돈 회차를 채울 때만 쓴다
+create or replace function public.myr_settlement_row_pay_run(r public.myr_settlement_rows)
+returns uuid
+language sql
+stable
+as $$
+  select coalesce(r.released_run_id, r.run_id)
+$$;
+revoke all on function public.myr_settlement_row_pay_run(public.myr_settlement_rows) from public, anon, authenticated;
+
 -- 지급 건 금액 = 담긴 정산 줄 지급액 합
 create or replace function public.myr_payout_amount(p public.myr_payouts)
 returns integer
@@ -49,8 +74,29 @@ as $$
 $$;
 revoke all on function public.myr_payout_amount(public.myr_payouts) from public, anon, authenticated;
 
--- 회차 지급 건 만들기 — 크리에이터마다 1건 · 확정됐지만 지급 건이 없는 줄을 담는다 · 0원이면 none · 멱등(다시 불러도 담을 줄이 없으면 그대로)
-create or replace function public.myr_payout_collect(p_run_id uuid)
+-- 0원보다 큰가 — 지급 대기 · 지급 없음을 가른다(지급 가능 판정 7-3 도 이것)
+create or replace function public.myr_payout_has_amount(p public.myr_payouts)
+returns boolean
+language sql
+stable
+as $$
+  select public.myr_payout_amount(p) > 0
+$$;
+revoke all on function public.myr_payout_has_amount(public.myr_payouts) from public, anon, authenticated;
+
+-- 상태를 금액으로 다시 정해도 되는 지급 건 — 지급 대기 · 지급 없음(보류 · 완료는 손대지 않는다)
+create or replace function public.myr_payout_status_auto(p public.myr_payouts)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p.status in ('pending', 'none'), false)
+$$;
+revoke all on function public.myr_payout_status_auto(public.myr_payouts) from public, anon, authenticated;
+
+-- 회차 지급 건 만들기 — 크리에이터마다 1건 · 지급 건에 담을 줄을 담는다 · 금액으로 지급 대기 / 지급 없음 · 멱등
+--   p_past_run = true 면 그 회차에 지급된 줄(myr_settlement_row_pay_run)만 — 이미 돈 회차를 채울 때(마이그레이션)
+create or replace function public.myr_payout_collect(p_run_id uuid, p_past_run boolean default false)
 returns integer
 language plpgsql
 volatile
@@ -63,26 +109,27 @@ declare
 begin
   for sr in
     select distinct r.seller_id from public.myr_settlement_rows r
-     where r.status = 'confirmed' and r.payout_id is null
+     where public.myr_settlement_row_payable(r) and (not p_past_run or public.myr_settlement_row_pay_run(r) = p_run_id)
      order by r.seller_id
   loop
     insert into public.myr_payouts (run_id, seller_id, status)
     values (p_run_id, sr.seller_id, 'pending')
     on conflict (run_id, seller_id) do nothing;
     select * into v_p from public.myr_payouts where run_id = p_run_id and seller_id = sr.seller_id for update;
-    update public.myr_settlement_rows set payout_id = v_p.id
-     where seller_id = sr.seller_id and status = 'confirmed' and payout_id is null;
-    if v_p.status in ('pending', 'none') then
-      update public.myr_payouts
-         set status = case when public.myr_payout_amount(v_p) > 0 then 'pending' else 'none' end, updated_at = now()
-       where id = v_p.id;
+    update public.myr_settlement_rows r set payout_id = v_p.id
+     where r.seller_id = sr.seller_id and public.myr_settlement_row_payable(r)
+       and (not p_past_run or public.myr_settlement_row_pay_run(r) = p_run_id);
+    if public.myr_payout_status_auto(v_p) then
+      update public.myr_payouts p
+         set status = case when public.myr_payout_has_amount(p) then 'pending' else 'none' end, updated_at = now()
+       where p.id = v_p.id;
     end if;
     v_n := v_n + 1;
   end loop;
   return v_n;
 end;
 $$;
-revoke all on function public.myr_payout_collect(uuid) from public, anon, authenticated;
+revoke all on function public.myr_payout_collect(uuid, boolean) from public, anon, authenticated;
 
 -- 0089 정의 + 끝에 지급 건 만들기 · 돌려주는 payout = 이 회차 지급 건 금액 합
 create or replace function public.myr_settlement_run(p_month date, p_actor text default 'cron', p_now timestamptz default now())
@@ -156,27 +203,49 @@ $$;
 revoke all on function public.myr_settlement_run(date, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_settlement_run(date, text, timestamptz) to service_role;
 
--- 이미 돈 회차 — 달 순서로 지급 건(그 회차 줄 + 그 회차에 풀린 줄 · 크리에이터 정산 탭 달 합계와 같은 묶음)
+-- 이미 돈 회차 — 달 순서로 지급 건(그 회차에 지급된 줄만 · myr_settlement_row_pay_run)
 do $$
 declare
   u record;
-  sr record;
-  v_id uuid;
 begin
   for u in select id from public.myr_settlement_runs order by month loop
-    for sr in
-      select distinct r.seller_id from public.myr_settlement_rows r
-       where r.status = 'confirmed' and r.payout_id is null
-         and ((r.run_id = u.id and r.released_run_id is null) or r.released_run_id = u.id)
-    loop
-      insert into public.myr_payouts (run_id, seller_id, status) values (u.id, sr.seller_id, 'pending')
-      on conflict (run_id, seller_id) do update set updated_at = now()
-      returning id into v_id;
-      update public.myr_settlement_rows r set payout_id = v_id
-       where r.seller_id = sr.seller_id and r.status = 'confirmed' and r.payout_id is null
-         and ((r.run_id = u.id and r.released_run_id is null) or r.released_run_id = u.id);
-      update public.myr_payouts p set status = case when public.myr_payout_amount(p) > 0 then 'pending' else 'none' end where p.id = v_id;
-    end loop;
+    perform public.myr_payout_collect(u.id, true);
   end loop;
 end;
 $$;
+
+-- 0087 정의 + 지급 건 · 지급 합계
+create or replace function public.myr_settlement_report(p_month date)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  select jsonb_build_object(
+    'month', to_char(u.month, 'YYYY-MM'), 'cutoff_at', u.cutoff_at, 'created_by', u.created_by,
+    'rows', coalesce((select jsonb_agg(jsonb_build_object(
+               'seller', jsonb_build_object('id', s.id, 'name', s.name, 'handle', s.handle, 'settle_status', s.myr_settle_status),
+               'product', jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name),
+               'status', r.status, 'pct', r.pct, 'sales', r.sales, 'refund_adj', r.refund_adj, 'carry_in', r.carry_in, 'base', r.base,
+               'carry_out', r.carry_out, 'settle', r.settle, 'mfg_before', r.mfg_before, 'offset', r.offset_amount, 'mfg_after', r.mfg_after,
+               'deposit_refund', r.deposit_refund, 'payout', r.payout, 'confirmed_at', r.confirmed_at,
+               'lines', (select count(*) from public.myr_settlement_items i where i.row_id = r.id and i.kind = 'sale'),
+               'refund_lines', (select count(*) from public.myr_settlement_items i where i.row_id = r.id and i.kind = 'refund_adj'))
+             order by s.handle, p.code)
+             from public.myr_settlement_rows r
+             join public.sellers s on s.id = r.seller_id
+             join public.myr_products p on p.id = r.product_id
+            where r.run_id = u.id), '[]'::jsonb),
+    -- 지급 건(0101) — 이 회차에서 나가는 크리에이터별 금액 · 상태 · 합계는 myr_payout_amount 로만 센다(스크립트가 줄을 직접 더하지 않게)
+    'payouts', coalesce((select jsonb_agg(jsonb_build_object(
+               'seller', jsonb_build_object('id', s.id, 'name', s.name, 'handle', s.handle, 'settle_status', s.myr_settle_status),
+               'status', p.status, 'amount', public.myr_payout_amount(p),
+               'rows', (select count(*) from public.myr_settlement_rows r where r.payout_id = p.id))
+             order by s.handle)
+             from public.myr_payouts p join public.sellers s on s.id = p.seller_id where p.run_id = u.id), '[]'::jsonb),
+    'payout_total', coalesce((select sum(public.myr_payout_amount(p)) from public.myr_payouts p where p.run_id = u.id), 0))
+    from public.myr_settlement_runs u
+   where u.month = date_trunc('month', p_month)::date
+$$;
+revoke all on function public.myr_settlement_report(date) from public, anon, authenticated;
+grant execute on function public.myr_settlement_report(date) to service_role;

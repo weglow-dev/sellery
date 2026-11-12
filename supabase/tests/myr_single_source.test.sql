@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(117);
+select plan(121);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -264,6 +264,10 @@ insert into _rules (label, pat, allowed) values
   ('열린 수정본 상태 묶음',                   $p$'pending'\s*,\s*'rejected'$p$,                                  '{myr_revision_status_open}'),
   ('주문 상태 묶음',                          $p$'PAID'\s*,\s*'PARTIAL_REFUNDED'$p$,                             '{myr_order_status_paid,myr_order_status_alive}'),
   ('출고 전 상태 묶음',                       $p$'PAID'\s*,\s*'PREPARING'$p$,                                    '{myr_ship_status_unshipped}'),
+  ('지급 건에 담을 줄',                        $p$payout_id\s+is\s+null$p$,                                         '{myr_settlement_row_payable}'),
+  ('줄이 지급된 회차(지난 기록)',              $p$coalesce\(\s*(\w+\.)?released_run_id$p$,                          '{myr_settlement_row_pay_run}'),
+  ('지급 건 0원 초과',                         $p$myr_payout_amount\([^)]*\)\s*(>|<|>=|<=|=|<>)$p$,                  '{myr_payout_has_amount}'),
+  ('지급 건 자동 상태 묶음',                   $p$'pending'\s*,\s*'none'$p$,                                      '{myr_payout_status_auto}'),
   ('줄에 환불이 있었나',                      $p$refunded_qty\s*>\s*0$p$,                                        '{myr_line_has_refund}'),
   ('줄의 열린 요청 찾기',                      $p$order_item_id\s*=\s*[\w.]+\s+and\s+public\.myr_claim_status_open$p$,     '{myr_line_open_claim}'),
   ('열린 요청 상태 묶음',                     $p$'pending'\s*,\s*'progress'$p$,                                  '{myr_claim_status_open}'),
