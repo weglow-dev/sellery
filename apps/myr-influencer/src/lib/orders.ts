@@ -44,6 +44,9 @@ export function orderLineState(it: Pick<SellerOrderLine, 'claim' | 'refundedQty'
 	return { text: SHIP_LABELS[it.shipStatus].text, alert: false };
 }
 
+/** 카드에 보일 줄 순서 — 진행 중인 요청이 걸린 줄을 먼저(첫 줄 옆 [진행 중] 버튼이 그 상품을 가리키게) · 나머지는 서버 순서 그대로 */
+export const orderCardLines = <L extends Pick<SellerOrderLine, 'claim'>>(o: { items: L[] }): L[] => [...o.items.filter((i) => i.claim), ...o.items.filter((i) => !i.claim)];
+
 /** 진행 중인 교환·환불 요청 — 카드의 [진행 중] 버튼이 가는 요청(내 줄 중 첫 요청) · 없으면 null */
 export const orderClaimCode = (o: Pick<SellerOrder, 'items'>): string | null => o.items.find((i) => i.claim)?.claim?.code ?? null;
 

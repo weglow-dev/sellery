@@ -10,7 +10,7 @@ import { QTY_INT_MAX, won } from './constants';
 import { isRefundPhotoPath, REFUND_NOTE_MAX, REFUND_PHOTO_MAX, UUID_RE, type RefundQuote } from './refund-rules';
 import { COURIERS, isCourier, normalizeCourier, normalizeTracking, TRACKING_RE } from './ship-rules';
 import { charLength, cleanMultiline, sliceChars } from './text';
-import type { OrderItem } from './order-view';
+import { isOpenClaimStatus, isShipStatus, type OpenClaimStatus, type OrderItem, type ShipStatus } from './order-view';
 
 export const CLAIM_KINDS = ['refund', 'exchange'] as const;
 export type ClaimKind = (typeof CLAIM_KINDS)[number];
@@ -221,9 +221,26 @@ export type Claim = {
 		shippingFee: number | null;
 		/** amount = 그 줄 주문 수량 전체의 금액(서버 값 · 0099) */
 		item: { id: string; name: string; option: string; qty: number; unitPrice: number; amount: number; refundedQty: number; status: string; shipStatus: string; courier: string | null; trackingNo: string | null; shippedAt: string | null; deliveredAt: string | null };
+		/** 같은 주문 · 같은 크리에이터의 다른 줄(요청 줄 제외 · 0100) — 콘솔 "함께 주문한 상품". 다른 크리에이터 줄은 서버가 싣지 않는다 · 옛 응답이면 [] */
+		others: ClaimOrderLine[];
 	};
 	product: { id: string; code: string; name: string; tile: string | null; icon: string; thumbUrl: string | null } | null;
 	seller: { id: string; name: string; handle: string } | null;
+};
+/** 같은 주문의 다른 줄 — 남은 수량 · 살아 있는 줄 · 열린 요청은 서버 값 그대로(0098 myr_line_left · myr_line_live · 0099 myr_claim_status_open) */
+export type ClaimOrderLine = {
+	id: string;
+	name: string;
+	option: string;
+	qty: number;
+	amount: number;
+	refundedQty: number;
+	status: string;
+	shipStatus: ShipStatus;
+	leftQty: number;
+	live: boolean;
+	deliveredAt: string | null;
+	claim: { code: string; status: OpenClaimStatus; kind: string } | null;
 };
 const s = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d);
 const sn = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
@@ -293,7 +310,27 @@ export function claimFromJson(v: unknown): Claim | null {
 				trackingNo: sn(it.tracking_no),
 				shippedAt: sn(it.shipped_at),
 				deliveredAt: sn(it.delivered_at)
-			}
+			},
+			others: (Array.isArray(ord.others) ? ord.others : [])
+				.map(obj)
+				.filter((x): x is Record<string, unknown> => !!x && !!sn(x.id))
+				.map((x) => {
+					const q = obj(x.claim);
+					return {
+						id: s(x.id),
+						name: s(x.name),
+						option: s(x.option),
+						qty: n(x.qty, 1),
+						amount: n(x.amount),
+						refundedQty: n(x.refunded_qty),
+						status: s(x.status, 'PAID'),
+						shipStatus: isShipStatus(x.ship_status) ? x.ship_status : 'PAID',
+						leftQty: n(x.left_qty),
+						live: x.live === true,
+						deliveredAt: sn(x.delivered_at),
+						claim: q && sn(q.code) && isOpenClaimStatus(q.status) ? { code: s(q.code), status: q.status, kind: s(q.kind) } : null
+					};
+				})
 		},
 		product: p && sn(p.id) ? { id: s(p.id), code: s(p.code), name: s(p.name), tile: sn(p.tile), icon: s(p.icon, 'pill'), thumbUrl: sn(p.thumb_url) } : null,
 		seller: sl && sn(sl.id) ? { id: s(sl.id), name: s(sl.name), handle: s(sl.handle) } : null

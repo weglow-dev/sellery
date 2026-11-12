@@ -104,6 +104,16 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 	});
 	it('상품 금액(그 줄 전체 수량) · 주문 배송비(0090) — 무료배송이면 "무료배송"', () => {
 		const paid = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2, amount: 64000 }), shipping_fee: 3000 } })); // 줄 금액은 서버 값(0099 item.amount)
+		// 같은 주문의 내 다른 상품(0100) — 요청 상품 바로 아래 "함께 주문한 상품" · 줄 상태는 주문 탭과 같은 문구
+		const withOthers = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'DELIVERED' }), others: [
+			{ id: 'x1', name: '포도 젤리', option: '', qty: 1, ship_status: 'DELIVERED', live: true, left_qty: 1 },
+			{ id: 'x2', name: '레몬', option: '2개 세트', qty: 2, ship_status: 'DELIVERED', live: true, left_qty: 1, refunded_qty: 1 }
+		] } }));
+		expect(withOthers.rows.slice(0, 3)).toEqual([
+			{ k: '요청 상품', v: '포도 젤리 × 1' },
+			{ k: '함께 주문한 상품', v: '포도 젤리 × 1 · 배송 완료' },
+			{ k: '', v: '레몬 (2개 세트) × 2 · 1개 환불' }
+		]);
 		expect(paid.rows.find((r) => r.k === '상품 금액')!.v).toBe('₩64,000 (2개)');
 		// 제품 카드도 같은 값 — 요청 수량(1개)이 아니라 주문 수량 전체
 		expect(claimOrderedAmount(claim({ qty: 1, order: { ...ord('PAID', { ship_status: 'PREPARING', qty: 2, amount: 64000 }), shipping_fee: 3000 } }))).toBe(64000); // 줄 금액은 서버 값(0099 item.amount)

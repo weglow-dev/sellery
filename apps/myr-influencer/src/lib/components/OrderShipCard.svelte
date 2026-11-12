@@ -10,7 +10,7 @@
 		<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap lg:text-[13px] {ship.cls}">{ship.label}</span>
 	</div>
 	<dl class="mt-3 flex flex-col gap-2 border-t border-white/8 pt-3 text-[13px] lg:text-[14px]">
-		{#each ship.rows as r (r.k)}
+		{#each ship.rows as r, i (i)}
 			<div class="flex justify-between gap-4">
 				<dt class="shrink-0 text-white/55">{r.k}</dt>
 				<dd class="min-w-0 text-right font-semibold text-fg">

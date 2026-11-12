@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { filterSellerOrders, SELLER_ORDER_TABS, sellerOrderTabCounts, type SellerOrderLine, type SellerOrderTab } from '@sellery/myr-core/seller-orders';
-	import { ORDER_EMPTY, orderChip, orderClaimCode, orderLineState, orderMeta, orderShipLine } from '$lib/orders';
+	import { ORDER_EMPTY, orderCardLines, orderChip, orderClaimCode, orderLineState, orderMeta, orderShipLine } from '$lib/orders';
 	import { won } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
@@ -45,8 +45,9 @@
 			{#each orders as o (o.id)}
 				{@const chip = orderChip(o)}
 				{@const amt = o.amounts}
-				{@const first = o.items[0]}
-				{@const rest = o.items.slice(1)}
+				{@const lines = orderCardLines(o)}
+				{@const first = lines[0]}
+				{@const rest = lines.slice(1)}
 				{@const claimCode = orderClaimCode(o)}
 				{@const shipLine = orderShipLine(o)}
 				{@const isOpen = openCode === o.code}

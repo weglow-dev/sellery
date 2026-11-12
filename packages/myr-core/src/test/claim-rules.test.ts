@@ -161,6 +161,15 @@ describe('파서', () => {
 	});
 	it('필수 칸 · 상태 · 종류 · 사유가 틀리면 null · 목록은 걸러낸다', () => {
 		expect(claimFromJson(json({ status: 'weird' }))).toBeNull();
+		// 같은 주문의 내 다른 줄(0100) — 서버 값 그대로 · 열린 요청만 claim · 모양이 틀린 줄은 버린다 · 옛 응답이면 []
+		const withOthers = claimFromJson(json({ order: { id: 'o', code: 'myr1', status: 'PAID', item: { id: 'i' }, others: [
+			{ id: 'x1', name: '포도 젤리', option: '', qty: 2, amount: 64000, refunded_qty: 1, status: 'PARTIAL_REFUNDED', ship_status: 'DELIVERED', left_qty: 1, live: true, delivered_at: '2026-11-10T00:00:00Z', claim: null },
+			{ id: 'x2', name: '레몬', qty: 1, ship_status: 'SHIPPING', live: true, claim: { code: 'rq9', status: 'progress', kind: 'exchange' } },
+			{ id: 'x3', name: '끝난 요청', qty: 1, claim: { code: 'rq8', status: 'done', kind: 'refund' } },
+			{ name: 'id 없음' }
+		] } }))!;
+		expect(withOthers.order.others.map((l) => [l.id, l.leftQty, l.live, l.shipStatus, l.claim?.code ?? null])).toEqual([['x1', 1, true, 'DELIVERED', null], ['x2', 0, true, 'SHIPPING', 'rq9'], ['x3', 0, false, 'PAID', null]]);
+		expect(claimFromJson(json({}))!.order.others).toEqual([]);
 		expect(claimFromJson(json({ reason: '그냥' }))).toBeNull();
 		expect(claimFromJson(null)).toBeNull();
 		expect(claimsFromJson([json(), { id: 'x' }, json({ id: 'c2', code: 'rq2002' })]).map((c) => c.code)).toEqual(['rq2001', 'rq2002']);

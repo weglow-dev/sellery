@@ -1,7 +1,7 @@
 // 콘솔 주문(6번 · 0081) — apps/myr-influencer/src/lib/orders.ts (카드 둘째 줄 · 상태 칩 · 줄 상태 · 배송 줄 · 시안 "MYR Influencer Admin" 주문 탭)
 import { describe, expect, it } from 'vitest';
 import { sellerOrderFromJson } from '@sellery/myr-core/seller-orders';
-import { orderChip, orderClaimCode, orderLineState, orderMeta, orderShipLine } from '../lib/orders';
+import { orderCardLines, orderChip, orderClaimCode, orderLineState, orderMeta, orderShipLine } from '../lib/orders';
 
 // ship_status · left_qty · live · amounts 는 서버(0098 · 0099) 값 — 테스트는 서버가 줄 법한 값으로 채운다
 const line = (o: Record<string, unknown> = {}) => ({ id: 'i', name: '포도 젤리', qty: 1, amount: 32000, left_qty: 1, live: true, ship_status: 'SHIPPING', status: 'PAID', refunded_qty: 0, ...o });
@@ -34,6 +34,11 @@ describe('주문 카드', () => {
 		expect(orderLineState({ claim: null, refundedQty: 0, status: 'PAID', shipStatus: 'PREPARING' })).toEqual({ text: '배송 준비중', alert: false });
 	});
 
+	it('카드 줄 순서 — 요청이 걸린 줄을 첫 줄로([진행 중] 버튼이 그 상품 옆) · 나머지는 서버 순서', () => {
+		const o = order([line({ id: 'a' }), line({ id: 'b', claim: { code: 'rq7', status: 'pending', kind: 'refund' } }), line({ id: 'c' })]);
+		expect(orderCardLines(o).map((i) => i.id)).toEqual(['b', 'a', 'c']);
+		expect(orderCardLines(order([line({ id: 'a' }), line({ id: 'c' })])).map((i) => i.id)).toEqual(['a', 'c']);
+	});
 	it('[진행 중] 버튼 — 내 줄 중 첫 요청 · 없으면 null', () => {
 		expect(orderClaimCode(order([line({ id: 'a' }), line({ id: 'b', claim: { code: 'rq7', status: 'progress', kind: 'exchange' } })]))).toBe('rq7');
 		expect(orderClaimCode(order([line()]))).toBeNull();

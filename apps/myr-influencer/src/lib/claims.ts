@@ -3,6 +3,7 @@
  *  순수 — $app · $env 를 import 하지 않는다(src/test/claims.test.ts). */
 import { claimTimeline, resolutionOption, type Claim, type ClaimKind, type ClaimQuotes, type ClaimStatus, type Resolution } from '@sellery/myr-core/claim-rules';
 import { orderShipping, type OrderShipping } from './order-ship';
+import { orderLineState } from './orders';
 import { relativeTime } from './product-row';
 
 /** 칩 색은 Tailwind 클래스로 (app.css 토큰 accent · lilac · mint) — 시안 그대로 */
@@ -94,9 +95,17 @@ export function consoleTimeline(c: Claim, now?: Date): { title: string; when: st
 /** 주문 · 배송 — 문의 상세와 같은 표(요청이 걸린 줄의 배송 상태 · 송장 · 발송일 · 배송 완료일 · 0080) */
 /** 그 줄 주문 수량 전체의 상품 금액 — 요청 상세 제품 카드 · "주문 · 배송" 상품 금액(요청 수량 금액은 처리 방법 · 처리 결과). 서버 값 그대로(0099 · 줄 amount) */
 export const claimOrderedAmount = (c: Pick<Claim, 'order'>): number => c.order.item.amount;
-/** 요청 상세 "주문 · 배송" — 그 줄 송장 · 상품 금액(그 줄 전체 수량) · 주문 배송비(0090) */
-export const claimShipping = (c: Pick<Claim, 'order'>): OrderShipping =>
-	orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } }, '요청 상품');
+/** 요청 상세 "주문 · 배송" — 요청 상품(그 줄 송장 · 상품 금액 · 주문 배송비 · 0090) + 같은 주문의 내 다른 상품(0100 · "함께 주문한 상품" · 줄 상태는 주문 탭과 같은 orderLineState) */
+export function claimShipping(c: Pick<Claim, 'order'>): OrderShipping {
+	const base = orderShipping({ ...c.order, money: c.order.shippingFee === null ? null : { goods: claimOrderedAmount(c), shippingFee: c.order.shippingFee } }, '요청 상품');
+	const others = c.order.others.map((l, i) => ({
+		k: i === 0 ? '함께 주문한 상품' : '',
+		v: `${l.name}${l.option ? ` (${l.option})` : ''} × ${l.qty} · ${orderLineState(l).text}`
+	}));
+	// 요청 상품 줄 바로 아래에 — 이 주문에 무엇이 더 있는지 먼저 보이게
+	const at = base.rows.findIndex((r) => r.k === '요청 상품') + 1;
+	return { ...base, rows: [...base.rows.slice(0, at), ...others, ...base.rows.slice(at)] };
+}
 
 /** 지금 단계 — 진행 중 요청에서 크리에이터가 볼 한 줄(실행은 운영 · 서버) */
 export const STEP_TEXT: Record<string, string> = {
