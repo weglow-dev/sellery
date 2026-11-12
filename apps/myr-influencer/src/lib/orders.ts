@@ -2,7 +2,7 @@
  *  순수 — $app · $env 를 import 하지 않는다(src/test/orders.test.ts). */
 import { KIND_LABEL, type ClaimKind } from '@sellery/myr-core/claim-rules';
 import { SHIP_LABELS, shortDate } from '@sellery/myr-core/order-view';
-import { liveLines, sellerClaimStatus, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
+import { hasSellerRefund, liveLines, sellerClaimStatus, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 export const ORDER_EMPTY: Record<string, string> = {
@@ -19,8 +19,8 @@ export const orderMeta = (o: Pick<SellerOrder, 'paidAt' | 'buyer'>): string => [
 
 /* ---------- 주문 카드(시안 "MYR Influencer Admin" 주문 탭) ---------- */
 
-/** 상태 칩 — 글자는 판정 그대로(sellerOrderLabel · 요청 → 배송 상태 → 환불 완료) · 색만 시안 값
- *  결제 완료 주황 · 배송 준비 흰 · 배송 중 민트 · 배송 완료/환불 완료 흐림 · 교환·환불 빨강 */
+/** 상태 칩 — 글자는 판정 그대로(sellerOrderLabel · 요청 → 환불 완료/부분 환불 → 배송 상태 · 탭과 같은 순서) · 색만 시안 값
+ *  결제 완료 주황 · 배송 준비 흰 · 배송 중 민트 · 배송 완료 · 환불 완료 · 부분 환불 흐림 · 교환·환불 빨강 */
 const CHIP_CLS = {
 	PAID: 'bg-accent/16 text-accent',
 	PREPARING: 'bg-white/8 text-white/85',
@@ -32,7 +32,8 @@ const CHIP_CLS = {
 export function orderChip(o: Pick<SellerOrder, 'items' | 'shipStatus'>): { text: string; cls: string } {
 	const text = sellerOrderLabel(o).text;
 	if (sellerClaimStatus(o)) return { text, cls: CHIP_CLS.claim };
-	return { text, cls: o.shipStatus ? CHIP_CLS[o.shipStatus] : CHIP_CLS.refunded };
+	if (!o.shipStatus || hasSellerRefund(o)) return { text, cls: CHIP_CLS.refunded };
+	return { text, cls: CHIP_CLS[o.shipStatus] };
 }
 
 /** 상품 줄 둘째 줄의 상태 — 진행 중인 요청 → 환불 수량 → 취소 → 그 줄 배송 상태. alert = 빨강(요청 · 환불) */

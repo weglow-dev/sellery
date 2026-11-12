@@ -1,6 +1,6 @@
 // 크리에이터 주문 열람(6번 · 0081) — packages/myr-core/src/seller-orders.ts
 import { describe, expect, it } from 'vitest';
-import { filterSellerOrders, liveLines, sellerOrderBoxes, sellerOrderFromJson, sellerOrderLabel, sellerOrdersFromJson, sellerOrderTab, sellerOrderTabCounts } from '../seller-orders';
+import { filterSellerOrders, liveLines, SELLER_ORDER_TABS, sellerOrderBoxes, sellerOrderFromJson, sellerOrderLabel, sellerOrdersFromJson, sellerOrderTab, sellerOrderTabCounts } from '../seller-orders';
 
 // left_qty · live(줄) · ship_status · amounts(주문)는 서버(0098 myr_line_left · myr_line_live · 0099 myr_order_ship_status · myr_line_net)가 주는 값 —
 // 테스트는 서버가 줄 법한 값으로 채운다(화면은 그 값을 읽기만 한다)
@@ -31,10 +31,10 @@ describe('상태 칩 · 탭', () => {
 		expect(sellerOrderLabel(o).text).toBe('배송 준비중');
 		expect(sellerOrderTab(o)).toBe('prep');
 	});
-	it('환불된 줄은 빼고 칩을 본다 · 환불이 하나라도 있으면 환불 탭(부분 포함)', () => {
+	it('환불이 하나라도 있으면 환불 완료 탭(부분 포함) · 칩은 남은 줄이 있으면 부분 환불 · 없으면 환불 완료', () => {
 		const part = order([line({ id: 'a', ship_status: 'PAID', status: 'REFUNDED', refunded_qty: 1 }), line({ id: 'b', ship_status: 'SHIPPING' })], { ship_status: 'SHIPPING' });
 		expect(liveLines(part).map((i) => i.id)).toEqual(['b']);
-		expect(sellerOrderLabel(part).text).toBe('배송 중');
+		expect(sellerOrderLabel(part).text).toBe('부분 환불'); // 환불 완료 탭 — 배송 상태 칩이 아니라 부분 환불(남은 줄 배송은 카드 배송 줄)
 		expect(sellerOrderTab(part)).toBe('refunded');
 		expect(sellerOrderTab(order([line({ qty: 2, refunded_qty: 1, status: 'PARTIAL_REFUNDED' })]))).toBe('refunded');
 		// 화면은 서버가 준 live 를 그대로 쓴다 — 수량으로 다시 판정하지 않는다(0098)
@@ -60,6 +60,7 @@ describe('상태 칩 · 탭', () => {
 			order([line({})], { id: 'o5', ship_status: 'DELIVERED' })
 		];
 		expect(sellerOrderTabCounts(list).map((t) => [t.id, t.count])).toEqual([['all', 5], ['prep', 1], ['shipping', 1], ['delivered', 1], ['claim', 1], ['refunded', 1]]);
+		expect(SELLER_ORDER_TABS.map((t) => t.name)).toEqual(['전체', '배송 준비', '배송 중', '배송 완료', '교환·환불', '환불 완료']);
 		expect(filterSellerOrders(list, 'shipping').map((o) => o.id)).toEqual(['o2']);
 		expect(filterSellerOrders(list, 'claim').map((o) => o.id)).toEqual(['o4']);
 	});

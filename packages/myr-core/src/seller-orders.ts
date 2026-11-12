@@ -105,17 +105,20 @@ export function sellerClaimStatus(o: Pick<SellerOrder, 'items'>): OpenClaimStatu
 	const st = o.items.map((i) => i.claim?.status).filter(Boolean);
 	return st.includes('pending') ? 'pending' : st.includes('progress') ? 'progress' : null;
 }
-/** 상태 칩 — 요청 → 환불 완료 → 배송 상태 */
-export function sellerOrderLabel(o: Pick<SellerOrder, 'items' | 'shipStatus'>): StatusLabel {
-	const claim = sellerClaimStatus(o);
-	if (claim) return CLAIM_LABELS[claim];
-	return o.shipStatus ? SHIP_LABELS[o.shipStatus] : { text: '환불 완료', tone: 'muted' };
-}
-
 /** 환불이 하나라도 있었나 — 내 줄 중 환불 수량이 있거나 취소된 줄(부분 환불 포함) */
 export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some((i) => i.refundedQty > 0 || i.status === 'CANCELED');
 
-/** 목록 탭 — 한 주문은 한 탭에만(2026-11-09 대표 결정). 우선순위 교환·환불(진행 중 요청) → 환불(부분 포함) → 배송 상태.
+/** 상태 칩 — 탭과 같은 우선순위: 요청 → 환불(남은 줄이 없으면 환불 완료 · 있으면 부분 환불) → 배송 상태.
+ *  "환불 완료" 탭의 주문이 배송 상태 칩(배송 완료 등)으로 보이지 않게 — 남은 줄의 배송은 카드 아래 배송 줄이 보여 준다 */
+export function sellerOrderLabel(o: Pick<SellerOrder, 'items' | 'shipStatus'>): StatusLabel {
+	const claim = sellerClaimStatus(o);
+	if (claim) return CLAIM_LABELS[claim];
+	if (!o.shipStatus) return { text: '환불 완료', tone: 'muted' };
+	if (hasSellerRefund(o)) return { text: '부분 환불', tone: 'muted' };
+	return SHIP_LABELS[o.shipStatus];
+}
+
+/** 목록 탭 — 한 주문은 한 탭에만(2026-11-09 대표 결정). 우선순위 교환·환불(진행 중 요청) → 환불 완료(부분 포함 · 2026-11-12 이름 "환불" → "환불 완료") → 배송 상태.
  *  요청이 끝나면(완료 · 반려) 다시 환불 또는 배송 상태 탭으로 돌아간다. 배송 완료 = 요청 · 환불 없이 끝난 주문 */
 export type SellerOrderTab = 'all' | 'prep' | 'shipping' | 'delivered' | 'claim' | 'refunded';
 export const SELLER_ORDER_TABS: { id: SellerOrderTab; name: string }[] = [
@@ -124,7 +127,7 @@ export const SELLER_ORDER_TABS: { id: SellerOrderTab; name: string }[] = [
 	{ id: 'shipping', name: '배송 중' },
 	{ id: 'delivered', name: '배송 완료' },
 	{ id: 'claim', name: '교환·환불' },
-	{ id: 'refunded', name: '환불' }
+	{ id: 'refunded', name: '환불 완료' }
 ];
 export function sellerOrderTab(o: Pick<SellerOrder, 'items' | 'shipStatus'>): Exclude<SellerOrderTab, 'all'> {
 	if (sellerClaimStatus(o)) return 'claim';

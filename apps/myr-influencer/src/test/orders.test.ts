@@ -20,6 +20,8 @@ describe('주문 카드', () => {
 		expect(orderChip(order([line()])).cls).toBe('bg-mint/16 text-mint');
 		expect(orderChip(order([line({ ship_status: 'DELIVERED' })], { ship_status: 'DELIVERED' })).cls).toBe('bg-white/6 text-white/50');
 		expect(orderChip(order([line({ live: false, left_qty: 0, refunded_qty: 1, status: 'REFUNDED' })], { ship_status: null }))).toEqual({ text: '환불 완료', cls: 'bg-white/6 text-white/50' });
+		// 일부 환불 + 남은 줄 배송 완료 — 환불 완료 탭이라 배송 완료가 아니라 부분 환불(흐림)
+		expect(orderChip(order([line({ qty: 2, left_qty: 1, refunded_qty: 1, status: 'PARTIAL_REFUNDED', ship_status: 'DELIVERED' })], { ship_status: 'DELIVERED' }))).toEqual({ text: '부분 환불', cls: 'bg-white/6 text-white/50' });
 		const claimed = order([line({ claim: { code: 'rq1', status: 'pending', kind: 'refund' } })]);
 		expect(orderChip(claimed)).toEqual({ text: '교환 · 환불 요청', cls: 'bg-[#ff6b6b]/14 text-[#ff8a8a]' });
 	});
