@@ -36,11 +36,11 @@ export function orderChip(o: Pick<SellerOrder, 'items' | 'shipStatus'>): { text:
 	return { text, cls: CHIP_CLS[o.shipStatus] };
 }
 
-/** 상품 줄 둘째 줄의 상태 — 진행 중인 요청 → 환불 수량 → 취소 → 그 줄 배송 상태. alert = 빨강(요청 · 환불) */
-export function orderLineState(it: Pick<SellerOrderLine, 'claim' | 'refundedQty' | 'status' | 'shipStatus'>): { text: string; alert: boolean } {
+/** 상품 줄 둘째 줄의 상태 — 진행 중인 요청 → 환불 → 그 줄 배송 상태. alert = 빨강(요청 · 환불) */
+export function orderLineState(it: Pick<SellerOrderLine, 'claim' | 'refundedQty' | 'hasRefund' | 'shipStatus'>): { text: string; alert: boolean } {
 	if (it.claim) return { text: `${KIND_LABEL[it.claim.kind as ClaimKind] ?? '교환 · 환불'} ${it.claim.status === 'pending' ? '요청' : '진행 중'}`, alert: true };
-	// 환불 · 취소 판정은 lineHasRefund 하나(주문 탭 · 상태 칩과 같다) — 여기서는 어느 글자인지만 고른다(환불 수량이 있으면 "N개 환불" · 아니면 취소)
-	if (lineHasRefund(it)) return { text: it.refundedQty ? `${it.refundedQty}개 환불` : '취소', alert: true };
+	// 환불이 있었는지는 서버 값(lineHasRefund · 0100 myr_line_has_refund) — 여기서는 "N개 환불" 글자만
+	if (lineHasRefund(it)) return { text: `${it.refundedQty}개 환불`, alert: true };
 	return { text: SHIP_LABELS[it.shipStatus].text, alert: false };
 }
 

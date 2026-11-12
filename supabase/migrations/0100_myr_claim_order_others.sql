@@ -5,8 +5,20 @@
 --   줄 판정은 기존 함수 그대로 — 남은 수량 myr_line_left · 살아 있는 줄 myr_line_live · 열린 요청 myr_claim_status_open.
 --   새 함수 myr_line_open_claim(줄) — 줄의 열린 교환·환불 요청 { code, status, kind } · 없으면 null. 콘솔 주문(myr_app_seller_orders) · 요청 접수(myr_app_claim_open
 --   OPEN_EXISTS) · 이 JSON 이 각자 쓰던 같은 하위 조회를 이 함수 하나로(백엔드 원칙 1 · 계산 결과 불변).
+--   새 함수 myr_line_has_refund(줄) — 이 줄에 환불이 있었나(환불 수량 > 0 · 입금 전 취소는 돈이 오가지 않아 환불이 아니다). 홈 CS 비율(myr_app_seller_sales
+--   refunded_orders) 이 SQL 로, 콘솔 주문 탭 · 상태 칩이 TS 로 각자 정하던 것을 이 함수 하나로 — 콘솔 주문 · 요청 JSON 줄에 has_refund 로 싣는다.
+--   myr_sales_lines 는 has_refund 칸이 늘어 drop 뒤 다시 만든다(쓰는 함수 둘도 같이).
 --   권한 그대로(anon · authenticated EXECUTE 없음 · service_role 만). 테스트: supabase/tests/myr_claim_order_others.test.sql
 -- ============================================================
+
+create or replace function public.myr_line_has_refund(i public.myr_order_items)
+returns boolean
+language sql
+stable
+as $$
+  select coalesce(i.refunded_qty > 0, false)
+$$;
+revoke all on function public.myr_line_has_refund(public.myr_order_items) from public, anon, authenticated;
 
 create or replace function public.myr_line_open_claim(i public.myr_order_items)
 returns jsonb
@@ -57,7 +69,7 @@ as $$
                                 --   다른 크리에이터 줄은 싣지 않는다(콘솔 주문 탭과 같은 범위) · 남은 수량 · 살아 있는 줄 · 열린 요청은 기존 판정 함수 값
                                 'others', coalesce((select jsonb_agg(jsonb_build_object(
                                                      'id', x.id, 'name', x.product_name, 'option', x.option_name, 'qty', x.qty, 'amount', x.amount,
-                                                     'refunded_qty', x.refunded_qty, 'status', x.status, 'ship_status', x.ship_status,
+                                                     'refunded_qty', x.refunded_qty, 'has_refund', public.myr_line_has_refund(x), 'status', x.status, 'ship_status', x.ship_status,
                                                      'left_qty', public.myr_line_left(x), 'live', public.myr_line_live(x), 'delivered_at', x.delivered_at,
                                                      'claim', public.myr_line_open_claim(x))
                                                    order by x.created_at, x.id)
@@ -90,7 +102,7 @@ as $$
                            from public.myr_order_items i where i.order_id = o.id and i.seller_id = p_seller),
              'items', (select jsonb_agg(jsonb_build_object(
                          'id', i.id, 'name', i.product_name, 'option', i.option_name, 'qty', i.qty, 'unit_price', i.unit_price, 'amount', i.amount,
-                         'status', i.status, 'refunded_qty', i.refunded_qty, 'refund_amount', i.refund_amount,
+                         'status', i.status, 'refunded_qty', i.refunded_qty, 'refund_amount', i.refund_amount, 'has_refund', public.myr_line_has_refund(i),
                          'left_qty', public.myr_line_left(i), 'live', public.myr_line_live(i),
                          'ship_status', i.ship_status, 'courier', i.courier, 'tracking_no', i.tracking_no, 'shipped_at', i.shipped_at, 'delivered_at', i.delivered_at,
                          'groupbuy', i.groupbuy_id is not null,
@@ -189,3 +201,72 @@ end;
 $$;
 revoke all on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) from public, anon, authenticated;
 grant execute on function public.myr_app_claim_open(uuid, uuid, text, text, jsonb) to service_role;
+
+-- 실적 줄(0099) + has_refund — 반환 모양이 바뀌어 다시 만든다(쓰는 함수 둘은 아래에서 같이)
+drop function if exists public.myr_sales_lines();
+create function public.myr_sales_lines()
+returns table (order_id uuid, seller_id uuid, product_id uuid, groupbuy_id uuid, qty integer, refunded_qty integer, amount integer,
+               refund_amount integer, paid_at timestamptz, left_qty integer, net integer, has_refund boolean)
+language sql
+stable
+as $$
+  select i.order_id, i.seller_id, i.product_id, i.groupbuy_id, i.qty, i.refunded_qty, i.amount, i.refund_amount, o.paid_at,
+         public.myr_line_left(i), public.myr_line_net(i), public.myr_line_has_refund(i)
+    from public.myr_order_items i
+    join public.myr_orders o on o.id = i.order_id
+   where o.paid_at is not null
+     and public.myr_order_status_paid(o.status)
+$$;
+revoke all on function public.myr_sales_lines() from public, anon, authenticated;
+
+-- 0099 정의 + 환불 주문 수를 myr_line_has_refund(실적 줄 has_refund)로
+create or replace function public.myr_app_seller_sales(p_seller uuid, p_now timestamptz default now())
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  with b as (
+    select date_trunc('month', p_now at time zone 'Asia/Seoul') as m0,
+           date_trunc('day', p_now at time zone 'Asia/Seoul') as d0
+  ),
+  lines as (
+    select l.order_id, l.qty, l.refunded_qty, l.left_qty, l.amount, l.refund_amount, l.net, l.has_refund,
+           (l.paid_at at time zone 'Asia/Seoul') as paid_kst
+      from public.myr_sales_lines() l
+     where l.seller_id = p_seller
+  ),
+  m as (select l.* from lines l, b where l.paid_kst >= b.m0 and l.paid_kst < b.m0 + interval '1 month'),
+  w as (select l.* from lines l, b where l.paid_kst >= b.d0 - interval '6 days' and l.paid_kst < b.d0 + interval '1 day')
+  select jsonb_build_object(
+    'month', to_char(b.m0, 'YYYY-MM'),
+    'gross', coalesce((select sum(amount) from m), 0),
+    'refunds', coalesce((select sum(refund_amount) from m), 0),
+    'net', coalesce((select sum(net) from m), 0),
+    'orders', (select count(distinct order_id) from m),
+    'units', coalesce((select sum(left_qty) from m), 0),
+    'refunded_orders', (select count(distinct order_id) from m where has_refund),
+    'week', (select jsonb_agg(jsonb_build_object('date', to_char(d, 'YYYY-MM-DD'),
+                                                 'orders', (select count(distinct w.order_id) from w where date_trunc('day', w.paid_kst) = d))
+                              order by d)
+               from generate_series(b.d0 - interval '6 days', b.d0, interval '1 day') d)
+  )
+  from b
+$$;
+revoke all on function public.myr_app_seller_sales(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.myr_app_seller_sales(uuid, timestamptz) to service_role;
+
+-- 0099 정의 그대로 — myr_sales_lines 를 다시 만들어 함께 다시 만든다
+create or replace function public.myr_groupbuy_seller_json(g public.myr_groupbuys, p public.myr_products)
+returns jsonb
+language sql
+stable
+as $$
+  select public.myr_groupbuy_product_json(g, p)
+      || jsonb_build_object('planned_ends_at', g.ends_at, 'closed_at', g.closed_at, 'created_at', g.created_at,
+                            'stats', (select jsonb_build_object('orders', count(distinct l.order_id),
+                                                                'units', coalesce(sum(l.left_qty), 0),
+                                                                'net', coalesce(sum(l.net), 0))
+                                        from public.myr_sales_lines() l where l.groupbuy_id = g.id))
+$$;
+revoke all on function public.myr_groupbuy_seller_json(public.myr_groupbuys, public.myr_products) from public, anon, authenticated;

@@ -235,6 +235,8 @@ export type ClaimOrderLine = {
 	qty: number;
 	amount: number;
 	refundedQty: number;
+	/** 이 줄에 환불이 있었나 — 서버 값(0100 myr_line_has_refund) */
+	hasRefund: boolean;
 	status: string;
 	shipStatus: ShipStatus;
 	leftQty: number;
@@ -323,6 +325,7 @@ export function claimFromJson(v: unknown): Claim | null {
 						qty: n(x.qty, 1),
 						amount: n(x.amount),
 						refundedQty: n(x.refunded_qty),
+						hasRefund: x.has_refund === true,
 						status: s(x.status, 'PAID'),
 						shipStatus: isShipStatus(x.ship_status) ? x.ship_status : 'PAID',
 						leftQty: n(x.left_qty),

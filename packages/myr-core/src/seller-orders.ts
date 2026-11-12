@@ -18,6 +18,8 @@ export type SellerOrderLine = {
 	status: string;
 	refundedQty: number;
 	refundAmount: number;
+	/** 이 줄에 환불이 있었나 — 서버 값(0100 myr_line_has_refund · 환불 수량 > 0 · 홈 CS 비율과 같은 함수) */
+	hasRefund: boolean;
 	/** 남은 수량 · 살아 있는 줄(취소 아님 · 남은 수량 있음) — 서버 값(0098 myr_line_left · myr_line_live) 그대로. 화면이 다시 계산하지 않는다 */
 	leftQty: number;
 	live: boolean;
@@ -67,6 +69,7 @@ function lineFromJson(v: unknown): SellerOrderLine | null {
 		status: s(o.status, 'PAID'),
 		refundedQty: n(o.refunded_qty),
 		refundAmount: n(o.refund_amount),
+		hasRefund: o.has_refund === true,
 		leftQty: n(o.left_qty),
 		live: o.live === true,
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
@@ -105,8 +108,8 @@ export function sellerClaimStatus(o: Pick<SellerOrder, 'items'>): OpenClaimStatu
 	const st = o.items.map((i) => i.claim?.status).filter(Boolean);
 	return st.includes('pending') ? 'pending' : st.includes('progress') ? 'progress' : null;
 }
-/** 이 줄에 환불이 있었나 — 환불 수량이 있거나 취소된 줄(부분 환불 포함). 줄 판정은 여기 하나(주문 탭 · 상태 칩 · 카드 줄 상태가 같이 쓴다) */
-export const lineHasRefund = (i: Pick<SellerOrderLine, 'refundedQty' | 'status'>): boolean => i.refundedQty > 0 || i.status === 'CANCELED';
+/** 이 줄에 환불이 있었나 — 서버 값 그대로(0100 myr_line_has_refund). 주문 탭 · 상태 칩 · 카드 줄 상태가 이 함수로 읽는다(화면이 수량으로 다시 판정하지 않는다) */
+export const lineHasRefund = (i: Pick<SellerOrderLine, 'hasRefund'>): boolean => i.hasRefund;
 /** 환불이 하나라도 있었나 — 내 줄 중 lineHasRefund 인 줄이 있으면 */
 export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some(lineHasRefund);
 

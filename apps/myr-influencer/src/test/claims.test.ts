@@ -107,7 +107,7 @@ describe('주문 · 배송 — 문의 상세와 같은 표(0080)', () => {
 		// 같은 주문의 내 다른 상품(0100) — 요청 상품 바로 아래 "함께 주문한 상품" · 줄 상태는 주문 탭과 같은 문구
 		const withOthers = claimShipping(claim({ order: { ...ord('PAID', { ship_status: 'DELIVERED' }), others: [
 			{ id: 'x1', name: '포도 젤리', option: '', qty: 1, ship_status: 'DELIVERED', live: true, left_qty: 1 },
-			{ id: 'x2', name: '레몬', option: '2개 세트', qty: 2, ship_status: 'DELIVERED', live: true, left_qty: 1, refunded_qty: 1 }
+			{ id: 'x2', name: '레몬', option: '2개 세트', qty: 2, ship_status: 'DELIVERED', live: true, left_qty: 1, refunded_qty: 1, has_refund: true }
 		] } }));
 		expect(withOthers.rows.slice(0, 3)).toEqual([
 			{ k: '요청 상품', v: '포도 젤리 × 1' },

@@ -1,10 +1,11 @@
 -- pgTAP — 0100 교환·환불 요청 JSON 의 order.others(같은 주문 · 같은 크리에이터의 다른 줄): 요청 줄 제외 · 다른 크리에이터 줄 제외 · 줄 판정은 기존 함수 값
 begin;
-select plan(11);
+select plan(16);
 
 select function_privs_are('public', 'myr_refund_request_json', '{myr_refund_requests}'::text[], 'anon', '{}'::text[], 'anon 은 refund_request_json 불가(다시 만든 뒤에도)');
 select function_privs_are('public', 'myr_refund_request_json', '{myr_refund_requests}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 불가');
 select function_privs_are('public', 'myr_line_open_claim', '{myr_order_items}'::text[], 'anon', '{}'::text[], 'anon 은 line_open_claim 불가');
+select function_privs_are('public', 'myr_line_has_refund', '{myr_order_items}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 line_has_refund 불가');
 select function_privs_are('public', 'myr_line_open_claim', '{myr_order_items}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 line_open_claim 불가');
 
 insert into public.sellers (id, name, handle, platform, active)
@@ -32,7 +33,7 @@ create temp table j as select r.code, public.myr_refund_request_json(r) as v fro
 select is((select jsonb_agg(e ->> 'id' order by e ->> 'id') from j, jsonb_array_elements(v -> 'order' -> 'others') e where code = 'pgoth01'),
           '["00000000-0000-4000-8000-00000000c042", "00000000-0000-4000-8000-00000000c043"]'::jsonb, '레몬 요청 — 같은 셀러의 다른 줄 둘(요청 줄 · 다른 셀러 줄 제외)');
 select is((select v -> 'order' -> 'others' -> 0 from j where code = 'pgoth01'),
-          '{"id": "00000000-0000-4000-8000-00000000c042", "name": "포도 젤리", "option": "", "qty": 2, "amount": 64000, "refunded_qty": 1, "status": "PARTIAL_REFUNDED",
+          '{"id": "00000000-0000-4000-8000-00000000c042", "name": "포도 젤리", "option": "", "qty": 2, "amount": 64000, "refunded_qty": 1, "has_refund": true, "status": "PARTIAL_REFUNDED",
             "ship_status": "DELIVERED", "left_qty": 1, "live": true, "delivered_at": null, "claim": null}'::jsonb,
           '줄 모양 — 남은 수량 · 살아 있는 줄은 myr_line_left · myr_line_live 값 · 요청 없으면 claim null');
 select is((select v -> 'order' -> 'others' -> 1 -> 'claim' from j where code = 'pgoth01'),
@@ -46,6 +47,15 @@ select is((select jsonb_object_agg(i.product_name || coalesce(' ' || nullif(i.op
           '줄의 열린 요청 — 요청 없는 줄은 null');
 select is((select jsonb_agg(l -> 'claim' ->> 'code' order by l ->> 'name', l ->> 'option') from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000c011', 50)) o, jsonb_array_elements(o -> 'items') l where o ->> 'code' = 'pgtap-oth-1'),
           '["pgoth01", null, "pgoth02"]'::jsonb, '콘솔 주문 줄 claim = 같은 함수 값(이름 순 — 레몬 · 포도 · 포도 2개 세트)');
+
+-- 줄 환불 여부 — myr_line_has_refund 하나(환불 수량 > 0 · 입금 전 취소는 환불 아님) · 콘솔 주문 줄 has_refund · 실적 줄 has_refund 가 같은 값
+select is((select jsonb_object_agg(i.product_name || coalesce(' ' || nullif(i.option_name, ''), ''), public.myr_line_has_refund(i)) from public.myr_order_items i where i.order_id = '00000000-0000-4000-8000-00000000c031'),
+          '{"레몬 스틱": false, "포도 젤리": true, "포도 젤리 2개 세트": false, "셀러 B 상품": false}'::jsonb, '줄 환불 여부 — 2개 중 1개 환불한 포도 젤리만');
+select is((select jsonb_agg((l ->> 'has_refund')::boolean order by l ->> 'name', l ->> 'option') from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000c011', 50)) o, jsonb_array_elements(o -> 'items') l where o ->> 'code' = 'pgtap-oth-1'),
+          '[false, true, false]'::jsonb, '콘솔 주문 줄 has_refund = 같은 함수 값');
+update public.myr_order_items set status = 'CANCELED' where id = '00000000-0000-4000-8000-00000000c043';
+select is((select public.myr_line_has_refund(i) from public.myr_order_items i where i.id = '00000000-0000-4000-8000-00000000c043'), false, '취소 줄(환불 수량 0)은 환불 아님 — 돈이 오가지 않았다');
+select is((public.myr_app_seller_sales('00000000-0000-4000-8000-00000000c011') ->> 'refunded_orders')::int, 1, '홈 CS 비율의 환불 주문 수도 같은 함수(실적 줄 has_refund)');
 
 select * from finish();
 rollback;

@@ -4,7 +4,11 @@ import { sellerOrderFromJson } from '@sellery/myr-core/seller-orders';
 import { orderCardLines, orderChip, orderClaimCode, orderLineState, orderMeta, orderShipLine } from '../lib/orders';
 
 // ship_status · left_qty · live · amounts 는 서버(0098 · 0099) 값 — 테스트는 서버가 줄 법한 값으로 채운다
-const line = (o: Record<string, unknown> = {}) => ({ id: 'i', name: '포도 젤리', qty: 1, amount: 32000, left_qty: 1, live: true, ship_status: 'SHIPPING', status: 'PAID', refunded_qty: 0, ...o });
+// has_refund 는 서버(0100 myr_line_has_refund = 환불 수량 > 0)가 주는 값 — 픽스처는 refunded_qty 로 서버가 줄 법한 값을 채운다
+const line = (o: Record<string, unknown> = {}) => {
+	const r = { id: 'i', name: '포도 젤리', qty: 1, amount: 32000, left_qty: 1, live: true, ship_status: 'SHIPPING', status: 'PAID', refunded_qty: 0, ...o };
+	return { has_refund: Number(r.refunded_qty) > 0, ...r };
+};
 const order = (items: unknown[], o: Record<string, unknown> = {}) =>
 	sellerOrderFromJson({ id: 'o', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T03:00:00Z', buyer: '김*은', ship_status: 'SHIPPING', items, ...o })!;
 
@@ -26,12 +30,11 @@ describe('주문 카드', () => {
 		expect(orderChip(claimed)).toEqual({ text: '교환 · 환불 요청', cls: 'bg-[#ff6b6b]/14 text-[#ff8a8a]' });
 	});
 
-	it('줄 상태 — 요청 → 환불 수량 → 취소 → 그 줄 배송 상태 · 요청 · 환불은 빨강', () => {
-		expect(orderLineState({ claim: { code: 'rq1', status: 'pending', kind: 'refund' }, refundedQty: 0, status: 'PAID', shipStatus: 'DELIVERED' })).toEqual({ text: '환불 요청', alert: true });
-		expect(orderLineState({ claim: { code: 'rq1', status: 'progress', kind: 'exchange' }, refundedQty: 0, status: 'PAID', shipStatus: 'DELIVERED' })).toEqual({ text: '교환 진행 중', alert: true });
-		expect(orderLineState({ claim: null, refundedQty: 1, status: 'PARTIAL_REFUNDED', shipStatus: 'DELIVERED' })).toEqual({ text: '1개 환불', alert: true });
-		expect(orderLineState({ claim: null, refundedQty: 0, status: 'CANCELED', shipStatus: 'PAID' })).toEqual({ text: '취소', alert: true });
-		expect(orderLineState({ claim: null, refundedQty: 0, status: 'PAID', shipStatus: 'PREPARING' })).toEqual({ text: '배송 준비중', alert: false });
+	it('줄 상태 — 요청 → 환불(서버 has_refund) → 그 줄 배송 상태 · 요청 · 환불은 빨강', () => {
+		expect(orderLineState({ claim: { code: 'rq1', status: 'pending', kind: 'refund' }, refundedQty: 0, hasRefund: false, shipStatus: 'DELIVERED' })).toEqual({ text: '환불 요청', alert: true });
+		expect(orderLineState({ claim: { code: 'rq1', status: 'progress', kind: 'exchange' }, refundedQty: 0, hasRefund: false, shipStatus: 'DELIVERED' })).toEqual({ text: '교환 진행 중', alert: true });
+		expect(orderLineState({ claim: null, refundedQty: 1, hasRefund: true, shipStatus: 'DELIVERED' })).toEqual({ text: '1개 환불', alert: true });
+		expect(orderLineState({ claim: null, refundedQty: 0, hasRefund: false, shipStatus: 'PREPARING' })).toEqual({ text: '배송 준비중', alert: false });
 	});
 
 	it('카드 줄 순서 — 요청이 걸린 줄을 첫 줄로([진행 중] 버튼이 그 상품 옆) · 나머지는 서버 순서', () => {

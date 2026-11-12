@@ -172,8 +172,7 @@ const MYR_MIRROR_RULES = [
   },
   {
     re: /\brefunded_?[qQ]ty\s*>\s*0\b/,
-    why: "줄에 환불 · 취소가 있었는지 다시 판정 — seller-orders lineHasRefund 를 쓴다",
-    allow: ["packages/myr-core/src/seller-orders.ts"], // lineHasRefund 의 주인
+    why: "줄에 환불이 있었는지 다시 판정 — 서버 값 hasRefund(myr_line_has_refund · lineHasRefund)를 쓴다",
   },
   { re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/, why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다" },
   { re: /\bGB_PCT_(MIN|MAX)\b|\b10_?000_?000\b/, why: "공구 할인율 범위 · 판매가 상한 숫자를 화면에 둠 — 서버 값(pctRange · 거절 응답 max)을 쓴다" },

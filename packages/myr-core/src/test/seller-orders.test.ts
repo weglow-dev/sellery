@@ -7,7 +7,7 @@ import { filterSellerOrders, lineHasRefund, liveLines, SELLER_ORDER_TABS, seller
 const line = (o: Record<string, unknown> = {}) => {
 	const r = { id: 'i1', name: '포도 젤리', option: '', qty: 1, unit_price: 32000, amount: 32000, status: 'PAID', refunded_qty: 0, refund_amount: 0, ship_status: 'DELIVERED', courier: null, tracking_no: null, product: { code: 'p', tile: null, icon: 'grape', thumb_url: null }, claim: null, ...o };
 	const left = Math.max(0, Number(r.qty) - Number(r.refunded_qty));
-	return { left_qty: left, live: r.status !== 'CANCELED' && left > 0, ...r };
+	return { left_qty: left, live: r.status !== 'CANCELED' && left > 0, has_refund: Number(r.refunded_qty) > 0, ...r };
 };
 const order = (items: unknown[], o: Record<string, unknown> = {}) => sellerOrderFromJson({ id: 'o1', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T00:00:00Z', buyer: '김*은', items, ...o })!;
 
@@ -23,12 +23,10 @@ describe('파서', () => {
 });
 
 describe('줄 환불 판정 — lineHasRefund 하나(탭 · 칩 · 카드 줄 상태가 같이 쓴다)', () => {
-	it('환불 수량이 있거나 취소된 줄만', () => {
-		expect([
-			lineHasRefund({ refundedQty: 1, status: 'PARTIAL_REFUNDED' }),
-			lineHasRefund({ refundedQty: 0, status: 'CANCELED' }),
-			lineHasRefund({ refundedQty: 0, status: 'PAID' })
-		]).toEqual([true, true, false]);
+	it('서버 값 has_refund 그대로(0100 myr_line_has_refund) — 화면이 수량 · 상태로 다시 판정하지 않는다', () => {
+		expect([lineHasRefund({ hasRefund: true }), lineHasRefund({ hasRefund: false })]).toEqual([true, false]);
+		const o = order([{ id: 'x', qty: 2, refunded_qty: 1, left_qty: 1, live: true, has_refund: true }, { id: 'y', qty: 1, refunded_qty: 0, left_qty: 1, live: true }]);
+		expect(o.items.map((i) => i.hasRefund)).toEqual([true, false]); // 응답에 없으면 false(짐작하지 않는다)
 	});
 });
 
