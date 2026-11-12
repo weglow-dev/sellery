@@ -25,7 +25,7 @@
 		title: `${monthShort(pv.month)} 정산`,
 		short: monthShort(pv.month),
 		payShort: `${shortDate(nextAt)} 지급 예정`,
-		status: monthStatus({ upcoming: true, held: pv.total.held, settleStatus: st.settleStatus }),
+		status: monthStatus({ upcoming: true, nextHold: st.nextHold }),
 		held: pv.total.held,
 		sales: pv.total.netSales,
 		settle: pv.total.settle,
@@ -40,8 +40,8 @@
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
 			payShort: `${shortDate(m.payAt)} 지급`,
-			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
-			held: 0,
+			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel }),
+			held: m.total.held,
 			sales: m.total.netSales,
 			settle: m.total.settle,
 			offset: m.total.offset,
@@ -86,7 +86,7 @@
 
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 lg:overflow-visible lg:p-0">
 		{#if view === 'pay'}
-			{#if st.settleStatus !== 'verified'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
+			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
 
 			<!-- 다음 정산 -->
 			<a href={next.href} class="relative block overflow-hidden rounded-3xl bg-panel p-5 text-fg lg:mt-5 lg:flex lg:items-center lg:gap-10 lg:px-7 lg:py-[26px]">

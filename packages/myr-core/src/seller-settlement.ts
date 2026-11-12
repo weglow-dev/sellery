@@ -38,8 +38,20 @@ export type SettleRow = {
 /** netSales = 판매 − 정산 뒤 환불(서버 myr_settlement_net_sales) · payout = 지급 건 금액(서버 myr_payout_amount · 다음 정산은 예상 합) */
 export type SettleTotal = { sales: number; refundAdj: number; netSales: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
 export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
-/** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) */
-export type SettleMonth = { month: string; settledAt: string | null; payAt: string | null; rows: SettleRow[]; total: SettleTotal };
+/** 지급 보류 이유(서버 0102 — code settle_info · manual · label = myr_payout_hold_label) */
+export type SettleHold = { code: string; label: string };
+/** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
+ *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 */
+export type SettleMonth = {
+	month: string;
+	settledAt: string | null;
+	payAt: string | null;
+	payoutStatus: string | null;
+	payoutLabel: string;
+	hold: SettleHold | null;
+	rows: SettleRow[];
+	total: SettleTotal;
+};
 /** 보증금 상태(서버 myr_mfg_deposits.state) — 환급 완료 · 입금 확인 전 · 맡김 */
 export type DepositState = 'refunded' | 'unpaid' | 'held';
 export type SettleLedger = {
@@ -62,7 +74,8 @@ export type SettleLedger = {
 };
 /** 제조금액 · 보증금 탭 머리 — 남은 제조금액 합 · 돌려받을 보증금 합(서버 0101) */
 export type SettleLedgerTotal = { remaining: number; depositHeld: number };
-export type SellerSettlements = { settleStatus: string; preview: SettlePreview; ledgers: SettleLedger[]; ledgerTotal: SettleLedgerTotal; months: SettleMonth[] };
+/** nextHold = 다음 정산 보류 이유(크리에이터 쪽 · 서버 myr_seller_hold_reason) — 없으면 null */
+export type SellerSettlements = { settleStatus: string; nextHold: SettleHold | null; preview: SettlePreview; ledgers: SettleLedger[]; ledgerTotal: SettleLedgerTotal; months: SettleMonth[] };
 export type SettleItem = {
 	orderCode: string;
 	buyer: string;
@@ -118,10 +131,16 @@ export function settlePreviewFromJson(v: unknown): SettlePreview {
 	return { month: s(o.month), settleAt: typeof o.settle_at === 'string' ? o.settle_at : null, rows: rows(o.rows), total: totalFrom(o.total), undelivered: { lines: n(u.lines), amount: n(u.amount) } };
 }
 
+function holdFrom(v: unknown): SettleHold | null {
+	const o = obj(v);
+	return o && typeof o.code === 'string' ? { code: o.code, label: s(o.label) } : null;
+}
+
 export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 	const o = obj(v) ?? {};
 	return {
 		settleStatus: s(o.settle_status, 'none'),
+		nextHold: holdFrom(o.next_hold),
 		preview: settlePreviewFromJson(o.preview),
 		ledgers: arr(o.ledgers)
 			.map(obj)
@@ -149,7 +168,16 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 		months: arr(o.months)
 			.map(obj)
 			.filter((x): x is Obj => !!x && typeof x.month === 'string')
-			.map((x) => ({ month: s(x.month), settledAt: typeof x.settled_at === 'string' ? x.settled_at : null, payAt: typeof x.pay_at === 'string' ? x.pay_at : null, rows: rows(x.rows), total: totalFrom(x.total) }))
+						.map((x) => ({
+				month: s(x.month),
+				settledAt: typeof x.settled_at === 'string' ? x.settled_at : null,
+				payAt: typeof x.pay_at === 'string' ? x.pay_at : null,
+				payoutStatus: typeof x.payout_status === 'string' ? x.payout_status : null,
+				payoutLabel: s(x.payout_label),
+				hold: holdFrom(x.hold),
+				rows: rows(x.rows),
+				total: totalFrom(x.total)
+			}))
 	};
 }
 
@@ -214,9 +242,6 @@ export function settleAtLabel(iso: string | null): string {
 	return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${'일월화수목금토'[d.getUTCDay()]}) ${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시`;
 }
 
-/** 지급 보류 안내 — 사업자 · 정산 정보 확인 전이면(0085 verified 아님) 계산 · 확정은 되고 지급만 보류 */
-export const payoutHold = (settleStatus: string): string | null => (settleStatus === 'verified' ? null : '사업자 · 정산 정보 확인 전이라 지급은 보류돼요');
-
 /** 제조금액 갚은 비율(0~100 · 막대 너비) — 갚은 금액은 서버 offset(확정된 상계 합) · 원장이 없거나 0원이면 100 */
 export const repaidPct = (l: Pick<SettleLedger, 'total' | 'offset'>): number => (l.total <= 0 ? 100 : Math.round((l.offset / l.total) * 100));
 
@@ -243,16 +268,15 @@ export const monthShort = (month: string): string => {
 };
 
 export type SettleTone = 'plan' | 'hold' | 'warn' | 'done';
-/** 월 카드 · 상세 상태 — 다음 정산: 지급 예정 / 지급 보류(사업자 정보 확인 전) · 지난 정산: 지급 완료(2026-11-10 대표 — 시안대로 미리 · 실제 입금 기록은 작업 순서 7) / 일부 보류(제조금액 확인 중) */
-export function monthStatus(o: { upcoming: boolean; held: number; settleStatus: string }): { label: string; tone: SettleTone } {
-	if (o.upcoming) return o.settleStatus === 'verified' ? { label: '지급 예정', tone: 'plan' } : { label: '지급 보류', tone: 'hold' };
-	if (o.held > 0) return { label: '일부 보류', tone: 'warn' };
-	return { label: '지급 완료', tone: 'done' };
+/** 월 카드 상태 칩 — 다음 정산은 보류 이유(서버 nextHold)가 있으면 지급 보류 · 지난 회차는 지급 건 상태(서버 payoutStatus · 문구 payoutLabel). 여기서는 색만 고른다 */
+const PAYOUT_TONE: Record<string, SettleTone> = { pending: 'plan', held: 'hold', paid: 'done', none: 'done' };
+export function monthStatus(o: { upcoming: true; nextHold: SettleHold | null } | { upcoming: false; payoutStatus: string | null; payoutLabel: string }): { label: string; tone: SettleTone } {
+	if (o.upcoming) return o.nextHold ? { label: '지급 보류', tone: 'hold' } : { label: '지급 예정', tone: 'plan' };
+	return { label: o.payoutLabel, tone: PAYOUT_TONE[o.payoutStatus ?? 'none'] ?? 'done' };
 }
 
-/** 정산 보류 배너(사업자 · 정산 정보) — 확인 완료면 null · 확인 중이면 버튼 없이 안내 */
-export function holdBanner(settleStatus: string, nextDate: string): { title: string; body: string; cta: string | null } | null {
-	if (settleStatus === 'verified') return null;
+/** 정산 보류 배너(사업자 · 정산 정보) — 보일지는 서버 보류 이유(nextHold.code === 'settle_info')가 정한다. 여기서는 입력 상태별 문구 · 버튼만 고른다 */
+export function holdBanner(settleStatus: string, nextDate: string): { title: string; body: string; cta: string | null } {
 	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나면 ${nextDate} 정산부터 지급돼요.`, cta: null };
 	if (settleStatus === 'rejected') return { title: '정산이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되면 바로 지급돼요.', cta: '정산 정보 다시 입력하기' };
 	return { title: '정산이 보류 중이에요', body: `사업자 · 정산 계좌 정보를 등록하면 ${nextDate} 정산부터 바로 지급돼요.`, cta: '정산 정보 등록하기' };

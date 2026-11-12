@@ -18,9 +18,10 @@ select function_privs_are('public', 'myr_mfg_change_shortfall', '{myr_mfg_batche
 
 -- ---------- 픽스처 ----------
 -- 셀러 1: A(제조금액 0원 명시 → 전부 지급) · B(제조 원장 없음 → 보류) / 셀러 2: C(제조금액 100만 · 1월 정산금이 전부 상계 → 0원)
-insert into public.sellers (id, name, handle, platform, active)
-values ('00000000-0000-4000-8000-0000000b7001', '셀러 1', '@pgtap.po1', 'instagram', true),
-       ('00000000-0000-4000-8000-0000000b7002', '셀러 2', '@pgtap.po2', 'instagram', true);
+-- 두 셀러 모두 사업자 · 정산 정보 확인 완료(0102 — 확인 전이면 지급 보류 · myr_payout_hold.test.sql)
+insert into public.sellers (id, name, handle, platform, active, myr_settle_status)
+values ('00000000-0000-4000-8000-0000000b7001', '셀러 1', '@pgtap.po1', 'instagram', true, 'verified'),
+       ('00000000-0000-4000-8000-0000000b7002', '셀러 2', '@pgtap.po2', 'instagram', true, 'verified');
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
 values ('00000000-0000-4000-8000-0000000b7a01', 'pgtap-po-a', '00000000-0000-4000-8000-0000000b7001', 'diet', 'A', 10000, 1000, 'listed', 'grape'),
        ('00000000-0000-4000-8000-0000000b7a02', 'pgtap-po-b', '00000000-0000-4000-8000-0000000b7001', 'diet', 'B', 10000, 1000, 'listed', 'lemon'),
@@ -69,8 +70,10 @@ select is((select jsonb_object_agg(p.code, public.myr_settlement_row_pay_run(r) 
           '{"pgtap-po-a": true, "pgtap-po-b": true, "pgtap-po-c": true}'::jsonb, '크론이 풀지 않은 줄(운영이 먼저 확정한 B 포함)의 지급된 회차 = 자기 회차');
 select is((select jsonb_agg(public.myr_payout_has_amount(p) order by s.handle) from public.myr_payouts p join public.sellers s on s.id = p.seller_id join public.myr_settlement_runs u on u.id = p.run_id where u.month = '2031-01-01' and s.handle like '@pgtap.po%'),
           '[true, false]'::jsonb, '0원 초과 — 셀러 1 true · 셀러 2(전부 상계) false');
-select is((select jsonb_object_agg(st, public.myr_payout_status_auto(row(null, null, null, st, null, null, null, null, null, now(), now())::public.myr_payouts)) from unnest(array['pending','none','held','paid']) st),
-          '{"pending": true, "none": true, "held": false, "paid": false}'::jsonb, '자동으로 다시 정해도 되는 상태 = 지급 대기 · 지급 없음');
+select is((select jsonb_object_agg(st || '/' || coalesce(why, '-'), public.myr_payout_status_auto(jsonb_populate_record(null::public.myr_payouts, jsonb_build_object('status', st, 'hold_reason', why))))
+             from (values ('pending', null), ('none', null), ('held', 'settle_info'), ('held', 'manual'), ('paid', null)) v(st, why)),
+          '{"pending/-": true, "none/-": true, "held/settle_info": true, "held/manual": false, "paid/-": false}'::jsonb,
+          '자동으로 다시 정해도 되는 지급 건 = 지급 완료 · 운영 보류가 아닌 것(0102 — 사업자 정보 보류도 자동)');
 -- 정산 탭 카드 줄(myr_settlement_card_rows) — [상품, 지난 달 줄, 이 회차 지급 건에 담김, 다른 회차 지급 건에서 나감]
 create function pg_temp.card(p_month date) returns jsonb language sql as $$
   select jsonb_agg(jsonb_build_array(p.code, c.origin, c.counted, (select to_char(l.month, 'YYYY-MM') from public.myr_settlement_runs l where l.id = c.paid_later_run)) order by p.code, c.origin)

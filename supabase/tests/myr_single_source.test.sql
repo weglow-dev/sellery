@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(141);
+select plan(147);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -267,7 +267,13 @@ insert into _rules (label, pat, allowed) values
   ('지급 건에 담을 줄',                        $p$payout_id\s+is\s+null$p$,                                         '{myr_settlement_row_payable}'),
   ('줄이 지급된 회차(지난 기록)',              $p$coalesce\(\s*(\w+\.)?released_run_id$p$,                          '{myr_settlement_row_pay_run}'),
   ('지급 건 0원 초과',                         $p$myr_payout_amount\([^)]*\)\s*(>|<|>=|<=|=|<>)$p$,                  '{myr_payout_has_amount}'),
-  ('지급 건 자동 상태 묶음',                   $p$'pending'\s*,\s*'none'$p$,                                      '{myr_payout_status_auto}'),
+  ('지급 건 자동 상태(대기 · 보류 · 없음)',    $p$then\s+'held'\s+else\s+'pending'|'pending'\s*,\s*'none'$p$,      '{myr_payout_auto_state}'),
+  ('지급 완료 지급 건',                        $p$status\s*(=|<>)\s*'paid'$p$,                                    '{myr_payout_is_paid}'),
+  ('운영 보류 지급 건',                        $p$and\s+(\w+\.)?hold_reason\s*=\s*'manual'$p$,                     '{myr_payout_manual_held}'),
+  ('사업자 · 정산 정보 확인 완료',             $p$(settle_status|p_status)\s*(<>|=|is\s+distinct\s+from)\s*'verified'$p$, '{myr_seller_settle_verified}'),
+  ('크리에이터 쪽 보류 이유',                  $p$then\s+'settle_info'$p$,                                        '{myr_seller_hold_reason}'),
+  ('지급 가능(자동 상태가 지급 대기)',         $p$myr_payout_auto_state\([^)]*\)\s*a\)\s*=\s*'pending'$p$,         '{myr_payout_payable}'),
+  ('정산월 · 핸들로 지급 건 찾기',             $p$\.handle\s*=\s*p_handle$p$,                                      '{myr_payout_find}'),
   ('지급 건 금액(줄 지급액 합)',               $p$sum\(\s*(\w+\.)?payout\s*\)$p$,                                  '{myr_payout_amount}'),
   ('줄 지급액(정산금 − 상계 + 보증금 환급)',   $p$settle\s*-\s*[\w.]*offset$p$,                                   '{myr_settlement_row_payout}'),
   ('순매출(판매 − 정산 뒤 환불)',              $p$sales\w*(,\s*0\))?\s*-\s*(coalesce\()?[\w.]*refund_adj$p$,      '{myr_settlement_net_sales}'),
