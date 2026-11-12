@@ -1,6 +1,6 @@
 // 크리에이터 주문 열람(6번 · 0081) — packages/myr-core/src/seller-orders.ts
 import { describe, expect, it } from 'vitest';
-import { filterSellerOrders, liveLines, SELLER_ORDER_TABS, sellerOrderBoxes, sellerOrderFromJson, sellerOrderLabel, sellerOrdersFromJson, sellerOrderTab, sellerOrderTabCounts } from '../seller-orders';
+import { filterSellerOrders, lineHasRefund, liveLines, SELLER_ORDER_TABS, sellerOrderBoxes, sellerOrderFromJson, sellerOrderLabel, sellerOrdersFromJson, sellerOrderTab, sellerOrderTabCounts } from '../seller-orders';
 
 // left_qty · live(줄) · ship_status · amounts(주문)는 서버(0098 myr_line_left · myr_line_live · 0099 myr_order_ship_status · myr_line_net)가 주는 값 —
 // 테스트는 서버가 줄 법한 값으로 채운다(화면은 그 값을 읽기만 한다)
@@ -19,6 +19,16 @@ describe('파서', () => {
 		expect([order([line({ groupbuy: true })]).items[0].groupbuy, order([line()]).items[0].groupbuy]).toEqual([true, false]); // 공구 줄(0086)
 		expect(sellerOrderFromJson({ id: 'o', code: 'c', items: [] })).toBeNull(); // 내 줄이 없으면 버림
 		expect(sellerOrdersFromJson(null)).toEqual([]);
+	});
+});
+
+describe('줄 환불 판정 — lineHasRefund 하나(탭 · 칩 · 카드 줄 상태가 같이 쓴다)', () => {
+	it('환불 수량이 있거나 취소된 줄만', () => {
+		expect([
+			lineHasRefund({ refundedQty: 1, status: 'PARTIAL_REFUNDED' }),
+			lineHasRefund({ refundedQty: 0, status: 'CANCELED' }),
+			lineHasRefund({ refundedQty: 0, status: 'PAID' })
+		]).toEqual([true, true, false]);
 	});
 });
 

@@ -1,9 +1,11 @@
 -- pgTAP — 0100 교환·환불 요청 JSON 의 order.others(같은 주문 · 같은 크리에이터의 다른 줄): 요청 줄 제외 · 다른 크리에이터 줄 제외 · 줄 판정은 기존 함수 값
 begin;
-select plan(7);
+select plan(11);
 
 select function_privs_are('public', 'myr_refund_request_json', '{myr_refund_requests}'::text[], 'anon', '{}'::text[], 'anon 은 refund_request_json 불가(다시 만든 뒤에도)');
 select function_privs_are('public', 'myr_refund_request_json', '{myr_refund_requests}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 불가');
+select function_privs_are('public', 'myr_line_open_claim', '{myr_order_items}'::text[], 'anon', '{}'::text[], 'anon 은 line_open_claim 불가');
+select function_privs_are('public', 'myr_line_open_claim', '{myr_order_items}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 line_open_claim 불가');
 
 insert into public.sellers (id, name, handle, platform, active)
 values ('00000000-0000-4000-8000-00000000c011', '셀러 A', '@pgtap.oth.a', 'instagram', true),
@@ -37,6 +39,13 @@ select is((select v -> 'order' -> 'others' -> 1 -> 'claim' from j where code = '
           '{"code": "pgoth02", "status": "progress", "kind": "exchange"}'::jsonb, '다른 줄의 열린 요청도 싣는다');
 select is((select jsonb_agg(e ->> 'name') from j, jsonb_array_elements(v -> 'order' -> 'others') e where code = 'pgoth03'), null, '다른 셀러 요청 — 그 셀러 줄은 하나뿐이라 others 비어 있음(셀러 A 줄은 안 실린다)');
 select is((select v -> 'order' -> 'others' from j where code = 'pgoth03'), '[]'::jsonb, '빈 배열(null 아님)');
+
+-- 줄의 열린 요청 — myr_line_open_claim 하나(콘솔 주문 · 요청 JSON · 요청 접수 OPEN_EXISTS 가 같이 쓴다)
+select is((select jsonb_object_agg(i.product_name || coalesce(' ' || nullif(i.option_name, ''), ''), coalesce(public.myr_line_open_claim(i), 'null'::jsonb)) from public.myr_order_items i where i.order_id = '00000000-0000-4000-8000-00000000c031'),
+          '{"레몬 스틱": {"code": "pgoth01", "status": "pending", "kind": "refund"}, "포도 젤리": null, "포도 젤리 2개 세트": {"code": "pgoth02", "status": "progress", "kind": "exchange"}, "셀러 B 상품": {"code": "pgoth03", "status": "pending", "kind": "refund"}}'::jsonb,
+          '줄의 열린 요청 — 요청 없는 줄은 null');
+select is((select jsonb_agg(l -> 'claim' ->> 'code' order by l ->> 'name', l ->> 'option') from jsonb_array_elements(public.myr_app_seller_orders('00000000-0000-4000-8000-00000000c011', 50)) o, jsonb_array_elements(o -> 'items') l where o ->> 'code' = 'pgtap-oth-1'),
+          '["pgoth01", null, "pgoth02"]'::jsonb, '콘솔 주문 줄 claim = 같은 함수 값(이름 순 — 레몬 · 포도 · 포도 2개 세트)');
 
 select * from finish();
 rollback;

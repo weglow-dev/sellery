@@ -105,8 +105,10 @@ export function sellerClaimStatus(o: Pick<SellerOrder, 'items'>): OpenClaimStatu
 	const st = o.items.map((i) => i.claim?.status).filter(Boolean);
 	return st.includes('pending') ? 'pending' : st.includes('progress') ? 'progress' : null;
 }
-/** 환불이 하나라도 있었나 — 내 줄 중 환불 수량이 있거나 취소된 줄(부분 환불 포함) */
-export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some((i) => i.refundedQty > 0 || i.status === 'CANCELED');
+/** 이 줄에 환불이 있었나 — 환불 수량이 있거나 취소된 줄(부분 환불 포함). 줄 판정은 여기 하나(주문 탭 · 상태 칩 · 카드 줄 상태가 같이 쓴다) */
+export const lineHasRefund = (i: Pick<SellerOrderLine, 'refundedQty' | 'status'>): boolean => i.refundedQty > 0 || i.status === 'CANCELED';
+/** 환불이 하나라도 있었나 — 내 줄 중 lineHasRefund 인 줄이 있으면 */
+export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some(lineHasRefund);
 
 /** 상태 칩 — 탭과 같은 우선순위: 요청 → 환불(남은 줄이 없으면 환불 완료 · 있으면 부분 환불) → 배송 상태.
  *  "환불 완료" 탭의 주문이 배송 상태 칩(배송 완료 등)으로 보이지 않게 — 남은 줄의 배송은 카드 아래 배송 줄이 보여 준다 */

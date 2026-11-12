@@ -2,7 +2,7 @@
  *  순수 — $app · $env 를 import 하지 않는다(src/test/orders.test.ts). */
 import { KIND_LABEL, type ClaimKind } from '@sellery/myr-core/claim-rules';
 import { SHIP_LABELS, shortDate } from '@sellery/myr-core/order-view';
-import { hasSellerRefund, liveLines, sellerClaimStatus, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
+import { hasSellerRefund, lineHasRefund, liveLines, sellerClaimStatus, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 export const ORDER_EMPTY: Record<string, string> = {
@@ -39,8 +39,8 @@ export function orderChip(o: Pick<SellerOrder, 'items' | 'shipStatus'>): { text:
 /** 상품 줄 둘째 줄의 상태 — 진행 중인 요청 → 환불 수량 → 취소 → 그 줄 배송 상태. alert = 빨강(요청 · 환불) */
 export function orderLineState(it: Pick<SellerOrderLine, 'claim' | 'refundedQty' | 'status' | 'shipStatus'>): { text: string; alert: boolean } {
 	if (it.claim) return { text: `${KIND_LABEL[it.claim.kind as ClaimKind] ?? '교환 · 환불'} ${it.claim.status === 'pending' ? '요청' : '진행 중'}`, alert: true };
-	if (it.refundedQty > 0) return { text: `${it.refundedQty}개 환불`, alert: true };
-	if (it.status === 'CANCELED') return { text: '취소', alert: true };
+	// 환불 · 취소 판정은 lineHasRefund 하나(주문 탭 · 상태 칩과 같다) — 여기서는 어느 글자인지만 고른다(환불 수량이 있으면 "N개 환불" · 아니면 취소)
+	if (lineHasRefund(it)) return { text: it.refundedQty ? `${it.refundedQty}개 환불` : '취소', alert: true };
 	return { text: SHIP_LABELS[it.shipStatus].text, alert: false };
 }
 
