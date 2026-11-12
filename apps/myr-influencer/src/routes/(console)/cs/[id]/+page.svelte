@@ -36,7 +36,7 @@
 	const canReject = $derived(reply.trim().length > 0 && reply.trim().length <= CLAIM_MESSAGE_MAX && !busy);
 	// 한 번 더 확인 — 승인 · 반려는 고객 메일이 바로 나가고 되돌릴 수 없다(공구 종료와 같은 방식). 처리 방법 · 메시지를 바꾸면 확인을 다시 받는다
 	let confirming = $state<'approve' | 'reject' | null>(null);
-	const confirmView = $derived(confirming ? decideConfirm(c, confirming, resolution, data.quotes) : null);
+	const confirmView = $derived(confirming ? decideConfirm(c, confirming, resolution) : null);
 	const pickResolution = (r: Resolution) => ((resolution = r), (confirming = null));
 	const setReply = (v: string) => ((reply = v), (confirming = null));
 
@@ -139,7 +139,7 @@
 {#snippet actions(cls: string)}
 	<div class="flex w-full flex-col gap-2.5">
 		{#if confirmView}
-			<p role="alert" class="text-[13px] leading-[1.55] break-words whitespace-pre-line {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
+			<p role="alert" class="text-[13px] leading-[1.55] break-words {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
 		{/if}
 		<div class="flex gap-2.5">
 			{#if confirmView}
