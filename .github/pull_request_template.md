@@ -19,15 +19,25 @@
 ### 백엔드를 건드렸다면 (`packages/db` · `packages/payments` · `*/lib/server` · `*/routes/api` · `supabase/migrations` — CLAUDE.md "백엔드 변경 원칙")
 
 - [ ] 돈·판정 로직(정산 · 순매출 · 수수료 · 등급 · 환불)을 바꿨다면 **그 판정을 쓰는 곳 전부**를 아래 표에 적었음 (화면 · 기준 · 호출 코드)
-- [ ] 같은 판정·계산을 새로 쓰지 않고 기존 함수/RPC 를 호출했음 — SQL 로 재현한 계산 없음
+- [ ] 같은 판정·계산을 새로 쓰지 않고 기존 함수/RPC 를 호출했음 — SQL · TS · Svelte 어디에도 재현한 계산 없음
+- [ ] 이번에 새로 쓴 비교식 · 산술식 · 상태 묶음 · 한도 숫자를 SQL · TS · Svelte 전부 아래 "새로 쓴 식" 표에 적었음 (함수 밖에 남은 식은 이유 — 입력 형식 규칙 등)
+- [ ] 화면에 보이는 금액 · 수량 · 버튼 표시 조건은 서버 응답 필드에서 읽음 — 어느 응답의 어느 필드인지 "새로 쓴 식" 표에 적었음
+- [ ] 새 판정 함수를 만들었다면 검사 표 두 곳에 식과 주인 함수를 같이 넣었음 — pgTAP `supabase/tests/myr_single_source.test.sql` 맨 아래 표 · `scripts/check-boundaries.mjs` `MYR_MIRROR_RULES`
 - [ ] 계산 결과가 바뀌면 안 되는 변경이면 "계산 결과 불변" 과 근거(테스트 · 전후 비교)를 적었음
 - [ ] 전체 순회·배치 경로(CSV · 크론 · 정산 실행)를 바꿨다면 운영 규모 시드로 전후 시간·메모리를 적었음
 - [ ] 권한(actor)은 서버 세션에서만 정했고, 새 `security definer` RPC 는 본문에서 권한을 검사하며 anon·authenticated EXECUTE 를 회수했음
 - [ ] **테스트를 같이 썼고 돌렸음** — 순수 규칙·매핑은 vitest(`npm test`), 마이그레이션의 RPC·권한·상태 전이는 pgTAP(`npm run test:db`). 결과(통과 수)를 아래에 적음 (docs/testing.md)
+- [ ] `node scripts/check-boundaries.mjs` 를 돌렸고 결과(오류 · 경고 수)를 아래에 적음
 
 | 사용처(화면·Job) | 판정 기준 | 호출 코드 |
 |---|---|---|
 | | | |
+
+새로 쓴 식 — "기존 함수를 썼다"는 체크 대신 근거로 적는다. 새 식이 없으면 "없음" 과 확인한 방법(`git diff main...HEAD` 검색 등).
+
+| 파일:줄 | 식 (SQL · TS · Svelte) | 호출하는 함수 · 읽는 응답 필드 | 함수 밖에 둔 이유 |
+|---|---|---|---|
+| | | | |
 
 ## 화면
 
