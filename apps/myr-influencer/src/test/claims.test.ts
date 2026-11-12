@@ -54,10 +54,10 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
 		expect(approveLabel(c, 'reship')).toBe('처리 방법을 선택하세요');
 	});
-	it('승인 · 반려 전 한 번 더 확인 — 되돌릴 수 없다는 안내 한 줄', () => {
+	it('승인 · 반려 전 한 번 더 확인 — 버튼만 [정말 반려하기] · [정말 승인하기]', () => {
 		const c = claim();
-		expect(decideConfirm(c, 'reject', null)).toEqual({ text: '반려하면 고객에게 반려 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 반려하기' });
-		expect(decideConfirm(c, 'approve', 'partial')).toEqual({ text: '승인하면 고객에게 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 승인하기' });
+		expect(decideConfirm(c, 'reject', null)).toEqual({ button: '정말 반려하기' });
+		expect(decideConfirm(c, 'approve', 'partial')).toEqual({ button: '정말 승인하기' });
 		// 처리 방법을 안 골랐거나 선택지 밖이면 확인 단계로 가지 않는다
 		expect([decideConfirm(c, 'approve', null), decideConfirm(c, 'approve', 'reship')]).toEqual([null, null]);
 	});

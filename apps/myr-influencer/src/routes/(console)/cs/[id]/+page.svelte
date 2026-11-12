@@ -114,7 +114,7 @@
 			<button type="button" onclick={() => setReply(rc.text)} class="rounded-full border border-white/12 px-3 py-2 text-[12px] font-semibold text-white/80 transition-colors lg:hover:border-accent lg:hover:text-accent">{rc.name}</button>
 		{/each}
 	</div>
-	<textarea class="{TEXTAREA} block" rows="4" value={reply} oninput={(e) => setReply(e.currentTarget.value)} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
+	<textarea class={TEXTAREA} rows="4" value={reply} oninput={(e) => setReply(e.currentTarget.value)} maxlength={CLAIM_MESSAGE_MAX} aria-label="고객에게 보낼 메시지" placeholder="고객에게 전달될 안내 문구 (승인은 선택 · 반려는 필수 — 메일에 들어가요)"></textarea>
 	{#if error}<p role="alert" class="mt-2 text-[13px] text-accent">{error}</p>{/if}
 {/snippet}
 
@@ -137,20 +137,14 @@
 {/snippet}
 
 {#snippet actions(cls: string)}
-	<!-- 확인 문구는 메시지 칸과 버튼 사이 위아래 가운데 — 문구 py-2(메시지 칩과 같은 값) · 위 16px(mt-4) + 8 = 아래 8 + gap 16 -->
-	<div class="flex w-full flex-col gap-4">
+	<div class="flex w-full gap-2.5">
 		{#if confirmView}
-			<p role="alert" class="py-2 text-[13px] leading-[1.55] break-words {confirming === 'reject' ? 'text-[#ff8a8a]' : 'text-white/80'}">{confirmView.text}</p>
+			<button type="button" onclick={() => (confirming = null)} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">취소</button>
+			<button type="button" onclick={() => confirming && send(confirming)} disabled={busy} class="flex-1 rounded-2xl bg-accent font-extrabold text-bg transition-colors disabled:opacity-60 {cls}">{busy ? '처리 중…' : confirmView.button}</button>
+		{:else}
+			<button type="button" onclick={() => send('reject')} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">반려</button>
+			<button type="button" onclick={() => send('approve')} disabled={!ok} class="flex-1 rounded-2xl font-extrabold transition-colors duration-250 {ok ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'} {cls}">{busy ? '처리 중…' : approveLabel(c, resolution)}</button>
 		{/if}
-		<div class="flex gap-2.5">
-			{#if confirmView}
-				<button type="button" onclick={() => (confirming = null)} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">취소</button>
-				<button type="button" onclick={() => confirming && send(confirming)} disabled={busy} class="flex-1 rounded-2xl font-extrabold transition-colors disabled:opacity-60 {confirming === 'reject' ? 'bg-[#ff6b6b] text-white' : 'bg-accent text-bg'} {cls}">{busy ? '처리 중…' : confirmView.button}</button>
-			{:else}
-				<button type="button" onclick={() => send('reject')} disabled={busy} class="w-24 shrink-0 rounded-2xl border-[1.5px] border-white/14 text-[14px] font-bold text-fg transition-colors lg:hover:border-white/35 {cls}">반려</button>
-				<button type="button" onclick={() => send('approve')} disabled={!ok} class="flex-1 rounded-2xl font-extrabold transition-colors duration-250 {ok ? 'bg-accent text-bg' : 'bg-white/8 text-white/40'} {cls}">{busy ? '처리 중…' : approveLabel(c, resolution)}</button>
-			{/if}
-		</div>
 	</div>
 {/snippet}
 

@@ -57,12 +57,12 @@ export function approveLabel(c: Claim, resolution: Resolution | null): string {
 }
 
 /** 승인 · 반려 전 한 번 더 확인(공구 종료 · 판매 종료와 같은 방식) — 둘 다 고객 메일이 바로 나가고 되돌릴 수 없다(서버는 처리 대기 요청만 받는다 · NOT_PENDING).
- *  승인은 처리 방법을 골랐을 때만(선택지 밖이면 null) · 문구는 되돌릴 수 없다는 안내 한 줄(처리 방법 · 금액은 바로 위 선택지에 있다) */
-export type DecideConfirm = { text: string; button: string };
+ *  확인 버튼 줄은 [취소] [정말 반려하기 · 정말 승인하기] 만(안내 문구 없음) · 승인은 처리 방법을 골랐을 때만(선택지 밖이면 null) */
+export type DecideConfirm = { button: string };
 export function decideConfirm(c: Pick<Claim, 'options'>, decision: 'approve' | 'reject', resolution: Resolution | null): DecideConfirm | null {
-	if (decision === 'reject') return { text: '반려하면 고객에게 반려 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 반려하기' };
+	if (decision === 'reject') return { button: '정말 반려하기' };
 	if (!resolution || !c.options.includes(resolution)) return null;
-	return { text: '승인하면 고객에게 메일이 바로 가고, 되돌릴 수 없어요', button: '정말 승인하기' };
+	return { button: '정말 승인하기' };
 }
 
 /** 고객에게 보낼 메시지 칩 — 고른 처리 방법에 맞는 문구 + 반려 안내. 크리에이터 이름을 넣지 않는다(메일에 크리에이터 이름이 붙는다) */
