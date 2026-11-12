@@ -2,7 +2,7 @@
 --   보류 줄은 풀린 회차 지급 건에 · 운영이 먼저 확정한 보류 줄은 다음 회차 지급 건에 · 다시 돌려도 지급 건이 늘지 않는다
 -- 2031년 회차를 쓴다(로컬 DB 의 실제 회차 · 다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(24);
+select plan(29);
 
 -- ---------- 권한 ----------
 select table_privs_are('public', 'myr_payouts', 'anon', '{}'::text[], 'anon 은 지급 건 표 직접 권한 없음');
@@ -11,6 +11,8 @@ select ok((select relrowsecurity from pg_class where oid = 'public.myr_payouts':
 select function_privs_are('public', 'myr_payout_collect', '{uuid,boolean}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 payout_collect 불가');
 select function_privs_are('public', 'myr_settlement_row_payable', '{myr_settlement_rows}'::text[], 'anon', '{}'::text[], 'anon 은 row_payable 불가');
 select function_privs_are('public', 'myr_payout_amount', '{myr_payouts}'::text[], 'anon', '{}'::text[], 'anon 은 payout_amount 불가');
+select function_privs_are('public', 'myr_settlement_card_rows', '{uuid,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 card_rows 불가');
+select function_privs_are('public', 'myr_mfg_deposits', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 mfg_deposits 불가');
 
 -- ---------- 픽스처 ----------
 -- 셀러 1: A(제조금액 0원 명시 → 전부 지급) · B(제조 원장 없음 → 보류) / 셀러 2: C(제조금액 100만 · 1월 정산금이 전부 상계 → 0원)
@@ -67,6 +69,20 @@ select is((select jsonb_agg(public.myr_payout_has_amount(p) order by s.handle) f
           '[true, false]'::jsonb, '0원 초과 — 셀러 1 true · 셀러 2(전부 상계) false');
 select is((select jsonb_object_agg(st, public.myr_payout_status_auto(row(null, null, null, st, null, null, null, null, null, now(), now())::public.myr_payouts)) from unnest(array['pending','none','held','paid']) st),
           '{"pending": true, "none": true, "held": false, "paid": false}'::jsonb, '자동으로 다시 정해도 되는 상태 = 지급 대기 · 지급 없음');
+-- 정산 탭 카드 줄(myr_settlement_card_rows) — [상품, 지난 달 줄, 이 회차 지급 건에 담김, 다른 회차 지급 건에서 나감]
+create function pg_temp.card(p_month date) returns jsonb language sql as $$
+  select jsonb_agg(jsonb_build_array(p.code, c.origin, c.counted, (select to_char(l.month, 'YYYY-MM') from public.myr_settlement_runs l where l.id = c.paid_later_run)) order by p.code, c.origin)
+    from public.myr_settlement_runs u cross join lateral public.myr_settlement_card_rows('00000000-0000-4000-8000-0000000b7001', u.id) c
+    join public.myr_settlement_rows r on r.id = c.row_id join public.myr_products p on p.id = r.product_id
+   where u.month = p_month
+$$;
+select is(pg_temp.card('2031-01-01'), '[["pgtap-po-a", false, true, null], ["pgtap-po-b", false, false, "2031-02"]]'::jsonb,
+          '1월 카드 — A 는 1월 지급 건 · B 는 1월 줄이지만 2월 지급 건에서 나감(합계 제외)');
+select is(pg_temp.card('2031-02-01'), '[["pgtap-po-a", false, true, null], ["pgtap-po-b", true, true, null]]'::jsonb,
+          '2월 카드 — 2월 A + 2월 지급 건에 담긴 1월 B(지난 달 줄 · 합계 포함)');
+select is((select jsonb_object_agg(to_char(u.month, 'MM'), public.myr_settlement_row_lines(r)) from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id where r.product_id = '00000000-0000-4000-8000-0000000b7a01'),
+          '{"01": 1, "02": 1}'::jsonb, '정산 줄 판매 줄 수 — A 1월 · 2월 각 1줄');
+
 -- 보고 — 지급 건 · 합계(스크립트가 줄을 더하지 않는다)
 select is((select jsonb_agg(jsonb_build_array(e #>> '{seller,handle}', e ->> 'status', (e ->> 'amount')::int, (e ->> 'rows')::int) order by e #>> '{seller,handle}') from jsonb_array_elements(public.myr_settlement_report('2031-02-01') -> 'payouts') e where e #>> '{seller,handle}' like '@pgtap.po%'),
           '[["@pgtap.po1", "pending", 18000, 2]]'::jsonb, '2월 보고 지급 건 = 지급 건 표 값');

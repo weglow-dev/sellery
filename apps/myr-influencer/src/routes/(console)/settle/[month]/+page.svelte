@@ -111,13 +111,14 @@
 								<span class="block text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
 								{#if r.origin}<span class="mt-2 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">{monthShort(r.origin)}분 · 보류 해제</span>{/if}
 								{#if r.releasedIn}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.done}">{monthShort(r.releasedIn)} 정산에서 지급</span>{/if}
+								{#if r.nextPayout}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">다음 정산에서 지급</span>{/if}
 							</span>
 							<span class="text-right whitespace-nowrap">
 								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
 								{#if r.status === 'held'}
 									<span class="mt-0.5 block text-[15px] font-extrabold text-white/35 lg:text-[18px]">—</span>
 								{:else}
-									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px] {r.releasedIn ? 'text-white/40' : ''}">{won(r.payout ?? 0)}</span>
+									<span class="mt-0.5 block text-[15px] font-extrabold tabular-nums lg:text-[18px] {r.releasedIn || r.nextPayout ? 'text-white/40' : ''}">{won(r.payout ?? 0)}</span>
 								{/if}
 							</span>
 						</div>

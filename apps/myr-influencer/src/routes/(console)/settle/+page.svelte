@@ -26,7 +26,7 @@
 		payShort: `${shortDate(nextAt)} 지급 예정`,
 		status: monthStatus({ upcoming: true, held: pv.total.held, settleStatus: st.settleStatus }),
 		held: pv.total.held,
-		sales: pv.total.sales - pv.total.refundAdj,
+		sales: pv.total.netSales,
 		settle: pv.total.settle,
 		offset: pv.total.offset,
 		refund: pv.total.depositRefund,
@@ -41,19 +41,16 @@
 			payShort: `${shortDate(settleAtOfMonth(m.month))} 지급`,
 			status: monthStatus({ upcoming: false, held: m.total.held, settleStatus: st.settleStatus }),
 			held: 0,
-			sales: m.total.sales - m.total.refundAdj,
+			sales: m.total.netSales,
 			settle: m.total.settle,
 			offset: m.total.offset,
 			refund: m.total.depositRefund,
 			net: m.total.payout
 		}))
 	]);
-	const remainSum = $derived(st.ledgers.reduce((n, l) => n + l.remaining, 0));
-	const depositSum = $derived(st.ledgers.reduce((n, l) => n + l.depositPaid - l.depositRefunded, 0));
-	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(remainSum)}`, `돌려받을 보증금 ${won(depositSum)}`] : ['매월 1일 오후 1시 지급']);
-	// 다음 정산 상환 예정 = 그 상품의 예상 줄(보류 해제분 포함) 상계 합
-	const nextOffset = (id: string) => pv.rows.filter((r) => r.product.id === id).reduce((n, r) => n + (r.offset ?? 0), 0) || null;
-	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, nextOffset(l.product.id), pv.month, won) })));
+	// 남은 제조금액 합 · 돌려받을 보증금 합 · 다음 정산 상환 예정은 서버 값(0101) — 화면이 더하지 않는다
+	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 오후 1시 지급']);
+	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.month, won) })));
 
 	const CHIP: Record<SettleTone, string> = {
 		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',

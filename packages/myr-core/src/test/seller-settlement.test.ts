@@ -24,6 +24,13 @@ describe('파서', () => {
 			months: [{ month: '2026-10', settled_at: '2026-11-01T04:00:00Z', rows: [{ product, status: 'confirmed', sales: 64000, settle: 38400, offset: 30000, deposit_refund: 7500, payout: 15900 }], total: { payout: 15900 } }, { bad: 1 }]
 		});
 		expect([t.settleStatus, t.ledgers[0].batches[0].depositRefunded, t.months.length, t.months[0].rows[0].payout]).toEqual(['verified', true, 1, 15900]);
+		expect([t.ledgers[0].depositHeld, t.ledgers[0].nextOffset, t.ledgerTotal, t.months[0].rows[0].nextPayout, t.months[0].total.netSales]).toEqual([0, 0, { remaining: 0, depositHeld: 0 }, false, 0]);
+		const u = sellerSettlementsFromJson({
+			ledgers: [{ product, has_ledger: true, total: 150000, remaining: 150000, deposit_held: 37500, deposit_total: 37500, next_offset: 108000 }],
+			ledger_total: { remaining: 150000, deposit_held: 37500 },
+			months: [{ month: '2026-11', rows: [{ product, status: 'confirmed', payout: 24000, next_payout: true }], total: { sales: 96000, refund_adj: 32000, net_sales: 64000, payout: 0 } }]
+		});
+		expect([u.ledgers[0].depositHeld, u.ledgers[0].depositTotal, u.ledgers[0].nextOffset, u.ledgerTotal, u.months[0].rows[0].nextPayout, u.months[0].total.netSales]).toEqual([37500, 37500, 108000, { remaining: 150000, depositHeld: 37500 }, true, 64000]);
 		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
 	});
 	it('줄 내역', () => {
@@ -46,9 +53,10 @@ describe('라벨', () => {
 		expect(settleRowText({ sales: 0, refundAdj: 25600, carryIn: -1000, settle: 0, offset: null, depositRefund: null }, won)).toBe('판매 ₩0 · 정산 뒤 환불 −₩25,600 · 지난 이월 −₩1,000 · 정산금 ₩0');
 		expect(payoutHold('verified')).toBeNull();
 		expect(payoutHold('pending')).toContain('보류');
-		expect([repaidPct({ total: 200000, remaining: 150000 }), repaidPct({ total: 0, remaining: 0 })]).toEqual([25, 100]);
-		expect(depositLabel({ depositPaid: 37500, depositUnpaid: 0, depositRefunded: 0, remaining: 150000 }, won)).toBe('₩37,500 제조금액을 다 갚으면 환급');
-		expect(depositLabel({ depositPaid: 7500, depositUnpaid: 5000, depositRefunded: 7500, remaining: 0 }, won)).toBe('₩7,500 환급 완료 · ₩5,000 입금 확인 전');
+		// 갚은 금액 · 맡긴 보증금은 서버 값(offset · deposit_held — 0101) — 여기서는 비율 · 문구만
+		expect([repaidPct({ total: 200000, offset: 50000 }), repaidPct({ total: 0, offset: 0 })]).toEqual([25, 100]);
+		expect(depositLabel({ depositHeld: 37500, depositUnpaid: 0, depositRefunded: 0 }, won)).toBe('₩37,500 제조금액을 다 갚으면 환급');
+		expect(depositLabel({ depositHeld: 0, depositUnpaid: 5000, depositRefunded: 7500 }, won)).toBe('₩7,500 환급 완료 · ₩5,000 입금 확인 전');
 	});
 });
 
@@ -80,11 +88,14 @@ describe('시안 라벨', () => {
 	});
 	it('원장 카드', async () => {
 		const { ledgerCard } = await import('../seller-settlement');
-		const base = { product: { id: 'p', code: 'c', name: 'n', tile: null, icon: 'pill', thumbUrl: null }, hasLedger: true, batches: [], offset: 0, depositUnpaid: 0, depositRefunded: 0 };
-		const lemon = ledgerCard({ ...base, total: 150000, remaining: 150000, depositPaid: 37500 }, 108000, '2026-11', won);
+		// 다음 정산 상환 예정(next_offset) · 맡긴 보증금(deposit_held) · 보증금 합(deposit_total)은 서버 값(0101)
+		const base = { product: { id: 'p', code: 'c', name: 'n', tile: null, icon: 'pill', thumbUrl: null }, hasLedger: true, batches: [], offset: 0, depositPaid: 0, depositUnpaid: 0, depositRefunded: 0, depositHeld: 0, depositTotal: 0, nextOffset: 0 };
+		const lemon = ledgerCard({ ...base, total: 150000, remaining: 150000, depositPaid: 37500, depositHeld: 37500, depositTotal: 37500, nextOffset: 108000 }, '2026-11', won);
 		expect([lemon.chip, lemon.paidPct, lemon.planPct, lemon.planText, lemon.depositText]).toEqual(['상환 중', 0, 72, '11월 정산에서 ₩108,000 상환 예정', '보증금 ₩37,500']);
-		const grape = ledgerCard({ ...base, total: 30000, remaining: 0, offset: 30000, depositPaid: 7500, depositRefunded: 7500 }, 0, '2026-11', won);
+		const grape = ledgerCard({ ...base, total: 30000, remaining: 0, offset: 30000, depositPaid: 7500, depositRefunded: 7500, depositTotal: 7500 }, '2026-11', won);
 		expect([grape.chip, grape.paidPct, grape.planText, grape.depositText]).toEqual(['상환 완료', 100, '', '보증금 ₩7,500 · 환급 완료']);
-		expect(ledgerCard({ ...base, hasLedger: false, total: 0, remaining: 0, depositPaid: 0 }, null, '2026-11', won).chip).toBe('제조금액 확인 중');
+		const unpaid = ledgerCard({ ...base, total: 100000, remaining: 100000, depositPaid: 5000, depositUnpaid: 20000, depositHeld: 5000, depositTotal: 25000 }, '2026-11', won);
+		expect(unpaid.depositText).toBe('보증금 ₩25,000 · 입금 확인 전 ₩20,000');
+		expect(ledgerCard({ ...base, hasLedger: false, total: 0, remaining: 0 }, '2026-11', won).chip).toBe('제조금액 확인 중');
 	});
 });

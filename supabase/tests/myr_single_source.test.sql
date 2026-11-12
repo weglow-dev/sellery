@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(121);
+select plan(131);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -268,6 +268,16 @@ insert into _rules (label, pat, allowed) values
   ('줄이 지급된 회차(지난 기록)',              $p$coalesce\(\s*(\w+\.)?released_run_id$p$,                          '{myr_settlement_row_pay_run}'),
   ('지급 건 0원 초과',                         $p$myr_payout_amount\([^)]*\)\s*(>|<|>=|<=|=|<>)$p$,                  '{myr_payout_has_amount}'),
   ('지급 건 자동 상태 묶음',                   $p$'pending'\s*,\s*'none'$p$,                                      '{myr_payout_status_auto}'),
+  ('지급 건 금액(줄 지급액 합)',               $p$sum\(\s*(\w+\.)?payout\s*\)$p$,                                  '{myr_payout_amount}'),
+  ('줄 지급액(정산금 − 상계 + 보증금 환급)',   $p$settle\s*-\s*[\w.]*offset$p$,                                   '{myr_settlement_row_payout}'),
+  ('순매출(판매 − 정산 뒤 환불)',              $p$sales\w*(,\s*0\))?\s*-\s*(coalesce\()?[\w.]*refund_adj$p$,      '{myr_settlement_net_sales}'),
+  ('정산 줄 판매 줄 수',                       $p$count\(\*\)(::integer)?\s+from\s+public\.myr_settlement_items\s+\w+\s+where\s+\w+\.row_id\s*=\s*[\w.]+\s+and\s+\w+\.kind\s*=\s*'sale'$p$, '{myr_settlement_row_lines}'),
+  ('다음 회차가 풀 보류 줄',                   $p$status\s*=\s*'held'\s+and\s+public\.myr_mfg_has_ledger$p$,        '{myr_settlement_row_releasable}'),
+  ('정산 탭 카드 줄(지급 건 회차 비교)',       $p$run_id\s*<>$p$,                                                 '{myr_settlement_card_rows}'),
+  ('제조금액 합',                              $p$sum\(\s*(\w+\.)?amount\)\s+from\s+public\.myr_mfg_batches$p$,   '{myr_mfg_total}'),
+  ('상계 합',                                  $p$sum\(\s*(\w+\.)?offset_amount\)(,\s*0\)\s*into\s+\w+)?\s+from\s+public\.myr_settlement_rows$p$, '{myr_mfg_offset_total}'),
+  ('맡긴 보증금 차수(입금 · 환급 전)',         $p$deposit_refund_row_id\s+is\s+null$p$,                           '{myr_mfg_batch_deposit_held,myr_mfg_deposits}'),
+  ('보증금 합',                                $p$sum\(\s*(\w+\.)?deposit_amount\)$p$,                           '{myr_mfg_deposits}'),
   ('줄에 환불이 있었나',                      $p$refunded_qty\s*>\s*0$p$,                                        '{myr_line_has_refund}'),
   ('줄의 열린 요청 찾기',                      $p$order_item_id\s*=\s*[\w.]+\s+and\s+public\.myr_claim_status_open$p$,     '{myr_line_open_claim}'),
   ('열린 요청 상태 묶음',                     $p$'pending'\s*,\s*'progress'$p$,                                  '{myr_claim_status_open}'),

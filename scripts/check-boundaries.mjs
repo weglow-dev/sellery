@@ -176,6 +176,13 @@ const MYR_MIRROR_RULES = [
   },
   { re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/, why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다" },
   { re: /\bGB_PCT_(MIN|MAX)\b|\b10_?000_?000\b/, why: "공구 할인율 범위 · 판매가 상한 숫자를 화면에 둠 — 서버 값(pctRange · 거절 응답 max)을 쓴다" },
+  { re: /\bsales\s*-\s*[\w.]*refund_?[aA]dj\b/, why: "순매출(판매 − 정산 뒤 환불)을 다시 계산 — 서버 값 netSales(myr_settlement_net_sales)를 쓴다" },
+  { re: /\bsettle\s*-\s*[\w.]*offset\b/, why: "줄 지급액(정산금 − 상계 + 보증금 환급)을 다시 계산 — 서버 값 payout(myr_settlement_row_payout)을 쓴다" },
+  { re: /\bdepositPaid\s*-\s*[\w.]*depositRefunded\b/, why: "맡긴 보증금을 다시 계산 — 서버 값 depositHeld 를 쓴다" },
+  {
+    re: /\.reduce\([^\n]*\.(remaining|depositPaid|depositHeld|depositTotal|nextOffset|offset|payout|netSales)\b/,
+    why: "정산 합계를 화면에서 더함 — 서버 값(ledgerTotal · 달 total · 지급 건 금액 myr_payout_amount)을 쓴다",
+  },
 ];
 /** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
 function codeLines(file) {
