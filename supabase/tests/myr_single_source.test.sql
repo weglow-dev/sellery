@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(149);
+select plan(151);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -273,6 +273,8 @@ insert into _rules (label, pat, allowed) values
   ('사업자 · 정산 정보 확인 완료',             $p$(settle_status|p_status)\s*(<>|=|is\s+distinct\s+from)\s*'verified'$p$, '{myr_seller_settle_verified}'),
   ('크리에이터 쪽 보류 이유',                  $p$then\s+'settle_info'$p$,                                        '{myr_seller_hold_reason}'),
   ('지급 가능(자동 상태가 지급 대기)',         $p$myr_payout_auto_state\([^)]*\)\s*a\)\s*=\s*'pending'$p$,         '{myr_payout_payable}'),
+  ('정산월 → 회차 찾기',                       $p$month\s*=\s*(date_trunc\('month',\s*p_month\)|v_month)$p$,       '{myr_settlement_run_of}'),
+  ('제조금액 갚은 비율',                       $p$\*\s*100(\.0)?\s*/$p$,                                           '{myr_mfg_repaid_pct}'),
   ('한국 날짜',                                $p$\(\s*[\w.]+\s+at\s+time\s+zone\s+'Asia/Seoul'\)::date$p$,          '{myr_kst_date}'),
   ('계좌번호 가리기',                          $p$'\*\*\*\*'\s*\|\|$p$,                                            '{myr_mask_account}'),
   ('정산월 · 핸들로 지급 건 찾기',             $p$\.handle\s*=\s*p_handle$p$,                                      '{myr_payout_find}'),

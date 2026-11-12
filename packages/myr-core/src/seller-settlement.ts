@@ -71,6 +71,8 @@ export type SettleLedger = {
 	nextOffset: number;
 	/** 상환 완료(원장이 있고 남은 제조금액 0 — 서버 myr_mfg_paid_off) */
 	paidOff: boolean;
+	/** 제조금액 갚은 비율(0~100 · 서버 myr_mfg_repaid_pct · 0103) */
+	repaidPct: number;
 	depositState: DepositState;
 };
 /** 제조금액 · 보증금 탭 머리 — 남은 제조금액 합 · 돌려받을 보증금 합(서버 0101) */
@@ -89,7 +91,7 @@ export type SettleItem = {
 	groupbuy: boolean;
 	kind: 'sale' | 'refund_adj';
 	amount: number;
-	/** sale 줄: 정산 때 이미 빠진 환불(줄 금액 − amount) */
+	/** 정산 때 줄 환불 누적(서버 refund_snapshot) — 화면은 sale 줄에서만 "환불 −" 로 보여 준다(kind 로 문구를 고른다) */
 	refunded: number;
 	/** 보류 해제분 줄이면 원래 달('YYYY-MM') */
 	origin: string | null;
@@ -163,6 +165,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				depositTotal: n(x.deposit_total),
 				nextOffset: n(x.next_offset),
 				paidOff: x.paid_off === true,
+				repaidPct: n(x.repaid_pct),
 				depositState: (x.deposit_state === 'refunded' || x.deposit_state === 'unpaid' ? x.deposit_state : 'held') as DepositState
 			})),
 		ledgerTotal: { remaining: n(obj(o.ledger_total)?.remaining), depositHeld: n(obj(o.ledger_total)?.deposit_held) },
@@ -199,7 +202,7 @@ export function settleItemsFromJson(v: unknown): SettleItem[] {
 			groupbuy: x.groupbuy === true,
 			kind: x.kind === 'refund_adj' ? 'refund_adj' : 'sale',
 			amount: n(x.amount),
-			refunded: x.kind === 'refund_adj' ? 0 : n(x.refund_snapshot),
+			refunded: n(x.refund_snapshot),
 			origin: typeof x.origin === 'string' ? x.origin : null
 		}));
 }
@@ -243,9 +246,6 @@ export function settleAtLabel(iso: string | null): string {
 	const h = d.getUTCHours();
 	return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${'일월화수목금토'[d.getUTCDay()]}) ${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}시`;
 }
-
-/** 제조금액 갚은 비율(0~100 · 막대 너비) — 갚은 금액은 서버 offset(확정된 상계 합) · 원장이 없거나 0원이면 100 */
-export const repaidPct = (l: Pick<SettleLedger, 'total' | 'offset'>): number => (l.total <= 0 ? 100 : Math.round((l.offset / l.total) * 100));
 
 /* ---------------- 시안("MYR Influencer Admin" 정산 · 2026-11-10) 라벨 ---------------- */
 
@@ -301,7 +301,8 @@ export function itemsByProduct(items: SettleItem[]): Map<string, SettleItem[]> {
 /** 상환 완료 · 다음 정산 상환 예정 · 보증금 금액과 상태는 서버 값(paidOff · nextOffset · depositHeld · depositTotal · depositState · 0101) — 여기서는 막대 너비 % 와 문구만 만든다 */
 export function ledgerCard(l: SettleLedger, nextMonth: string, won: (n: number) => string) {
 	const done = l.paidOff;
-	const paidPct = repaidPct(l);
+	// 갚은 비율은 서버 값(repaid_pct) · 다음 정산 상환 예정 막대 너비(planPct)만 여기서 — 글자로 보이지 않는 그림 크기
+	const paidPct = l.repaidPct;
 	const nextOffset = l.nextOffset || null;
 	const planPct = !done && l.total > 0 && nextOffset ? Math.min(100 - paidPct, (nextOffset / l.total) * 100) : 0;
 	return {

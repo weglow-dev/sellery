@@ -51,6 +51,16 @@ as $$
 $$;
 revoke all on function public.myr_kst_date(timestamptz) from public, anon, authenticated;
 
+-- 정산월('YYYY-MM-..' 아무 날) → 그 달 회차(없으면 빈 행) — 회차 실행 · 보고 · 달 상세 내역 · 지급 건 찾기 · 지급 목록이 같이 쓴다
+create or replace function public.myr_settlement_run_of(p_month date)
+returns public.myr_settlement_runs
+language sql
+stable
+as $$
+  select u.* from public.myr_settlement_runs u where u.month = date_trunc('month', p_month)::date
+$$;
+revoke all on function public.myr_settlement_run_of(date) from public, anon, authenticated;
+
 -- 계좌번호 가리기(뒤 4자리) · 없으면 null — 정산 정보 화면 · 지급 때 계좌 기록이 같이 쓴다
 create or replace function public.myr_mask_account(p_account text)
 returns text
@@ -71,6 +81,17 @@ as $$
     from public.sellers s where s.id = p_seller_id
 $$;
 revoke all on function public.myr_payout_bank_snapshot(uuid) from public, anon, authenticated;
+
+-- 제조금액 갚은 비율(0~100 · 정수) — 원장이 없거나 0원이면 100. 정산 탭 원장 카드가 글자로 보여 준다(화면이 나누지 않는다)
+create or replace function public.myr_mfg_repaid_pct(p_product_id uuid)
+returns integer
+language sql
+stable
+as $$
+  select case when public.myr_mfg_total(p_product_id) <= 0 then 100
+              else round(public.myr_mfg_offset_total(p_product_id) * 100.0 / public.myr_mfg_total(p_product_id))::integer end
+$$;
+revoke all on function public.myr_mfg_repaid_pct(uuid) from public, anon, authenticated;
 
 -- ---------- 같은 식을 쓰던 함수 ----------
 -- 0085 정의 — 계좌 가리기 · 계좌 있음은 myr_mask_account
@@ -123,9 +144,8 @@ as $$
            'bank', jsonb_build_object('bank', s.bank_info ->> 'bank', 'account', s.bank_info ->> 'account', 'holder', s.bank_info ->> 'holder'))
          order by s.handle), '[]'::jsonb)
     from public.myr_payouts p
-    join public.myr_settlement_runs u on u.id = p.run_id
     join public.sellers s on s.id = p.seller_id
-   where u.month = date_trunc('month', p_month)::date and public.myr_payout_payable(p)
+   where p.run_id = (public.myr_settlement_run_of(p_month)).id and public.myr_payout_payable(p)
 $$;
 revoke all on function public.myr_payout_to_pay(date) from public, anon, authenticated;
 grant execute on function public.myr_payout_to_pay(date) to service_role;
@@ -197,7 +217,7 @@ $$;
 revoke all on function public.myr_payout_unmark_paid(date, text, text, text) from public, anon, authenticated;
 grant execute on function public.myr_payout_unmark_paid(date, text, text, text) to service_role;
 
--- 0102 정의 + 지급 완료(이체한 날 · 그때 금액 · 메모 · 가린 계좌)
+-- 0102 정의 + 지급 완료(이체한 날 · 그때 금액 · 메모 · 가린 계좌) · 회차 찾기는 myr_settlement_run_of
 create or replace function public.myr_settlement_report(p_month date)
 returns jsonb
 language sql
@@ -230,13 +250,13 @@ as $$
              order by s.handle)
              from public.myr_payouts p join public.sellers s on s.id = p.seller_id where p.run_id = u.id), '[]'::jsonb),
     'payout_total', coalesce((select sum(public.myr_payout_amount(p)) from public.myr_payouts p where p.run_id = u.id), 0))
-    from public.myr_settlement_runs u
-   where u.month = date_trunc('month', p_month)::date
+    from public.myr_settlement_run_of(p_month) u
+   where u.id is not null
 $$;
 revoke all on function public.myr_settlement_report(date) from public, anon, authenticated;
 grant execute on function public.myr_settlement_report(date) to service_role;
 
--- 0102 정의 + 이체한 날(paid_on)
+-- 0102 정의 + 이체한 날(paid_on) · 원장 갚은 비율(repaid_pct)
 create or replace function public.myr_app_seller_settlements_of_user(p_user uuid, p_now timestamptz default now())
 returns jsonb
 language sql
@@ -310,6 +330,8 @@ as $$
                  'total', public.myr_mfg_total(p.id),
                  'offset', public.myr_mfg_offset_total(p.id),
                  'remaining', public.myr_mfg_remaining(p.id),
+                 -- 갚은 비율(0103 · myr_mfg_repaid_pct) — 원장 카드 글자 · 막대
+                 'repaid_pct', public.myr_mfg_repaid_pct(p.id),
                  -- 상환 완료 = 원장이 있고 남은 제조금액 0(myr_mfg_paid_off) — 화면이 remaining 을 비교하지 않는다
                  'paid_off', public.myr_mfg_has_ledger(p.id) and public.myr_mfg_paid_off(public.myr_mfg_remaining(p.id)),
                  -- 보증금 합 — myr_mfg_deposits 하나(맡김 = 입금 확인 · 환급 전 · 전체 = 환급 전 · 입금 전 포함) · 화면이 빼고 더하지 않는다
@@ -328,3 +350,116 @@ as $$
 $$;
 revoke all on function public.myr_app_seller_settlements_of_user(uuid, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_settlements_of_user(uuid, timestamptz) to service_role;
+
+-- ---------- 정산월 → 회차를 myr_settlement_run_of 하나로(같은 조회를 쓰던 함수 · 결과 그대로) ----------
+-- 0102 정의
+create or replace function public.myr_payout_find(p_month date, p_handle text)
+returns public.myr_payouts
+language sql
+stable
+as $$
+  select p.* from public.myr_payouts p
+    join public.sellers s on s.id = p.seller_id
+   where p.run_id = (public.myr_settlement_run_of(p_month)).id and s.handle = p_handle
+$$;
+revoke all on function public.myr_payout_find(date, text) from public, anon, authenticated;
+
+-- 0101 정의
+create or replace function public.myr_app_seller_settlement_items_of_user(p_user uuid, p_month date)
+returns jsonb
+language sql
+stable
+security definer set search_path = public
+as $$
+  -- 그 회차 카드 줄(myr_settlement_card_rows) — 지난 달 줄은 origin = 원래 달 · 화면은 상품 · origin 으로 묶는다
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'order_code', o.code, 'buyer', public.myr_mask_name(o.buyer_name), 'delivered_at', i.delivered_at,
+           'product_code', p.code, 'product', i.product_name, 'option', i.option_name, 'qty', i.qty, 'unit_price', i.unit_price,
+           'groupbuy', i.groupbuy_id is not null, 'kind', t.kind, 'amount', t.amount, 'refund_snapshot', t.refund_snapshot,
+           'origin', case when c.origin then to_char(ro.month, 'YYYY-MM') end)
+         order by t.kind desc, i.delivered_at, o.code), '[]'::jsonb)
+    from public.sellers s
+    cross join lateral public.myr_settlement_run_of(p_month) u
+    cross join lateral public.myr_settlement_card_rows(s.id, u.id) c
+    join public.myr_settlement_rows r on r.id = c.row_id
+    join public.myr_settlement_runs ro on ro.id = r.run_id
+    join public.myr_settlement_items t on t.row_id = r.id
+    join public.myr_order_items i on i.id = t.order_item_id
+    join public.myr_orders o on o.id = i.order_id
+    join public.myr_products p on p.id = r.product_id
+   where s.user_id = p_user and p_user is not null
+$$;
+revoke all on function public.myr_app_seller_settlement_items_of_user(uuid, date) from public, anon, authenticated;
+grant execute on function public.myr_app_seller_settlement_items_of_user(uuid, date) to service_role;
+
+-- 0101 정의
+create or replace function public.myr_settlement_run(p_month date, p_actor text default 'cron', p_now timestamptz default now())
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  v_month   date := date_trunc('month', p_month)::date;
+  v_end     timestamptz;
+  v_run     public.myr_settlement_runs%rowtype;
+  pr        record;
+  pc        record;
+  hr        record;
+  v_row_id  uuid;
+  v_released integer := 0;
+begin
+  if p_month is null then return jsonb_build_object('ok', false, 'code', 'BAD_MONTH'); end if;
+  v_end := public.myr_settlement_month_end(v_month);
+  if v_end > p_now then return jsonb_build_object('ok', false, 'code', 'NOT_CLOSED'); end if;
+  perform pg_advisory_xact_lock(hashtext('myr_settlement_run'));
+  v_run := public.myr_settlement_run_of(v_month);
+  if v_run.id is not null then return jsonb_build_object('ok', true, 'already', true, 'month', to_char(v_month, 'YYYY-MM')); end if;
+  if exists (select 1 from public.myr_settlement_runs where month > v_month) then return jsonb_build_object('ok', false, 'code', 'OUT_OF_ORDER'); end if;
+
+  insert into public.myr_settlement_runs (month, cutoff_at, created_by) values (v_month, p_now, coalesce(p_actor, 'cron')) returning * into v_run;
+
+  -- 1) 보류 자동 해제 — 제조금액이 들어온 보류 줄을 정산월 순서로 확정 · 이 회차에서 지급
+  for hr in
+    select r.id from public.myr_settlement_rows r join public.myr_settlement_runs u on u.id = r.run_id
+     where public.myr_settlement_row_releasable(r)
+     order by u.month, r.product_id
+  loop
+    perform public.myr_settlement_apply(hr.id, coalesce(p_actor, 'cron'), v_run.id);
+    v_released := v_released + 1;
+  end loop;
+
+  -- 2) 이번 달 줄
+  create temp table if not exists _myr_settle_new (order_item_id uuid, product_id uuid, seller_id uuid, kind text, amount integer, refund_snapshot integer) on commit drop;
+  truncate _myr_settle_new;
+  insert into _myr_settle_new select * from public.myr_settlement_candidates(v_end, null);
+
+  for pr in
+    select n.product_id, min(n.seller_id::text)::uuid as seller_id,
+           coalesce(sum(n.amount) filter (where n.kind = 'sale'), 0)::integer as sales,
+           coalesce(sum(n.amount) filter (where n.kind = 'refund_adj'), 0)::integer as refund_adj
+      from _myr_settle_new n group by n.product_id order by n.product_id
+  loop
+    select * into pc from public.myr_settlement_product_calc(pr.product_id, pr.sales, pr.refund_adj);
+    insert into public.myr_settlement_rows (run_id, product_id, seller_id, pct, sales, refund_adj, carry_in, base, carry_out, settle, status)
+    values (v_run.id, pr.product_id, pr.seller_id, pc.pct, pr.sales, pr.refund_adj, pc.carry_in, pc.base, pc.carry_out, pc.settle, 'held')
+    returning id into v_row_id;
+    insert into public.myr_settlement_items (row_id, order_item_id, kind, amount, refund_snapshot)
+    select v_row_id, n.order_item_id, n.kind, n.amount, n.refund_snapshot from _myr_settle_new n where n.product_id = pr.product_id;
+    if not pc.held then perform public.myr_settlement_apply(v_row_id, coalesce(p_actor, 'cron')); end if;
+  end loop;
+
+  -- 3) 지급 건 — 크리에이터마다 1건 · 확정됐지만 아직 지급 건에 안 들어간 줄 전부(이번 달 줄 · 이번에 풀린 보류 줄 · 운영이 먼저 확정한 보류 줄)
+  perform public.myr_payout_collect(v_run.id);
+
+  return jsonb_build_object('ok', true, 'already', false, 'month', to_char(v_month, 'YYYY-MM'),
+    'rows', (select count(*) from public.myr_settlement_rows where run_id = v_run.id),
+    'confirmed', (select count(*) from public.myr_settlement_rows where run_id = v_run.id and status = 'confirmed'),
+    'held', (select count(*) from public.myr_settlement_rows where run_id = v_run.id and status = 'held'),
+    'released', v_released,
+    'payouts', (select count(*) from public.myr_payouts where run_id = v_run.id),
+    'payout', coalesce((select sum(public.myr_payout_amount(p)) from public.myr_payouts p where p.run_id = v_run.id), 0));
+end;
+$$;
+revoke all on function public.myr_settlement_run(date, text, timestamptz) from public, anon, authenticated;
+grant execute on function public.myr_settlement_run(date, text, timestamptz) to service_role;
