@@ -19,7 +19,8 @@ export type ShipOrder = Partial<ShipFields> & {
 export type OrderShipping = { label: string; cls: string; rows: { k: string; v: string; href?: string | null }[] };
 const TONE_CLS = { accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint', muted: 'bg-white/6 text-white/60', danger: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' } as const;
 
-export function orderShipping(o: ShipOrder): OrderShipping {
+/** itemLabel — 상품 줄 이름. 교환·환불 요청 상세는 "요청 상품"(이 칸은 요청이 걸린 줄 하나만 보여 준다 — 같은 주문의 다른 상품은 싣지 않는다) */
+export function orderShipping(o: ShipOrder, itemLabel = '주문 상품'): OrderShipping {
 	const it = o.item;
 	const line = it?.shipStatus && isShipStatus(it.shipStatus) ? it : null;
 	const ship = line
@@ -27,7 +28,7 @@ export function orderShipping(o: ShipOrder): OrderShipping {
 		: { shipStatus: null, courier: o.courier ?? null, trackingNo: o.trackingNo ?? null, shippedAt: o.shippedAt ?? null, deliveredAt: o.deliveredAt ?? null };
 	const st = statusLabel({ status: o.status, ...ship });
 	const rows: OrderShipping['rows'] = [];
-	if (it) rows.push({ k: '주문 상품', v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
+	if (it) rows.push({ k: itemLabel, v: `${it.name}${it.option ? ` (${it.option})` : ''} × ${it.qty}` });
 	if (o.money) {
 		rows.push({ k: '상품 금액', v: it ? `${won(o.money.goods)} (${it.qty}개)` : won(o.money.goods) });
 		rows.push({ k: '배송비', v: o.money.shippingFee > 0 ? won(o.money.shippingFee) : '무료배송' });

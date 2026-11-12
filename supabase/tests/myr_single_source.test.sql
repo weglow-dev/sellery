@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(115);
+select plan(117);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -264,6 +264,8 @@ insert into _rules (label, pat, allowed) values
   ('열린 수정본 상태 묶음',                   $p$'pending'\s*,\s*'rejected'$p$,                                  '{myr_revision_status_open}'),
   ('주문 상태 묶음',                          $p$'PAID'\s*,\s*'PARTIAL_REFUNDED'$p$,                             '{myr_order_status_paid,myr_order_status_alive}'),
   ('출고 전 상태 묶음',                       $p$'PAID'\s*,\s*'PREPARING'$p$,                                    '{myr_ship_status_unshipped}'),
+  ('줄에 환불이 있었나',                      $p$refunded_qty\s*>\s*0$p$,                                        '{myr_line_has_refund}'),
+  ('줄의 열린 요청 찾기',                      $p$order_item_id\s*=\s*[\w.]+\s+and\s+public\.myr_claim_status_open$p$,     '{myr_line_open_claim}'),
   ('열린 요청 상태 묶음',                     $p$'pending'\s*,\s*'progress'$p$,                                  '{myr_claim_status_open}'),
   ('요청 사유 목록',                          $p$'단순 변심'\s*,\s*'파손 · 누액'$p$,                               '{myr_claim_reasons}'),
   ('단순 변심 사유 비교',                     $p$=\s*'단순 변심'$p$,                                             '{myr_claim_reason_change_mind}'),
