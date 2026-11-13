@@ -1,20 +1,21 @@
 -- ============================================================
--- 0110 · MYR "결제된 줄"을 함수 하나로 — 실적 · 정산 · 미리보기 · 정산 탭 상품 목록 · 이벗 발주 후보가 같은 기준 (2026-11-13)
+-- 0110 · MYR "결제된 줄"을 함수 하나로 — 실적 · 정산 대상 · 배송 전 판매 · 정산 탭 상품 목록이 같은 기준 (2026-11-13)
 --
---   점검(백엔드 원칙 1): "결제된 줄"을 다섯 곳이 각자 적었다.
+--   점검(백엔드 원칙 1): "결제된 줄"을 네 곳이 각자 적었다.
 --     정산 대상(myr_settlement_candidates)        paid_at + 결제 상태 + 취소 아님
 --     실적(myr_sales_lines)                        paid_at + 결제 상태 (취소 줄 확인 없음)
 --     배송 전 판매(myr_settlement_preview)         paid_at + 열린 주문 상태 + 살아 있는 줄
 --     정산 탭 상품 목록(myr_app_seller_settlements_of_user)  paid_at + 취소 아님 (결제 상태 확인 없음)
---     이벗 발주 후보(myr_app_admin_prepare_candidates)        paid_at + 열린 주문 상태 + 살아 있는 줄
 --   지금 데이터에서는 결과가 같다 — 결제 상태면 paid_at 이 있고(표 제약) · 줄 CANCELED 는 주문 전체 취소(입금 전 · 입금 기한)에서만 생기고 ·
 --     전액 환불 주문의 줄은 남은 수량이 0 이라 살아 있는 줄이 아니다. 결제된 주문 안에서 줄만 취소하는 기능이 생기면 실적만 그 줄을 세어 정산과 어긋난다.
 --   고침:
 --     myr_line_paid(o, i)   결제가 끝났고 취소되지 않은 줄 — paid_at · myr_order_status_paid · myr_line_valid
---     다섯 곳이 이 함수 + 자기 조건(배송 완료 · 마감 · 남은 수량 · 출고 전 · 기준 시각)을 쓴다
+--     네 곳이 이 함수 + 자기 조건(배송 완료 · 마감 · 남은 수량 · 배송 전)을 쓴다
+--   그대로 둔 것: 배송 작업 쪽(발주 후보 · 발주 처리 · 송장 · 배송 완료 · 발송 대기 등)의 "열린 주문 + 살아 있는 줄" — "배송 작업 대상 줄"이라는
+--     다른 판정이라 따로 묶는다(다음 정리). 발주 후보만 바꾸면 발주 처리(myr_app_admin_mark_prepared)와 식이 갈라진다.
 --   계산 결과 — 지금 코드가 만드는 데이터에서는 같다. 바뀌는 것은 "결제된 주문 안의 취소 줄"뿐: 실적(myr_sales_lines)이 그 줄을 세지 않는다(정산과 같아진다).
 --     그런 줄을 일부러 넣은 기존 테스트(myr_line_live · 판매 수량 5 → 4)만 기대값이 바뀐다.
---   테스트: supabase/tests/myr_line_paid.test.sql · 기존 실적 · 정산 · 미리보기 · 발주 테스트
+--   테스트: supabase/tests/myr_line_paid.test.sql · 기존 실적 · 정산 · 미리보기 테스트
 -- ============================================================
 
 create or replace function public.myr_line_paid(o public.myr_orders, i public.myr_order_items)
@@ -259,24 +260,3 @@ as $$
 $$;
 revoke all on function public.myr_app_seller_settlements_of_user(uuid, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_app_seller_settlements_of_user(uuid, timestamptz) to service_role;
-
--- 0099 정의 + 발주 후보의 결제된 줄을 myr_line_paid(열린 주문 상태 → 결제 상태 · 살아 있는 줄이라 같다)
-create or replace function public.myr_app_admin_prepare_candidates(p_cutoff timestamptz default now())
-returns jsonb
-language sql
-stable
-security definer set search_path = public
-as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-           'item_id', i.id, 'order_id', o.id, 'order_code', o.code, 'ordered_at', o.created_at, 'paid_at', o.paid_at,
-           'goods_code', coalesce(nullif(btrim(p.ebut_goods_code), ''), p.code), 'goods_name', i.product_name, 'goods_option', coalesce(i.option_name, ''),
-           'qty', public.myr_line_left(i), 'seller_id', i.seller_id, 'shipping', o.shipping
-         ) order by o.paid_at, o.id, i.created_at, i.id), '[]'::jsonb)
-    from public.myr_order_items i
-    join public.myr_orders o on o.id = i.order_id
-    join public.myr_products p on p.id = i.product_id
-   where i.ship_status = 'PAID' and public.myr_line_live(i)
-     and public.myr_line_paid(o, i) and o.paid_at < p_cutoff
-$$;
-revoke all on function public.myr_app_admin_prepare_candidates(timestamptz) from public, anon, authenticated;
-grant execute on function public.myr_app_admin_prepare_candidates(timestamptz) to service_role;

@@ -359,7 +359,7 @@ insert into _rules (label, pat, allowed) values
   -- 금지 패턴(허용 목록 비움) — 주인 함수 없이 어디에도 다시 나오면 실패. 0108 에서 없앤 "줄 상태로 전체 환불 판정"(남은 수량 기준 myr_order_refund_status 를 쓴다)
   ('줄 상태 묶음으로 전체 환불 판정(REFUNDED · CANCELED) — 금지 · myr_order_refund_status', $p$'REFUNDED'\s*,\s*'CANCELED'|'CANCELED'\s*,\s*'REFUNDED'$p$, '{}'),
   ('줄에 열린 요청이 있으면(신청 길 없음 · 같은 줄 중복 OPEN_EXISTS)', $p$myr_line_open_claim\(\w+\)\s+is\s+not\s+null$p$, '{myr_line_customer_path,myr_app_claim_open}'),
-  ('결제된 줄(paid_at · 결제 상태 · 취소 아님) — 실적 · 정산 · 미리보기 · 발주', $p$\mpaid_at\s+is\s+not\s+null$p$, '{myr_line_paid}'),
+  ('결제된 줄(paid_at · 결제 상태 · 취소 아님) — 실적 · 정산 · 미리보기 · 발주 후보는 배송 작업 대상 줄(다음 정리)', $p$\mpaid_at\s+is\s+not\s+null$p$, '{myr_line_paid,myr_app_admin_prepare_candidates}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');

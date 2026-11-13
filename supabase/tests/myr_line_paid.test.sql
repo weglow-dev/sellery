@@ -1,7 +1,7 @@
--- pgTAP — 0110 "결제된 줄"(myr_line_paid) 하나를 실적 · 정산 대상 · 배송 전 판매 · 이벗 발주 후보가 같이 쓴다.
+-- pgTAP — 0110 "결제된 줄"(myr_line_paid) 하나를 실적 · 정산 대상 · 배송 전 판매 · 정산 탭 상품 목록이 같이 쓴다.
 --   결제된 주문 안의 취소 줄은 어디에서도 세지 않는다(전에는 실적만 셌다).
 begin;
-select plan(8);
+select plan(7);
 
 select function_privs_are('public', 'myr_line_paid', '{myr_orders,myr_order_items}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 line_paid 불가');
 
@@ -33,10 +33,6 @@ select is((select jsonb_agg(c.order_item_id order by c.order_item_id) from publi
           '["00000000-0000-4000-8000-00000000fa41", "00000000-0000-4000-8000-00000000fa45"]'::jsonb, '정산 대상 = 결제된 줄(1 · 5) 중 배송 완료 — 취소 줄 2 · 배송 전 3 · 입금 대기 4 제외');
 -- 배송 전 판매(미리보기) = 결제된 줄 중 남은 수량 · 배송 전(3)
 select is((public.myr_settlement_preview('00000000-0000-4000-8000-00000000fa11') #>> '{undelivered,lines}')::int, 1, '배송 전 판매 1줄(취소 줄 · 입금 대기 줄 제외)');
--- 이벗 발주 후보 = 결제된 줄 중 남은 수량 · 출고 전(3)
-select is((select jsonb_agg(e ->> 'item_id' order by e ->> 'item_id') from jsonb_array_elements(public.myr_app_admin_prepare_candidates(now())) e
-            where e ->> 'order_id' in ('00000000-0000-4000-8000-00000000fa31', '00000000-0000-4000-8000-00000000fa32')),
-          '["00000000-0000-4000-8000-00000000fa43"]'::jsonb, '발주 후보는 결제된 출고 전 줄만(취소 줄 · 입금 대기 줄 제외)');
 -- 정산 탭 상품 목록 근거 — 결제된 줄이 있는 상품
 select ok(exists (select 1 from public.myr_order_items i join public.myr_orders o on o.id = i.order_id where i.product_id = '00000000-0000-4000-8000-00000000fa21' and public.myr_line_paid(o, i)),
           '상품에 결제된 줄이 있다(정산 탭 상품 목록과 같은 조건)');
