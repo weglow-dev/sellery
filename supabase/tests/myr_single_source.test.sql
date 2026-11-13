@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(193);
+select plan(194);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -358,6 +358,7 @@ insert into _rules (label, pat, allowed) values
   ('환불 상태(남은 수량 0 이면 REFUNDED) — 주문 · 줄', $p$else\s+'PARTIAL_REFUNDED'$p$,                           '{myr_order_refund_status,myr_line_refund_status}'),
   -- 금지 패턴(허용 목록 비움) — 주인 함수 없이 어디에도 다시 나오면 실패. 0108 에서 없앤 "줄 상태로 전체 환불 판정"(남은 수량 기준 myr_order_refund_status 를 쓴다)
   ('줄 상태 묶음으로 전체 환불 판정(REFUNDED · CANCELED) — 금지 · myr_order_refund_status', $p$'REFUNDED'\s*,\s*'CANCELED'|'CANCELED'\s*,\s*'REFUNDED'$p$, '{}'),
+  ('줄에 열린 요청이 있으면(신청 길 없음 · 같은 줄 중복 OPEN_EXISTS)', $p$myr_line_open_claim\(\w+\)\s+is\s+not\s+null$p$, '{myr_line_customer_path,myr_app_claim_open}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');

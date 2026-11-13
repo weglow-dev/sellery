@@ -369,8 +369,8 @@ export function changeMindNote(i: Pick<OrderItem, 'changeMindOk' | 'changeMindUn
 	return `수령 후 7일이 지나 단순 변심 환불은 어려워요`;
 }
 
-/** 요청할 수 있는 줄 — 서버 refundPath = claim(0092 myr_line_refund_path · myr_app_claim_open 이 같은 함수로 다시 막는다).
- *  열린 요청이 있는 주문은 신청 페이지 자체가 닫힌다(customerCanRefund · claimStatus) — 같은 줄 중복은 서버(OPEN_EXISTS)가 다시 막는다 */
+/** 요청할 수 있는 줄 — 서버 refundPath = claim(0109 myr_line_customer_path — 열린 요청이 걸린 줄은 비운다 · myr_app_claim_open 이 길 · OPEN_EXISTS 로 다시 막는다).
+ *  열린 요청은 그 줄만 막는다(2026-11-13) — 같은 주문의 다른 상품은 이 목록에 남는다 */
 export const claimableItems = (items: OrderItem[]): OrderItem[] => items.filter((i) => i.refundPath === 'claim');
 
 /* ---------------- 문구 — 상태 · 단계 · 타임라인 ---------------- */

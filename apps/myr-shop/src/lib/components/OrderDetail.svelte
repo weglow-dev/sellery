@@ -225,7 +225,7 @@
 			<a href={refundHref} class="flex h-14 w-full items-center justify-center rounded-[16px] border border-white/16 text-[15px] font-bold text-fg">{actionLabel}</a>
 		</div>
 	{:else if can.claimOpen}
-		<!-- 열린 교환·환불 요청이 끝날 때까지 비활성(customerCanRefund) -->
+		<!-- 신청할 수 있는 상품이 모두 요청 중이면 비활성(customerCanRefund · 열린 요청은 그 줄만 막는다 0109) -->
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
 			<span aria-disabled="true" class="flex h-14 w-full cursor-not-allowed items-center justify-center rounded-[16px] border border-white/8 text-[15px] font-bold text-white/30">교환 · 환불 신청</span>
 		</div>

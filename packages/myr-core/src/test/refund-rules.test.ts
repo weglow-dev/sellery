@@ -148,10 +148,16 @@ describe('customerCanRefund · customerRefundableItems — 서버 refundPath 그
 		expect(customerCanRefund(order({ items: [item(A, 1, 10000, 0, 'PAID', 'PAID', null)] }))).toEqual({ ok: false, reason: '환불할 수 있는 상품이 없어요' });
 		expect(customerRefundableItems([item(A, 1, 10000, 0, 'PAID', 'PREPARING', 'instant')]).map((i) => i.id)).toEqual([A]);
 	});
-	it('열린 교환·환불 요청이 있으면 신청 불가(claimOpen) — 끝나면 다시', () => {
-		expect(customerCanRefund({ ...order(), claimStatus: 'pending' })).toEqual({ ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true });
-		expect(customerCanRefund({ ...order(), claimStatus: 'progress' }).ok).toBe(false);
-		expect(customerCanRefund({ ...order(), claimStatus: null })).toEqual({ ok: true, deposit: false });
+	it('열린 교환·환불 요청은 그 줄만 막는다(2026-11-13 · 0109) — 다른 상품에 신청 길이 있으면 신청할 수 있다', () => {
+		// 서버가 요청이 걸린 줄의 refundPath 를 비운다(myr_line_customer_path) — A 는 요청 중 · B 는 아직 바로 환불 가능
+		const withOpen = order({ items: [item(A, 1, 10000, 0, 'PAID', 'DELIVERED', null), item(B, 1, 20000, 0, 'PAID', 'PAID', 'instant')] });
+		expect(customerCanRefund({ ...withOpen, claimStatus: 'pending' })).toEqual({ ok: true, deposit: false });
+		expect(customerRefundableItems(withOpen.items).map((i) => i.id)).toEqual([B]);
+		// 남은 상품이 모두 요청 중이면(신청 길 없음) 비활성 · 안내
+		const allOpen = order({ items: [item(A, 1, 10000, 0, 'PAID', 'DELIVERED', null)] });
+		expect(customerCanRefund({ ...allOpen, claimStatus: 'pending' })).toEqual({ ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true });
+		expect(customerCanRefund({ ...allOpen, claimStatus: 'progress' }).ok).toBe(false);
+		expect(customerCanRefund({ ...allOpen, claimStatus: null })).toEqual({ ok: false, reason: '환불할 수 있는 상품이 없어요' });
 		expect(customerCanRefund({ ...order({ status: 'REFUNDED' }), claimStatus: 'pending' })).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
 	});
 });
