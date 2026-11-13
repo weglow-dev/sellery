@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(151);
+select plan(167);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -296,6 +296,23 @@ insert into _rules (label, pat, allowed) values
   ('회차 마감(다음 달 1일)',                   $p$myr_month_start\(\([^;]*interval\s+'1 month'$p$,                '{myr_settlement_month_end}'),
   ('지급 시각(마감 + 13시간)',                 $p$interval\s+'13 hours'$p$,                                       '{myr_settlement_pay_at}'),
   ('그 회차의 크리에이터 지급 건 찾기',        $p$run_id\s*=\s*[\w.]+\s+and\s+(\w+\.)?seller_id\s*=$p$,             '{myr_payout_of}'),
+  -- 세금계산서(0104)
+  ('지급 건의 정산월(회차 달)',                $p$myr_settlement_runs\s+\w+\s+where\s+\w+\.id\s*=\s*\w+\.run_id$p$, '{myr_payout_month}'),
+  ('세금계산서 합계(보증금 환급 뺀 줄 지급액)', $p$myr_settlement_row_payout\([\w.]+,\s*[\w.]+,\s*0\)$p$,            '{myr_payout_invoice_total}'),
+  ('공급가액 · 세액(합계 ÷ 11)',               $p$/\s*11\M$p$,                                                    '{myr_tax_invoice_amounts}'),
+  ('세금계산서 필요(합계 0원 초과)',            $p$myr_payout_invoice_total\([^)]*\)\s*(>|<|>=|<=|<>)$p$,           '{myr_payout_needs_invoice}'),
+  ('세금계산서를 아직 받는 지급 건(필요 · 지급 전)', $p$myr_payout_needs_invoice\(\w+\)\s+and\s+not\s+public\.myr_payout_is_paid$p$, '{myr_tax_invoice_open}'),
+  ('낸 합계 = 지금 합계',                      $p$(=|<>|is\s+distinct\s+from)\s*public\.myr_payout_invoice_total$p$, '{myr_tax_invoice_matches}'),
+  ('지급 건의 세금계산서 찾기',                $p$myr_tax_invoices\s+\w+\s+where\s+\w+\.payout_id\s*=$p$,          '{myr_tax_invoice_of}'),
+  ('세금계산서 확인 완료(비교 — set 은 값 넣기)', $p$(\(|and|or|where|when|not)\s*(\w+\.)?status\s*(=|<>)\s*'accepted'$p$, '{myr_tax_invoice_accepted}'),
+  ('크리에이터가 낼 차례(없음 · 다시 제출 요청)', $p$(\(|and|or|where|when|not)\s*(\w+\.)?status\s*(=|<>)\s*'returned'$p$, '{myr_tax_invoice_waiting_creator}'),
+  ('세금계산서 쪽 지급 가능(확인 완료 · 금액 같음)', $p$myr_tax_invoice_accepted\(\w+\)\s+and\s+public\.myr_tax_invoice_matches$p$, '{myr_payout_invoice_ok}'),
+  ('지급 건 보류 이유(세금계산서)',            $p$then\s+'tax_invoice'$p$,                                        '{myr_payout_hold_reasons}'),
+  ('보류 이유 목록 합치기(칸 이유 + 나머지)',   $p$array\[\w+\.hold_reason\]\s*\|\|$p$,                            '{myr_payout_holds_json}'),
+  ('세금계산서 작성일자(정산월 말일)',          $p$myr_settlement_month_end\([^)]*\)\)\s*-\s*1$p$,                 '{myr_tax_invoice_write_date}'),
+  ('세금계산서 발행 기한(다음 달 10일)',        $p$myr_settlement_month_end\([^)]*\)\)\s*\+\s*9$p$,                '{myr_tax_invoice_due}'),
+  ('세금계산서 발행 기한 지남',                $p$>\s*public\.myr_tax_invoice_due$p$,                             '{myr_tax_invoice_overdue}'),
+  ('세금계산서 승인번호 형식',                 $p$\[0-9a-z\]\{16\}$p$,                                            '{myr_tax_invoice_no}'),
   ('보증금 합',                                $p$sum\(\s*(\w+\.)?deposit_amount\)$p$,                           '{myr_mfg_deposits}'),
   ('줄에 환불이 있었나',                      $p$refunded_qty\s*>\s*0$p$,                                        '{myr_line_has_refund}'),
   ('줄의 열린 요청 찾기',                      $p$order_item_id\s*=\s*[\w.]+\s+and\s+public\.myr_claim_status_open$p$,     '{myr_line_open_claim}'),

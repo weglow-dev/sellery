@@ -23,8 +23,13 @@
 //   to-pay <YYYY-MM>                          지급 목록 — 지급 가능한 지급 건 · 금액 · 이체할 계좌(원문 · 터미널에만)
 //   paid <YYYY-MM> <@핸들> <금액> --date YYYY-MM-DD ["메모"]
 //                                             지급 완료 기록(0103) — 직접 이체한 뒤. 금액은 to-pay 의 금액과 같아야 · 이체한 날은 오늘 이후 · 회차 계산일 전이면 거절
-//                                             세금계산서를 받았는지는 운영이 확인하고 기록한다(7-4 전까지)
+//                                             세금계산서 확인 전이면 지급 가능이 아니라 to-pay 에 나오지 않는다(0104)
 //   unpaid <YYYY-MM> <@핸들> "<사유>"            지급 완료 취소(잘못 기록했을 때 · 사유 필수 · 이력은 남는다)
+//   invoices [<YYYY-MM>] [--status submitted|returned|accepted|none]
+//                                             세금계산서(0104) — 필요한 지급 건 · 상태 · 합계 · 공급가액 · 세액 · 작성일자 · 발행 기한 · 승인번호 · 상호 · 사업자등록번호(홈택스 대조용 원문)
+//                                             달을 빼면 모든 달 · --status 기본 submitted(확인 대기) · --status all 이면 전부
+//   invoice-ok <YYYY-MM> <@핸들>                홈택스에서 대조한 뒤 확인 → 지급 대기(사업자 정보 확인 전이면 그 이유로 보류). 낸 뒤 금액이 바뀌었으면 거절
+//   invoice-return <YYYY-MM> <@핸들> "<사유>"    다시 제출 요청(사유는 크리에이터에게 보인다 · 확인 완료도 지급 전이면 되돌릴 수 있다)
 //
 // 크론: 샵 /api/cron/settle — 매월 1일 13:00(KST)에 지난달 회차를 계산하고 바로 확정(원장 없는 상품만 보류).
 // 키는 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등 · 거절 코드).
@@ -86,7 +91,7 @@ const PAYOUT_MESSAGES = {
   ALREADY_PAID: "이미 지급 완료된 지급 건입니다",
   ALREADY_HELD: "이미 운영 보류 중입니다",
   NOTHING_TO_PAY: "0원 지급 건(지급 없음)이라 보류할 것이 없습니다",
-  NOT_MANUAL: "운영 보류가 아닙니다(사업자 정보 보류는 정보가 확인되면 자동으로 풀립니다)",
+  NOT_MANUAL: "운영 보류가 아닙니다(사업자 정보 · 세금계산서 보류는 확인되면 자동으로 풀립니다)",
   NOT_PAYABLE: "지급 가능한 지급 건이 아닙니다",
   AMOUNT_MISMATCH: "적은 금액이 지급 건 금액과 다릅니다",
   BAD_DATE: "--date YYYY-MM-DD 로 이체한 날을 적어 주세요",
@@ -94,11 +99,15 @@ const PAYOUT_MESSAGES = {
   BEFORE_RUN: "이체한 날이 회차 계산일 전입니다",
   REASON_REQUIRED: "취소 사유를 적어 주세요",
   NOT_PAID: "지급 완료가 아닙니다",
+  // 세금계산서(0104)
+  NOT_SUBMITTED: "크리에이터가 아직 승인번호를 내지 않았습니다(또는 이미 다시 제출 요청 중)",
+  ALREADY_ACCEPTED: "이미 확인한 세금계산서입니다",
+  AMOUNT_CHANGED: "크리에이터가 낸 뒤 세금계산서 합계가 바뀌었습니다 — invoice-return 으로 다시 발행을 요청하세요",
 };
 function checkPayout(r) {
   if (!r || r.ok === false) {
     // 서버가 같이 준 값(맞는 금액 · 보류 이유 · 이미 기록된 날 · 회차 계산일)을 그대로 덧붙인다
-    const extra = r?.amount != null ? ` (지급 건 금액 ${won(r.amount)})` : r?.hold_label ? ` (${r.status} · ${r.hold_label})` : r?.paid_on ? ` (이체한 날 ${r.paid_on})` : r?.run_on ? ` (회차 계산일 ${r.run_on})` : "";
+    const extra = r?.submitted_total != null ? ` (낸 합계 ${won(r.submitted_total)} · 지금 합계 ${won(r.total)})` : r?.amount != null ? ` (지급 건 금액 ${won(r.amount)})` : r?.hold_label ? ` (${r.status} · ${r.hold_label})` : r?.paid_on ? ` (이체한 날 ${r.paid_on})` : r?.run_on ? ` (회차 계산일 ${r.run_on})` : "";
     fail(`${r?.code ?? "실패"} — ${PAYOUT_MESSAGES[r?.code] ?? ""}${extra}`);
   }
   return r;
@@ -219,9 +228,12 @@ async function cmdReport() {
   // 지급 건(0101 · 0102) — 금액 · 합계 · 상태 문구 · 보류 이유 · 지급 가능은 서버 값 그대로. 보류 해제 줄이 풀린 회차에 들어가 위 줄 합과 다를 수 있다
   console.log("  지급 건");
   for (const p of r.payouts ?? []) {
-    const why = p.hold_label ? ` (${p.hold_label}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
+    // 보류 이유 전부(0104 holds — 사업자 정보와 세금계산서가 같이 걸리면 둘 다)
+    const labels = (p.holds ?? []).map((h) => h.label).join(" · ");
+    const why = labels ? ` (${labels}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
     const paid = p.paid_on ? ` | 이체 ${p.paid_on} ${won(p.paid_amount)}${p.paid_note ? ` · ${p.paid_note}` : ""}` : "";
-    console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}${paid}`);
+    const inv = p.invoice?.needed ? ` | 세금계산서 ${p.invoice.status_label} ${won(p.invoice.total)}${p.invoice.overdue ? " · 기한 지남" : ""}` : " | 세금계산서 필요 없음";
+    console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}${inv}${paid}`);
   }
   console.log(`  지급 합계 ${won(r.payout_total ?? 0)}`);
 }
@@ -257,6 +269,33 @@ async function cmdUnpaid() {
   console.log(`[${where}] ${args[0]} ${args[1]} 지급 완료 취소 — 지금 상태 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""}`);
 }
 
+// 세금계산서(0104) — 금액 · 날짜 · 상태 문구는 서버 값(myr_payout_invoice_json) 그대로
+async function cmdInvoices() {
+  const m = args[0] ? month(args[0]) : null;
+  const status = flags.status === "all" ? null : String(flags.status ?? "submitted");
+  const list = (await rpc("myr_tax_invoice_list", { p_month: m, p_status: status })) ?? [];
+  console.log(`[${where}] 세금계산서 ${args[0] ?? "모든 달"} · ${status ?? "전부"} — ${list.length}건 (사업자등록번호 원문이 보입니다 · 화면 공유 주의)`);
+  for (const x of list) {
+    const i = x.invoice;
+    console.log(
+      `  ${x.month} | ${x.seller.handle} | ${x.seller.company ?? "-"} ${x.seller.biz_no ?? "-"} | ${i.status_label}${i.overdue ? " · 기한 지남" : ""}${i.amount_changed ? " · 낸 뒤 금액 바뀜" : ""}` +
+        ` | 합계 ${won(i.total)} (공급가액 ${won(i.supply)} · 세액 ${won(i.tax)}) | 작성일자 ${i.write_date} · 기한 ${i.due_date}` +
+        `${i.approval_no ? ` | 승인번호 ${i.approval_no.slice(0, 8)}-${i.approval_no.slice(8, 16)}-${i.approval_no.slice(16)}` : ""}${i.return_note ? ` | 요청 사유: ${i.return_note}` : ""} | 지급 건 ${x.payout_label}`,
+    );
+  }
+  if (list.length && status === "submitted") console.log(`  홈택스에서 대조한 뒤: invoice-ok <YYYY-MM> <@핸들> · 다르면 invoice-return <YYYY-MM> <@핸들> "사유"`);
+}
+async function cmdInvoiceOk() {
+  const m = month(args[0]);
+  const r = checkPayout(await rpc("myr_tax_invoice_accept", { p_month: m, p_handle: args[1] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 세금계산서 확인 — 지급 건 ${r.status}${r.hold_label ? `(${r.hold_label})` : ""} · ${r.payable ? "지급 가능 → to-pay" : "아직 지급 불가"}`);
+}
+async function cmdInvoiceReturn() {
+  const m = month(args[0]);
+  const r = checkPayout(await rpc("myr_tax_invoice_return", { p_month: m, p_handle: args[1] ?? "", p_note: args[2] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 세금계산서 다시 제출 요청 — 지급 건 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""}`);
+}
+
 const COMMANDS = {
   pending: cmdPending,
   mfg: cmdMfg,
@@ -272,10 +311,13 @@ const COMMANDS = {
   "to-pay": cmdToPay,
   paid: cmdPaid,
   unpaid: cmdUnpaid,
+  invoices: cmdInvoices,
+  "invoice-ok": cmdInvoiceOk,
+  "invoice-return": cmdInvoiceReturn,
 };
 const fn = COMMANDS[cmd];
 if (!fn) {
-  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release|to-pay|paid|unpaid> … (파일 머리말 참고)");
+  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release|to-pay|paid|unpaid|invoices|invoice-ok|invoice-return> … (파일 머리말 참고)");
   process.exit(2);
 }
 await fn();

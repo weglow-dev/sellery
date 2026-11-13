@@ -91,6 +91,8 @@
 		color: var(--color-fg);
 		font-family: var(--font-sans);
 		word-break: keep-all;
+		/* 시안(Claude Design)과 같은 굵기로 — 없으면 맥에서 어두운 배경의 밝은 글자가 한 단계 두꺼워 보인다 · 윈도우는 무시 */
+		-webkit-font-smoothing: antialiased;
 	}
 	input,
 	textarea,

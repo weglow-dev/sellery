@@ -3,14 +3,15 @@
 	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
-	import SettleHold from '$lib/components/SettleHold.svelte';
+	import SettleTodo from '$lib/components/SettleTodo.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
 	/** 정산 상세(0089 · 시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL). `/settle/next` = 다음 정산(예상) · `/settle/YYYY-MM` = 확정된 회차.
 	 *  상품별 내역(지급액 · 판매 · 정산금 · 상계 · 보증금 · 판매 내역 = 주문 줄 · 고객 이름 가림) · 정산 계산 · 지급 정보 · (다음 정산) 아직 포함되지 않은 판매.
 	 *  보류 상품(제조금액 확인 중)은 지급액 대신 "—" + 한 줄 안내. 정산 뒤 환불이 있으면 정산 계산에 줄을 더한다.
 	 *  보류 해제(0089): 지난 달 보류분이 이 정산에서 지급되면 같은 상품이라도 "○월분 · 보류 해제" 줄이 따로 생긴다. 원래 달 상세에는 "○월 정산에서 지급"으로 남고 합계에서 빠진다.
-	 *  모바일: 60px 머리 · 정산 계산 → 상품별 내역 / PC(lg~): 32px 제목 · 왼쪽 상품별 내역 + 오른쪽 420px sticky 정산 계산 · 지급 정보 */
+	 *  지급까지 할 일(시안 2026-11-13 · SettleTodo): 지급 전이면 ① 정산 정보 등록 ② 세금계산서 발행(0104 · 서버 myr_payout_invoice_json) — 지급은 세금계산서 확인 뒤라 날짜는 "정산일"(지급 완료면 이체한 날).
+	 *  모바일: 60px 머리 · 상태 · 지급까지 할 일 → 정산 계산 → 상품별 내역 / PC(lg~): 32px 제목 · 왼쪽 지급까지 할 일 · 상품별 내역 + 오른쪽 420px sticky 정산 계산 · 지급 정보(보류 사유 · 세금계산서 상태) */
 	let { data } = $props();
 	const st = $derived(data.settle);
 	const upcoming = $derived(data.key === 'next');
@@ -21,11 +22,19 @@
 	const payAt = $derived(upcoming ? st.preview.settleAt : (mon?.payAt ?? null));
 	// 지급 완료면 이체한 날(서버 paid_on · 0103) — 시각 없이 날짜만
 	const paidOn = $derived(mon?.paidOn ?? null);
-	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · hold — 0102)
-	const hold = $derived(upcoming ? st.nextHold : (mon?.hold ?? null));
+	// 세금계산서(0104) — 서버 값 그대로(show = 칸을 그린다)
+	const inv = $derived(mon?.invoice?.show ? mon.invoice : null);
+	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · holds — 0102 · 0104). 이유가 여럿이면 전부 보여 준다
+	const holds = $derived(upcoming ? (st.nextHold ? [st.nextHold] : []) : (mon?.holds ?? []));
+	const holdText = $derived(holds.map((h) => h.label).join(', '));
+	// 지급까지 할 일 ① — 사업자 · 정산 정보 이유가 있으면 아직(서버 코드로 고른다)
+	const settleInfoHold = $derived(holds.some((h) => h.code === 'settle_info'));
+	// 지급 완료(이체한 날이 있다)면 할 일 카드를 그리지 않는다 · 다음 정산 · 세금계산서가 있는 달 · 정산 정보가 걸린 달만
+	const showTodo = $derived(!paidOn && (upcoming || !!inv || settleInfoHold));
 	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '' }));
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
-	const totalLabel = $derived(upcoming ? '지급 예정 금액' : '지급액');
+	// 이체 전이면 지급 예정 금액 · 지급 완료(이체한 날이 있다)면 지급액
+	const totalLabel = $derived(paidOn ? '지급액' : '지급 예정 금액');
 	const byProduct = $derived(itemsByProduct(data.items));
 	const nextPay = $derived(shortDate(st.preview.settleAt));
 
@@ -66,7 +75,10 @@
 			<span class="font-extrabold text-accent tabular-nums {big ? 'text-[22px]' : 'text-[20px]'}">{won(src.total.payout)}</span>
 		</div>
 	</div>
-	{#if src.total.held}<p class="mt-2.5 text-[12px] leading-[1.6] text-[#ff8a8a]">제조금액 확인 중인 상품 {src.total.held}개는 금액이 정해지면 정산돼요(합계에서 빠져 있어요)</p>{/if}
+{/snippet}
+
+{#snippet heldNote(cls: string)}
+	{#if src.total.held}<p class="text-[12px] leading-[1.6] text-[#ff8a8a] {cls}">제조금액 확인 중인 상품 {src.total.held}개는 합계에서 빠져 있어요. 금액이 정해지면 정산돼요.</p>{/if}
 {/snippet}
 
 {#snippet upcomingNote(cls: string)}
@@ -91,15 +103,18 @@
 			<!-- 모바일 상태 줄 -->
 			<div class="flex items-center gap-2 lg:hidden">
 				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
-				<span class="ml-auto text-[12px] text-white/50">{paidOn ? `${shortDate(paidOn)} 지급` : `${settleAtLabel(payAt)} ${upcoming ? '지급 예정' : '지급'}`}</span>
+				<span class="ml-auto text-[12px] text-white/50">{paidOn ? `${shortDate(paidOn)} 지급` : `${settleAtLabel(payAt)} 정산${upcoming ? ' 예정' : ''}`}</span>
 			</div>
-			{#if hold && hold.code !== 'settle_info'}<p class="mt-2 text-[12px] text-white/55 lg:hidden">보류 사유 · {hold.label}</p>{/if}
-			{#if hold?.code === 'settle_info'}<div class="mt-4 lg:mt-0 lg:mb-[22px]"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(payAt)} /></div>{/if}
+			{#if holds.length}<p class="mt-2 text-[12px] leading-[1.5] text-white/55 lg:hidden">보류 사유 : {holdText}</p>{/if}
+			{#if showTodo}
+				<SettleTodo month={data.key} settleStatus={st.settleStatus} settleInfoDone={!settleInfoHold} {inv} depositRefund={src.total.depositRefund} {payAt} />
+			{/if}
 
 			<!-- 모바일 정산 계산 -->
 			<div class="lg:hidden">
 				<h3 class="mt-[22px] mb-2.5 text-[14px] font-extrabold text-white/70">정산 계산</h3>
 				<div class="rounded-[20px] border border-white/8 bg-white/3 p-4">{@render calcRows(false)}</div>
+				{@render heldNote('mt-2.5')}
 				{@render upcomingNote('mt-2.5')}
 			</div>
 
@@ -188,12 +203,18 @@
 			<div class="rounded-3xl border border-white/8 bg-panel p-6">
 				<p class="mb-3.5 text-[16px] font-extrabold">정산 계산</p>
 				{@render calcRows(true)}
+				{@render heldNote('mt-3')}
 				<p class="mt-[22px] mb-3 text-[14px] font-extrabold text-white/70">지급 정보</p>
 				<div class="flex flex-col gap-2.5 text-[14px]">
-					<div class="flex justify-between text-white/60"><span>지급일</span><span class="font-semibold text-fg tabular-nums">{paidOn ? shortDate(paidOn) : settleAtLabel(payAt)}</span></div>
+					<div class="flex justify-between text-white/60"><span>{paidOn ? '지급일' : '정산일'}</span><span class="font-semibold text-fg tabular-nums">{paidOn ? shortDate(paidOn) : settleAtLabel(payAt)}</span></div>
 					<div class="flex justify-between text-white/60"><span>정산 대상</span><span class="font-semibold text-fg">{target}</span></div>
 					<div class="flex items-center justify-between text-white/60"><span>상태</span><span class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span></div>
-					{#if hold}<div class="flex justify-between text-white/60"><span>보류 사유</span><span class="font-semibold text-fg">{hold.label}</span></div>{/if}
+					{#if holds.length}
+						<div class="flex justify-between gap-3 text-white/60">
+							<span class="shrink-0">보류 사유</span>
+							<span class="text-right font-semibold text-fg">{holdText}</span>
+						</div>
+					{/if}
 				</div>
 				{@render upcomingNote('mt-4')}
 				<button type="button" onclick={() => goto('/settle')} class="mt-5 h-[54px] w-full rounded-2xl border-[1.5px] border-white/14 text-[15px] font-bold text-fg transition-colors hover:border-white/35">목록으로</button>
