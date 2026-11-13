@@ -203,6 +203,8 @@ const MYR_MIRROR_RULES = [
   { re: /\bfull\s*&&\s*!\s*[\w.]*deduction\b/, why: "토스 전액 취소 여부를 다시 판정 — 서버 값 cancelFull(myr_refund_cancel_full · 0105)을 쓴다" },
   { re: /\bdeposit\)\s*return\s*\{\s*amount:\s*0\b/, why: "입금 전 취소 금액을 다시 정함 — 서버 값 refundAmount(precheck · 0105)를 쓴다" },
   { re: /\bclaimQuote\([^)]*returnFee\b/, why: "처리 방법별 예상 금액의 차감액을 왕복 배송비로 다시 정함 — 서버 값 optionDeductions(0105)를 쓴다" },
+  // 정산할 달(0106)
+  { re: /\b(m|month|mon)\s*===\s*0\s*\?\s*12\b|\bpreviousSettlementMonth\b/, why: "정산할 달(지난달)을 TS 에서 계산 — 서버 값 myr_settlement_due(0106 · 마지막 회차 다음 달 · 실패 따라잡기)를 쓴다" },
   // 세금계산서(0104)
   { re: /\/\s*1\.1\b|\/\s*11\b|\bsupply\s*\*\s*0\.1\b|\*\s*10\s*\/\s*11\b/, why: "세금계산서 공급가액 · 세액을 화면에서 나눔 — 서버 값 supply · tax(myr_tax_invoice_amounts · 0104)를 쓴다" },
   { re: /\bsupply\s*\+\s*[\w.]*tax\b|\btax\s*\+\s*[\w.]*supply\b/, why: "세금계산서 합계를 화면에서 더함 — 서버 값 total(myr_payout_invoice_total · 0104)을 쓴다" },

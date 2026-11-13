@@ -33,6 +33,8 @@ values ('00000000-0000-4000-8000-0000000a9c01', '00000000-0000-4000-8000-0000000
        ('00000000-0000-4000-8000-0000000a9c04', '00000000-0000-4000-8000-0000000a9b02', '00000000-0000-4000-8000-0000000a9a01', '00000000-0000-4000-8000-0000000a9001', '포도 젤리', 1, 100000, 'SHIPPING', null);
 
 -- ---------- 예상(1월 회차 전 · 2월 1일 10시) ----------
+-- 0106 — 정산할 달은 마지막 회차 다음 달(빠진 달 중 가장 오래된 달). 로컬 DB 에 예전 회차가 있어도 결과가 같게 직전 회차(2029-12)를 둔다
+insert into public.myr_settlement_runs (month, cutoff_at, created_by) values ('2029-12-01', '2030-01-01 13:00+09', 'pgtap');
 create temp table pv as select public.myr_settlement_preview('00000000-0000-4000-8000-0000000a9001', '2030-02-01 10:00+09') as v;
 create temp table hp as select public.myr_app_seller_settle_preview_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-01 10:00+09') as v;
 select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settle_preview_items_of_user('00000000-0000-4000-8000-0000000a9e01', '2030-02-01 10:00+09'))), 2, '예상 주문 줄 2줄(P · Q · 배송 전 줄 제외)');

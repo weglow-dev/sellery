@@ -5,7 +5,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Admin = SupabaseClient;
-export type EventSource = 'webhook' | 'deposit_callback' | 'confirm' | 'cancel';
+/** settlement = MYR 정산 크론 실패(0106 · 운영 할 일 목록) */
+export type EventSource = 'webhook' | 'deposit_callback' | 'confirm' | 'cancel' | 'settlement';
 
 export async function logPaymentEvent(
 	admin: Admin,
