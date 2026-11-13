@@ -203,6 +203,8 @@ const MYR_MIRROR_RULES = [
   { re: /\bfull\s*&&\s*!\s*[\w.]*deduction\b/, why: "토스 전액 취소 여부를 다시 판정 — 서버 값 cancelFull(myr_refund_cancel_full · 0105)을 쓴다" },
   { re: /\bdeposit\)\s*return\s*\{\s*amount:\s*0\b/, why: "입금 전 취소 금액을 다시 정함 — 서버 값 refundAmount(precheck · 0105)를 쓴다" },
   { re: /\bclaimQuote\([^)]*returnFee\b/, why: "처리 방법별 예상 금액의 차감액을 왕복 배송비로 다시 정함 — 서버 값 optionDeductions(0105)를 쓴다" },
+  // 전체 환불(0108) — 줄 상태로 주문 전체 환불을 판정하지 않는다(남은 수량 기준 · 서버 주문 상태)
+  { re: /\.every\([^\n]*['"](REFUNDED|CANCELED)['"]/, why: "줄 상태로 주문 전체 환불을 다시 판정 — 서버 주문 상태(myr_order_refund_status · 남은 수량 기준 · 0108)를 쓴다" },
   // 정산할 달(0106)
   { re: /\b(m|month|mon)\s*===\s*0\s*\?\s*12\b|\bpreviousSettlementMonth\b/, why: "정산할 달(지난달)을 TS 에서 계산 — 서버 값 myr_settlement_due(0106 · 마지막 회차 다음 달 · 실패 따라잡기)를 쓴다" },
   // 세금계산서(0104)
