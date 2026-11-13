@@ -12,6 +12,8 @@
 --     myr_order_refund_full(o, 수량)   이번 환불이 주문을 끝내는지 — 수량 ≥ 남은 수량(precheck full)
 --     myr_order_refund_status(o)       주문 상태 — 남은 수량 0 이면 REFUNDED · 아니면 PARTIAL_REFUNDED(record · 줄을 기록한 뒤)
 --     myr_line_refund_status(i, 수량)  줄 상태 — 이번 환불 뒤 남은 수량(myr_line_left − 수량)이 0 이하면 REFUNDED · 아니면 PARTIAL_REFUNDED
+--   같은 함수 안에서 모양만 바꿔 다시 쓴 식도 주인 함수로 — precheck 의 refund_amount + 금액 + 배송비 <= amount → myr_order_net ·
+--     record 의 refunded_qty + 수량 >= qty → myr_line_refund_status(myr_line_left). 검사 패턴도 이 모양을 잡게 넓힌다.
 --   그대로 둔 것: 동시 환불 틈(precheck 는 토스 전 · record 는 토스 뒤 — 그 사이 다른 줄 환불이 끼면 배송비가 빠진 채 REFUNDED) —
 --     record 가 precheck 로 다시 계산해 금액이 다르면 운영 할 일 목록에 띄운다(0105 mismatch).
 --   계산 결과 불변 — 같은 판정을 수량 기준 함수로 옮겼다(supabase/tests/myr_refund_full.test.sql · 기존 환불 테스트).
@@ -53,7 +55,7 @@ as $$
 $$;
 revoke all on function public.myr_line_refund_status(public.myr_order_items, integer) from public, anon, authenticated;
 
--- 0105 정의 + 주문이 끝나는지 → myr_order_refund_full
+-- 0105 정의 + 주문이 끝나는지 → myr_order_refund_full · 배송비가 남은 결제 금액 안인지 → myr_order_net(모양만 바꾼 식을 주인 함수로)
 create or replace function public.myr_app_refund_precheck(p_order_id uuid, p_items jsonb, p_actor text, p_actor_id uuid, p_deduction integer default 0)
 returns jsonb
 language plpgsql
@@ -112,7 +114,8 @@ begin
   --   0108: 주문이 끝나는지는 남은 수량 하나(myr_order_refund_full → myr_order_left_qty) — record 의 주문 상태(myr_order_refund_status)와 같은 기준
   v_full := public.myr_order_refund_full(o, v_req_total);
   v_goods := v_amount;
-  if v_full and o.shipping_fee > 0 and o.refund_amount + v_amount + o.shipping_fee <= o.amount then v_amount := v_amount + o.shipping_fee; end if;
+  --   0108: 배송비까지 돌려줘도 남은 결제 금액(myr_order_net = 결제 − 환불) 안인지 — 같은 뜻을 모양만 바꿔 쓰지 않는다
+  if v_full and o.shipping_fee > 0 and v_amount + o.shipping_fee <= public.myr_order_net(o) then v_amount := v_amount + o.shipping_fee; end if;
 
   -- 0105: 돌려줄 돈 — 입금 전 취소는 돈이 오가지 않아 0(차감도 없다) · 그 밖은 결제 금액 − 차감(myr_refund_after_deduction · 차감이 금액 이상이면 거절)
   v_deposit := o.status = 'WAITING_DEPOSIT';

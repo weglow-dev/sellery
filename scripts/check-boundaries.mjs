@@ -151,9 +151,9 @@ for (const file of walk(join(ROOT, "packages", "myr-core", "src"))) {
 // ---------- (h) MYR — 서버 판정 식을 화면 · TS 에서 다시 쓰지 않는다 ----------
 // 식 하나 = 규칙 하나. allow 는 그 식이 "형식(서버가 보내는 값의 종류)"으로만 쓰이는 파일. 새 예외를 넣기 전에 서버 응답에 값을 더하는 쪽을 먼저 본다.
 const MYR_MIRROR_RULES = [
-  { re: /\bqty\s*-\s*[\w.]*refunded_?[qQ]ty\b/, why: "줄의 남은 수량(수량 − 환불 수량)을 다시 계산 — 서버 값 leftQty(myr_line_left)를 쓴다" },
+  { re: /\bqty\s*-\s*[\w.]*refunded_?[qQ]ty\b|\brefunded_?[qQ]ty\s*\+\s*[\w.]+\s*(>=|>|<=|<)\s*[\w.]*\bqty\b/, why: "줄의 남은 수량(수량 − 환불 수량 · 환불 수량 + n ≥ 수량 모양도)을 다시 계산 — 서버 값 leftQty(myr_line_left)를 쓴다" },
   { re: /['"]CANCELED['"]\s*&&[^\n]*\bleftQty\b|\bleftQty\s*(>|<=|===)\s*0\b/, why: "살아 있는 줄을 다시 판정 — 서버 값 live(myr_line_live)를 쓴다" },
-  { re: /\b[aA]mount\s*-\s*[\w.]*refund_?[aA]mount\b/, why: "금액 − 환불을 다시 계산 — 서버 값(netAmount · amounts.net · myr_line_net)을 쓴다" },
+  { re: /\b[aA]mount\s*-\s*[\w.]*refund_?[aA]mount\b|\brefund_?[aA]mount\s*\+[^;\n]*<=\s*[\w.]*\b[aA]mount\b/, why: "금액 − 환불(환불 + n ≤ 금액 모양도)을 다시 계산 — 서버 값(netAmount · amounts.net · myr_line_net · myr_order_net)을 쓴다" },
   { re: /\b[uU]nit_?[pP]rice\s*\*|\*\s*[\w.]*[uU]nit_?[pP]rice\b/, why: "단가 × 수량을 다시 계산 — 서버 값(줄 amount · leftAmount · 예상 금액 lines · myr_line_amount)을 쓴다" },
   { re: /\bgoods\s*\+\s*[\w.]*shippingBack\b|\bshippingBack\s*\+\s*[\w.]*goods\b/, why: "결제 금액(상품 + 배송비)을 다시 계산 — 서버 값 paid 를 쓴다" },
   { re: /['"]PAID['"]\s*(,|\|\|)[^\n]*['"]PARTIAL_REFUNDED['"]/, why: "주문 상태 묶음을 다시 씀 — 서버 값(alive · claimStatus) 또는 DB 함수(myr_order_status_*)를 쓴다" },

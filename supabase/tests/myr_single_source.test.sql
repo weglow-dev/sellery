@@ -265,10 +265,10 @@ create temp table _fn as
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'myr%';
 create temp table _rules (ord serial, label text, pat text, allowed text[]);
 insert into _rules (label, pat, allowed) values
-  ('줄의 남은 수량(수량 − 환불 수량)',        $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty$p$,        '{myr_line_left}'),
+  ('줄의 남은 수량(수량 − 환불 수량 · 환불 수량 + n ≥ 수량 모양도)', $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty|refunded_qty\s*\+\s*[\w.]+\s*(>=|>|<=|<)\s*(\w+\.)?qty\M$p$, '{myr_line_left}'),
   ('살아 있는 줄(남은 수량 > 0)',             $p$myr_line_left\(\w+\)\s*>\s*0$p$,                                '{myr_line_live}'),
   ('취소 줄 비교',                            $p$status\s*<>\s*'CANCELED'|\.status\s*=\s*'CANCELED'|'REFUNDED'\s*,\s*'CANCELED'$p$, '{myr_line_valid,myr_app_deposit_expire,myr_app_refund_record}'),
-  ('금액 − 환불',                             $p$amount\s*-\s*(\w+\.)?refund_amount$p$,                          '{myr_line_net,myr_order_net}'),
+  ('금액 − 환불(환불 + n ≤ 금액 모양도)',      $p$amount\s*-\s*(\w+\.)?refund_amount|refund_amount\s*\+[^;]*<=\s*(\w+\.)?amount\M$p$, '{myr_line_net,myr_order_net}'),
   ('단가 × 수량',                             $p$unit_price(::bigint)?\s*\*|v_unit(::bigint)?\s*\*|\*\s*(\w+\.)?qty\M|\*\s*v_qty$p$, '{myr_line_amount}'),
   ('상품 남은 재고(입고 − 판매)',             $p$-\s*(coalesce\()?(\w+\.)?sold_qty$p$,                           '{myr_product_left}'),
   ('품절(남은 재고 0)',                       $p$myr_product_left\(\w+\)\s*(<=|>|<|=)$p$,                        '{myr_product_sold_out}'),
