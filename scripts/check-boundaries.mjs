@@ -197,6 +197,11 @@ const MYR_MIRROR_RULES = [
   // 교환·환불 요청 처리 방법(0105)
   //   'refund' · 'reship' 은 요청 종류 · 단계 · 운영 동작 이름과 겹쳐 잡지 않는다 — 'partial' 은 처리 방법에만 쓰는 값
   { re: /(===|!==)\s*['"]partial['"]/, why: "처리 방법으로 차감 여부를 다시 판정 — 서버 값 optionDeductions(myr_claim_option_deduction · myr_claim_option_blocked · 0105)를 쓴다" },
+  // 환불 금액(0105) — 차감 뒤 금액 · 차감 가능 · 토스 전액 취소 · 입금 전 0원은 precheck 응답(refundAmount · cancelFull)
+  { re: /\b(amount|paid)\s*-\s*[\w.]*deduction\b/, why: "차감 뒤 환불 금액을 다시 계산 — 서버 값 refundAmount(precheck refund_amount · myr_refund_after_deduction · 0105)를 쓴다" },
+  { re: /\bdeduction\s*<=?\s*[\w.]*(amount|paid)\b/, why: "차감할 수 있는지 다시 판정 — 서버가 거절한다(DEDUCTION_TOO_BIG · myr_deduction_fits · 0105)" },
+  { re: /\bfull\s*&&\s*!\s*[\w.]*deduction\b/, why: "토스 전액 취소 여부를 다시 판정 — 서버 값 cancelFull(myr_refund_cancel_full · 0105)을 쓴다" },
+  { re: /\bdeposit\)\s*return\s*\{\s*amount:\s*0\b/, why: "입금 전 취소 금액을 다시 정함 — 서버 값 refundAmount(precheck · 0105)를 쓴다" },
   { re: /\bclaimQuote\([^)]*returnFee\b/, why: "처리 방법별 예상 금액의 차감액을 왕복 배송비로 다시 정함 — 서버 값 optionDeductions(0105)를 쓴다" },
   // 세금계산서(0104)
   { re: /\/\s*1\.1\b|\/\s*11\b|\bsupply\s*\*\s*0\.1\b|\*\s*10\s*\/\s*11\b/, why: "세금계산서 공급가액 · 세액을 화면에서 나눔 — 서버 값 supply · tax(myr_tax_invoice_amounts · 0104)를 쓴다" },

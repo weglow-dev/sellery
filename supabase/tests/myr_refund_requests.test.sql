@@ -1,7 +1,7 @@
 -- pgTAP — 0078 교환·환불 요청: 권한 · 요청 남기기(가드 · 사진 · 줄마다 하나) · 크리에이터 목록 · 승인/반려(처리 방법 · 할 일 · 차감) ·
 --         회수 확인 · 환불 기록 · 재발송 송장 · 완료 판정 · 환불 재시도 대상 · 고아 사진 (docs/myr.md §4.2.1 7번)
 begin;
-select plan(89);
+select plan(90);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open 불가');
@@ -140,6 +140,9 @@ select ok((select bool_or(e ->> 'code' = (select code from rq where k = 'rc1') a
 select ok(not exists (select 1 from jsonb_array_elements(public.myr_app_claims_refund_due(interval '-1 minute', 20)) e where e ->> 'code' = (select code from rq where k = 'rc4')), '회수 전 요청은 재시도 대상 아님');
 select is(public.myr_app_claim_refunded((select code from rq where k = 'rc1'), 26000), '{"ok": true, "already": false, "status": "done"}'::jsonb, '환불 기록 → 할 일이 끝나 완료');
 select is((select jsonb_build_object('amount', refund_amount, 'done', done_at is not null) from public.myr_refund_requests where code = (select code from rq where k = 'rc1')), '{"amount": 26000, "done": true}'::jsonb, '환불 금액 · 완료 시각');
+select is((select jsonb_build_object('paid', (j ->> 'refund_paid')::int, 'back', public.myr_refund_after_deduction((j ->> 'refund_paid')::int, (j ->> 'deduction')::int), 'refund', (j ->> 'refund_amount')::int)
+             from (select public.myr_refund_request_json(q) as j from public.myr_refund_requests q where q.code = (select code from rq where k = 'rc1')) s),
+  '{"paid": 32000, "back": 26000, "refund": 26000}'::jsonb, '0105 응답 refund_paid(환불액 + 차감)를 차감 뒤 금액 함수에 넣으면 환불액 — 두 식이 같은 관계');
 select is((public.myr_app_claim_refunded((select code from rq where k = 'rc1'), 26000) ->> 'already')::boolean, true, '환불 기록 다시 → already');
 
 -- ---------- 재발송 ----------

@@ -3,7 +3,7 @@
 --   여기서는 요청 줄(배송준비중 이후)을 actor system 으로 precheck 했을 때: 마지막 줄이면 배송비 포함 · 아니면 줄만 · 고객 actor 는 셀프 환불 가드로 막힘 · 금액 계산은 읽기만.
 --   MYR2087 재현: 36,000 줄 하나 + 배송비 3,000 → precheck 39,000 → 단순 변심 차감 6,000 → 33,000.
 begin;
-select plan(15);
+select plan(25);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-000000000e01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-quote-cust@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
@@ -24,6 +24,15 @@ values ('00000000-0000-4000-8000-000000000e41', '00000000-0000-4000-8000-0000000
 -- 마지막 줄 — 배송비 포함(39,000 → 차감 6,000 하면 33,000 · 콘솔 · 샵 · 실제 환불 모두 이 값)
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null) ->> 'amount', '39000', '마지막 요청 줄 → 줄 36,000 + 배송비 3,000');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null) ->> 'full', 'true', '마지막 줄이면 full');
+-- 0105 — 차감 뒤 금액 · 토스 전액 취소 여부도 precheck 가 정한다(TS 는 읽기만)
+select is((select jsonb_build_object('refund', j -> 'refund_amount', 'deduction', j -> 'deduction', 'cancel_full', j -> 'cancel_full') from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, 6000) as j) s),
+  '{"refund": 33000, "deduction": 6000, "cancel_full": false}'::jsonb, '차감 — 39,000 − 6,000 = 33,000 · 차감이 있으면 부분 취소(남은 돈을 남긴다)');
+select is((select jsonb_build_object('refund', j -> 'refund_amount', 'deduction', j -> 'deduction', 'cancel_full', j -> 'cancel_full') from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, 0) as j) s),
+  '{"refund": 39000, "deduction": 0, "cancel_full": true}'::jsonb, '전액 · 차감 0(같은 묶음에서 이미 뺐을 때와 같다) → 그대로 · 토스 전액 취소');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, -1) ->> 'code', 'BAD_DEDUCTION', '음수 차감 BAD_DEDUCTION');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, 39000) ->> 'code', 'DEDUCTION_TOO_BIG', '차감이 결제 금액과 같으면(0원) DEDUCTION_TOO_BIG');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, 38999) ->> 'refund_amount', '1', '차감 뒤 1원이면 환불한다');
+select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e32', '[{"item_id":"00000000-0000-4000-8000-000000000e42","qty":1}]', 'system', null, 6000) ->> 'refund_amount', '30000', '부분 — 마지막 줄이 아니면 줄 금액에서만 차감(36,000 − 6,000)');
 -- 다른 줄이 남은 주문 — 한 줄만이면 배송비 없음
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000e32', '[{"item_id":"00000000-0000-4000-8000-000000000e42","qty":1}]', 'system', null) ->> 'amount', '36000', '다른 줄이 남으면 줄 금액만(배송비 없음)');
 -- 고른 줄이 남은 전부면(한 번에 보낸 요청) — 배송비 한 번
@@ -48,8 +57,14 @@ select is(public.myr_app_claim_decide((select code from public.myr_refund_reques
 select is(public.myr_app_claim_decide((select code from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'), '00000000-0000-4000-8000-000000000e01', 'approve', 'partial', '   ') ->> 'ok', 'true', '승인 · 빈 메시지 → 승인된다');
 select is((select jsonb_build_object('status', status, 'message', message, 'deduction', deduction) from public.myr_refund_requests where order_id = '00000000-0000-4000-8000-000000000e31'),
   '{"status": "progress", "message": null, "deduction": 6000}'::jsonb, '메시지는 null · 처리 진행 · 차감 그대로');
+-- 0105 record — 받은 금액을 같은 precheck(같은 차감)로 다시 계산해 비교 · 다르면 거절하지 않고 기록한 뒤 mismatch
+select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000e31', '[{"item_id":"00000000-0000-4000-8000-000000000e41","qty":1}]', 'system', null, '단순 변심', 30000, null, 6000) - 'order_code',
+  '{"ok": true, "already": false, "status": "REFUNDED", "amount": 30000, "mismatch": true, "expected": 33000, "got": 30000}'::jsonb, '금액이 다르면 mismatch(expected 33,000 · got 30,000) — 기록은 된다');
+select is((select refund_amount from public.myr_orders where id = '00000000-0000-4000-8000-000000000e31'), 30000, 'mismatch 여도 받은 금액(토스에 보낸 금액)으로 기록');
 -- 권한 — precheck 는 서버(service role) 전용
-select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 precheck 불가');
+select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 precheck 불가');
+select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 record 불가');
+select is((select count(*)::int from pg_proc where proname in ('myr_app_refund_precheck', 'myr_app_refund_record')), 2, '옛 인자 버전이 남지 않았다(precheck · record 하나씩)');
 
 select * from finish();
 rollback;
