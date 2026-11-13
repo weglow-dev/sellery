@@ -2,7 +2,7 @@
 --   지급 건 보류 이유 tax_invoice(사업자 정보 이유 다음) · 크리에이터 제출 · 운영 확인 · 다시 제출 요청 · 금액 바뀜 · 지급 완료 뒤 · 목록 · 보고 · 정산 탭 · 이력 · 표 제약
 -- 2034년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(68);
+select plan(73);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_tax_invoice_submit', '{uuid,date,text,"timestamp with time zone"}'::text[], 'anon', '{}'::text[], 'anon 은 세금계산서 제출 불가');
@@ -86,12 +86,21 @@ select is((select jsonb_agg(jsonb_build_array(h, public.myr_payout_amount(pg_tem
 select is((select jsonb_object_agg(h, pg_temp.st(h)) from unnest(array['@pgtap.ti1', '@pgtap.ti2', '@pgtap.ti3', '@pgtap.ti4']) h),
           '{"@pgtap.ti1": ["held", "tax_invoice", false], "@pgtap.ti2": ["held", "tax_invoice", false], "@pgtap.ti3": ["pending", null, true], "@pgtap.ti4": ["held", "settle_info", false]}'::jsonb,
           '자동 상태 — 세금계산서 확인 전이면 보류 · 필요 없으면 지급 대기 · 사업자 정보 이유가 먼저');
+select is((select jsonb_object_agg(h, jsonb_path_query_array(public.myr_payout_holds_json(pg_temp.po(h)), '$[*].code')) from unnest(array['@pgtap.ti1', '@pgtap.ti3', '@pgtap.ti4']) h),
+          '{"@pgtap.ti1": ["tax_invoice"], "@pgtap.ti3": [], "@pgtap.ti4": ["settle_info", "tax_invoice"]}'::jsonb,
+          '보류 이유 전부 — 사업자 정보와 세금계산서가 같이 걸리면 둘 다(먼저 볼 이유부터) · 보류가 아니면 빈 배열');
+select is(jsonb_path_query_array(public.myr_payout_holds_json(pg_temp.po('@pgtap.ti4')), '$[*].label'), '["사업자 · 정산 정보 확인 전", "세금계산서 확인 전"]'::jsonb, '보류 이유 문구 둘');
+select public.myr_payout_hold('2034-01-01', '@pgtap.ti4', '계좌 다시 확인', 'test');
+select is(jsonb_path_query_array(public.myr_payout_holds_json(pg_temp.po('@pgtap.ti4')), '$[*].code'), '["manual", "settle_info", "tax_invoice"]'::jsonb, '운영 보류 중이면 운영 보류 먼저 · 자동 이유도 같이');
+select public.myr_payout_release('2034-01-01', '@pgtap.ti4', 'test');
 select is(pg_temp.inv('@pgtap.ti2') - 'submitted_at' - 'checked_at',
           '{"needed": true, "show": true, "total": 20000, "supply": 18182, "tax": 1818, "write_date": "2034-01-31", "due_date": "2034-02-10", "overdue": false, "todo": true,
-            "status": "none", "status_label": "제출 전", "approval_no": null, "return_note": null, "amount_changed": false, "can_submit": true}'::jsonb,
+            "status": "none", "status_label": "제출 전", "accepted": false, "approval_no": null, "return_note": null, "amount_changed": false, "can_submit": true}'::jsonb,
           'T2 응답 — 합계 2만 · 공급가액 18,182 · 세액 1,818 · 작성일자 1/31 · 기한 2/10 · 제출 전 · 제출 가능');
 select is(jsonb_build_array(pg_temp.inv('@pgtap.ti2', '2034-02-10 23:59+09') -> 'overdue', pg_temp.inv('@pgtap.ti2', '2034-02-11 00:00+09') -> 'overdue'), '[false, true]'::jsonb,
           '기한 지남 — 10일까지는 아님 · 11일(KST)부터');
+select is(jsonb_build_array(public.myr_tax_invoice_open(pg_temp.po('@pgtap.ti2')), public.myr_tax_invoice_open(pg_temp.po('@pgtap.ti3'))), '[true, false]'::jsonb,
+          '아직 받는 지급 건 — 필요하고 지급 전 · 필요 없으면 아님');
 select is(jsonb_build_array(pg_temp.inv('@pgtap.ti3') -> 'needed', pg_temp.inv('@pgtap.ti3') -> 'show', pg_temp.inv('@pgtap.ti3') -> 'can_submit'), '[false, false, false]'::jsonb, 'T3 — 세금계산서 칸 없음');
 
 -- ---------- 크리에이터 제출 — 거절 ----------
@@ -129,7 +138,7 @@ select is(public.myr_tax_invoice_return('2034-01-01', '@pgtap.ti1', '  ', 'test'
 select is(public.myr_tax_invoice_return('2034-01-01', '@pgtap.ti2', '금액', 'test') ->> 'code', 'NOT_SUBMITTED', '안 낸 세금계산서는 요청할 것이 없다');
 select is(public.myr_tax_invoice_return('2034-01-01', '@pgtap.ti1', '작성일자가 1월 31일이 아니에요', 'test') - 'ok', '{"status": "held", "hold_reason": "tax_invoice"}'::jsonb, '확인 완료도 지급 전이면 되돌릴 수 있다 → 다시 보류');
 select is(pg_temp.inv('@pgtap.ti1', '2034-02-11 10:00+09') - 'submitted_at' - 'checked_at' - 'supply' - 'tax' - 'write_date' - 'due_date' - 'needed' - 'show' - 'total',
-          '{"overdue": true, "todo": true, "status": "returned", "status_label": "다시 제출 필요", "approval_no": "203402034100000011111111", "return_note": "작성일자가 1월 31일이 아니에요",
+          '{"overdue": true, "todo": true, "status": "returned", "status_label": "다시 제출 필요", "accepted": false, "approval_no": "203402034100000011111111", "return_note": "작성일자가 1월 31일이 아니에요",
             "amount_changed": false, "can_submit": true}'::jsonb, '크리에이터 — 다시 제출 필요 · 사유 · 기한 지났으면 기한 지남');
 select is(public.myr_tax_invoice_return('2034-01-01', '@pgtap.ti1', '또', 'test') ->> 'code', 'NOT_SUBMITTED', '이미 다시 제출 요청 중');
 select is(pg_temp.submit(1, '20340211-41000000-11111113', '2034-02-11 10:00+09') #>> '{invoice,return_note}', null, '다시 내면 사유는 지운다');
@@ -166,11 +175,12 @@ select is((select jsonb_build_array(e ->> 'month', e #>> '{seller,company}', e #
           '["2034-01", "티원상회", "1234567891"]'::jsonb, '홈택스 대조용 — 상호 · 사업자등록번호 원문(service_role 만)');
 
 -- ---------- 보고 · 정산 탭 ----------
+select is(jsonb_build_array(pg_temp.inv('@pgtap.ti1') -> 'accepted', pg_temp.inv('@pgtap.ti2') -> 'accepted'), '[true, false]'::jsonb, '응답 accepted — 확인 완료만 true');
 select is((select jsonb_object_agg(e #>> '{seller,handle}', jsonb_build_array(e ->> 'status', e #>> '{invoice,status}')) from jsonb_array_elements(public.myr_settlement_report('2034-01-01') -> 'payouts') e where e #>> '{seller,handle}' like '@pgtap.ti%'),
           '{"@pgtap.ti1": ["pending", "accepted"], "@pgtap.ti2": ["held", "submitted"], "@pgtap.ti3": ["pending", "none"], "@pgtap.ti4": ["pending", "accepted"]}'::jsonb, '보고 — 지급 건마다 세금계산서 상태');
-select is((select jsonb_build_array(m ->> 'payout_status', m #>> '{hold,label}', m #>> '{invoice,status_label}', (m #>> '{invoice,total}')::int, (m #>> '{invoice,supply}')::int)
+select is((select jsonb_build_array(m ->> 'payout_status', jsonb_path_query_array(m -> 'holds', '$[*].label'), m #>> '{invoice,status_label}', (m #>> '{invoice,total}')::int, (m #>> '{invoice,supply}')::int)
              from jsonb_array_elements(public.myr_app_seller_settlements_of_user('00000000-0000-4000-8000-0000000e70c2', '2034-02-05 10:00+09') -> 'months') m where m ->> 'month' = '2034-01'),
-          '["held", "세금계산서 확인 전", "확인 중", 20000, 18182]'::jsonb, '정산 탭(T2) — 지급 보류 · 이유 · 세금계산서 상태 · 합계 · 공급가액');
+          '["held", ["세금계산서 확인 전"], "확인 중", 20000, 18182]'::jsonb, '정산 탭(T2) — 지급 보류 · 이유 목록 · 세금계산서 상태 · 합계 · 공급가액');
 select is((select count(*)::int from jsonb_array_elements(public.myr_app_seller_settlements_of_user('00000000-0000-4000-8000-0000000e70c3') -> 'months') m where m ->> 'month' = '2034-01' and (m #>> '{invoice,show}')::boolean),
           0, '정산 탭(T3) — 세금계산서 칸 없음');
 

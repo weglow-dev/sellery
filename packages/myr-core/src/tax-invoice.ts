@@ -31,6 +31,8 @@ export type TaxInvoice = {
 	todo: boolean;
 	status: TaxInvoiceStatus;
 	statusLabel: string;
+	/** 운영 확인 완료 — 서버 myr_tax_invoice_accepted */
+	accepted: boolean;
 	approvalNo: string | null;
 	returnNote: string | null;
 	submittedAt: string | null;
@@ -55,6 +57,7 @@ export function taxInvoiceFromJson(v: unknown): TaxInvoice | null {
 		todo: o.todo === true,
 		status: STATUSES.includes(o.status as TaxInvoiceStatus) ? (o.status as TaxInvoiceStatus) : 'none',
 		statusLabel: s(o.status_label, '제출 전'),
+		accepted: o.accepted === true,
 		approvalNo: sn(o.approval_no),
 		returnNote: sn(o.return_note),
 		submittedAt: sn(o.submitted_at),

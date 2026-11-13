@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(165);
+select plan(167);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -301,12 +301,14 @@ insert into _rules (label, pat, allowed) values
   ('세금계산서 합계(보증금 환급 뺀 줄 지급액)', $p$myr_settlement_row_payout\([\w.]+,\s*[\w.]+,\s*0\)$p$,            '{myr_payout_invoice_total}'),
   ('공급가액 · 세액(합계 ÷ 11)',               $p$/\s*11\M$p$,                                                    '{myr_tax_invoice_amounts}'),
   ('세금계산서 필요(합계 0원 초과)',            $p$myr_payout_invoice_total\([^)]*\)\s*(>|<|>=|<=|<>)$p$,           '{myr_payout_needs_invoice}'),
+  ('세금계산서를 아직 받는 지급 건(필요 · 지급 전)', $p$myr_payout_needs_invoice\(\w+\)\s+and\s+not\s+public\.myr_payout_is_paid$p$, '{myr_tax_invoice_open}'),
   ('낸 합계 = 지금 합계',                      $p$(=|<>|is\s+distinct\s+from)\s*public\.myr_payout_invoice_total$p$, '{myr_tax_invoice_matches}'),
   ('지급 건의 세금계산서 찾기',                $p$myr_tax_invoices\s+\w+\s+where\s+\w+\.payout_id\s*=$p$,          '{myr_tax_invoice_of}'),
   ('세금계산서 확인 완료(비교 — set 은 값 넣기)', $p$(\(|and|or|where|when|not)\s*(\w+\.)?status\s*(=|<>)\s*'accepted'$p$, '{myr_tax_invoice_accepted}'),
   ('크리에이터가 낼 차례(없음 · 다시 제출 요청)', $p$(\(|and|or|where|when|not)\s*(\w+\.)?status\s*(=|<>)\s*'returned'$p$, '{myr_tax_invoice_waiting_creator}'),
   ('세금계산서 쪽 지급 가능(확인 완료 · 금액 같음)', $p$myr_tax_invoice_accepted\(\w+\)\s+and\s+public\.myr_tax_invoice_matches$p$, '{myr_payout_invoice_ok}'),
-  ('지급 건 보류 이유(세금계산서)',            $p$then\s+'tax_invoice'$p$,                                        '{myr_payout_hold_reason}'),
+  ('지급 건 보류 이유(세금계산서)',            $p$then\s+'tax_invoice'$p$,                                        '{myr_payout_hold_reasons}'),
+  ('보류 이유 목록 합치기(칸 이유 + 나머지)',   $p$array\[\w+\.hold_reason\]\s*\|\|$p$,                            '{myr_payout_holds_json}'),
   ('세금계산서 작성일자(정산월 말일)',          $p$myr_settlement_month_end\([^)]*\)\)\s*-\s*1$p$,                 '{myr_tax_invoice_write_date}'),
   ('세금계산서 발행 기한(다음 달 10일)',        $p$myr_settlement_month_end\([^)]*\)\)\s*\+\s*9$p$,                '{myr_tax_invoice_due}'),
   ('세금계산서 발행 기한 지남',                $p$>\s*public\.myr_tax_invoice_due$p$,                             '{myr_tax_invoice_overdue}'),

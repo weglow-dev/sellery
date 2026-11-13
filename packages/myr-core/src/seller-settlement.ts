@@ -43,7 +43,8 @@ export type SettlePreview = { month: string; settleAt: string | null; rows: Sett
 /** 지급 보류 이유(서버 0102 · 0104 — code settle_info · tax_invoice · manual · label = myr_payout_hold_label) */
 export type SettleHold = { code: string; label: string };
 /** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
- *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · hold = 보류 이유 · paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103)
+ *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · holds = 보류 이유 전부(서버 myr_payout_holds_json · 0104 — 사업자 정보와 세금계산서가 같이 걸리면 둘 다 · 보류가 아니면 [])
+ *  paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103)
  *  invoice = 세금계산서(서버 myr_payout_invoice_json · 0104 — 지급 건이 없으면 null) */
 export type SettleMonth = {
 	month: string;
@@ -51,7 +52,7 @@ export type SettleMonth = {
 	payAt: string | null;
 	payoutStatus: string | null;
 	payoutLabel: string;
-	hold: SettleHold | null;
+	holds: SettleHold[];
 	paidOn: string | null;
 	invoice: TaxInvoice | null;
 	rows: SettleRow[];
@@ -182,7 +183,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				payAt: typeof x.pay_at === 'string' ? x.pay_at : null,
 				payoutStatus: typeof x.payout_status === 'string' ? x.payout_status : null,
 				payoutLabel: s(x.payout_label),
-				hold: holdFrom(x.hold),
+				holds: arr(x.holds).map(holdFrom).filter((h): h is SettleHold => !!h),
 				paidOn: typeof x.paid_on === 'string' ? x.paid_on : null,
 				invoice: taxInvoiceFromJson(x.invoice),
 				rows: rows(x.rows),
@@ -287,6 +288,13 @@ export function holdBanner(settleStatus: string, nextDate: string): { title: str
 	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나면 ${nextDate} 정산부터 지급돼요.`, cta: null };
 	if (settleStatus === 'rejected') return { title: '정산이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되면 바로 지급돼요.', cta: '정산 정보 다시 입력하기' };
 	return { title: '정산이 보류 중이에요', body: `사업자 · 정산 계좌 정보를 등록하면 ${nextDate} 정산부터 바로 지급돼요.`, cta: '정산 정보 등록하기' };
+}
+
+/** 정산 상세 "지급까지 할 일" 1단계(정산 정보 등록 · 시안 2026-11-13) — 끝났는지는 서버 보류 이유(settle_info)가 정한다. 여기서는 입력 상태별 버튼 · 칩 문구만 고른다 */
+export function settleInfoStep(settleStatus: string): { sub: string; action: string | null; chip: string | null } {
+	if (settleStatus === 'pending') return { sub: '운영팀이 확인하고 있어요', action: null, chip: '확인 중' };
+	if (settleStatus === 'rejected') return { sub: '정산 정보를 다시 입력해 주세요', action: '다시 입력', chip: null };
+	return { sub: '사업자 · 정산 계좌', action: '등록하기', chip: null };
 }
 
 /** 상품 줄 열쇠 — 같은 상품이라도 보류 해제분(origin)은 다른 줄 */

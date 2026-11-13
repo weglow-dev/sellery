@@ -228,7 +228,9 @@ async function cmdReport() {
   // 지급 건(0101 · 0102) — 금액 · 합계 · 상태 문구 · 보류 이유 · 지급 가능은 서버 값 그대로. 보류 해제 줄이 풀린 회차에 들어가 위 줄 합과 다를 수 있다
   console.log("  지급 건");
   for (const p of r.payouts ?? []) {
-    const why = p.hold_label ? ` (${p.hold_label}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
+    // 보류 이유 전부(0104 holds — 사업자 정보와 세금계산서가 같이 걸리면 둘 다)
+    const labels = (p.holds ?? []).map((h) => h.label).join(" · ");
+    const why = labels ? ` (${labels}${p.hold_note ? ` · ${p.hold_note}` : ""})` : "";
     const paid = p.paid_on ? ` | 이체 ${p.paid_on} ${won(p.paid_amount)}${p.paid_note ? ` · ${p.paid_note}` : ""}` : "";
     const inv = p.invoice?.needed ? ` | 세금계산서 ${p.invoice.status_label} ${won(p.invoice.total)}${p.invoice.overdue ? " · 기한 지남" : ""}` : " | 세금계산서 필요 없음";
     console.log(`  ${p.seller.handle} | ${p.status_label ?? p.status}${why} | 줄 ${p.rows}개 | ${won(p.amount)} | ${p.payable ? "지급 가능" : "지급 불가"}${inv}${paid}`);

@@ -36,12 +36,14 @@ describe('파서', () => {
 		expect([u.ledgers[0].depositState, u.months[0].payAt, u.months[0].rows[0].counted, u.months[0].rows[1].releasable]).toEqual(['unpaid', '2026-12-01T04:00:00+00:00', false, true]);
 		const h = sellerSettlementsFromJson({
 			next_hold: { code: 'settle_info', label: '사업자 · 정산 정보 확인 전' },
-			months: [{ month: '2026-11', payout_status: 'held', payout_label: '지급 보류', hold: { code: 'manual', label: '운영팀 확인 중' }, rows: [], total: {} }]
+			months: [{ month: '2026-11', payout_status: 'held', payout_label: '지급 보류', holds: [{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, { code: 'tax_invoice', label: '세금계산서 확인 전' }, { bad: 1 }], rows: [], total: {} }]
 		});
-		expect([h.nextHold, h.months[0].payoutStatus, h.months[0].payoutLabel, h.months[0].hold]).toEqual([
-			{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, 'held', '지급 보류', { code: 'manual', label: '운영팀 확인 중' }
+		// 보류 이유는 서버 목록 그대로(사업자 정보와 세금계산서가 같이 걸리면 둘 다 · 모양이 틀린 칸은 버린다)
+		expect([h.nextHold, h.months[0].payoutStatus, h.months[0].payoutLabel, h.months[0].holds]).toEqual([
+			{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, 'held', '지급 보류',
+			[{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, { code: 'tax_invoice', label: '세금계산서 확인 전' }]
 		]);
-		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].hold]).toEqual([null, null, null]);
+		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].holds]).toEqual([null, null, []]);
 		// 이체한 날(서버 paid_on · 0103) — 지급 완료일 때만
 		expect(sellerSettlementsFromJson({ months: [{ month: '2026-11', payout_status: 'paid', paid_on: '2026-12-02', rows: [], total: {} }] }).months[0].paidOn).toBe('2026-12-02');
 		expect(t.months[0].paidOn).toBeNull();
@@ -88,6 +90,12 @@ describe('시안 라벨', () => {
 		expect(monthStatus({ upcoming: false, payoutStatus: null, payoutLabel: '지급 없음' })).toEqual({ label: '지급 없음', tone: 'done' });
 		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
 		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
+	});
+	it('지급까지 할 일 1단계 — 입력 상태별 버튼 · 칩(끝났는지는 서버 보류 이유)', async () => {
+		const { settleInfoStep } = await import('../seller-settlement');
+		expect(settleInfoStep('none')).toEqual({ sub: '사업자 · 정산 계좌', action: '등록하기', chip: null });
+		expect(settleInfoStep('pending')).toEqual({ sub: '운영팀이 확인하고 있어요', action: null, chip: '확인 중' });
+		expect(settleInfoStep('rejected').action).toBe('다시 입력');
 	});
 	it('보류 해제분은 같은 상품이라도 다른 줄로 묶인다', async () => {
 		const { itemsByProduct, rowKey, settleItemsFromJson } = await import('../seller-settlement');

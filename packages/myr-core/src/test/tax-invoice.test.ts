@@ -5,7 +5,7 @@ import { approvalNoText, normalizeApprovalNo, parseTaxInvoiceBody, TAX_INVOICE_G
 
 const server = {
 	needed: true, show: true, total: 20000, supply: 18182, tax: 1818, write_date: '2034-01-31', due_date: '2034-02-10', overdue: false, todo: false,
-	status: 'returned', status_label: '다시 제출 필요', approval_no: '203402034100000011111111', return_note: '작성일자 확인', submitted_at: '2034-02-03T01:00:00+00:00',
+	status: 'returned', status_label: '다시 제출 필요', accepted: false, approval_no: '203402034100000011111111', return_note: '작성일자 확인', submitted_at: '2034-02-03T01:00:00+00:00',
 	checked_at: null, amount_changed: false, can_submit: true
 };
 
@@ -13,14 +13,14 @@ describe('파서', () => {
 	it('서버 값을 그대로 옮긴다(금액 · 날짜 · 판정을 다시 만들지 않는다)', () => {
 		expect(taxInvoiceFromJson(server)).toEqual({
 			needed: true, show: true, total: 20000, supply: 18182, tax: 1818, writeDate: '2034-01-31', dueDate: '2034-02-10', overdue: false, todo: false,
-			status: 'returned', statusLabel: '다시 제출 필요', approvalNo: '203402034100000011111111', returnNote: '작성일자 확인', submittedAt: '2034-02-03T01:00:00+00:00',
+			status: 'returned', statusLabel: '다시 제출 필요', accepted: false, approvalNo: '203402034100000011111111', returnNote: '작성일자 확인', submittedAt: '2034-02-03T01:00:00+00:00',
 			checkedAt: null, amountChanged: false, canSubmit: true
 		});
 	});
 	it('없거나 모르는 값 — null · 제출 전 · 꺼짐', () => {
 		expect(taxInvoiceFromJson(null)).toBeNull();
 		const t = taxInvoiceFromJson({ status: 'weird' })!;
-		expect([t.status, t.statusLabel, t.canSubmit, t.show, t.total, t.approvalNo]).toEqual(['none', '제출 전', false, false, 0, null]);
+		expect([t.status, t.statusLabel, t.canSubmit, t.show, t.total, t.approvalNo, t.accepted]).toEqual(['none', '제출 전', false, false, 0, null, false]);
 	});
 	it('정산 탭 달마다 invoice(지급 건이 없으면 null)', () => {
 		const st = sellerSettlementsFromJson({ months: [{ month: '2034-01', invoice: server, rows: [], total: {} }, { month: '2033-12', invoice: null, rows: [], total: {} }] });

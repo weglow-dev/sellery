@@ -93,6 +93,16 @@ as $$
 $$;
 revoke all on function public.myr_payout_needs_invoice(public.myr_payouts) from public, anon, authenticated;
 
+-- 세금계산서를 아직 받는 지급 건 — 필요하고 지급 전(낼 수 있음 · 할 일 · 기한 지남이 같이 쓴다)
+create or replace function public.myr_tax_invoice_open(p public.myr_payouts)
+returns boolean
+language sql
+stable
+as $$
+  select public.myr_payout_needs_invoice(p) and not public.myr_payout_is_paid(p)
+$$;
+revoke all on function public.myr_tax_invoice_open(public.myr_payouts) from public, anon, authenticated;
+
 -- 지급 건의 세금계산서(없으면 빈 행)
 create or replace function public.myr_tax_invoice_of(p_payout_id uuid)
 returns public.myr_tax_invoices
@@ -144,13 +154,23 @@ as $$
 $$;
 revoke all on function public.myr_payout_invoice_ok(public.myr_payouts) from public, anon, authenticated;
 
--- 지급 건 보류 이유(없으면 null) — 크리에이터 쪽 이유(사업자 · 정산 정보) 먼저 · 다음 세금계산서
+-- 지급 건 자동 보류 이유 전부(없으면 빈 배열) — 순서 = 먼저 볼 이유: 크리에이터 쪽(사업자 · 정산 정보) · 세금계산서
+create or replace function public.myr_payout_hold_reasons(p public.myr_payouts)
+returns text[]
+language sql
+stable
+as $$
+  select array_remove(array[public.myr_seller_hold_reason(p.seller_id), case when not public.myr_payout_invoice_ok(p) then 'tax_invoice' end], null)
+$$;
+revoke all on function public.myr_payout_hold_reasons(public.myr_payouts) from public, anon, authenticated;
+
+-- 지급 건 보류 이유(없으면 null) — 위 목록의 첫 번째(지급 건 hold_reason 칸에 들어간다)
 create or replace function public.myr_payout_hold_reason(p public.myr_payouts)
 returns text
 language sql
 stable
 as $$
-  select coalesce(public.myr_seller_hold_reason(p.seller_id), case when not public.myr_payout_invoice_ok(p) then 'tax_invoice' end)
+  select (public.myr_payout_hold_reasons(p))[1]
 $$;
 revoke all on function public.myr_payout_hold_reason(public.myr_payouts) from public, anon, authenticated;
 
@@ -176,6 +196,19 @@ as $$
   select case p_code when 'settle_info' then '사업자 · 정산 정보 확인 전' when 'tax_invoice' then '세금계산서 확인 전' when 'manual' then '운영팀 확인 중' end
 $$;
 revoke all on function public.myr_payout_hold_label(text) from public, anon, authenticated;
+
+-- 보류 지급 건에 지금 걸린 이유 전부 [{code, label}] — 보류가 아니면 빈 배열.
+--   지급 건 칸의 이유(운영 보류 · 자동 첫 이유) 먼저 · 다음 나머지 자동 이유(사업자 정보와 세금계산서가 같이 걸리면 둘 다)
+create or replace function public.myr_payout_holds_json(p public.myr_payouts)
+returns jsonb
+language sql
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('code', c, 'label', public.myr_payout_hold_label(c)) order by o), '[]'::jsonb)
+    from unnest(case when p.hold_reason is null then '{}'::text[]
+                     else array[p.hold_reason] || array(select r from unnest(public.myr_payout_hold_reasons(p)) r where r <> p.hold_reason) end) with ordinality u(c, o)
+$$;
+revoke all on function public.myr_payout_holds_json(public.myr_payouts) from public, anon, authenticated;
 
 -- 세금계산서 상태 문구 — 정산 탭 · 운영 목록이 같이 쓴다(없으면 제출 전)
 create or replace function public.myr_tax_invoice_status_label(p_status text)
@@ -213,7 +246,7 @@ returns boolean
 language sql
 stable
 as $$
-  select public.myr_payout_needs_invoice(p) and not public.myr_payout_is_paid(p)
+  select public.myr_tax_invoice_open(p)
      and public.myr_tax_invoice_waiting_creator(public.myr_tax_invoice_of(p.id))
      and public.myr_kst_date(p_now) > public.myr_tax_invoice_due(public.myr_payout_month(p))
 $$;
@@ -246,12 +279,14 @@ as $$
     'due_date', public.myr_tax_invoice_due(public.myr_payout_month(p)),
     'overdue', public.myr_tax_invoice_overdue(p, p_now),
     -- 크리에이터가 할 일(제출 전 · 다시 제출 필요 · 지급 전) — 정산 탭 달 카드 칩
-    'todo', public.myr_payout_needs_invoice(p) and not public.myr_payout_is_paid(p) and public.myr_tax_invoice_waiting_creator(i),
+    'todo', public.myr_tax_invoice_open(p) and public.myr_tax_invoice_waiting_creator(i),
     'status', coalesce(i.status, 'none'), 'status_label', public.myr_tax_invoice_status_label(i.status),
+    -- 운영 확인 완료(정산 상세 "지급까지 할 일" 2단계 체크)
+    'accepted', public.myr_tax_invoice_accepted(i),
     'approval_no', i.approval_no, 'return_note', i.return_note, 'submitted_at', i.submitted_at, 'checked_at', i.checked_at,
     -- 낸 뒤 합계가 바뀌었다(다시 발행해야 한다)
     'amount_changed', i.id is not null and not public.myr_tax_invoice_matches(i, p),
-    'can_submit', public.myr_payout_needs_invoice(p) and not public.myr_payout_is_paid(p) and not public.myr_tax_invoice_accepted(i)) end
+    'can_submit', public.myr_tax_invoice_open(p) and not public.myr_tax_invoice_accepted(i)) end
     from public.myr_tax_invoice_of(p.id) i
     cross join lateral public.myr_tax_invoice_amounts(public.myr_payout_invoice_total(p)) a
 $$;
@@ -413,6 +448,7 @@ as $$
                'seller', jsonb_build_object('id', s.id, 'name', s.name, 'handle', s.handle, 'settle_status', s.myr_settle_status),
                'status', p.status, 'status_label', public.myr_payout_status_label(p.status),
                'hold_reason', p.hold_reason, 'hold_label', public.myr_payout_hold_label(p.hold_reason), 'hold_note', p.hold_note,
+               'holds', public.myr_payout_holds_json(p),
                'payable', public.myr_payout_payable(p), 'amount', public.myr_payout_amount(p),
                'paid_on', p.paid_on, 'paid_amount', p.paid_amount, 'paid_note', p.paid_note, 'paid_bank', p.paid_bank,
                'invoice', public.myr_payout_invoice_json(p),
@@ -456,9 +492,8 @@ as $$
                    -- 이체한 날(지급 완료일 때 · 0103) — 화면은 이 날을 지급일로 보여 준다
                    'paid_on', (public.myr_payout_of(u.id, s.id)).paid_on,
                    'payout_label', coalesce(public.myr_payout_status_label((public.myr_payout_of(u.id, s.id)).status), public.myr_payout_status_label('none')),
-                   -- 보류 이유(크리에이터에게는 문구만 · 운영 메모는 싣지 않는다)
-                   'hold', case when (public.myr_payout_of(u.id, s.id)).hold_reason is not null
-                                then jsonb_build_object('code', (public.myr_payout_of(u.id, s.id)).hold_reason, 'label', public.myr_payout_hold_label((public.myr_payout_of(u.id, s.id)).hold_reason)) end,
+                   -- 보류 이유 전부(0104 · 사업자 정보와 세금계산서가 같이 걸리면 둘 다 · 크리에이터에게는 문구만 · 운영 메모는 싣지 않는다)
+                   'holds', public.myr_payout_holds_json(public.myr_payout_of(u.id, s.id)),
                    -- 세금계산서(0104) — 합계 · 공급가액 · 세액 · 작성일자 · 발행 기한 · 상태 · 제출 가능
                    'invoice', public.myr_payout_invoice_json(public.myr_payout_of(u.id, s.id), p_now),
                    'total', jsonb_build_object(
