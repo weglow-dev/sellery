@@ -29,8 +29,9 @@ select is((select jsonb_build_object('lines', (e ->> 'lines')::int, 'preparing',
           '{"lines": 2, "preparing": 1}'::jsonb, '발송 대기 — 살아 있는 줄 2 · 배송준비중 1');
 
 -- 실적 — 판매 수량 = 살아 있든 아니든 남은 수량 합(취소 줄 포함 · 0086 과 같은 결과)
-select is((select sum(left_qty)::int from public.myr_sales_lines() where order_id = '00000000-0000-4000-8000-00000000d931'), 5, 'myr_sales_lines.left_qty 합 = 2 + 0 + 1 + 2');
-select is((public.myr_app_seller_sales('00000000-0000-4000-8000-00000000d911') ->> 'units')::int, 5, '홈 판매 수량 = 같은 합(0086 식 qty − refunded_qty 와 같은 결과)');
+-- 0110: 실적도 정산과 같은 "결제된 줄"(myr_line_paid · 취소 줄 제외) — 취소된 c 는 판매가 아니다(전에는 c 의 1개까지 세어 5)
+select is((select sum(left_qty)::int from public.myr_sales_lines() where order_id = '00000000-0000-4000-8000-00000000d931'), 4, 'myr_sales_lines.left_qty 합 = 2 + 0 + 2(취소 줄 c 제외 · 0110)');
+select is((public.myr_app_seller_sales('00000000-0000-4000-8000-00000000d911') ->> 'units')::int, 4, '홈 판매 수량 = 같은 합(취소 줄 제외 · 정산과 같은 기준)');
 
 -- 콘솔 주문 줄 JSON — left_qty · live(주문 탭이 다시 계산하지 않는다)
 select is((select jsonb_object_agg(l ->> 'name', jsonb_build_array((l ->> 'left_qty')::int, (l ->> 'live')::boolean))
