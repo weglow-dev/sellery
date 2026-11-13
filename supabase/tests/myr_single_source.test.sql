@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(189);
+select plan(192);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -353,6 +353,9 @@ insert into _rules (label, pat, allowed) values
   ('재고를 잡는 결제 상태(PENDING · CONFIRMING) — 결제 승인은 "이미 끝난 결제인지"(상태 바꾸기)', $p$'PENDING'\s*,\s*'CONFIRMING'$p$, '{myr_checkout_holds_stock,myr_app_confirm_checkout}'),
   ('새 결제로 대체될 결제(PENDING) — 선점 · 정리 크론은 상태 바꾸기라 자기 조건', $p$status\s*=\s*'PENDING'$p$,         '{myr_checkout_supersedable,myr_app_claim_checkout,myr_expire_checkouts}'),
   ('내 결제(비회원은 이전 결제)',              $p$id\s*=\s*p_prev_checkout_id$p$,                                '{myr_checkout_mine}'),
+  ('주문에 남은 수량(줄 남은 수량 합) — 상품 판매 수량 재계산은 상품 단위', $p$sum\(\s*public\.myr_line_left$p$,  '{myr_order_left_qty,myr_recalc_product_sold_qty}'),
+  ('이번 환불이 주문을 끝내는지(수량 ≥ 남은 수량)', $p$>=\s*public\.myr_order_left_qty$p$,                           '{myr_order_refund_full}'),
+  ('환불 상태(남은 수량 0 이면 REFUNDED) — 주문 · 줄', $p$else\s+'PARTIAL_REFUNDED'$p$,                           '{myr_order_refund_status,myr_line_refund_status}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
