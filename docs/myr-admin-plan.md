@@ -113,6 +113,7 @@
 |---|---|
 | 지급할 차례 · 금액 | `myr_payout_payable` · `myr_payout_amount` · (스크립트) `myr_payout_to_pay` |
 | 상태 문구 · 보류 이유 | `myr_payout_status_label` · `myr_payout_hold_label` · `myr_payout_auto_state` |
+| 보류 이유 전부(운영 보류 맨 앞) | `myr_payout_hold_reasons`(자동 이유 목록 · 첫 번째가 `myr_payout_hold_reason`) · `myr_payout_holds_json`(`[{code, label}]` — `myr_settlement_report` · 크리에이터 정산 탭 응답 `holds`) (0104) |
 | 지급 완료 기록 | `myr_payout_mark_paid(month, handle, amount, paid_on, note, actor)` — 거절 `NOT_FOUND` · `ALREADY_PAID`(paid_on) · `NOT_PAYABLE`(status · hold_label) · `AMOUNT_MISMATCH`(amount) · `BAD_DATE` · `FUTURE_DATE` · `BEFORE_RUN`(run_on) |
 | 지급 완료 취소 | `myr_payout_unmark_paid` — `REASON_REQUIRED` · `NOT_PAID` |
 | 운영 보류 · 해제 | `myr_payout_hold` · `myr_payout_release` — `NOTE_REQUIRED` · `ALREADY_PAID` · `ALREADY_HELD` · `NOTHING_TO_PAY` · `NOT_MANUAL` |
@@ -120,7 +121,7 @@
 
 | 새로 만들 것 | 이유 |
 |---|---|
-| 화면용 지급 목록 읽기 RPC(가린 계좌 · 탭 카운트 · 크리에이터 필터) | `myr_payout_to_pay` 는 계좌 원문을 돌려준다(스크립트용) |
+| 화면용 지급 목록 읽기 RPC(가린 계좌 · 탭 카운트 · 크리에이터 필터 · 줄마다 `holds` = `myr_payout_holds_json`) | `myr_payout_to_pay` 는 계좌 원문을 돌려준다(스크립트용) · 보류 이유가 여러 개일 수 있다 |
 | 계좌 원문 열람 RPC(열람 기록) · 이체용 내려받기(열람 기록) | 원문은 `sellers.bank_info` 에만 |
 | 일괄 지급 완료 RPC(같은 이체일 · 줄별 결과 · 일부 실패해도 나머지 기록) | 여러 줄 선택 기록 |
 | 지급 건 상세 읽기 RPC(담긴 줄 · 이력) | 지급 건 상세 |
