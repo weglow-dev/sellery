@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(183);
+select plan(186);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -307,7 +307,7 @@ insert into _rules (label, pat, allowed) values
   ('상환 끝(남은 제조금액 0)',                 $p$(mfg_after|remaining\w*|after)\s*=\s*0|-\s*least\([^)]*\)\s*=\s*0$p$, '{myr_mfg_paid_off}'),
   ('차수 바꾼 뒤 상계 부족',                   $p$myr_mfg_total\([^)]*\)\s*-\s*case|<\s*v_offset|id\s*<>\s*b\.id$p$,     '{myr_mfg_change_shortfall}'),
   ('회차 마감(다음 달 1일)',                   $p$myr_month_start\(\([^;]*interval\s+'1 month'$p$,                '{myr_settlement_month_end}'),
-  ('지급 시각(마감 + 13시간)',                 $p$interval\s+'13 hours'$p$,                                       '{myr_settlement_pay_at}'),
+  ('정산 시각(그날 13시 · 지급 시각 · 크론 시각)', $p$interval\s+'13 hours'$p$,                                     '{myr_settlement_time_on}'),
   ('그 회차의 크리에이터 지급 건 찾기',        $p$run_id\s*=\s*[\w.]+\s+and\s+(\w+\.)?seller_id\s*=$p$,             '{myr_payout_of}'),
   -- 세금계산서(0104)
   ('지급 건의 정산월(회차 달)',                $p$myr_settlement_runs\s+\w+\s+where\s+\w+\.id\s*=\s*\w+\.run_id$p$, '{myr_payout_month}'),
@@ -349,6 +349,9 @@ insert into _rules (label, pat, allowed) values
   ('공구가 식',                               $p$\(100\s*-\s*\w+\)$p$,                                           '{myr_groupbuy_price}'),
   ('비율 나누기(정산 · 보증금)',              $p$/\s*100\M$p$,                                                   '{myr_settlement_amount,myr_deposit_amount}'),
   ('보증금 식',                               $p$myr_deposit_pct\(\)\s*[*/]$p$,                                  '{myr_deposit_amount}'),
+  ('미리보기 정산 시각 — 크론이 도는 1시간',    $p$pay_at\(\w+\)\s*\+\s*interval\s*'1 hour'$p$,                  '{myr_settlement_settle_at}'),
+  ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
+  ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
 
 -- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)

@@ -45,6 +45,8 @@ select is(public.myr_mfg_add('00000000-0000-4000-8000-0000000b7a03', 1000000, '1
 select pg_temp.line('00000000-0000-4000-8000-0000000b7d01', '00000000-0000-4000-8000-0000000b7a01', '00000000-0000-4000-8000-0000000b7001', 5, '2031-01-10 12:00+09');   -- A 5만 → 정산 3만
 select pg_temp.line('00000000-0000-4000-8000-0000000b7d02', '00000000-0000-4000-8000-0000000b7a02', '00000000-0000-4000-8000-0000000b7001', 2, '2031-01-11 12:00+09');   -- B 2만 → 보류
 select pg_temp.line('00000000-0000-4000-8000-0000000b7d03', '00000000-0000-4000-8000-0000000b7a03', '00000000-0000-4000-8000-0000000b7002', 3, '2031-01-12 12:00+09');   -- C 3만 → 1.8만 전부 상계
+-- 0106 — 회차는 정산할 차례인 달만(myr_settlement_due = 마지막 회차 다음 달). 로컬 DB 에 예전 회차가 있어도 결과가 같게 직전 회차(2030-12)를 둔다
+insert into public.myr_settlement_runs (month, cutoff_at, created_by) values ('2030-12-01', '2031-01-01 13:00+09', 'pgtap');
 select is(public.myr_settlement_run('2031-01-01', 'test', '2031-02-01 13:00+09') ->> 'ok', 'true', '1월 회차');
 -- 로컬 DB 의 실제 미정산 줄도 이 회차에 들어올 수 있어 테스트 셀러만 센다
 select is((select count(*)::int from public.myr_payouts p join public.myr_settlement_runs u on u.id = p.run_id join public.sellers s on s.id = p.seller_id where u.month = '2031-01-01' and s.handle like '@pgtap.po%'), 2, '크리에이터마다 지급 건 1건(셀러 1 · 셀러 2)');

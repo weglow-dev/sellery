@@ -15,7 +15,7 @@
 //                                             올바른 금액이 이미 상계한 금액보다 작으면 거절 + 덜 지급한 차액 안내(운영이 따로 지급)
 //   mfg-void <code> <차수> "<사유>"              차수를 통째로 무효(중복 입력 등 · 지우지 않는다 · 금액을 고칠 때는 mfg-fix)
 //   confirm-held <code>                       보류된 정산 확정(그 상품의 보류 줄을 달 순서로) — 원장이 있어야 한다
-//   run <YYYY-MM>                             회차 수동 실행(크론이 실패했을 때 — 크론과 같은 함수 · 이미 돌았으면 already)
+//   run [<YYYY-MM>]                           회차 수동 실행 — 달을 주지 않으면 정산할 차례인 달(크론과 같은 myr_settlement_due) · 이미 돌았으면 already
 //   report <YYYY-MM>                          회차 보고(크리에이터 · 상품별 판매 · 정산 뒤 환불 · 이월 · 정산금 · 상계 · 보증금 환급 · 지급)
 //                                             + 지급 건(상태 · 보류 이유 · 운영 메모 · 지급 가능 — 0102 서버 값 그대로)
 //   hold <YYYY-MM> <@핸들> "<메모>"             지급 건 운영 보류(메모 필수 · 지급 완료 · 0원은 거절) — 사람이 건 보류는 자동으로 풀리지 않는다
@@ -31,7 +31,7 @@
 //   invoice-ok <YYYY-MM> <@핸들>                홈택스에서 대조한 뒤 확인 → 지급 대기(사업자 정보 확인 전이면 그 이유로 보류). 낸 뒤 금액이 바뀌었으면 거절
 //   invoice-return <YYYY-MM> <@핸들> "<사유>"    다시 제출 요청(사유는 크리에이터에게 보인다 · 확인 완료도 지급 전이면 되돌릴 수 있다)
 //
-// 크론: 샵 /api/cron/settle — 매월 1일 13:00(KST)에 지난달 회차를 계산하고 바로 확정(원장 없는 상품만 보류).
+// 크론: 샵 /api/cron/settle — 매일 13:00(KST) 정산할 차례인 달(myr_settlement_due · 0106)을 계산하고 바로 확정(원장 없는 상품만 보류) · 차례가 없으면 바로 끝.
 // 키는 출력하지 않는다. 두 번 실행해도 같은 결과(RPC 멱등 · 거절 코드).
 
 import { existsSync } from "node:fs";
@@ -82,6 +82,7 @@ const MESSAGES = {
   NOTHING_HELD: "보류된 정산이 없습니다",
   NOT_CLOSED: "아직 끝나지 않은 달입니다",
   OUT_OF_ORDER: "더 늦은 회차가 이미 있습니다",
+  NOT_DUE: "정산할 차례인 달이 아닙니다 — 빠진 달부터 순서대로 돌립니다(0106)",
   BAD_MONTH: "달 형식은 YYYY-MM",
 };
 // 지급 건 보류 · 해제(0102) — ALREADY_PAID 처럼 차수 명령과 코드가 겹쳐 따로 둔다
@@ -195,8 +196,12 @@ async function cmdConfirmHeld() {
   console.log(`[${where}] ${p.code} 보류 ${r.confirmed}개 확정 · 지급 ${won(r.payout)}`);
 }
 async function cmdRun() {
-  const m = month(args[0]);
-  const r = check(await rpc("myr_settlement_run", { p_month: m, p_actor: "script" }));
+  // 달을 주지 않으면 정산할 차례인 달(크론과 같은 myr_settlement_due)
+  const m = args[0] ? month(args[0]) : await rpc("myr_settlement_due", {});
+  if (!m) fail("정산할 차례인 달이 없습니다(마지막 회차 다음 달이 아직 끝나지 않았습니다)");
+  const raw = await rpc("myr_settlement_run", { p_month: m, p_actor: "script" });
+  if (raw?.code === "NOT_DUE") fail(`NOT_DUE — ${MESSAGES.NOT_DUE}\n  지금 차례인 달은 ${raw.due ?? "없음(아직 끝난 달이 없습니다)"} — run ${raw.due ?? ""}`.trimEnd());
+  const r = check(raw);
   if (r.already) console.log(`[${where}] ${r.month} 회차는 이미 있습니다 — report ${r.month}`);
   else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 건 ${r.payouts ?? 0}건 · 지급 합계 ${won(r.payout)}`);
 }

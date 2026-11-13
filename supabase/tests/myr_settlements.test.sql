@@ -66,6 +66,8 @@ select pg_temp.line('00000000-0000-4000-8000-0000000a7d08', '00000000-0000-4000-
 select pg_temp.refund('00000000-0000-4000-8000-0000000a7d02', 1, 100000);
 select pg_temp.refund('00000000-0000-4000-8000-0000000a7d03', 1, 50000);
 
+-- 0106 — 회차는 정산할 차례인 달만(myr_settlement_due = 마지막 회차 다음 달). 로컬 DB 에 예전 회차가 있어도 결과가 같게 직전 회차(2029-12)를 둔다
+insert into public.myr_settlement_runs (month, cutoff_at, created_by) values ('2029-12-01', '2030-01-01 13:00+09', 'pgtap');
 select is(public.myr_settlement_run('2030-01-01', 'test', '2030-01-31 23:00+09') ->> 'code', 'NOT_CLOSED', '달이 끝나기 전에는 NOT_CLOSED');
 select is(public.myr_settlement_run('2030-01-15', 'test', '2030-02-01 13:00+09') ->> 'month', '2030-01', '1월 회차(그 달 아무 날이어도 1일로)');
 select is((select array_agg(r.status order by p.code) from public.myr_settlement_rows r join public.myr_products p on p.id = r.product_id
@@ -100,7 +102,7 @@ select ok((select bool_and(deposit_refund_row_id = (pg_temp.row('2030-02-01', '0
 select is((select count(*)::int from public.myr_settlement_items i where i.order_item_id = '00000000-0000-4000-8000-0000000a7d01' and i.kind = 'refund_adj'), 1, '정산 뒤 환불은 refund_adj 줄로');
 select is(pg_temp.money('2030-02-01', '00000000-0000-4000-8000-0000000a7a03'), array[0, 25600, 0, 0, 0, 0, 0, 0, 0], 'C 2월 — 판매 없이 환불만 → 정산 0 · 지급 0');
 select is((pg_temp.row('2030-02-01', '00000000-0000-4000-8000-0000000a7a03')).carry_out, -25600, 'C 2월 — 마이너스 25,600 다음 회차로 이월');
-select is(public.myr_settlement_run('2029-12-01', 'test', '2030-03-01 13:00+09') ->> 'code', 'OUT_OF_ORDER', '더 늦은 회차가 있으면 OUT_OF_ORDER');
+select is(public.myr_settlement_run('2029-11-01', 'test', '2030-03-01 13:00+09') ->> 'code', 'OUT_OF_ORDER', '더 늦은 회차가 있으면 OUT_OF_ORDER');
 
 -- ---------- 보류 확정 ----------
 select is(public.myr_mfg_add('00000000-0000-4000-8000-0000000a7a02', 30000, '1차', 'test') ->> 'ok', 'true', 'B 제조금액 3만 입력(보증금 미입금)');
