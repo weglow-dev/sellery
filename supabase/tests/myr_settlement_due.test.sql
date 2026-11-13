@@ -1,7 +1,7 @@
 -- pgTAP — 정산할 차례인 달(0106 myr_settlement_due) · 다음 회차 미리보기(myr_settlement_next) · 정산 크론 실패 운영 할 일(payment_events source 'settlement').
 --   로컬 DB 에 회차가 있어도 결과가 같게 먼 미래 회차(2030-01)를 넣고 본다 — 마지막 회차 = 2030-01.
 begin;
-select plan(24);
+select plan(25);
 
 select function_privs_are('public', 'myr_settlement_due', '{timestamptz}'::text[], 'anon', '{}'::text[], 'anon 은 settlement_due 불가');
 select function_privs_are('public', 'myr_settlement_due', '{timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 settlement_due 불가');
@@ -34,6 +34,9 @@ select is((select row(n.month, n.end_at)::text from public.myr_settlement_next('
 
 -- 회차는 정산할 차례인 달만 — 2월이 빠진 채로 3월을 돌리면 NOT_DUE(차례인 달 2월을 알려 준다) · 3월이 먼저 생겨 2월이 영영 막히는 일을 DB 가 막는다
 select is(public.myr_settlement_run('2030-03-01', 'pgtap', '2030-04-02 13:00+09') - 'ok', '{"code": "NOT_DUE", "due": "2030-02"}'::jsonb, '차례가 아닌 늦은 달은 NOT_DUE(수동 실행 · 스크립트도)');
+
+select is((select array_agg(public.myr_settlement_pay_at(m) order by m) from unnest(array['2030-02-01', '2030-12-15']::date[]) m),
+          array['2030-03-01 13:00+09', '2031-01-01 13:00+09']::timestamptz[], '지급 시각 = 마감 날(다음 달 1일) 13시 · 연말도(마감 · 13시 함수 하나씩)');
 
 -- 미리보기 정산 시각 — 따라잡는 중이면 지난 시각 대신 다음 크론 시각(매일 13:00 KST)
 select is(public.myr_settlement_next_cron('2030-03-01 12:59+09'), '2030-03-01 13:00+09'::timestamptz, '다음 크론 — 13시 전이면 오늘 13시');

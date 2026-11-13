@@ -65,13 +65,13 @@ as $$
 $$;
 revoke all on function public.myr_settlement_time_on(date) from public, anon, authenticated;
 
--- 0087 정의 → myr_settlement_time_on 으로(같은 값 — 정산월 다음 달 1일 13:00 KST = 마감 + 13시간)
+-- 0087 정의 → myr_settlement_time_on 으로(같은 값 — 정산월 다음 달 1일 13:00 KST = 마감 + 13시간). "다음 달 1일"은 마감(myr_settlement_month_end) 한 곳에서
 create or replace function public.myr_settlement_pay_at(p_month date)
 returns timestamptz
 language sql
 stable
 as $$
-  select public.myr_settlement_time_on((date_trunc('month', p_month) + interval '1 month')::date)
+  select public.myr_settlement_time_on(public.myr_kst_date(public.myr_settlement_month_end(p_month)))
 $$;
 revoke all on function public.myr_settlement_pay_at(date) from public, anon, authenticated;
 
