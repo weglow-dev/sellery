@@ -1,7 +1,7 @@
 -- pgTAP — 정산할 차례인 달(0106 myr_settlement_due) · 다음 회차 미리보기(myr_settlement_next) · 정산 크론 실패 운영 할 일(payment_events source 'settlement').
 --   로컬 DB 에 회차가 있어도 결과가 같게 먼 미래 회차(2030-01)를 넣고 본다 — 마지막 회차 = 2030-01.
 begin;
-select plan(25);
+select plan(26);
 
 select function_privs_are('public', 'myr_settlement_due', '{timestamptz}'::text[], 'anon', '{}'::text[], 'anon 은 settlement_due 불가');
 select function_privs_are('public', 'myr_settlement_due', '{timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 settlement_due 불가');
@@ -11,6 +11,8 @@ select function_privs_are('public', 'myr_settlement_due', '{timestamptz}'::text[
 select ok(case when exists (select 1 from public.myr_settlement_runs) then true
                else public.myr_settlement_due('2026-12-01 13:00+09') = '2026-11-01'::date end,
           '회차가 없으면 KST 지난달(빈 DB 에서만 확인)');
+
+select is(array[public.myr_kst_month('2030-02-28 15:30+00'), public.myr_kst_month('2030-02-28 14:59+00')], array['2030-03-01', '2030-02-01']::date[], 'KST 이번 달 — UTC 2월 28일 15시 반 = KST 3월');
 
 insert into public.myr_settlement_runs (month, cutoff_at, created_by) values ('2030-01-01', '2030-02-01 13:00+09', 'pgtap');
 select is(public.myr_settlement_after_last(), '2030-02-01'::date, '마지막 회차 다음 달');

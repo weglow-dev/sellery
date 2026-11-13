@@ -17,6 +17,16 @@
 --   테스트: supabase/tests/myr_settlement_due.test.sql
 -- ============================================================
 
+-- 이번 달 1일(KST)
+create or replace function public.myr_kst_month(p_at timestamptz default now())
+returns date
+language sql
+stable
+as $$
+  select date_trunc('month', public.myr_kst_date(p_at))::date
+$$;
+revoke all on function public.myr_kst_month(timestamptz) from public, anon, authenticated;
+
 -- 마지막 회차 다음 달 · 회차가 없으면 null
 create or replace function public.myr_settlement_after_last()
 returns date
@@ -33,7 +43,7 @@ language sql
 stable
 as $$
   with c as (
-    select coalesce(public.myr_settlement_after_last(), (date_trunc('month', p_now at time zone 'Asia/Seoul') - interval '1 month')::date) as month
+    select coalesce(public.myr_settlement_after_last(), (public.myr_kst_month(p_now) - interval '1 month')::date) as month
   )
   select c.month from c where public.myr_settlement_month_end(c.month) <= p_now
 $$;
@@ -46,7 +56,7 @@ returns table (month date, end_at timestamptz)
 language sql
 stable
 as $$
-  select coalesce(d.due, greatest(date_trunc('month', p_now at time zone 'Asia/Seoul')::date, public.myr_settlement_after_last())),
+  select coalesce(d.due, greatest(public.myr_kst_month(p_now), public.myr_settlement_after_last())),
          case when d.due is not null then public.myr_settlement_month_end(d.due) else p_now end
     from (select public.myr_settlement_due(p_now) as due) d
 $$;
