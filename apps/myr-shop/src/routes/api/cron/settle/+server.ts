@@ -11,7 +11,7 @@ import { runSettlementCron } from '$lib/server/settlement';
  *   정산할 차례인 달(DB myr_settlement_due — 마지막 회차 다음 달 · 끝난 달만)을 계산하고 바로 확정한다 — 제조 원장이 없는 상품만 보류.
  *   차례인 달이 없으면 { nothing: true } 로 바로 끝난다(평소 2일~말일). 1일에 실패해도 다음 날 같은 달을 다시 돈다 · 한 번에 한 달.
  *   자동 실행 실패는 운영 할 일 목록(payment_events source 'settlement' · handled=false).
- *   ?month=YYYY-MM 으로 특정 달(수동) — 끝난 달만 · 더 늦은 회차가 있으면 OUT_OF_ORDER.
+ *   ?month=YYYY-MM 으로 특정 달(수동) — 끝난 달만 · 더 늦은 회차가 있으면 OUT_OF_ORDER · 정산할 차례인 달이 아니면 NOT_DUE(응답 due = 차례인 달 · DB 가 막는다).
  */
 export const config: Config = { maxDuration: 300 };
 

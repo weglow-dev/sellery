@@ -18,7 +18,7 @@ export type { SellerSettlements, SettleItem, SettlePreview } from '../seller-set
 
 export type SettlementRunResult =
 	| { ok: true; already: boolean; month: string; rows?: number; confirmed?: number; held?: number; payout?: number }
-	| { ok: false; code: string };
+	| { ok: false; code: string; due?: string | null };
 
 /** month = 'YYYY-MM-01' · actor = 'cron' | 'script' | 'admin:<uuid>' */
 export async function runSettlement(month: string, actor: string): Promise<SettlementRunResult> {

@@ -82,6 +82,7 @@ const MESSAGES = {
   NOTHING_HELD: "보류된 정산이 없습니다",
   NOT_CLOSED: "아직 끝나지 않은 달입니다",
   OUT_OF_ORDER: "더 늦은 회차가 이미 있습니다",
+  NOT_DUE: "정산할 차례인 달이 아닙니다 — 빠진 달부터 순서대로 돌립니다(0106)",
   BAD_MONTH: "달 형식은 YYYY-MM",
 };
 // 지급 건 보류 · 해제(0102) — ALREADY_PAID 처럼 차수 명령과 코드가 겹쳐 따로 둔다
@@ -198,7 +199,9 @@ async function cmdRun() {
   // 달을 주지 않으면 정산할 차례인 달(크론과 같은 myr_settlement_due)
   const m = args[0] ? month(args[0]) : await rpc("myr_settlement_due", {});
   if (!m) fail("정산할 차례인 달이 없습니다(마지막 회차 다음 달이 아직 끝나지 않았습니다)");
-  const r = check(await rpc("myr_settlement_run", { p_month: m, p_actor: "script" }));
+  const raw = await rpc("myr_settlement_run", { p_month: m, p_actor: "script" });
+  if (raw?.code === "NOT_DUE") fail(`NOT_DUE — ${MESSAGES.NOT_DUE}\n  지금 차례인 달은 ${raw.due ?? "없음(아직 끝난 달이 없습니다)"} — run ${raw.due ?? ""}`.trimEnd());
+  const r = check(raw);
   if (r.already) console.log(`[${where}] ${r.month} 회차는 이미 있습니다 — report ${r.month}`);
   else console.log(`[${where}] ${r.month} 회차 — 상품 ${r.rows}개 · 확정 ${r.confirmed} · 보류 ${r.held} · 지급 건 ${r.payouts ?? 0}건 · 지급 합계 ${won(r.payout)}`);
 }

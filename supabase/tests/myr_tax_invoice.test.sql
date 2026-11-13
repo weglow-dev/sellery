@@ -65,6 +65,8 @@ insert into public.myr_order_items (id, order_id, product_id, seller_id, product
 select ('00000000-0000-4000-8000-0000000e7d0' || n)::uuid, '00000000-0000-4000-8000-0000000e7b01', ('00000000-0000-4000-8000-0000000e7a0' || n)::uuid,
        ('00000000-0000-4000-8000-0000000e700' || n)::uuid, '줄', 5, 10000, 'DELIVERED', '2034-01-10 12:00+09'
   from generate_series(1, 4) n;
+-- 0106 — 회차는 정산할 차례인 달만(myr_settlement_due = 마지막 회차 다음 달). 로컬 DB 에 예전 회차가 있어도 결과가 같게 직전 회차(2033-12)를 둔다
+insert into public.myr_settlement_runs (month, cutoff_at, created_by) values ('2033-12-01', '2034-01-01 13:00+09', 'pgtap');
 select is(public.myr_settlement_run('2034-01-01', 'test', '2034-02-01 13:00+09') ->> 'ok', 'true', '1월 회차(2월 1일 13시)');
 
 create function pg_temp.po(p_handle text) returns public.myr_payouts language sql as $$ select public.myr_payout_find('2034-01-01', p_handle) $$;
