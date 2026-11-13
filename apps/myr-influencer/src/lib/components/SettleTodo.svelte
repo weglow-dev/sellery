@@ -76,7 +76,7 @@
 			<span class="block text-[14px] font-bold lg:text-[15px]">세금계산서 발행</span>
 			{#if inv}
 				<span class="mt-0.5 block text-[12px] text-white/55 lg:text-[13px]">
-					<span class="hidden lg:inline">홈택스에서 발행한 뒤 승인번호를 내주세요 · </span><b class="font-semibold {inv.overdue ? 'text-[#ff8a8a]' : 'text-fg'}">{shortDate(inv.dueDate)}까지</b><span class="lg:hidden"> 승인번호 제출</span>
+					<span class="hidden lg:inline">홈택스에서 발행한 뒤 승인번호를 내주세요 &nbsp; </span><b class="font-semibold {inv.overdue ? 'text-[#ff8a8a]' : 'text-fg'}">{shortDate(inv.dueDate)}까지 &nbsp;</b><span class="lg:hidden"> 승인번호 제출</span>
 				</span>
 			{:else}
 				<span class="mt-0.5 block text-[12px] text-white/55 lg:text-[13px]">{shortDate(payAt)} 정산이 확정되면 발행할 금액이 나와요</span>
