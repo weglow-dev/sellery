@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(189);
+select plan(193);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -265,10 +265,10 @@ create temp table _fn as
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'myr%';
 create temp table _rules (ord serial, label text, pat text, allowed text[]);
 insert into _rules (label, pat, allowed) values
-  ('줄의 남은 수량(수량 − 환불 수량)',        $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty$p$,        '{myr_line_left}'),
+  ('줄의 남은 수량(수량 − 환불 수량 · 환불 수량 + n ≥ 수량 모양도)', $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty|refunded_qty\s*\+\s*[\w.]+\s*(>=|>|<=|<)\s*(\w+\.)?qty\M$p$, '{myr_line_left}'),
   ('살아 있는 줄(남은 수량 > 0)',             $p$myr_line_left\(\w+\)\s*>\s*0$p$,                                '{myr_line_live}'),
   ('취소 줄 비교',                            $p$status\s*<>\s*'CANCELED'|\.status\s*=\s*'CANCELED'|'REFUNDED'\s*,\s*'CANCELED'$p$, '{myr_line_valid,myr_app_deposit_expire,myr_app_refund_record}'),
-  ('금액 − 환불',                             $p$amount\s*-\s*(\w+\.)?refund_amount$p$,                          '{myr_line_net,myr_order_net}'),
+  ('금액 − 환불(환불 + n ≤ 금액 모양도)',      $p$amount\s*-\s*(\w+\.)?refund_amount|refund_amount\s*\+[^;]*<=\s*(\w+\.)?amount\M$p$, '{myr_line_net,myr_order_net}'),
   ('단가 × 수량',                             $p$unit_price(::bigint)?\s*\*|v_unit(::bigint)?\s*\*|\*\s*(\w+\.)?qty\M|\*\s*v_qty$p$, '{myr_line_amount}'),
   ('상품 남은 재고(입고 − 판매)',             $p$-\s*(coalesce\()?(\w+\.)?sold_qty$p$,                           '{myr_product_left}'),
   ('품절(남은 재고 0)',                       $p$myr_product_left\(\w+\)\s*(<=|>|<|=)$p$,                        '{myr_product_sold_out}'),
@@ -353,6 +353,11 @@ insert into _rules (label, pat, allowed) values
   ('재고를 잡는 결제 상태(PENDING · CONFIRMING) — 결제 승인은 "이미 끝난 결제인지"(상태 바꾸기)', $p$'PENDING'\s*,\s*'CONFIRMING'$p$, '{myr_checkout_holds_stock,myr_app_confirm_checkout}'),
   ('새 결제로 대체될 결제(PENDING) — 선점 · 정리 크론은 상태 바꾸기라 자기 조건', $p$status\s*=\s*'PENDING'$p$,         '{myr_checkout_supersedable,myr_app_claim_checkout,myr_expire_checkouts}'),
   ('내 결제(비회원은 이전 결제)',              $p$id\s*=\s*p_prev_checkout_id$p$,                                '{myr_checkout_mine}'),
+  ('주문에 남은 수량(줄 남은 수량 합) — 상품 판매 수량 재계산은 상품 단위', $p$sum\(\s*public\.myr_line_left$p$,  '{myr_order_left_qty,myr_recalc_product_sold_qty}'),
+  ('이번 환불이 주문을 끝내는지(수량 ≥ 남은 수량)', $p$>=\s*public\.myr_order_left_qty$p$,                           '{myr_order_refund_full}'),
+  ('환불 상태(남은 수량 0 이면 REFUNDED) — 주문 · 줄', $p$else\s+'PARTIAL_REFUNDED'$p$,                           '{myr_order_refund_status,myr_line_refund_status}'),
+  -- 금지 패턴(허용 목록 비움) — 주인 함수 없이 어디에도 다시 나오면 실패. 0108 에서 없앤 "줄 상태로 전체 환불 판정"(남은 수량 기준 myr_order_refund_status 를 쓴다)
+  ('줄 상태 묶음으로 전체 환불 판정(REFUNDED · CANCELED) — 금지 · myr_order_refund_status', $p$'REFUNDED'\s*,\s*'CANCELED'|'CANCELED'\s*,\s*'REFUNDED'$p$, '{}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
@@ -362,7 +367,8 @@ select is((select count(*)::int from _fn f, regexp_matches(f.src, 'not\s+p_past_
 select is(coalesce((select string_agg(f.proname, ', ' order by f.proname) from _fn f where f.src ~ r.pat and not (f.proname = any (r.allowed))), ''), '',
           r.label || ' — 지정한 함수 밖에 이 식이 없다') from _rules r order by r.ord;
 -- 검사가 살아 있는지 — 식이 판정의 주인 함수에는 있어야 한다(패턴이 틀려 아무것도 못 잡는 검사를 막는다)
-select is((select count(*)::int from _rules r where not exists (select 1 from _fn f where f.proname = r.allowed[1] and f.src ~ r.pat)), 0, '모든 검사 식이 주인 함수에는 있다(죽은 검사 없음)');
+--   허용 목록이 빈 규칙(금지 패턴)은 주인이 없으니 이 확인에서 뺀다
+select is((select count(*)::int from _rules r where r.allowed <> '{}' and not exists (select 1 from _fn f where f.proname = r.allowed[1] and f.src ~ r.pat)), 0, '모든 검사 식이 주인 함수에는 있다(죽은 검사 없음)');
 
 select * from finish();
 rollback;
