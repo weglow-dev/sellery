@@ -112,6 +112,7 @@ docs/  supabase/    정책 문서 · Supabase 스키마 (그대로)
 - 본문 `IBM Plex Sans KR`은 **700이 최대**. `font-weight:800`을 쓰면 가짜 굵기가 적용돼 글자가 뭉갭니다.
 - `font-synthesis:none` 유지 (합성 굵기 차단 · `packages/ui/src/css/legacy/base.css`, theme.css 에서 layer 로 로드)
 - `-webkit-font-smoothing:antialiased` **넣지 마세요** — 윈도우 서브픽셀 렌더링이 꺼져서 흐려집니다
+  - 예외: MYR 크리에이터 콘솔(`apps/myr-influencer` · Pretendard · 어두운 배경)은 시안대로 `antialiased` 를 씁니다(2026-11-13) — 없으면 맥에서 시안보다 굵어 보입니다
 - 한글은 `word-break:keep-all` — 없으면 표에서 "바인허/브"처럼 어절 중간에서 잘립니다
 - Tailwind 유틸리티는 새 마크업에서 자유롭게 쓰되, 색·여백 토큰은 `theme.css` 의 `@theme`/`:root` 값을 씁니다.
 
