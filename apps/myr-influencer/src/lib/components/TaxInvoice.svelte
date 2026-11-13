@@ -33,7 +33,7 @@
 				app.showToast(taxInvoiceMessage(r?.code ?? 'DB_ERROR'));
 				return;
 			}
-			app.showToast('승인번호를 냈어요 · 운영팀이 홈택스에서 확인하면 지급돼요');
+			app.showToast('승인번호를 냈어요 · 운영팀이 확인하면 다음 날 오후 1시에 입금돼요');
 			draft = '';
 			touched = false;
 			editing = false;

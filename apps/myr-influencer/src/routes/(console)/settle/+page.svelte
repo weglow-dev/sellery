@@ -18,13 +18,13 @@
 	let view = $state<'pay' | 'mfg'>(readParam('view', ['pay', 'mfg'] as const, 'pay'));
 	$effect(() => syncParam('view', view, 'pay'));
 
-	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
+	// 정산 확정 시각은 서버 값(다음 회차 settle_at · 0106) — "정산 확정"(금액이 정해짐)과 "지급"(입금)을 나눠 쓴다(2026-11-13)
 	const nextAt = $derived(pv.settleAt);
 	const next = $derived({
 		href: '/settle/next',
 		title: `${monthShort(pv.month)} 정산`,
 		short: monthShort(pv.month),
-		payShort: `${shortDate(nextAt)} 정산 예정`,
+		payShort: `${shortDate(nextAt)} 정산 확정 예정`,
 		invoiceTodo: null as { overdue: boolean } | null,
 		status: monthStatus({ upcoming: true, nextHold: st.nextHold }),
 		held: pv.total.held,
@@ -40,11 +40,11 @@
 			href: `/settle/${m.month}`,
 			title: `${monthShort(m.month)} 정산`,
 			short: monthShort(m.month),
-			// 지급 완료면 이체한 날(서버 paid_on · 0103) · 아니면 정산일(지급은 세금계산서 확인 뒤 · 0104)
-			payShort: m.paidOn ? `${shortDate(m.paidOn)} 지급` : `${shortDate(m.payAt)} 정산`,
+			// 지급 완료면 이체한 날(서버 paid_on · 0103) · 지급할 수 있으면 지급 예정(서버 pay_due_at · 0111) · 아니면 정산 확정한 날
+			payShort: m.paidOn ? `${shortDate(m.paidOn)} 지급` : m.payDueAt ? `${shortDate(m.payDueAt)} 지급 예정` : `${shortDate(m.payAt)} 정산 확정`,
 			// 세금계산서를 낼 차례(서버 todo · 기한 지남 overdue · 0104)
 			invoiceTodo: m.invoice?.todo ? { overdue: m.invoice.overdue } : null,
-			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel }),
+			status: monthStatus({ upcoming: false, payoutStatus: m.payoutStatus, payoutLabel: m.payoutLabel, transfer: m.transfer }),
 			held: m.total.held,
 			sales: m.total.netSales,
 			settle: m.total.settle,
@@ -54,7 +54,7 @@
 		}))
 	]);
 	// 남은 제조금액 합 · 돌려받을 보증금 합 · 다음 정산 상환 예정은 서버 값(0101) — 화면이 더하지 않는다
-	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 정산 · 세금계산서 확인 뒤 지급']);
+	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 정산 확정 · 세금계산서 확인 다음 날 오후 1시 입금']);
 	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.month, won) })));
 
 	const CHIP: Record<SettleTone, string> = {
@@ -97,7 +97,7 @@
 				<span class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))] lg:-top-[90px] lg:right-auto lg:-left-20 lg:h-[280px] lg:w-[280px]"></span>
 				<span class="relative block lg:min-w-[300px] lg:shrink-0">
 					<span class="flex items-center justify-between gap-2 lg:justify-start">
-						<span class="text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 · {settleAtLabel(nextAt)}</span>
+						<span class="text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 확정 · {settleAtLabel(nextAt)}</span>
 						<span class="text-[12px] font-extrabold text-accent lg:text-[13px]">{dDay(nextAt)}</span>
 					</span>
 					<span class="mt-1.5 flex items-center gap-2.5 lg:mt-2 lg:gap-3">

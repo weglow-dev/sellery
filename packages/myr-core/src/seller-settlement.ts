@@ -42,9 +42,14 @@ export type SettleTotal = { sales: number; refundAdj: number; netSales: number; 
 export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
 /** 지급 보류 이유(서버 0102 · 0104 — code settle_info · tax_invoice · manual · label = myr_payout_hold_label) */
 export type SettleHold = { code: string; label: string };
-/** payAt = 지급 시각(서버 myr_settlement_pay_at — 다음 달 1일 오후 1시) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
- *  payoutLabel = 상태 문구(서버 myr_payout_status_label) · holds = 보류 이유 전부(서버 myr_payout_holds_json · 0104 — 사업자 정보와 세금계산서가 같이 걸리면 둘 다 · 보류가 아니면 [])
- *  paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103)
+/** 자동 이체 상태(0111 myr_payout_transfer_json) — state sending(송금 중) · failed(실패) · kind 는 크리에이터에게 보이는 실패 종류
+ *  (retry 잠깐 안 됨 · account 계좌 문제 · ops 운영 확인 중 — 운영 쪽 원인은 서버가 ops 로 합쳐 이유를 싣지 않는다) */
+export type PayoutTransfer = { state: 'sending' | 'failed'; kind: 'retry' | 'account' | 'ops' | null; tries: number };
+/** payAt = 정산 확정 시각(서버 myr_settlement_pay_at — 정산월 다음 달 1일 오후 1시 · 이름은 0101 그대로) · payoutStatus = 그 회차 지급 건 상태(pending · held · paid · none · 지급 건이 없으면 null)
+ *  payoutLabel = 크리에이터 상태 문구(서버 myr_payout_creator_label · 0111 — 지급 예정 · 지급 보류 · 지급 중 · 지급 지연 · 지급 실패 · 지급 확인 중 · 지급 완료) ·
+ *  holds = 보류 이유 전부(서버 myr_payout_holds_json · 0104 — 사업자 정보와 세금계산서가 같이 걸리면 둘 다 · 보류가 아니면 [])
+ *  paidOn = 이체한 날('YYYY-MM-DD' · 지급 완료일 때만 · 0103) · payDueAt = 지급 예정 시각(서버 myr_payout_pay_due_at · 지급할 수 있으면 다음 오후 1시 · 아니면 null) ·
+ *  transfer = 자동 이체 상태(0111 · 없으면 null)
  *  invoice = 세금계산서(서버 myr_payout_invoice_json · 0104 — 지급 건이 없으면 null) */
 export type SettleMonth = {
 	month: string;
@@ -54,6 +59,8 @@ export type SettleMonth = {
 	payoutLabel: string;
 	holds: SettleHold[];
 	paidOn: string | null;
+	payDueAt: string | null;
+	transfer: PayoutTransfer | null;
 	invoice: TaxInvoice | null;
 	rows: SettleRow[];
 	total: SettleTotal;
@@ -144,6 +151,14 @@ function holdFrom(v: unknown): SettleHold | null {
 	return o && typeof o.code === 'string' ? { code: o.code, label: s(o.label) } : null;
 }
 
+const TRANSFER_KINDS = ['retry', 'account', 'ops'] as const;
+function transferFrom(v: unknown): PayoutTransfer | null {
+	const o = obj(v);
+	if (!o || (o.state !== 'sending' && o.state !== 'failed')) return null;
+	const kind = TRANSFER_KINDS.find((k) => k === o.kind) ?? null;
+	return { state: o.state, kind, tries: n(o.tries) };
+}
+
 export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 	const o = obj(v) ?? {};
 	return {
@@ -185,6 +200,8 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				payoutLabel: s(x.payout_label),
 				holds: arr(x.holds).map(holdFrom).filter((h): h is SettleHold => !!h),
 				paidOn: typeof x.paid_on === 'string' ? x.paid_on : null,
+				payDueAt: typeof x.pay_due_at === 'string' ? x.pay_due_at : null,
+				transfer: transferFrom(x.transfer),
 				invoice: taxInvoiceFromJson(x.invoice),
 				rows: rows(x.rows),
 				total: totalFrom(x.total)
@@ -276,18 +293,35 @@ export const monthShort = (month: string): string => {
 };
 
 export type SettleTone = 'plan' | 'hold' | 'warn' | 'done';
-/** 월 카드 상태 칩 — 다음 정산은 보류 이유(서버 nextHold)가 있으면 지급 보류 · 지난 회차는 지급 건 상태(서버 payoutStatus · 문구 payoutLabel). 여기서는 색만 고른다 */
+/** 월 카드 상태 칩 — 다음 정산은 보류 이유(서버 nextHold)가 있으면 지급 보류 · 지난 회차는 서버 문구(payoutLabel · 0111 이체 상태 포함).
+ *  여기서는 색만 고른다 — 이체 상태가 있으면 그 종류(계좌 문제 빨강 · 지연 · 확인 중 주황 · 송금 중 민트) · 없으면 지급 건 상태 */
 const PAYOUT_TONE: Record<string, SettleTone> = { pending: 'plan', held: 'hold', paid: 'done', none: 'done' };
-export function monthStatus(o: { upcoming: true; nextHold: SettleHold | null } | { upcoming: false; payoutStatus: string | null; payoutLabel: string }): { label: string; tone: SettleTone } {
+const TRANSFER_TONE: Record<string, SettleTone> = { account: 'hold', retry: 'warn', ops: 'warn' };
+export function monthStatus(
+	o: { upcoming: true; nextHold: SettleHold | null } | { upcoming: false; payoutStatus: string | null; payoutLabel: string; transfer?: PayoutTransfer | null }
+): { label: string; tone: SettleTone } {
 	if (o.upcoming) return o.nextHold ? { label: '지급 보류', tone: 'hold' } : { label: '지급 예정', tone: 'plan' };
+	if (o.transfer) return { label: o.payoutLabel, tone: o.transfer.state === 'sending' ? 'plan' : (TRANSFER_TONE[o.transfer.kind ?? ''] ?? 'warn') };
 	return { label: o.payoutLabel, tone: PAYOUT_TONE[o.payoutStatus ?? 'none'] ?? 'done' };
+}
+
+/** 자동 이체 안내(정산 상세) — 이체 상태 종류(서버 transfer · 0111)로 문구 · 버튼만 고른다. 다시 보내는 시각은 서버 지급 예정 시각(payDueAt).
+ *  운영 쪽 원인(잔액 · 한도 · 결과 확인)은 서버가 ops 로 합쳐 보내서 크리에이터에게 이유를 보여 주지 않는다(2026-11-13) */
+export type PayoutNotice = { tone: SettleTone; title: string; body: string; cta: { label: string; href: string } | null };
+export function payoutNotice(transfer: PayoutTransfer | null, payDueAt: string | null): PayoutNotice | null {
+	if (!transfer) return null;
+	if (transfer.state === 'sending') return { tone: 'plan', title: '정산금을 보내고 있어요', body: '은행 처리가 끝나면 지급 완료로 바뀌어요.', cta: null };
+	if (transfer.kind === 'account')
+		return { tone: 'hold', title: '계좌 정보가 맞지 않아 지급하지 못했어요', body: '정산 계좌를 다시 입력해 주세요. 운영팀이 확인하면 다음 날 오후 1시에 다시 보내요.', cta: { label: '계좌 다시 입력', href: '/my' } };
+	if (transfer.kind === 'retry') return { tone: 'warn', title: '지급이 잠시 늦어지고 있어요', body: payDueAt ? `${settleAtLabel(payDueAt)}에 다시 보내요.` : '다음 날 오후 1시에 다시 보내요.', cta: null };
+	return { tone: 'warn', title: '운영팀이 지급을 확인하고 있어요', body: '확인이 끝나면 이 화면에서 지급 상태가 바뀌어요.', cta: null };
 }
 
 /** 정산 보류 배너(사업자 · 정산 정보) — 보일지는 서버 보류 이유(nextHold.code === 'settle_info')가 정한다. 여기서는 입력 상태별 문구 · 버튼만 고른다 */
 export function holdBanner(settleStatus: string, nextDate: string): { title: string; body: string; cta: string | null } {
-	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나면 ${nextDate} 정산부터 지급돼요.`, cta: null };
-	if (settleStatus === 'rejected') return { title: '정산이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되면 바로 지급돼요.', cta: '정산 정보 다시 입력하기' };
-	return { title: '정산이 보류 중이에요', body: `사업자 · 정산 계좌 정보를 등록하면 ${nextDate} 정산부터 바로 지급돼요.`, cta: '정산 정보 등록하기' };
+	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나야 정산금이 지급돼요. ${nextDate} 정산 확정분부터 받을 수 있어요.`, cta: null };
+	if (settleStatus === 'rejected') return { title: '지급이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되기 전에는 정산금이 지급되지 않아요.', cta: '정산 정보 다시 입력하기' };
+	return { title: '지급이 보류 중이에요', body: '사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.', cta: '정산 정보 등록하기' };
 }
 
 /** 정산 상세 "지급까지 할 일" 1단계(정산 정보 등록 · 시안 2026-11-13) — 끝났는지는 서버 보류 이유(settle_info)가 정한다. 여기서는 입력 상태별 버튼 · 칩 문구만 고른다 */

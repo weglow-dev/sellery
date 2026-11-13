@@ -13,8 +13,9 @@ export const BANKS = [
 export type SettleStatus = 'none' | 'pending' | 'verified' | 'rejected';
 export const SETTLE_STATUS_META: Record<SettleStatus, { label: string; tone: 'muted' | 'accent' | 'ok' | 'danger'; desc: string }> = {
 	none: { label: '미입력', tone: 'muted', desc: '정산을 받으려면 사업자 · 정산 정보를 입력해 주세요' },
-	pending: { label: '확인 중', tone: 'accent', desc: 'MYR 운영팀이 사업자 · 계좌 정보를 확인하고 있어요. 확인이 끝나면 정산금이 지급돼요' },
-	verified: { label: '확인 완료', tone: 'ok', desc: '확인이 끝났어요. 정산일(매월 1일)에 정산돼요' },
+	pending: { label: '확인 중', tone: 'accent', desc: 'MYR 운영팀이 사업자 · 계좌 정보를 확인하고 있어요. 확인이 끝나야 정산금이 지급돼요' },
+	// 정산 확정 · 지급을 나눠 쓴다(2026-11-13 · settlement-rules SETTLE_CONFIRM_TEXT · PAYOUT_RULE_TEXT 와 같은 뜻)
+	verified: { label: '확인 완료', tone: 'ok', desc: '확인이 끝났어요. 매월 1일 오후 1시 정산금이 정해지고, 세금계산서가 확인된 다음 날 오후 1시에 입금돼요' },
 	rejected: { label: '다시 입력 필요', tone: 'danger', desc: '운영팀이 다시 입력을 요청했어요. 아래 사유를 보고 고쳐 주세요' }
 };
 

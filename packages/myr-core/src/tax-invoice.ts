@@ -82,8 +82,8 @@ export const TAX_INVOICE_TONE: Record<TaxInvoiceStatus, 'plan' | 'hold' | 'warn'
 /** 상태별 안내 한 줄(제출 전 · 다시 제출 필요는 입력 칸 · 사유가 대신한다) */
 export const TAX_INVOICE_GUIDE: Record<TaxInvoiceStatus, string> = {
 	none: '',
-	submitted: '운영팀이 홈택스에서 확인하고 있어요. 확인되면 지급돼요.',
-	accepted: '운영팀 확인이 끝났어요. 지급 준비가 되면 이체돼요.',
+	submitted: '운영팀이 홈택스에서 확인하고 있어요. 확인된 다음 날 오후 1시에 정산금이 입금돼요.',
+	accepted: '운영팀 확인이 끝났어요. 다음 날 오후 1시에 정산금이 입금돼요.',
 	returned: ''
 };
 

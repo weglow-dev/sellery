@@ -46,6 +46,10 @@ describe('파서', () => {
 		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].holds]).toEqual([null, null, []]);
 		// 이체한 날(서버 paid_on · 0103) — 지급 완료일 때만
 		expect(sellerSettlementsFromJson({ months: [{ month: '2026-11', payout_status: 'paid', paid_on: '2026-12-02', rows: [], total: {} }] }).months[0].paidOn).toBe('2026-12-02');
+		// 0111 — 지급 예정 시각 · 이체 상태(모르는 종류는 버린다 · 상태가 없으면 null)
+		const tm = sellerSettlementsFromJson({ months: [{ month: '2026-11', pay_due_at: '2026-12-03T04:00:00Z', transfer: { state: 'failed', kind: 'what', tries: 2 }, rows: [], total: {} }, { month: '2026-10', transfer: { state: 'x' }, rows: [], total: {} }] }).months;
+		expect(tm[0]).toMatchObject({ payDueAt: '2026-12-03T04:00:00Z', transfer: { state: 'failed', kind: null, tries: 2 } });
+		expect(tm[1]).toMatchObject({ payDueAt: null, transfer: null });
 		expect(t.months[0].paidOn).toBeNull();
 		expect(sellerSettlementsFromJson(undefined)).toMatchObject({ settleStatus: 'none', ledgers: [], months: [] });
 	});
@@ -88,8 +92,28 @@ describe('시안 라벨', () => {
 		expect(monthStatus({ upcoming: false, payoutStatus: 'held', payoutLabel: '지급 보류' })).toEqual({ label: '지급 보류', tone: 'hold' });
 		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 대기' })).toEqual({ label: '지급 대기', tone: 'plan' });
 		expect(monthStatus({ upcoming: false, payoutStatus: null, payoutLabel: '지급 없음' })).toEqual({ label: '지급 없음', tone: 'done' });
-		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록하면 12월 1일 정산부터 바로 지급돼요.');
+		// 0111 — 이체 상태가 있으면 그 종류로 색(계좌 문제 빨강 · 지연 · 확인 중 주황 · 송금 중 민트) · 문구는 서버(myr_payout_creator_label)
+		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 실패', transfer: { state: 'failed', kind: 'account', tries: 1 } })).toEqual({ label: '지급 실패', tone: 'hold' });
+		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 지연', transfer: { state: 'failed', kind: 'retry', tries: 1 } }).tone).toBe('warn');
+		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 확인 중', transfer: { state: 'failed', kind: 'ops', tries: 1 } }).tone).toBe('warn');
+		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 중', transfer: { state: 'sending', kind: null, tries: 1 } }).tone).toBe('plan');
+		// 보류 배너 — 확인되지 않으면 지급되지 않는다는 것을 같이(2026-11-13)
+		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.');
+		expect(holdBanner('rejected', '12월 1일')?.body).toContain('확인되기 전에는 정산금이 지급되지 않아요');
+		expect(holdBanner('pending', '12월 1일')?.body).toContain('12월 1일 정산 확정분부터');
 		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
+	});
+	it('자동 이체 안내(0111) — 종류별 문구 · 버튼 · 운영 쪽 원인은 이유 없이 확인 중', async () => {
+		const { payoutNotice } = await import('../seller-settlement');
+		expect(payoutNotice(null, null)).toBeNull();
+		expect(payoutNotice({ state: 'sending', kind: null, tries: 1 }, null)).toMatchObject({ tone: 'plan', title: '정산금을 보내고 있어요', cta: null });
+		expect(payoutNotice({ state: 'failed', kind: 'account', tries: 1 }, null)).toMatchObject({ tone: 'hold', cta: { label: '계좌 다시 입력', href: '/my' } });
+		// 재시도 시각은 서버 지급 예정 시각(다음 오후 1시) — 없으면 규칙 문장
+		expect(payoutNotice({ state: 'failed', kind: 'retry', tries: 2 }, '2026-12-03T04:00:00Z')?.body).toBe('12월 3일(목) 오후 1시에 다시 보내요.');
+		expect(payoutNotice({ state: 'failed', kind: 'retry', tries: 2 }, null)?.body).toBe('다음 날 오후 1시에 다시 보내요.');
+		const ops = payoutNotice({ state: 'failed', kind: 'ops', tries: 1 }, null);
+		expect(ops).toMatchObject({ tone: 'warn', title: '운영팀이 지급을 확인하고 있어요', cta: null });
+		expect(ops?.body).not.toMatch(/잔액|한도|오류/);
 	});
 	it('지급까지 할 일 1단계 — 입력 상태별 버튼 · 칩(끝났는지는 서버 보류 이유)', async () => {
 		const { settleInfoStep } = await import('../seller-settlement');
