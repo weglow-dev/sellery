@@ -117,14 +117,18 @@ export async function claimQuote(c: Pick<Claim, 'qty' | 'order'>, deduction: num
 	}
 }
 
-/** 콘솔 요청 상세 — 처리 대기면 처리 방법별(전액 = 차감 없음 · 부분 = 왕복 배송비) · 환불 전 진행 중이면 승인된 처리(current) */
+/** 콘솔 요청 상세 — 처리 대기면 환불이 나가는 처리 방법별(차감액은 서버 optionDeductions · 0105 — 승인과 같은 함수 · 고를 수 없으면 null) ·
+ *  환불 전 진행 중이면 승인된 처리(current · 저장된 deduction) */
 export async function claimQuotes(c: Claim): Promise<ClaimQuotes> {
 	const out: ClaimQuotes = {};
 	if (c.status === 'pending') {
+		const options: NonNullable<ClaimQuotes['options']> = {};
 		for (const r of c.options) {
-			if (r === 'refund') out.refund = await claimQuote(c, 0);
-			if (r === 'partial') out.partial = c.returnFee === null ? null : await claimQuote(c, c.returnFee);
+			if (!(r in c.optionDeductions)) continue;
+			const deduction = c.optionDeductions[r];
+			options[r] = deduction == null ? null : await claimQuote(c, deduction);
 		}
+		out.options = options;
 	} else if (c.status === 'progress' && c.needsRefund && !c.refundedAt) {
 		out.current = await claimQuote(c, c.deduction);
 	}

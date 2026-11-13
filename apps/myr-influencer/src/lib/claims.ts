@@ -50,9 +50,10 @@ export const dueText = (c: Pick<Claim, 'createdAt'>, now?: Date): string => {
 /** 목록 카드 강조 테두리 — 기한이 하루 이하 남은 처리 대기 요청만 */
 export const isUrgentPending = (c: Pick<Claim, 'status' | 'createdAt'>, now?: Date): boolean => c.status === 'pending' && dueDays(c, now) <= 1;
 
-/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) · 금액은 서버 예상 금액(claimQuotes · 없으면 금액 없이) */
+/** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) · 금액은 서버 예상 금액(claimQuotes · 없으면 금액 없이).
+ *  서버가 고를 수 없다고 한 처리(optionDeductions null · 0105 myr_claim_option_blocked — 승인이 BAD_RESOLUTION 으로 거절)는 빼고 보여 준다 */
 export const resolutionOptions = (c: Claim, quotes: ClaimQuotes = {}) =>
-	c.options.map((r) => resolutionOption(r, c, r === 'refund' ? quotes.refund : r === 'partial' ? quotes.partial : null));
+	c.options.filter((r) => c.optionDeductions[r] !== null).map((r) => resolutionOption(r, c, quotes.options?.[r] ?? null));
 export function approveLabel(c: Claim, resolution: Resolution | null): string {
 	return resolution && c.options.includes(resolution) ? `${resolutionOption(resolution, c).title} 승인` : '처리 방법을 선택하세요';
 }

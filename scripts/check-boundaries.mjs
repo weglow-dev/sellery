@@ -194,6 +194,10 @@ const MYR_MIRROR_RULES = [
   { re: /\bsettleStatus\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 nextHold · hold(myr_seller_hold_reason · 0102)를 쓴다" },
   { re: /\bsettle_status\s*(===|!==)\s*['"]verified['"]/, why: "지급 보류 여부를 사업자 정보 상태로 다시 판정 — 서버 값 hold_reason · payable(0102)을 쓴다" },
   { re: /Date\.UTC\([^)\n]*,\s*1\s*,\s*4\s*[,)]/, why: "정산 지급 시각(다음 달 1일 오후 1시)을 화면에서 계산 — 서버 값 payAt · settleAt(myr_settlement_pay_at)을 쓴다" },
+  // 교환·환불 요청 처리 방법(0105)
+  //   'refund' · 'reship' 은 요청 종류 · 단계 · 운영 동작 이름과 겹쳐 잡지 않는다 — 'partial' 은 처리 방법에만 쓰는 값
+  { re: /(===|!==)\s*['"]partial['"]/, why: "처리 방법으로 차감 여부를 다시 판정 — 서버 값 optionDeductions(myr_claim_option_deduction · myr_claim_option_blocked · 0105)를 쓴다" },
+  { re: /\bclaimQuote\([^)]*returnFee\b/, why: "처리 방법별 예상 금액의 차감액을 왕복 배송비로 다시 정함 — 서버 값 optionDeductions(0105)를 쓴다" },
   // 세금계산서(0104)
   { re: /\/\s*1\.1\b|\/\s*11\b|\bsupply\s*\*\s*0\.1\b|\*\s*10\s*\/\s*11\b/, why: "세금계산서 공급가액 · 세액을 화면에서 나눔 — 서버 값 supply · tax(myr_tax_invoice_amounts · 0104)를 쓴다" },
   { re: /\bsupply\s*\+\s*[\w.]*tax\b|\btax\s*\+\s*[\w.]*supply\b/, why: "세금계산서 합계를 화면에서 더함 — 서버 값 total(myr_payout_invoice_total · 0104)을 쓴다" },

@@ -189,6 +189,10 @@ describe('처리 방법 이름 · 금액', () => {
 		// 회수 여부는 서버 값(0099 option_collects · 파손 · 누액 환불은 회수 없이 — myr_claim_resolution_collects)
 		const broken = claim({ kind: 'exchange', reason: '파손 · 누액', options: ['reship', 'refund'], option_collects: { reship: false, refund: false, what: true } });
 		expect(broken.optionCollects).toEqual({ reship: false, refund: false });
+		// 처리 방법별 차감액은 서버 값(0105 option_deductions) — null(고를 수 없음)은 남기고 · 모르는 키 · 음수 · 소수는 버린다
+		expect(claim({ option_deductions: { partial: null, refund: 0, what: 1, reship: -1, reship_collect: 1.5 } }).optionDeductions).toEqual({ partial: null, refund: 0 });
+		expect(claim({ option_deductions: { partial: 6000, refund: 0 } }).optionDeductions).toEqual({ partial: 6000, refund: 0 });
+		expect(claim().optionDeductions).toEqual({});
 		expect(resolutionOption('reship', broken).title).toBe('새 제품 재발송');
 		expect(resolutionOption('refund', broken, { paid: 32000, goods: 32000, shippingBack: 0, deduction: 0, amount: 32000 })).toEqual({ id: 'refund', title: '환불로 전환', desc: '₩32,000 · 회수 없이 바로 환불' });
 		expect(resolutionOption('reship_collect', claim({ kind: 'exchange', reason: '오배송' })).title).toBe('재발송 + 회수');
