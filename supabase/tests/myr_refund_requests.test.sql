@@ -1,7 +1,7 @@
 -- pgTAP — 0078 교환·환불 요청: 권한 · 요청 남기기(가드 · 사진 · 줄마다 하나) · 크리에이터 목록 · 승인/반려(처리 방법 · 할 일 · 차감) ·
 --         회수 확인 · 환불 기록 · 재발송 송장 · 완료 판정 · 환불 재시도 대상 · 고아 사진 (docs/myr.md §4.2.1 7번)
 begin;
-select plan(85);
+select plan(90);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_claim_open', '{uuid,uuid,text,text,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 claim_open 불가');
@@ -97,6 +97,10 @@ select is((select jsonb_build_object('options', j -> 'options', 'phone', j ->> '
              from (select public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', upper((select code from rq where k = 'rc1'))) as j) s),
   '{"options": ["partial", "refund"], "phone": "010-****-5678", "step": "decide", "amount": 32000, "fee": 6000}'::jsonb, '상세 JSON — 단순 변심 선택지 · 연락처 가림 · 단계 · 금액 · 왕복 배송비(코드 대소문자 무관)');
 select is(public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc5')) -> 'options', '["reship", "refund"]'::jsonb, '파손 교환 요청 선택지 — 재발송 먼저');
+-- 0105: 처리 방법별 차감액(승인과 같은 함수) — 환불이 나가는 처리만 · 고를 수 없으면 null
+select is(public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc1')) -> 'option_deductions', '{"partial": 6000, "refund": 0}'::jsonb, '단순 변심 — 부분 환불은 왕복 배송비 · 전액 환불은 0');
+select is(public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc5')) -> 'option_deductions', '{"refund": 0}'::jsonb, '파손 교환 — 재발송은 환불이 없어 키 없음');
+select is((select public.myr_refund_request_json(q) -> 'option_deductions' from public.myr_refund_requests q where q.code = (select code from rq where k = 'rc3')), '{"partial": null, "refund": 0}'::jsonb, '차감 뒤 0원 이하 — 부분 환불은 null(고를 수 없음 · 승인 BAD_RESOLUTION 과 같은 함수)');
 update public.myr_order_items set courier = '한진택배', tracking_no = '440000000001', shipped_at = now() where id = '00000000-0000-4000-8000-000000000fc5';
 select is((select jsonb_build_object('status', j #>> '{order,status}', 'courier', j #>> '{order,item,courier}', 'tracking', j #>> '{order,item,tracking_no}')
              from (select public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select code from rq where k = 'rc5')) as j) s),
@@ -136,6 +140,9 @@ select ok((select bool_or(e ->> 'code' = (select code from rq where k = 'rc1') a
 select ok(not exists (select 1 from jsonb_array_elements(public.myr_app_claims_refund_due(interval '-1 minute', 20)) e where e ->> 'code' = (select code from rq where k = 'rc4')), '회수 전 요청은 재시도 대상 아님');
 select is(public.myr_app_claim_refunded((select code from rq where k = 'rc1'), 26000), '{"ok": true, "already": false, "status": "done"}'::jsonb, '환불 기록 → 할 일이 끝나 완료');
 select is((select jsonb_build_object('amount', refund_amount, 'done', done_at is not null) from public.myr_refund_requests where code = (select code from rq where k = 'rc1')), '{"amount": 26000, "done": true}'::jsonb, '환불 금액 · 완료 시각');
+select is((select jsonb_build_object('paid', (j ->> 'refund_paid')::int, 'back', public.myr_refund_after_deduction((j ->> 'refund_paid')::int, (j ->> 'deduction')::int), 'refund', (j ->> 'refund_amount')::int)
+             from (select public.myr_refund_request_json(q) as j from public.myr_refund_requests q where q.code = (select code from rq where k = 'rc1')) s),
+  '{"paid": 32000, "back": 26000, "refund": 26000}'::jsonb, '0105 응답 refund_paid(환불액 + 차감)를 차감 뒤 금액 함수에 넣으면 환불액 — 두 식이 같은 관계');
 select is((public.myr_app_claim_refunded((select code from rq where k = 'rc1'), 26000) ->> 'already')::boolean, true, '환불 기록 다시 → already');
 
 -- ---------- 재발송 ----------
@@ -164,6 +171,7 @@ create temp table bt as select public.myr_app_claim_open('00000000-0000-4000-800
 select is((select count(distinct batch)::int from public.myr_refund_requests where order_item_id in ('00000000-0000-4000-8000-000000000fc7', '00000000-0000-4000-8000-000000000fc8')), 1, '한 번에 보낸 요청은 한 묶음');
 select is((public.myr_app_claim_decide((select r #>> '{requests,0,code}' from bt), '00000000-0000-4000-8000-000000000f81', 'approve', 'partial', '확인') #>> '{request,deduction}')::int, 6000, '묶음 첫 부분 환불 → 배송비 차감');
 select is((select (j ->> 'return_fee')::int from (select public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select r #>> '{requests,1,code}' from bt)) as j) s), 0, '같은 묶음 다른 요청 — 뺄 배송비 0(화면 안내)');
+select is(public.myr_app_seller_claim_of_user('00000000-0000-4000-8000-000000000f81', (select r #>> '{requests,1,code}' from bt)) -> 'option_deductions', '{"partial": 0, "refund": 0}'::jsonb, '같은 묶음 다른 요청 — 부분 환불 차감 0(예상 금액도 전액과 같다)');
 select is((public.myr_app_claim_decide((select r #>> '{requests,1,code}' from bt), '00000000-0000-4000-8000-000000000f81', 'approve', 'partial', '확인') #>> '{request,deduction}')::int, 0, '같은 묶음 두 번째 부분 환불 → 차감 없음');
 
 -- ---------- 고아 사진 ----------

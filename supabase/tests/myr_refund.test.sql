@@ -1,11 +1,11 @@
 -- pgTAP — 0061 환불: 권한 · precheck 가드(actor 표) · 금액(부분/전액+배송비) · record(줄·주문 상태 파생 · sold_qty 반환 · 멱등) · 입금 대기 취소 (docs/myr.md §6.3)
 begin;
-select plan(50);
+select plan(51);
 
-select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 precheck 실행 불가');
-select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 precheck 실행 불가');
-select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 record 실행 불가');
-select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 record 실행 가능');
+select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid,integer}'::text[], 'anon', '{}'::text[], 'anon 은 precheck 실행 불가');
+select function_privs_are('public', 'myr_app_refund_precheck', '{uuid,jsonb,text,uuid,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 precheck 실행 불가');
+select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb,integer}'::text[], 'anon', '{}'::text[], 'anon 은 record 실행 불가');
+select function_privs_are('public', 'myr_app_refund_record', '{uuid,jsonb,text,uuid,text,integer,jsonb,integer}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 record 실행 가능');
 
 select has_column('public', 'payment_events', 'order_code', 'payment_events.order_code (0062) 가 있다');
 select col_type_is('public', 'payment_events', 'order_code', 'text', 'order_code 는 text');
@@ -49,12 +49,12 @@ update public.myr_order_items set ship_status = 'PAID' where order_id = '0000000
 
 -- ---------- precheck 금액 ----------
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'customer', '00000000-0000-4000-8000-0000000000c7') - 'items',
-  '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 10000, "goods": 10000, "shipping_back": 0, "deposit": false, "full": false}'::jsonb, '부분 환불 — 단가 × qty · 배송비 없음');
+  '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 10000, "goods": 10000, "shipping_back": 0, "deposit": false, "full": false, "deduction": 0, "refund_amount": 10000, "cancel_full": false}'::jsonb, '부분 환불 — 단가 × qty · 배송비 없음 · 차감 없음 → 돌려줄 돈 = 결제 금액 · 부분 취소');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1},{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1}]', 'admin', null) ->> 'amount', '20000', '같은 줄 두 번은 합쳐진다');
 -- 줄 순서는 정해져 있지 않다(전체 = 남은 줄 전부) — items 는 item_id 순으로 다시 묶어 비교
 select is((select (j - 'items') || jsonb_build_object('items', (select jsonb_agg(e order by e ->> 'item_id') from jsonb_array_elements(j -> 'items') e))
              from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d41', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7') as j) s),
-  '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 43000, "goods": 40000, "shipping_back": 3000, "deposit": false, "full": true, "items": [{"item_id": "00000000-0000-4000-8000-000000000f41", "qty": 2, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a41"}, {"item_id": "00000000-0000-4000-8000-000000000f42", "qty": 1, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a42"}]}'::jsonb,
+  '{"ok": true, "order_code": "pgtap-rf-m", "order_status": "PAID", "payment_key": "pk_rf1", "amount": 43000, "goods": 40000, "shipping_back": 3000, "deposit": false, "full": true, "deduction": 0, "refund_amount": 43000, "cancel_full": true, "items": [{"item_id": "00000000-0000-4000-8000-000000000f41", "qty": 2, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a41"}, {"item_id": "00000000-0000-4000-8000-000000000f42", "qty": 1, "amount": 20000, "seller_id": "00000000-0000-4000-8000-000000000a42"}]}'::jsonb,
   '빈 items = 전체 → 모든 줄 남은 수량 · full · 배송비 포함 43,000');
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d42', '[]', 'customer', '00000000-0000-4000-8000-0000000000e1') ->> 'amount', '13000', '비회원은 customer_id 로 본인 확인 · 전액 13,000');
 
@@ -64,7 +64,7 @@ select is((select public || '/' || file_size_limit from storage.buckets where id
 select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"photos":["00000000-0000-4000-8000-000000000d42/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000aa.jpg"]}]', 'customer', '00000000-0000-4000-8000-0000000000c7', 'x', 10000) -> 'items' -> 0 ->> 'reason', 'BAD_PHOTOS', '0068 다른 주문 아래 사진 경로는 BAD_PHOTOS(기록 없음)');
 select is((select refunded_qty from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), 0, '0068 BAD_PHOTOS 면 줄이 그대로');
 select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d41', '[{"item_id":"00000000-0000-4000-8000-000000000f41","qty":1,"note":"  포장이 찢어졌어요  ","photos":["00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000aa.jpg","00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ab.png"]}]', 'customer', '00000000-0000-4000-8000-0000000000c7', '단순 변심', 10000),
-  '{"ok": true, "already": false, "order_code": "pgtap-rf-m", "status": "PARTIAL_REFUNDED", "amount": 10000}'::jsonb, '부분 환불 기록 → 주문 PARTIAL_REFUNDED');
+  '{"ok": true, "already": false, "order_code": "pgtap-rf-m", "status": "PARTIAL_REFUNDED", "amount": 10000, "mismatch": false}'::jsonb, '부분 환불 기록 → 주문 PARTIAL_REFUNDED');
 select is((select refund_reason from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), '단순 변심 — 포장이 찢어졌어요', '0067 줄 refund_reason = 사유 — 상세(공백 정리)');
 select is((select refund_reason from public.myr_orders where id = '00000000-0000-4000-8000-000000000d41'), '단순 변심', '0067 주문 refund_reason 은 사유만');
 select is((select array_length(refund_photos, 1) || '/' || refund_photos[2] from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f41'), '2/00000000-0000-4000-8000-000000000d41/00000000-0000-4000-8000-000000000f41/00000000-0000-4000-8000-0000000000ab.png', '0068 줄 refund_photos 에 경로 2개');
@@ -95,8 +95,10 @@ select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d42', '
 
 -- ---------- 입금 대기 취소 ----------
 select is(public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d43', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7') ->> 'deposit', 'true', 'WAITING_DEPOSIT 은 deposit:true (토스 호출 없이 취소)');
+select is((select jsonb_build_object('refund', j -> 'refund_amount', 'deduction', j -> 'deduction', 'paid', j -> 'amount') from (select public.myr_app_refund_precheck('00000000-0000-4000-8000-000000000d43', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7', 6000) as j) s),
+  '{"refund": 0, "deduction": 0, "paid": 23000}'::jsonb, '0105 입금 전 취소 — 돌려줄 돈 0 · 차감을 넘겨도 0(돈이 오가지 않는다)');
 select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d43', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7', '입금 전 취소', 0),
-  '{"ok": true, "already": false, "order_code": "pgtap-rf-d", "status": "CANCELED", "amount": 0}'::jsonb, '입금 대기 취소 → CANCELED · 금액 0');
+  '{"ok": true, "already": false, "order_code": "pgtap-rf-d", "status": "CANCELED", "amount": 0, "mismatch": false}'::jsonb, '입금 대기 취소 → CANCELED · 금액 0');
 select is((select status || '/' || refund_actor from public.myr_order_items where id = '00000000-0000-4000-8000-000000000f44'), 'CANCELED/customer', '줄 CANCELED · actor 기록');
 select is((select sold_qty from public.myr_products where code = 'pgtap-rf-b'), 0, 'B 예약 반환 (sold 0)');
 select is(public.myr_app_refund_record('00000000-0000-4000-8000-000000000d43', '[]', 'customer', '00000000-0000-4000-8000-0000000000c7', 'x', 0) ->> 'already', 'true', '취소된 주문 재기록은 already');

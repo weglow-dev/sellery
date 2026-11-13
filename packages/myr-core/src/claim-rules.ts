@@ -70,8 +70,9 @@ export function claimPolicy(reason: string, returnFee: number | null): string[] 
 	}
 }
 
-/** 예상 환불 금액(서버 refundQuote) — 콘솔 요청 상세. 처리 대기면 처리 방법별(refund · partial) · 환불 전 진행 중이면 current. 계산 실패한 칸은 null */
-export type ClaimQuotes = { refund?: RefundQuote | null; partial?: RefundQuote | null; current?: RefundQuote | null };
+/** 예상 환불 금액(서버 refundQuote) — 콘솔 요청 상세. 처리 대기면 환불이 나가는 처리 방법별(options · 차감액은 서버 optionDeductions) · 환불 전 진행 중이면 current.
+ *  고를 수 없는 처리 · 계산 실패한 칸은 null */
+export type ClaimQuotes = { options?: Partial<Record<Resolution, RefundQuote | null>>; current?: RefundQuote | null };
 
 /** 환불 금액을 결제 기준으로 펼친 한 벌(표시용) — 결제 금액(상품 + 함께 돌려줄 배송비) − 왕복 배송비 = 환불 금액.
  *  값은 서버가 정한 그대로(환불 전 = refundQuote · 환불 뒤 = claimRefundView) — 여기서 금액을 다시 계산하지 않는다. RefundQuote 도 이 모양이다 */
@@ -182,6 +183,9 @@ export type Claim = {
 	options: Resolution[];
 	/** 처리 방법마다 회수가 필요한가 — 서버 값(0099 option_collects) · 콘솔 처리 방법 안내가 사유로 다시 판정하지 않는다 */
 	optionCollects: Partial<Record<Resolution, boolean>>;
+	/** 환불이 나가는 처리 방법마다 뺄 왕복 배송비 — 서버 값(0105 option_deductions · 승인과 같은 myr_claim_option_deduction).
+	 *  null = 차감 뒤 0원 이하라 고를 수 없음(myr_claim_option_blocked) · 키 없음 = 환불이 없는 처리(재발송) */
+	optionDeductions: Partial<Record<Resolution, number | null>>;
 	resolution: Resolution | null;
 	message: string | null;
 	decidedAt: string | null;
@@ -269,6 +273,9 @@ export function claimFromJson(v: unknown): Claim | null {
 		photos: Array.isArray(o.photos) ? o.photos.filter((x): x is string => typeof x === 'string') : [],
 		options: Array.isArray(o.options) ? o.options.filter(isResolution) : [],
 		optionCollects: Object.fromEntries(Object.entries(obj(o.option_collects) ?? {}).filter(([k, v]) => isResolution(k) && typeof v === 'boolean')) as Partial<Record<Resolution, boolean>>,
+		optionDeductions: Object.fromEntries(
+			Object.entries(obj(o.option_deductions) ?? {}).filter(([k, v]) => isResolution(k) && (v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 0)))
+		) as Partial<Record<Resolution, number | null>>,
 		resolution: isResolution(o.resolution) ? o.resolution : null,
 		message: sn(o.message),
 		decidedAt: sn(o.decided_at),

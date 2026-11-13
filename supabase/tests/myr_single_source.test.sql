@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(167);
+select plan(183);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -38,6 +38,19 @@ select is((select jsonb_object_agg(st, public.myr_ship_status_unshipped(st)) fro
           '{"PAID": true, "PREPARING": true, "SHIPPING": false, "DELIVERED": false}'::jsonb, '출고 전 = 결제완료 · 배송준비중');
 select is((select jsonb_object_agg(coalesce(r, 'null'), public.myr_claim_resolution_deducts(r)) from unnest(array['partial','refund','reship','reship_collect',null]) r),
           '{"partial": true, "refund": false, "reship": false, "reship_collect": false, "null": false}'::jsonb, '왕복 배송비를 빼는 처리 방법 = partial');
+select is((select jsonb_object_agg(coalesce(r, 'null'), public.myr_claim_resolution_refunds(r)) from unnest(array['partial','refund','reship','reship_collect',null]) r),
+          '{"partial": true, "refund": true, "reship": false, "reship_collect": false, "null": false}'::jsonb, '환불이 나가는 처리 방법 = refund · partial(0105)');
+-- 0105 환불 금액 — 차감할 수 있나 · 차감 뒤 금액 · 토스 전액 취소 · 기록 금액 비교
+select is((select jsonb_agg(public.myr_deduction_fits(a, d) order by o) from unnest(array[32000, 6000, 5000, 0, 32000], array[6000, 6000, 6000, 0, 0]) with ordinality u(a, d, o)),
+          '[true, false, false, true, true]'::jsonb, '차감할 수 있나 — 금액보다 작거나 차감 없음(0원 금액도 차감 없으면 된다)');
+select is((select jsonb_agg(public.myr_refund_after_deduction(a, d) order by o) from unnest(array[39000, 36000, 6000, 32000, 0], array[6000, 6000, 6000, 0, 0]) with ordinality u(a, d, o)),
+          '[33000, 30000, null, 32000, 0]'::jsonb, '차감 뒤 금액 — 정상 · 부분 · 차감 불가 null · 전액 · 0원');
+select is(public.myr_refund_after_deduction(39000, null), 39000, '차감 null = 0');
+select is((select jsonb_agg(public.myr_refund_cancel_full(f, d) order by o) from unnest(array[true, true, false, null], array[0, 6000, 0, 0]) with ordinality u(f, d, o)),
+          '[true, false, false, false]'::jsonb, '토스 전액 취소 — 다 끝나고 차감 없을 때만');
+select is(public.myr_refund_mismatch_json(33000, 33000), '{"mismatch": false}'::jsonb, '기록 금액 같음 → mismatch false');
+select is(public.myr_refund_mismatch_json(30000, 33000), '{"mismatch": true, "expected": 33000, "got": 30000}'::jsonb, '기록 금액 다름 → 두 금액');
+select is(public.myr_refund_mismatch_json(0, null), '{"mismatch": true, "expected": null, "got": 0}'::jsonb, '다시 계산 실패(null) → mismatch');
 
 -- ---------- 3. 금액 ----------
 select is(public.myr_line_amount(10000000, 999999), 9999990000000::bigint, '단가 × 수량 — bigint(정수 범위를 넘어도 오류 없음)');
@@ -320,6 +333,14 @@ insert into _rules (label, pat, allowed) values
   ('요청 사유 목록',                          $p$'단순 변심'\s*,\s*'파손 · 누액'$p$,                               '{myr_claim_reasons}'),
   ('단순 변심 사유 비교',                     $p$=\s*'단순 변심'$p$,                                             '{myr_claim_reason_change_mind}'),
   ('사진 필수 사유',                          $p$'파손 · 누액'\s*,\s*'오배송'$p$,                                 '{myr_claim_photo_required,myr_claim_reasons}'),
+  ('처리 방법별 차감액(차감 처리면 뺄 배송비)', $p$myr_claim_resolution_deducts\(\w+\)\s+then$p$,                 '{myr_claim_option_deduction}'),
+  ('부분 환불 불가(줄 금액에 차감이 안 맞음)',  $p$myr_deduction_fits\(public\.myr_line_amount|myr_line_amount\([^)]*\)\s*<=$p$, '{myr_claim_option_blocked}'),
+  ('차감할 수 있나(차감 < 금액)',              $p$deduction\w*\s*<\s*\w*(amount|paid)$p$,                          '{myr_deduction_fits}'),
+  ('차감 뒤 금액(금액 − 차감)',                $p$-\s*(coalesce\()?\s*(\w+\.)?\w*deduction\M$p$,                  '{myr_refund_after_deduction}'),
+  ('환불한 요청의 결제 기준 금액(환불액 + 차감)', $p$refund_amount\s*\+\s*(\w+\.)?deduction$p$,                   '{myr_claim_refund_paid}'),
+  ('토스 전액 취소(다 끝나고 차감 없음)',      $p$full\w*,\s*false\)\s+and\s+coalesce\(\w*deduction$p$,            '{myr_refund_cancel_full}'),
+  ('기록 금액 어긋남',                         $p$'mismatch',\s*true$p$,                                          '{myr_refund_mismatch_json}'),
+  ('환불이 나가는 처리 방법',                 $p$'refund'\s*,\s*'partial'$p$,                                  '{myr_claim_resolution_refunds}'),
   ('회수 없는 사유 비교',                     $p$<>\s*'파손 · 누액'$p$,                                          '{myr_claim_resolution_collects}'),
   ('주문 주인',                               $p$user_id is null and (\w+\.)?customer_id$p$,                     '{myr_order_owned_by}'),
   ('판매가 상한',                             $p$10000000$p$,                                                    '{myr_product_price_max}'),

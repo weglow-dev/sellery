@@ -4,7 +4,6 @@ import type { OrderItem, OrderView } from '../order-view';
 import {
 	customerCanRefund,
 	customerRefundableItems,
-	deductedAmount,
 	isRefundPhotoPath,
 	parseCancelBody,
 	parsePrecheckResult,
@@ -157,46 +156,26 @@ describe('customerCanRefund · customerRefundableItems — 서버 refundPath 그
 	});
 });
 
-describe('deductedAmount — 요청 환불의 왕복 배송비 차감(0078)', () => {
-	it('차감 없음 = 그대로 · 차감 < 금액이면 뺀다 · 금액 이상 · 음수 · 소수는 null(환불하지 않는다)', () => {
-		expect(deductedAmount(32000)).toBe(32000);
-		expect(deductedAmount(32000, 0)).toBe(32000);
-		expect(deductedAmount(32000, 6000)).toBe(26000);
-		expect(deductedAmount(6000, 6000)).toBeNull();
-		expect(deductedAmount(5000, 6000)).toBeNull();
-		expect(deductedAmount(32000, -1)).toBeNull();
-		expect(deductedAmount(32000, 1.5)).toBeNull();
-	});
-});
-
-describe('quoteFromPrecheck — 실제 환불 · 예상 금액이 같이 쓰는 금액 계산', () => {
-	// precheck 응답 — amount(차감 전 환불 금액) · goods(상품) · shippingBack(함께 돌려줄 처음 배송비)를 서버가 준다(0099). 여기서 나누지 않는다
-	const pre = (amount: number, goods: number, over: { deposit?: boolean; full?: boolean } = {}) => ({
+describe('quoteFromPrecheck — 실제 환불 · 예상 금액이 같이 쓰는 한 벌(금액은 전부 서버 precheck · 0105)', () => {
+	// precheck 응답 — amount(결제 금액 = 상품 + 함께 돌려줄 처음 배송비) · goods · shippingBack · deduction(적용한 차감) · refundAmount(돌려줄 돈)를 서버가 준다. 여기서 빼거나 나누지 않는다
+	const pre = (amount: number, goods: number, over: { deposit?: boolean; full?: boolean; deduction?: number; refundAmount?: number } = {}) => ({
 		amount,
 		goods,
 		items: [{ item_id: A, qty: 1, amount: goods, seller_id: null }],
 		shippingBack: amount - goods,
 		deposit: over.deposit ?? false,
-		full: over.full ?? false
+		full: over.full ?? false,
+		deduction: over.deduction ?? 0,
+		refundAmount: over.refundAmount ?? amount
 	});
-	it('정상 — 일부 줄 · 차감 없음', () => {
+	it('정상 — 서버 값을 모양만 바꿔 담는다', () => {
 		expect(quoteFromPrecheck(pre(10000, 10000))).toEqual({ amount: 10000, paid: 10000, goods: 10000, shippingBack: 0, deduction: 0, full: false, deposit: false, lines: [{ itemId: A, qty: 1, amount: 10000 }] });
 	});
-	it('마지막 줄(전부 환불) — precheck 가 붙인 배송비가 shippingBack 으로 · 단순 변심 차감(MYR2087: 36,000 + 3,000 − 6,000 = 33,000)', () => {
-		expect(quoteFromPrecheck(pre(39000, 36000, { full: true }), 6000)).toMatchObject({ amount: 33000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false });
+	it('차감 — 돌려줄 돈은 서버 refund_amount 그대로(MYR2087: 서버가 39,000 − 6,000 = 33,000 을 준다)', () => {
+		expect(quoteFromPrecheck(pre(39000, 36000, { full: true, deduction: 6000, refundAmount: 33000 }))).toMatchObject({ amount: 33000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true });
 	});
-	it('부분 — 마지막 줄이 아니면 배송비 없이 차감만', () => {
-		expect(quoteFromPrecheck(pre(36000, 36000), 6000)).toMatchObject({ amount: 30000, paid: 36000, goods: 36000, shippingBack: 0, deduction: 6000, full: false, deposit: false });
-	});
-	it('전액 — 차감 없는 전부 환불은 배송비까지 그대로', () => {
-		expect(quoteFromPrecheck(pre(43000, 40000, { full: true }))).toMatchObject({ amount: 43000, paid: 43000, goods: 40000, shippingBack: 3000, deduction: 0 });
-	});
-	it('0원 · 입금 전 — 입금 전 취소는 돈이 오가지 않아 0 · 차감도 0', () => {
-		expect(quoteFromPrecheck(pre(43000, 40000, { deposit: true, full: true }), 6000)).toMatchObject({ amount: 0, paid: 43000, goods: 40000, shippingBack: 3000, deduction: 0, full: true, deposit: true });
-	});
-	it('차감이 금액 이상이면 null(환불하지 않는다 · deductedAmount 와 같다)', () => {
-		expect(quoteFromPrecheck(pre(5000, 5000), 6000)).toBeNull();
-		expect(quoteFromPrecheck(pre(6000, 6000), 6000)).toBeNull();
+	it('입금 전 — 서버가 0원 · 차감 0 을 준다', () => {
+		expect(quoteFromPrecheck(pre(43000, 40000, { deposit: true, full: true, refundAmount: 0 }))).toMatchObject({ amount: 0, paid: 43000, deduction: 0, deposit: true });
 	});
 });
 
@@ -280,9 +259,14 @@ describe('RPC 파서 · 문구', () => {
 				shipping_back: 3000,
 				deposit: false,
 				full: true,
-				items: [{ item_id: A, qty: 1, amount: 10000, seller_id: 's' }]
+				items: [{ item_id: A, qty: 1, amount: 10000, seller_id: 's' }],
+				deduction: 6000,
+				refund_amount: 7000,
+				cancel_full: false
 			})
-		).toMatchObject({ ok: true, amount: 13000, goods: 10000, shippingBack: 3000, items: [{ item_id: A, qty: 1 }] });
+		).toMatchObject({ ok: true, amount: 13000, goods: 10000, shippingBack: 3000, items: [{ item_id: A, qty: 1 }], deduction: 6000, refundAmount: 7000, cancelFull: false });
+		// refund_amount(0105 돌려줄 돈)가 없는 응답은 짐작하지 않고 BAD_RESULT
+		expect(parsePrecheckResult({ ok: true, order_code: 'myr1001', amount: 10000, goods: 10000, shipping_back: 0, deposit: false, full: false, items: [] })).toEqual({ ok: false, code: 'BAD_RESULT' });
 		// goods · shipping_back 이 없는 응답(0099 전)은 금액을 나눠 짐작하지 않고 BAD_RESULT
 		expect(parsePrecheckResult({ ok: true, order_code: 'myr1001', amount: 10000, deposit: false, full: false, items: [] })).toEqual({ ok: false, code: 'BAD_RESULT' });
 		expect(parsePrecheckResult({ ok: false, code: 'BAD_ITEMS', items: [{ item_id: A, reason: 'TOO_MANY', left: 2 }] })).toEqual({
@@ -297,8 +281,13 @@ describe('RPC 파서 · 문구', () => {
 			already: false,
 			orderCode: 'myr1001',
 			status: 'PARTIAL_REFUNDED',
-			amount: 10000
+			amount: 10000,
+			mismatch: null
 		});
+		// 0105 — record 가 다시 계산한 금액과 다르면 mismatch(기록은 됐다)
+		expect(parseRecordResult({ ok: true, already: false, order_code: 'myr1001', status: 'REFUNDED', amount: 9000, mismatch: true, expected: 7000, got: 9000 })).toMatchObject({ ok: true, mismatch: { expected: 7000, got: 9000 } });
+		expect(parseRecordResult({ ok: true, already: false, order_code: 'myr1001', status: 'REFUNDED', amount: 9000, mismatch: true, expected: null, got: 9000 })).toMatchObject({ mismatch: { expected: null, got: 9000 } });
+		expect(refundMessage('DEDUCTION_TOO_BIG')).toBe('차감 금액이 환불 금액보다 커요');
 		expect(refundMessage('SHIPPED')).toContain('출고 준비');
 		expect(refundMessage('ZZZ', '토스 메시지')).toBe('토스 메시지');
 	});

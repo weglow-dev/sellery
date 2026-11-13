@@ -2,6 +2,7 @@
  * 환불 — 단일 함수(docs/myr.md §3.1): precheck(가드·금액) → 토스 부분 취소(cancelAmount · Idempotency-Key) → record(줄·주문 기록). 0061.
  *   · actor · actorId 는 라우트가 세션/쿠키 검증에서 정한다(회원 user.id · 비회원은 토큰 검증 뒤 customer_id · 셀러/관리자는 다음 앱).
  *   · WAITING_DEPOSIT(입금 전) 은 토스 호출 없이 record 만.
+ *   · 돌려줄 돈 · 차감 · 토스 전액 취소 여부는 precheck 응답(0105) — record 는 같은 precheck 로 다시 계산해 다르면 mismatch(거절하지 않음 → payment_events handled=false).
  *   · 토스 취소가 불명(0/5xx)이면 기록하지 않고 CANCEL_UNCERTAIN — payment_events(handled=false) 운영 큐. 같은 줄 묶음으로 재시도하면 같은 Idempotency-Key 라 토스가 같은 결과를 준다.
  *   · 토스 ALREADY_CANCELED_PAYMENT(전액 이미 취소) 는 취소 성공으로 보고 기록한다.
  *   · 교환·환불 요청(0078)에서 나가는 환불은 deduction(왕복 배송비) · tag(요청 코드)를 준다 — 금액은 `refundQuote` 한 번으로 정해 토스 · record · 메일이 같은 값을 쓴다(화면 예상 금액도 같은 함수).
@@ -19,21 +20,20 @@ export type RefundOutcome =
 	| { ok: false; code: string; message?: string; items?: { item_id: string; reason: string; left: number }[] };
 export type RefundQuoteResult = { ok: true; pre: PrecheckOk; quote: RefundQuote } | Extract<RefundOutcome, { ok: false }>;
 
-/** 환불 금액 — precheck(가드 · 줄 + 마지막이면 배송비) → 차감(quoteFromPrecheck). 돈을 움직이지 않는다.
+/** 환불 금액 — precheck(가드 · 줄 + 마지막이면 배송비 · 차감 뒤 금액 · 토스 전액 취소 여부 — 0105 서버가 다 정한다) → 모양만 바꾼다(quoteFromPrecheck). 돈을 움직이지 않는다.
  *  refundItems 가 실제 환불 금액을 여기서 정하고, 샵 신청 화면 · 콘솔 처리 방법 · 승인 메일의 예상 금액도 이 함수를 부른다 — 금액 계산은 이 한 곳(백엔드 원칙 1) */
 export async function refundQuote(input: { actor: RefundActor; actorId: string | null; orderId: string; items: RefundLine[]; deduction?: number }): Promise<RefundQuoteResult> {
 	const { data: preJson, error: preError } = await admin().rpc('myr_app_refund_precheck', {
 		p_order_id: input.orderId,
 		p_items: input.items,
 		p_actor: input.actor,
-		p_actor_id: input.actorId
+		p_actor_id: input.actorId,
+		p_deduction: input.deduction ?? 0
 	});
 	if (preError) throw new Error(`myr_app_refund_precheck failed: ${preError.message}`);
 	const pre = parsePrecheckResult(preJson);
 	if (!pre.ok) return { ok: false, code: pre.code, items: pre.items };
-	const quote = quoteFromPrecheck(pre, input.deduction ?? 0);
-	if (!quote) return { ok: false, code: 'BAD_ITEMS', message: '차감 금액이 환불 금액보다 커요' };
-	return { ok: true, pre, quote };
+	return { ok: true, pre, quote: quoteFromPrecheck(pre) };
 }
 
 export async function refundItems(input: {
@@ -74,8 +74,8 @@ export async function refundItems(input: {
 	if (!pre.deposit) {
 		if (!pre.paymentKey) return { ok: false, code: 'TOSS_ERROR', message: '결제 정보가 없는 주문이에요' };
 		const key = refundIdempotencyKey(input.orderId, pre.items, input.tag);
-		// 전액 취소(cancelAmount 없음)는 차감이 없을 때만 — 차감이 있으면 남은 돈을 남기는 부분 취소
-		const cancel = await tossCancel(pre.paymentKey, reason, { idempotencyKey: key, cancelAmount: pre.full && !deduction ? undefined : amount });
+		// 전액 취소(cancelAmount 없음)인지는 서버 값(cancel_full · myr_refund_cancel_full — 다 끝나고 차감 없음) · 아니면 돌려줄 돈만 부분 취소
+		const cancel = await tossCancel(pre.paymentKey, reason, { idempotencyKey: key, cancelAmount: pre.cancelFull ? undefined : amount });
 		const alreadyAll = !cancel.ok && isTossError(cancel.body) && cancel.body.code === 'ALREADY_CANCELED_PAYMENT';
 		if (!cancel.ok && !alreadyAll) {
 			if (isUncertain(cancel)) {
@@ -114,7 +114,8 @@ export async function refundItems(input: {
 		p_actor_id: input.actorId,
 		p_reason: reason,
 		p_amount: amount,
-		p_raw: raw
+		p_raw: raw,
+		p_deduction: deduction
 	});
 	if (recError) {
 		// 돈은 돌아갔는데 기록 실패 — 운영 큐. 재시도하면 같은 키로 토스가 같은 응답을 주고 record 만 다시 한다.
@@ -132,6 +133,20 @@ export async function refundItems(input: {
 	}
 	const rec = parseRecordResult(recJson);
 	if (!rec.ok) return { ok: false, code: rec.code };
+	if (rec.mismatch) {
+		// 기록은 됐지만 토스에 보낸 금액이 record 가 다시 계산한 금액과 다르다(0105) — 운영 큐(돈은 나갔으니 막지 않는다)
+		console.error(`[refund] amount mismatch ${orderCode ?? input.orderId}: got ${rec.mismatch.got} · expected ${rec.mismatch.expected}`);
+		await logPaymentEvent(db, {
+			source: 'cancel',
+			toss_order_id: tossOrderId,
+			order_code: orderCode,
+			event_type: 'refund',
+			payment_key: pre.paymentKey,
+			payload: { orderId: input.orderId, items: pre.items, amount, deduction, expected: rec.mismatch.expected, raw },
+			handled: false,
+			result: 'error: refund amount mismatch'
+		});
+	}
 	await logPaymentEvent(db, {
 		source: 'cancel',
 		toss_order_id: tossOrderId,

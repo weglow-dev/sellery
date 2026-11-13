@@ -48,11 +48,14 @@ describe('처리 방법 · 승인 버튼 · 메시지', () => {
 		const c = claim();
 		expect(resolutionOptions(c).map((o) => o.title)).toEqual(['부분 환불 (왕복 배송비 차감)', '전액 환불']);
 		// 금액은 서버 예상 금액(claimQuotes) — 처리 방법마다 그 칸의 금액
-		const quotes = { partial: { amount: 33000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false, lines: [] }, refund: { amount: 39000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false, lines: [] } };
+		const quotes = { options: { partial: { amount: 33000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 6000, full: true, deposit: false, lines: [] }, refund: { amount: 39000, paid: 39000, goods: 36000, shippingBack: 3000, deduction: 0, full: true, deposit: false, lines: [] } } };
 		expect(resolutionOptions(c, quotes).map((o) => o.desc)).toEqual(['₩33,000 (상품 ₩36,000 + 배송비 ₩3,000 − 왕복 배송비 ₩6,000) · 회수 확인 뒤 환불', '₩39,000 (상품 ₩36,000 + 배송비 ₩3,000) · 회수 확인 뒤 환불']);
 		expect(approveLabel(c, 'partial')).toBe('부분 환불 (왕복 배송비 차감) 승인');
 		expect(approveLabel(c, null)).toBe('처리 방법을 선택하세요');
 		expect(approveLabel(c, 'reship')).toBe('처리 방법을 선택하세요');
+		// 서버가 고를 수 없다고 한 처리(0105 option_deductions null — 차감 뒤 0원 이하)는 선택지에서 뺀다 · 차감 0 은 그대로
+		expect(resolutionOptions(claim({ option_deductions: { partial: null, refund: 0 } })).map((o) => o.id)).toEqual(['refund']);
+		expect(resolutionOptions(claim({ option_deductions: { partial: 0, refund: 0 } })).map((o) => o.id)).toEqual(['partial', 'refund']);
 	});
 	it('승인 · 반려 전 한 번 더 확인 — 버튼만 [정말 반려하기] · [정말 승인하기]', () => {
 		const c = claim();
