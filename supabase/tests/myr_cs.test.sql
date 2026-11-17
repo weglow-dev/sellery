@@ -1,6 +1,6 @@
 -- pgTAP — 0063 MYR 고객 문의: 권한 · 접수(검증 · 주문 소유 증명 · 이 상품 줄만) · actor 별 스레드/목록 · 답변 상태 전이 · 종료 (docs/myr.md §7 S7 · §6.6)
 begin;
-select plan(80);
+select plan(81);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_cs_open', '{uuid,uuid,uuid,text,text,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 cs_open 실행 불가');
@@ -71,8 +71,11 @@ select is((select r ->> 'order_matched' from t_o), 'false', '남의 주문은 �
 select is((select order_code from public.myr_cs_conversations where id = (select (r ->> 'conversation_id')::uuid from t_o)), 'pgtap-cs-m2', '주문번호 원문은 보관');
 -- 증명된 주문(m2 = c9)이지만 상품 A 줄이 없음 → 연결 안 함
 select is(public.myr_app_cs_open('00000000-0000-4000-8000-000000000b51', null, '00000000-0000-4000-8000-0000000000c9', '', '배송 문의', '줄 없음', 'pgtap-cs-m2') ->> 'order_matched', 'false', '본인 주문이라도 이 상품 줄이 없으면 연결 안 함');
--- ② 고객 행(customer_id) 증명
-select is(public.myr_app_cs_open('00000000-0000-4000-8000-000000000b52', '00000000-0000-4000-8000-0000000000e5', null, '', '교환·반품', '고객행', 'pgtap-cs-m1') ->> 'order_item_id', '00000000-0000-4000-8000-000000000f52', 'customer_id 로 증명 · B 줄 연결');
+-- ② 고객 행(customer_id) 증명 — 0119: 주문 주인은 myr_order_owned_by(회원 주문은 회원 id · 비회원 주문은 고객 id · 원칙 6)
+select is(public.myr_app_cs_open('00000000-0000-4000-8000-000000000b52', '00000000-0000-4000-8000-0000000000e5', null, '', '교환·반품', '고객행', 'pgtap-cs-m1') ->> 'order_matched', 'false',
+          '회원 주문은 고객 행(customer_id)으로 증명하지 않는다 — 연결 안 함(0119 · 전에는 연결했다)');
+select is(public.myr_app_cs_open('00000000-0000-4000-8000-000000000b51', '00000000-0000-4000-8000-0000000000e6', null, '', '교환·반품', '비회원 고객행', 'pgtap-cs-g1') ->> 'order_item_id', '00000000-0000-4000-8000-000000000f53',
+          '비회원 주문은 고객 행(customer_id)으로 증명 · A 줄 연결');
 -- ③ 비회원 조회 토큰
 create temp table t_g as select public.myr_app_cs_open('00000000-0000-4000-8000-000000000b51', null, null, '김비회원', '배송 문의', '토큰으로', 'pgtap-cs-g1', repeat('a', 64)) as r;
 select is((select r ->> 'order_item_id' from t_g), '00000000-0000-4000-8000-000000000f53', '비회원 토큰으로 증명 · A 줄 연결');
@@ -118,14 +121,14 @@ select is(jsonb_array_length(public.myr_app_cs_thread((select r ->> 'conversatio
 select is((select e ->> 'first_body' from jsonb_array_elements(public.myr_app_cs_list('customer', '00000000-0000-4000-8000-0000000000c8')) e where e ->> 'code' = (select r ->> 'conversation_code' from t_m)), '언제 오나요', '답변이 쌓여도 first_body 는 첫 질문 그대로');
 
 -- ---------- 목록 ----------
-select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a51')), 6, '셀러 A 의 문의 6건(상품 A)');
+select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a51')), 7, '셀러 A 의 문의 7건(상품 A · 비회원 고객행 문의 포함)');
 select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a52')), 2, '셀러 B 의 문의 2건(상품 B)');
 select is(jsonb_array_length(public.myr_app_cs_list('customer', '00000000-0000-4000-8000-0000000000c8')), 2, '회원 c8 의 문의 2건(비회원 접수는 제외)');
 select is(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a51') -> 0 ->> 'status', 'OPEN', 'OPEN 이 먼저');
 select is(jsonb_array_length(public.myr_app_cs_list('seller', '00000000-0000-4000-8000-000000000a51', 'ANSWERED')), 1, '상태 필터');
 select is(public.myr_app_cs_list('customer', null), '[]'::jsonb, 'actor_id 없는 customer 는 빈 배열');
 select is(public.myr_app_cs_list('hacker'), '[]'::jsonb, '모르는 actor 빈 배열');
-select is(jsonb_array_length(public.myr_app_cs_for_order('00000000-0000-4000-8000-000000000d51')), 2, '주문 m1 에 연결된 문의 2건(A 줄 · B 줄)');
+select is(jsonb_array_length(public.myr_app_cs_for_order('00000000-0000-4000-8000-000000000d51')), 1, '주문 m1 에 연결된 문의 1건(A 줄 · 고객 행으로 연결하려던 B 줄 문의는 연결 안 됨 · 0119)');
 select ok((select bool_and(e -> 'conversation' ->> 'code' is not null and jsonb_typeof(e -> 'messages') = 'array' and jsonb_array_length(e -> 'messages') >= 1) from jsonb_array_elements(public.myr_app_cs_for_order('00000000-0000-4000-8000-000000000d51')) e), '주문의 문의 = 스레드(대화 + 메시지) — 0079');
 select is(public.myr_app_cs_for_order('00000000-0000-4000-8000-0000000000ff'), '[]'::jsonb, '문의 없는 주문은 빈 배열');
 
