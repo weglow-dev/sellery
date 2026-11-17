@@ -7,7 +7,7 @@ import { orderCardLines, orderChip, orderClaimCode, orderLineState, orderMeta, o
 // has_refund 는 서버(0100 myr_line_has_refund = 환불 수량 > 0)가 주는 값 — 픽스처는 refunded_qty 로 서버가 줄 법한 값을 채운다
 const line = (o: Record<string, unknown> = {}) => {
 	const r = { id: 'i', name: '포도 젤리', qty: 1, amount: 32000, left_qty: 1, live: true, ship_status: 'SHIPPING', status: 'PAID', refunded_qty: 0, ...o };
-	return { has_refund: Number(r.refunded_qty) > 0, ...r };
+	return { has_refund: Number(r.refunded_qty) > 0, valid: r.status !== 'CANCELED', ...r };
 };
 const order = (items: unknown[], o: Record<string, unknown> = {}) =>
 	sellerOrderFromJson({ id: 'o', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T03:00:00Z', buyer: '김*은', ship_status: 'SHIPPING', items, ...o })!;

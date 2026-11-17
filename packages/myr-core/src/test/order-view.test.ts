@@ -146,7 +146,8 @@ describe('줄 단위 배송(0077)', () => {
 	});
 	describe('송장(박스)별 묶음', () => {
 		// leftQty · live 는 서버(0097 myr_line_left · 0099 myr_line_live)가 주는 값 — 테스트는 서버가 줄 법한 값을 넣는다
-		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, leftQty: 1, live: true, status: 'PAID', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
+		// valid = 서버 값(0120 myr_line_valid = 취소 아님) — 픽스처는 서버가 그 상태에 주는 값
+		const it_ = (o: Partial<OrderItem>) => ({ id: 'x', name: '젤리', option: '', qty: 1, refundedQty: 0, leftQty: 1, live: true, status: 'PAID', valid: o.status !== 'CANCELED', courier: null, trackingNo: null, shippedAt: null, ...o }) as OrderItem;
 		it('한 박스 — 남은 줄이 전부 같은 송장 → single', () => {
 			const r = shipBoxes([it_({ courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-05T00:00:00Z' }), it_({ name: '스틱', option: '레몬', courier: 'CJ대한통운', trackingNo: '1', shippedAt: '2026-11-04T00:00:00Z' })]);
 			expect(r.single).toBe(true);

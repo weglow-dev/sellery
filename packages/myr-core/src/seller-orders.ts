@@ -22,6 +22,8 @@ export type SellerOrderLine = {
 	/** 남은 수량 · 살아 있는 줄(취소 아님 · 남은 수량 있음) — 서버 값(0098 myr_line_left · myr_line_live) 그대로. 화면이 다시 계산하지 않는다 */
 	leftQty: number;
 	live: boolean;
+	/** 취소 아닌 줄(0120 myr_line_valid) — 송장(박스) 표시 · 서버 값 그대로 */
+	valid: boolean;
 	shipStatus: ShipStatus;
 	courier: string | null;
 	trackingNo: string | null;
@@ -78,6 +80,7 @@ function lineFromJson(v: unknown): SellerOrderLine | null {
 		hasRefund: o.has_refund === true,
 		leftQty: n(o.left_qty),
 		live: o.live === true,
+		valid: o.valid === true,
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : 'PAID',
 		courier: sn(o.courier),
 		trackingNo: sn(o.tracking_no),
@@ -153,9 +156,9 @@ export const sellerOrderTab = (o: Pick<SellerOrder, 'tab'>): Exclude<SellerOrder
 export const filterSellerOrders = <T extends Pick<SellerOrder, 'tab'>>(list: T[], tab: SellerOrderTab): T[] => (tab === 'all' ? list : list.filter((o) => o.tab === tab));
 export const sellerOrderTabCounts = (list: Pick<SellerOrder, 'tab'>[]) => SELLER_ORDER_TABS.map((t) => ({ ...t, count: filterSellerOrders(list, t.id).length }));
 
-/** 내 줄의 송장(박스) — 같은 택배사 + 송장이면 한 박스 */
+/** 내 줄의 송장(박스) — 같은 택배사 + 송장이면 한 박스 · 취소 줄 제외(서버 valid · 0120) */
 export function sellerOrderBoxes(o: Pick<SellerOrder, 'items'>): { courier: string | null; trackingNo: string }[] {
 	const seen = new Map<string, { courier: string | null; trackingNo: string }>();
-	for (const i of o.items) if (i.trackingNo && i.status !== 'CANCELED') seen.set(`${i.courier ?? ''}|${i.trackingNo}`, { courier: i.courier, trackingNo: i.trackingNo });
+	for (const i of o.items) if (i.trackingNo && i.valid) seen.set(`${i.courier ?? ''}|${i.trackingNo}`, { courier: i.courier, trackingNo: i.trackingNo });
 	return [...seen.values()];
 }

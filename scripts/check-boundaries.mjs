@@ -228,6 +228,8 @@ const MYR_MIRROR_RULES = [
   // 메일 · 발주 · 배송 완료(0118) — 크리에이터 환불 금액 · 출고 마감 · 자동 배송 완료는 서버
   { re: /\bDELIVERED_AFTER_DAYS\b|\bprepareCutoff\b|getUTCDate\(\),\s*11\)/, why: "출고 마감 · 자동 배송 완료를 TS 에서 판정 — 서버 myr_prepare_cutoff · myr_line_auto_delivered(0118)를 쓴다" },
   { re: /\.reduce\(\([\w\s,]*\)\s*=>\s*\w+\s*\+\s*[\w.]*\.x\.amount\b/, why: "환불 줄 금액을 메일에서 더함 — 서버 sellerGoods(precheck seller_goods · myr_refund_seller_goods · 0118)를 쓴다" },
+  // 줄 취소 여부(0120) — 배송 상자 표시는 서버 valid(myr_line_valid)
+  { re: /\b(it|i|l|line)\.status\s*(===|!==)\s*'CANCELED'/, why: "줄 취소 여부를 줄 상태로 다시 판정 — 서버 valid(myr_line_valid · 0120)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
   { re: /\b(unit|price)\s*\*\s*[\w.]*qty\b|\bqty\s*\*\s*[\w.]*(unit|price)\b/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
@@ -276,6 +278,23 @@ for (const files of [...myrSrcDirs.map((dir) => walk(dir)), myrScriptFiles]) {
         if (rule.re.test(text)) report("error", file, line, `(h) ${rule.why} — 백엔드 원칙 1(CLAUDE.md)`);
       }
     }
+  }
+}
+
+// ---------- (i) 운영사 정보 — MYR(packages/myr-core/src/company.ts)은 셀러리 패키지를 import 하지 않아 값을 복사한다. 두 파일이 다르면 실패 ----------
+{
+  const pairs = (file) => {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    const body = text.slice(text.indexOf("export const COMPANY = {"));
+    const out = {};
+    for (const m of body.slice(0, body.indexOf("}")).matchAll(/^\s*(\w+):\s*(['"])(.*?)\2,?\s*$/gm)) out[m[1]] = m[3];
+    return out;
+  };
+  const myr = pairs("packages/myr-core/src/company.ts");
+  const sellery = pairs("packages/db/src/company.ts");
+  if (!Object.keys(myr).length) report("error", join(ROOT, "packages/myr-core/src/company.ts"), 1, "(i) 운영사 정보(COMPANY)를 읽지 못함 — 검사 정규식을 확인");
+  for (const [k, v] of Object.entries(myr)) {
+    if (sellery[k] !== v) report("error", join(ROOT, "packages/myr-core/src/company.ts"), 1, `(i) 운영사 정보 ${k} 가 셀러리(packages/db/src/company.ts)와 다름: '${v}' ≠ '${sellery[k] ?? '(없음)'}' — 두 파일을 같이 고친다`);
   }
 }
 

@@ -23,6 +23,8 @@ export type OrderItem = {
 	leftAmount: number;
 	/** 살아 있는 줄(0099 myr_line_live = 취소가 아니고 남은 수량이 있다) — 서버 값 그대로 · 화면이 상태와 수량으로 다시 판정하지 않는다. 옛 응답이면 false */
 	live: boolean;
+	/** 취소 아닌 줄(0120 myr_line_valid) — 배송 상자 표시 · 서버 값 그대로(화면이 줄 상태로 다시 판정하지 않는다). 옛 응답이면 false */
+	valid: boolean;
 	tile: string;
 	ic: string;
 	thumbUrl: string | null;
@@ -104,6 +106,7 @@ export function itemFromJson(v: unknown): OrderItem | null {
 		leftQty: num(o, 'left_qty'),
 		leftAmount: num(o, 'left_amount'),
 		live: o.live === true,
+		valid: o.valid === true,
 		tile: str(o, 'tile', 'linear-gradient(145deg,#6b7280,#262a33)'),
 		ic: str(o, 'icon', 'pill'),
 		thumbUrl: strOrNull(o, 'thumb_url'),
@@ -208,13 +211,13 @@ export function statusLabel(
 	}
 }
 
-/** 송장(박스)별 묶음 — 줄 송장 기준(0077 · 한 주문에 크리에이터 여럿이면 박스가 나뉠 수 있다). 취소 줄 제외 · 같은 택배사+송장이면 한 박스.
+/** 송장(박스)별 묶음 — 줄 송장 기준(0077 · 한 주문에 크리에이터 여럿이면 박스가 나뉠 수 있다). 취소 줄 제외(서버 valid · 0120 — 전액 환불 줄은 이미 보낸 상자에 남는다) · 같은 택배사+송장이면 한 박스.
  *  single = 남은 줄(수량 남음)이 전부 같은 송장 하나 → 화면은 지금처럼 한 줄. 아니면 박스마다 담긴 상품 이름을 같이 보여 준다 */
 export type ShipBox = { courier: string | null; trackingNo: string; shippedAt: string | null; names: string[] };
 export function shipBoxes(items: OrderItem[]): { boxes: ShipBox[]; single: boolean } {
 	const boxes: ShipBox[] = [];
 	for (const it of items) {
-		if (it.status === 'CANCELED' || !it.trackingNo) continue;
+		if (!it.valid || !it.trackingNo) continue;
 		const name = it.option ? `${it.name} · ${it.option}` : it.name;
 		const box = boxes.find((b) => b.trackingNo === it.trackingNo && b.courier === it.courier);
 		if (box) {
