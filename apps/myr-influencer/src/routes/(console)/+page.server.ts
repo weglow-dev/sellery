@@ -13,7 +13,7 @@ import { getSettleInfoOfUser } from '$lib/server/settle-info';
 import { getSellerSettlePreviewOfUser } from '$lib/server/settlement';
 import { myProducts } from '$lib/server/seller-products';
 
-/** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 최근 7일(0076) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
+/** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 이번 주 월 ~ 일(0117) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
  *  큰 숫자는 다음 정산 예정(0089 · 정산 탭과 같은 예상) · 그 아래 이번 달 순매출 · 주문 · 판매 수량 · CS 비율.
  *  크리에이터 게이트 · 상품 · 실적 · 문의 · 요청을 **동시에** 보낸다(게이트가 통과해야 쓴다 — myProducts 가 redirect 를 먼저 던진다). */
 export const load: PageServerLoad = async (event) => {

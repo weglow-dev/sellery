@@ -14,15 +14,16 @@
 	import UserMenu from '$lib/components/UserMenu.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
-	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 최근 7일 판매 막대.
-	 *  모바일은 한 줄로 쌓고, PC(lg~)는 지표 3단(1.6 : 1 : 1) + 아래 2단(할 일 · 7일 판매, 합계와 막대 값 표시).
-	 *  서버 값(+page.server.ts): 판매 중 제품 · 이번 달 순매출 · 주문 · 판매 수량 · CS 비율 · 최근 7일 주문(0076) · 고객 문의 답변 대기.
+	/** 홈 — 인사 · 이번 달 정산 예정 · 처리 대기 CS / 판매 중 제품 카드 · 오늘 처리할 일(대기 CS 3건) · 이번 주(월 ~ 일) 판매 막대.
+	  *  모바일은 한 줄로 쌓고, PC(lg~)는 지표 3단(1.6 : 1 : 1) + 아래 2단(할 일 · 이번 주 판매, 합계와 막대 값 표시).
+	 *  서버 값(+page.server.ts): 판매 중 제품 · 이번 달 순매출 · 주문 · 판매 수량 · CS 비율 · 이번 주 주문(0117 · 월 ~ 일) · 고객 문의 답변 대기.
 	 *  큰 숫자는 시안의 "정산 예정" 대신 **이번 달 순매출**(매출 − 환불) — 정산 비율이 정해지면 정산 예정액으로 바꾼다(2026-11-06 대표 결정 · docs/myr.md §9-6).
 	 *  CS 비율 = 환불이 생긴 주문 ÷ 주문. 오늘 처리할 일 = 처리 대기 교환 · 환불(0078 · 오래된 순) + 답변 대기 문의(오래된 순) 합쳐 3건. */
 	let { data } = $props();
 	const sales = $derived(data.sales);
 	const bars = $derived(weekBars(sales.week));
-	const weekTotal = $derived(sales.week.reduce((n, d) => n + d.orders, 0));
+	// 이번 주 합계 — 서버 값(0117 week_orders) · 화면이 날짜별 값을 더하지 않는다
+	const weekTotal = $derived(sales.weekOrders);
 	const todayClaims = $derived(data.todayClaims);
 	const todayInq = $derived(data.todayInquiries);
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
@@ -171,17 +172,18 @@
 
 		<section class="flex flex-col">
 			<div class="mt-7 mb-3 flex items-baseline justify-between lg:mt-0 lg:mb-0">
-				<h2 class="text-[17px] font-extrabold tracking-[-0.02em] lg:text-[20px]">최근 7일 판매</h2>
+				<h2 class="text-[17px] font-extrabold tracking-[-0.02em] lg:text-[20px]">이번 주 판매</h2>
 				<span class="hidden text-[14px] text-white/50 lg:inline">합계 <b class="font-bold text-fg tabular-nums">{weekTotal}건</b></span>
 			</div>
 			<div class="rounded-[20px] border border-white/8 bg-white/3 px-4 pt-[18px] pb-3.5 lg:mt-3.5 lg:flex lg:flex-1 lg:flex-col lg:rounded-3xl lg:px-5 lg:pt-[22px] lg:pb-[18px]">
-				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="최근 7일 주문 {bars.map((b) => `${b.day} ${b.value}건`).join(', ')}">
+				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="이번 주 주문 {bars.filter((b) => !b.future).map((b) => `${b.day} ${b.value}건`).join(', ')}">
 					{#each bars as b (b.date)}
 						{@const top = b.top}
 						<div class="flex h-full flex-1 flex-col items-center justify-end gap-1.5 lg:gap-2">
-							<span class="hidden text-[12px] font-bold tabular-nums lg:block {top ? 'text-accent' : 'text-white/45'}">{b.value}</span>
-							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {top ? 'bg-accent' : 'bg-white/12'}" style:height="{Math.max(b.height, 2)}%"></span>
-							<span class="text-[11px] font-semibold lg:text-[12px] {top ? 'text-accent' : 'text-white/45'}">{b.day}</span>
+							<!-- 아직 오지 않은 날(서버 future) — 숫자 · 막대 없이 요일만 흐리게 -->
+							<span class="hidden text-[12px] font-bold tabular-nums lg:block {b.future ? 'invisible' : top ? 'text-accent' : 'text-white/45'}">{b.value}</span>
+							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {b.future ? 'bg-white/4' : top ? 'bg-accent' : 'bg-white/12'}" style:height="{b.future ? 2 : Math.max(b.height, 2)}%"></span>
+							<span class="text-[11px] font-semibold lg:text-[12px] {b.future ? 'text-white/22' : top ? 'text-accent' : 'text-white/45'}">{b.day}</span>
 						</div>
 					{/each}
 				</div>

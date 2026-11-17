@@ -223,6 +223,7 @@ const MYR_MIRROR_RULES = [
   { re: /===\s*'rejected'\s*\|\||\|\|\s*[\w.]*status\s*===\s*'rejected'/, why: "상태 묶음을 화면에서 다시 씀 — 서버 값(요청 open · 상품 console · 정산 hold · 0116)을 쓴다" },
   { re: /includes\(\s*'pending'\s*\)\s*\?\s*'pending'/, why: "주문의 요청 상태 순위를 화면에서 정함 — 서버 claimStatus · state · tab(myr_order_claim_status · myr_seller_order_state · 0116)을 쓴다" },
   { re: /\brefundedOrders\s*\//, why: "CS 비율을 화면에서 나눔 — 서버 csRate(myr_cs_rate · 0116)를 쓴다" },
+  { re: /\.week\.reduce\(/, why: "이번 주 합계를 화면에서 더함 — 서버 weekOrders(week_orders · 0117)를 쓴다" },
   { re: /settleStatus\s*===\s*'none'\s*\|\|/, why: "사업자 · 정산 정보 배너를 입력 상태로 다시 판정 — 서버 hold(myr_seller_next_hold_json · 0116 · homeSettleBanner)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
