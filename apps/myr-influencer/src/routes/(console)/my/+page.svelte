@@ -69,7 +69,7 @@
 	async function saved(next: SettleInfo, recheck: boolean) {
 		info = next;
 		editing = false;
-		app.showToast(recheck ? '저장했어요 · 운영팀이 확인한 뒤 정산금이 지급돼요' : '저장했어요');
+		app.showToast(recheck ? '저장했어요 · 운영팀이 확인해야 정산금이 지급돼요' : '저장했어요');
 		await invalidateAll();
 	}
 </script>

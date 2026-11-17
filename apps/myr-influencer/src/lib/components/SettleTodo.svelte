@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { dDay, settleAtLabel, settleInfoStep, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { settleAtLabel, settleInfoStep, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { PAYOUT_BLOCK_TEXT, PAYOUT_RULE_TEXT, SETTLE_CONFIRM_TEXT } from '@sellery/myr-core/settlement-rules';
 	import { TAX_INVOICE_TONE, type TaxInvoice as Invoice } from '@sellery/myr-core/tax-invoice';
 	import TaxInvoice from './TaxInvoice.svelte';
 
@@ -13,8 +14,9 @@
 		settleInfoDone,
 		inv,
 		depositRefund,
-		payAt
-	}: { month: string; settleStatus: string; settleInfoDone: boolean; inv: Invoice | null; depositRefund: number; payAt: string | null } = $props();
+		payAt,
+		payDueAt = null
+	}: { month: string; settleStatus: string; settleInfoDone: boolean; inv: Invoice | null; depositRefund: number; payAt: string | null; payDueAt?: string | null } = $props();
 
 	const CHIP: Record<SettleTone, string> = {
 		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',
@@ -25,10 +27,8 @@
 	const step1 = $derived(settleInfoStep(settleStatus));
 	const invDone = $derived(!!inv?.accepted);
 	const left = $derived((settleInfoDone ? 0 : 1) + (invDone ? 0 : 1));
-	// 정산일(서버 pay_at)이 아직 오지 않았으면 그 시각을 적는다 — 지났으면(세금계산서 확인을 기다리는 달) 날짜 없이
-	//   지급은 세금계산서 확인 뒤라 "정산 뒤"(정산일에 바로 이체된다고 쓰지 않는다)
-	const when = $derived(payAt && dDay(payAt) ? `${settleAtLabel(payAt)} 정산 뒤 ` : '');
-	const todoText = $derived(left ? `${left === 2 ? '두' : '한'} 가지를 마치면 ${when}지급돼요` : when ? `모두 끝났어요. ${when}지급돼요` : '모두 끝났어요. 운영팀이 이체하면 지급 완료로 바뀌어요');
+	// 할 일이 남았으면 개수만 · 다 끝났으면 지급 예정 시각(서버 pay_due_at · 0111 — 자동 이체 다음 오후 1시) · 예정이 없으면(이체 실패 · 운영 보류 등은 따로 안내) 날짜 없이
+	const todoText = $derived(left ? `${left === 2 ? '두' : '한'} 가지를 마치면 지급돼요` : payDueAt ? `모두 끝났어요. ${settleAtLabel(payDueAt)}에 입금돼요` : '모두 끝났어요');
 </script>
 
 {#snippet dot(n: number, done: boolean)}
@@ -88,10 +88,17 @@
 				{#if inv.overdue}{@render chip('기한 지남', CHIP.hold, true)}{/if}
 			</span>
 		{:else}
-			{@render chip('정산 뒤', CHIP.done, true)}
+			{@render chip('정산 확정 뒤', CHIP.done, true)}
 		{/if}
 	</div>
 	{#if inv}
 		<div class="mt-3.5 lg:mt-4 lg:ml-[42px]"><TaxInvoice {month} {inv} {depositRefund} /></div>
 	{/if}
+
+	<!-- 정산 확정 · 지급 규칙(2026-11-13 · 자동 이체) — "정산일"을 돈이 들어오는 날로 읽지 않게 둘을 나눠 적고, 세금계산서가 없으면 지급되지 않는다는 것을 같이 -->
+	<div class="mt-4 border-t border-white/7 pt-3.5 text-[12px] leading-[1.65] text-white/50 lg:mt-[18px] lg:text-[12.5px]">
+		<p><b class="font-semibold text-white/70">정산 확정</b> : {SETTLE_CONFIRM_TEXT}</p>
+		<p><b class="font-semibold text-white/70">지급</b> : {PAYOUT_RULE_TEXT}</p>
+		<p class="mt-0.5 font-semibold text-[#ff8a8a]">{PAYOUT_BLOCK_TEXT}</p>
+	</div>
 </section>

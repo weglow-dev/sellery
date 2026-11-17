@@ -73,6 +73,12 @@ export function normalizeApprovalNo(v: string): string | null {
 	return /^[0-9]{8}[0-9a-z]{16}$/.test(x) ? x : null;
 }
 
+/** 입력 중 승인번호 — 영문 · 숫자만 24자리까지 남기고 8자리마다 하이픈(입력 형식 규칙 · 붙여넣은 하이픈 · 공백도 정리). 그 이상은 입력되지 않는다 */
+export function approvalNoInput(v: string): string {
+	const x = v.replace(/[^0-9a-zA-Z]/g, '').toLowerCase().slice(0, 24);
+	return x.match(/.{1,8}/g)?.join('-') ?? '';
+}
+
 /** '2034020341000000a1b2c3d4' → '20340203-41000000-a1b2c3d4' */
 export const approvalNoText = (no: string): string => (no.length === 24 ? `${no.slice(0, 8)}-${no.slice(8, 16)}-${no.slice(16)}` : no);
 
@@ -82,8 +88,8 @@ export const TAX_INVOICE_TONE: Record<TaxInvoiceStatus, 'plan' | 'hold' | 'warn'
 /** 상태별 안내 한 줄(제출 전 · 다시 제출 필요는 입력 칸 · 사유가 대신한다) */
 export const TAX_INVOICE_GUIDE: Record<TaxInvoiceStatus, string> = {
 	none: '',
-	submitted: '운영팀이 홈택스에서 확인하고 있어요. 확인되면 지급돼요.',
-	accepted: '운영팀 확인이 끝났어요. 지급 준비가 되면 이체돼요.',
+	submitted: '운영팀이 홈택스에서 확인하고 있어요. 확인된 다음 날 오후 1시에 정산금이 입금돼요.',
+	accepted: '운영팀 확인이 끝났어요. 다음 날 오후 1시에 정산금이 입금돼요.',
 	returned: ''
 };
 

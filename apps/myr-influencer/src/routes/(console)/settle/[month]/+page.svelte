@@ -3,6 +3,7 @@
 	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
+	import PayoutNotice from '$lib/components/PayoutNotice.svelte';
 	import SettleTodo from '$lib/components/SettleTodo.svelte';
 	import Tile from '$lib/components/Tile.svelte';
 
@@ -17,11 +18,13 @@
 	const upcoming = $derived(data.key === 'next');
 	const src = $derived(upcoming ? st.preview : st.months.find((m) => m.month === data.key)!);
 	const month = $derived(upcoming ? st.preview.month : data.key);
-	// 지급 시각은 서버 값(myr_settlement_pay_at · 0101)
+	// 정산 확정 시각은 서버 값(myr_settlement_pay_at · 0101 — 이름은 그대로 · 뜻은 정산 확정) · 지급 예정 시각 · 이체 상태도 서버 값(0111)
 	const mon = $derived(upcoming ? null : (st.months.find((m) => m.month === data.key) ?? null));
 	const payAt = $derived(upcoming ? st.preview.settleAt : (mon?.payAt ?? null));
 	// 지급 완료면 이체한 날(서버 paid_on · 0103) — 시각 없이 날짜만
 	const paidOn = $derived(mon?.paidOn ?? null);
+	const payDueAt = $derived(mon?.payDueAt ?? null);
+	const transfer = $derived(mon?.transfer ?? null);
 	// 세금계산서(0104) — 서버 값 그대로(show = 칸을 그린다)
 	const inv = $derived(mon?.invoice?.show ? mon.invoice : null);
 	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · holds — 0102 · 0104). 이유가 여럿이면 전부 보여 준다
@@ -31,7 +34,7 @@
 	const settleInfoHold = $derived(holds.some((h) => h.code === 'settle_info'));
 	// 지급 완료(이체한 날이 있다)면 할 일 카드를 그리지 않는다 · 다음 정산 · 세금계산서가 있는 달 · 정산 정보가 걸린 달만
 	const showTodo = $derived(!paidOn && (upcoming || !!inv || settleInfoHold));
-	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '' }));
+	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '', transfer }));
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
 	// 이체 전이면 지급 예정 금액 · 지급 완료(이체한 날이 있다)면 지급액
 	const totalLabel = $derived(paidOn ? '지급액' : '지급 예정 금액');
@@ -103,11 +106,12 @@
 			<!-- 모바일 상태 줄 -->
 			<div class="flex items-center gap-2 lg:hidden">
 				<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span>
-				<span class="ml-auto text-[12px] text-white/50">{paidOn ? `${shortDate(paidOn)} 지급` : `${settleAtLabel(payAt)} 정산${upcoming ? ' 예정' : ''}`}</span>
+				<span class="ml-auto text-[12px] text-white/50">{paidOn ? `${shortDate(paidOn)} 지급` : payDueAt ? `${settleAtLabel(payDueAt)} 지급 예정` : `${settleAtLabel(payAt)} 정산 확정${upcoming ? ' 예정' : ''}`}</span>
 			</div>
 			{#if holds.length}<p class="mt-2 text-[12px] leading-[1.5] text-white/55 lg:hidden">보류 사유 : {holdText}</p>{/if}
+			<PayoutNotice {transfer} {payDueAt} />
 			{#if showTodo}
-				<SettleTodo month={data.key} settleStatus={st.settleStatus} settleInfoDone={!settleInfoHold} {inv} depositRefund={src.total.depositRefund} {payAt} />
+				<SettleTodo month={data.key} settleStatus={st.settleStatus} settleInfoDone={!settleInfoHold} {inv} depositRefund={src.total.depositRefund} {payAt} {payDueAt} />
 			{/if}
 
 			<!-- 모바일 정산 계산 -->
@@ -130,8 +134,8 @@
 							<span class="min-w-0 flex-1">
 								<span class="block text-[14px] leading-[1.3] font-bold lg:text-[16px]">{r.product.name}</span>
 								{#if r.origin}<span class="mt-2 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">{monthShort(r.origin)}분 · 보류 해제</span>{/if}
-								{#if r.releasedIn}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.done}">{monthShort(r.releasedIn)} 정산에서 지급</span>{/if}
-								{#if r.nextPayout}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">다음 정산에서 지급</span>{/if}
+								{#if r.releasedIn}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.done}">{monthShort(r.releasedIn)} 정산 확정에 포함</span>{/if}
+								{#if r.nextPayout}<span class="mt-1 inline-block rounded-md px-[7px] py-[2px] text-[11px] font-bold {CHIP.plan}">다음 정산 확정에 포함</span>{/if}
 							</span>
 							<span class="text-right whitespace-nowrap">
 								<span class="block text-[11px] text-white/50 lg:text-[12px]">지급액</span>
@@ -148,7 +152,7 @@
 								<!-- 보류 줄인데 제조금액이 이미 들어왔으면 — 다음 정산 크론이 먼저 해제해 그때 지급한다(서버 releasable · myr_settlement_row_releasable) -->
 								{#if r.releasable}
 									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.plan}">보류 해제 예정</span>
-									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 ({nextPay} 정산에서 지급돼요)</span>
+									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">제조금액이 입력됐어요 ({nextPay} 정산 확정에 들어가요)</span>
 								{:else}
 									<span class="shrink-0 rounded-md px-[7px] py-[3px] text-[11.5px] font-bold whitespace-nowrap {CHIP.hold}">제조금액 확인 중</span>
 									<span class="min-w-0 text-[12px] leading-[1.45] text-white/65 lg:text-[13px]">운영팀이 제조금액을 입력하면 정산이 확정돼요</span>
@@ -206,7 +210,9 @@
 				{@render heldNote('mt-3')}
 				<p class="mt-[22px] mb-3 text-[14px] font-extrabold text-white/70">지급 정보</p>
 				<div class="flex flex-col gap-2.5 text-[14px]">
-					<div class="flex justify-between text-white/60"><span>{paidOn ? '지급일' : '정산일'}</span><span class="font-semibold text-fg tabular-nums">{paidOn ? shortDate(paidOn) : settleAtLabel(payAt)}</span></div>
+					<div class="flex justify-between text-white/60"><span>정산 확정</span><span class="font-semibold text-fg tabular-nums">{settleAtLabel(payAt)}{upcoming ? ' 예정' : ''}</span></div>
+					<!-- 지급 — 지급 완료면 이체한 날 · 지급할 수 있으면 지급 예정 시각(서버 pay_due_at) · 아니면 규칙(세금계산서 확인 다음 날 오후 1시) -->
+					<div class="flex justify-between gap-3 text-white/60"><span class="shrink-0">지급</span><span class="text-right font-semibold text-fg tabular-nums">{paidOn ? shortDate(paidOn) : payDueAt ? `${settleAtLabel(payDueAt)} 예정` : '세금계산서 확인 다음 날 오후 1시'}</span></div>
 					<div class="flex justify-between text-white/60"><span>정산 대상</span><span class="font-semibold text-fg">{target}</span></div>
 					<div class="flex items-center justify-between text-white/60"><span>상태</span><span class="rounded-lg px-2.5 py-[5px] text-[13px] font-bold whitespace-nowrap {CHIP[status.tone]}">{status.label}</span></div>
 					{#if holds.length}

@@ -3,8 +3,8 @@
 
 	/** 정산 보류 배너(시안 "MYR Influencer Admin" 정산) — 사업자 · 정산 정보(0085) 확인 전이면. 등록 · 다시 입력은 내 정보로. 확인 완료면 그리지 않는다.
 	 *  모바일: 아이콘 · 글 + 아래 꽉 찬 버튼 / PC(lg~): 한 줄(아이콘 · 글 · 오른쪽 버튼) */
-	let { settleStatus, nextDate }: { settleStatus: string; nextDate: string } = $props();
-	const b = $derived(holdBanner(settleStatus, nextDate));
+	let { settleStatus }: { settleStatus: string } = $props();
+	const b = $derived(holdBanner(settleStatus));
 </script>
 
 {#if b}
