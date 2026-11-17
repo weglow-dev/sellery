@@ -61,7 +61,7 @@
 	/** 주문 상품 = 장바구니에서 체크한 줄(살 수 있는 것만) — 합계·배송비도 같은 기준(state.orderLines) */
 	const items = $derived(shop.selectedItems);
 	// 금액은 서버 견적(shop.total)을 받은 뒤에만 — 견적 전 · 실패면 결제 버튼을 막는다
-	const canPay = $derived(ready && !widgetError && !blocked && !changed && agreedRequired && !submitting && items.length > 0 && shop.total !== null && (data.guest ? gdraft.consent : true));
+	const canPay = $derived(ready && !widgetError && !blocked && !shop.linesOver && !changed && agreedRequired && !submitting && items.length > 0 && shop.total !== null && (data.guest ? gdraft.consent : true));
 
 	function nameOf(code: string): string {
 		return shop.cart.find((l) => l.product.code === code)?.product.name ?? code;
@@ -247,6 +247,9 @@
 					{/if}
 					{#if blocked}
 						<div class="rounded-[14px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3.5 text-[13px] leading-[1.55] text-white/85" role="alert">{blocked}</div>
+					{:else if shop.linesOver}
+						<!-- 한 번에 결제할 수 있는 줄 수를 넘었다 — 넘었는지 · 한도는 서버 견적(0115 lines_over · lines_max · 결제 BAD_LINES 와 같은 함수) -->
+						<div class="rounded-[14px] border border-[#ff6b6b]/30 bg-[#ff6b6b]/8 px-4 py-3.5 text-[13px] leading-[1.55] text-white/85" role="alert">한 번에 {shop.linesMax}개 상품까지 주문할 수 있어요 — 장바구니에서 선택을 줄여주세요</div>
 						<a href="/cart" class="mt-3 flex h-12 items-center justify-center rounded-[14px] border border-white/14 text-[14px] font-bold text-fg">장바구니로</a>
 					{:else}
 						<!-- 결제 위젯은 서버 견적 금액이 있을 때만(처음 금액부터 서버 값) -->

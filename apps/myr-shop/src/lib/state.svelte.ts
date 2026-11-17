@@ -151,8 +151,10 @@ class ShopState {
 				gbCode: l.gb && q?.gbState !== 'ended' ? l.gb.code : undefined,
 				lineAmount: q?.lineAmount ?? null,
 				baseAmount: q?.baseAmount ?? null,
-				/** 지금 살 수 있는 수량(서버 견적 · 0096) — 수량 버튼 상한 · 넘으면 안내 */
-				stockLeft: q?.stockLeft ?? null
+				/** 지금 살 수 있는 수량(서버 견적 · 0096) — 수량 버튼 상한 · 남은 수량 안내 */
+				stockLeft: q?.stockLeft ?? null,
+				/** 남은 수량보다 많이 담았나 — 서버 판정(0115 over_stock · 결제 SOLD_OUT 과 같은 함수) */
+				overStock: q?.overStock ?? false
 			};
 		})
 	);
@@ -172,13 +174,16 @@ class ShopState {
 	shipping = $derived(this.totals?.shipping ?? null);
 	total = $derived(this.totals?.total ?? null);
 	shippingMsg = $derived(this.totals?.shippingMsg ?? '');
+	/** 고른 줄이 한 번에 결제할 수 있는 줄 수를 넘었나 · 그 한도 — 서버 견적(0115 lines_over · lines_max · 결제 BAD_LINES 와 같은 함수) */
+	linesOver = $derived(this.quoteSel?.linesOver ?? false);
+	linesMax = $derived(this.quoteSel?.linesMax ?? null);
 
 	/** 서버 견적 다시 받기 — 빠른 연속 변경은 마지막 응답만 적용(seq). 실패하면 견적을 비우고 quoteFailed(결제 버튼은 막힌다) */
 	async requote() {
 		const seq = ++this.quoteSeq;
 		const buyable = this.cart.filter(canBuy);
 		if (!buyable.length) {
-			const empty: CartQuote = { lines: [], itemsAmount: 0, shippingFee: 0, freeOver: 0, freeShippingLeft: 0 };
+			const empty: CartQuote = { lines: [], itemsAmount: 0, shippingFee: 0, amount: 0, freeOver: 0, freeShippingLeft: 0, linesMax: 0, linesOver: false };
 			this.quoteAll = empty;
 			this.quoteSel = empty;
 			this.quoteFailed = false;
@@ -217,6 +222,16 @@ class ShopState {
 			});
 	}
 	/** gb = 공구 링크로 들어와 담을 때의 공구(0086 · 끝나지 않은 것만) */
+	/** 한 줄 견적 — 상품 페이지 [담기] 금액 · 무료배송 기준. 장바구니와 같은 서버 견적(POST /api/cart/quote · 0092 · 0115) · 실패면 null */
+	async quoteOne(product: Product, qty: number, gb?: Groupbuy): Promise<CartQuote | null> {
+		const lines = quoteRequest([{ product, qty, ...(gb ? { gb } : {}) }]);
+		try {
+			return parseQuoteResponse(await api<unknown>('/api/cart/quote', 'POST', { all: lines, selected: lines }))?.selected ?? null;
+		} catch {
+			return null;
+		}
+	}
+
 	add(product: Product, qty: number, gb?: Groupbuy) {
 		this.cart = mergeLine(this.cart, product, qty, gb); // 같은 상품이면 합산 + 최신 가격·이름 스냅샷으로
 		this.showToast(`${product.name} ${qty}개를 담았어요`);

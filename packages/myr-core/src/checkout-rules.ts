@@ -24,14 +24,16 @@ export function generateOrderId(now = Date.now()): string {
 
 /* ---------------- 줄 ---------------- */
 
-export const LINES_MAX = 20;
+/** 결제 요청 본문의 전송 형식 한도(장바구니 · 견적과 같은 50줄) — 한 번에 결제할 수 있는 줄 수(20)는 서버가 정한다(0115 myr_checkout_lines_max · 넘으면 BAD_LINES).
+ *  여기서 20을 다시 적으면 서버 한도를 바꿀 때 둘이 어긋난다 */
+export const LINES_MAX = 50;
 export const CODE_RE = /^[a-z0-9][a-z0-9-]{0,47}$/;
 /** gb = 공구 링크 코드(0086 · 진행 중이면 공구가) · price = 화면이 보여 준 단가(서버 단가와 다르면 PRICE_CHANGED) — 둘 다 있을 때만 싣는다 */
 export type CheckoutLine = { code: string; qty: number; option_index: number; gb?: string; price?: number };
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
-/** 본문 `lines: [{ code, qty, optionIndex?, gb?, price? }]` → 같은 (code, option) 합침(gb · price 는 처음 값). 형식 틀림·빈 배열·20줄 초과·합계 9 초과면 null */
+/** 본문 `lines: [{ code, qty, optionIndex?, gb?, price? }]` → 같은 (code, option) 합침(gb · price 는 처음 값). 형식 틀림·빈 배열·50줄(전송 형식) 초과·수량 정수 범위 초과면 null */
 export function parseLines(v: unknown): CheckoutLine[] | null {
 	if (!Array.isArray(v) || v.length < 1 || v.length > LINES_MAX) return null;
 	const by = new Map<string, CheckoutLine>();

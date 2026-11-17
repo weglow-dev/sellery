@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { parseQuoteBody } from '$lib/cart';
 import { hasAdmin } from '$lib/server/admin';
-import { quoteCart } from '$lib/server/cart';
+import { quoteActor, quoteCart } from '$lib/server/cart';
 import { rejectCrossSite } from '$lib/server/checkout-sync';
 import { rateLimit } from '$lib/server/rate-limit';
 
@@ -11,7 +11,7 @@ import { rateLimit } from '$lib/server/rate-limit';
  * 체크아웃(myr_app_create_checkout)과 같은 함수(myr_line_price · myr_shipping_fee)라 화면 금액 = 결제 금액. 화면은 이 값을 그대로 쓰고 다시 계산하지 않는다.
  *   all = 살 수 있는 줄 전부(줄마다 단가 · 공구 표시) · selected = 주문에 들어갈 줄(합계 · 배송비). 회원 · 비회원 같음(가격은 공개 정보) · IP 30분 300건.
  */
-export const POST: RequestHandler = async ({ request, getClientAddress }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress, locals, cookies }) => {
 	const cross = rejectCrossSite(request);
 	if (cross) return cross;
 	const body = parseQuoteBody(await request.json().catch(() => null));
@@ -19,7 +19,9 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	if (!hasAdmin()) return json({ ok: false, code: 'NO_SERVICE_KEY' }, { status: 503 });
 	if (!rateLimit(`cart-quote:${getClientAddress()}`, 300)) return json({ ok: false, code: 'RATE_LIMITED' }, { status: 429 });
 	try {
-		const [all, selected] = await Promise.all([quoteCart(body.all), quoteCart(body.selected)]);
+		// 남은 수량은 내 대기 결제 몫을 돌려받은 값(0115 · 결제 생성과 같은 인자 — 회원은 세션 · 비회원은 이전 결제 쿠키)
+		const actor = await quoteActor(locals, cookies);
+		const [all, selected] = await Promise.all([quoteCart(body.all, actor), quoteCart(body.selected, actor)]);
 		// 서버 거절(BAD_LINES — 수량 형식 등)은 400 으로 그대로 · 그 밖은 500
 		const bad = !all.ok ? all : !selected.ok ? selected : null;
 		if (bad) return json({ ok: false, code: bad.code }, { status: bad.code === 'BAD_LINES' ? 400 : 500 });

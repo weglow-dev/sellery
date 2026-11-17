@@ -6,6 +6,8 @@
 import { linesFromRows, parseCartQuote, type CartLine, type CartQuote, type MergeLine, type QuoteRequestLine } from '$lib/cart';
 import { fromRow, type Row } from '$lib/product-row';
 import type { Product } from '$lib/data';
+import type { Cookies } from '@sveltejs/kit';
+import { GUEST_CHECKOUT_COOKIE } from '@sellery/myr-core/checkout-rules';
 import { admin } from './admin';
 
 /** RPC 가 돌려주는 `{ ok, code, … }` — 실패 code 는 0057 머리말 (NO_USER · NOT_FOUND · NOT_AVAILABLE · BAD_QTY · BAD_OPTION · BAD_LINES) */
@@ -55,8 +57,20 @@ export const mergeLikes = async (userId: string, codes: string[]): Promise<RpcRe
 /** 장바구니 · 체크아웃 요약 견적(0092 myr_app_cart_quote) — 체크아웃과 같은 단가 · 공구 · 배송비 함수. 돈은 움직이지 않는다.
  *  서버가 거절하면(수량 형식 등 — 0097 myr_qty_parse) 그 code 를 그대로 · 응답 모양이 틀리면 BAD_RESPONSE */
 export type QuoteResult = { ok: true; quote: CartQuote } | { ok: false; code: string };
-export const quoteCart = async (lines: QuoteRequestLine[]): Promise<QuoteResult> => {
-	const data = await rpc('myr_app_cart_quote', { p_lines: lines.map((l) => ({ code: l.code, option_index: l.optionIndex, qty: l.qty, ...(l.gb ? { gb: l.gb } : {}) })) });
+/** 누구의 견적인지 — 남은 수량에서 내 대기 결제 몫을 돌려받는다(0115 · 결제 생성 /api/checkout 과 같은 인자).
+ *  회원은 세션 사용자 · 비회원은 이전 결제 쿠키. 라우트가 세션에서 정한다(요청 본문은 쓰지 않는다 — 규칙 6) */
+export type QuoteActor = { userId: string | null; prevCheckoutId: string | null };
+export async function quoteActor(locals: App.Locals, cookies: Cookies): Promise<QuoteActor> {
+	const { user } = await locals.safeGetSession();
+	const prev = user ? null : (cookies.get(GUEST_CHECKOUT_COOKIE) ?? null);
+	return { userId: user?.id ?? null, prevCheckoutId: prev && /^[0-9a-f-]{36}$/.test(prev) ? prev : null };
+}
+export const quoteCart = async (lines: QuoteRequestLine[], actor?: QuoteActor): Promise<QuoteResult> => {
+	const data = await rpc('myr_app_cart_quote', {
+		p_lines: lines.map((l) => ({ code: l.code, option_index: l.optionIndex, qty: l.qty, ...(l.gb ? { gb: l.gb } : {}) })),
+		p_user_id: actor?.userId ?? null,
+		p_prev_checkout_id: actor?.prevCheckoutId ?? null
+	});
 	const quote = parseCartQuote(data);
 	if (quote) return { ok: true, quote };
 	const code = (data as { code?: unknown } | null)?.code;

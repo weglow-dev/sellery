@@ -13,6 +13,8 @@
 	 *  공구 링크로 담은 줄(0086): 진행 중이면 공구가(기본가 취소선) · 예정이면 시작 안내 · 끝났으면 "기본가로 바뀌었어요" */
 	const selectedCount = $derived(shop.selectedItems.length);
 	const buyableCount = $derived(shop.cartItems.filter((it) => it.available).length);
+	/** 고른 줄이 한 번에 결제할 수 있는 줄 수를 넘었을 때 — 넘었는지 · 한도는 서버 견적(0115 lines_over · lines_max) */
+	const linesOverMsg = $derived(`한 번에 ${shop.linesMax ?? ''}개 상품까지 주문할 수 있어요 — 선택을 줄여주세요`);
 	const checkCls = 'h-[22px] w-[22px] shrink-0 cursor-pointer appearance-none rounded-[7px] border-[1.5px] border-white/25 bg-transparent transition-colors checked:border-accent checked:bg-accent checked:bg-[url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%20fill=%27none%27%20stroke=%27%230a0b0e%27%20stroke-width=%273%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M5%2012.5l4.5%204.5L19%207.5%27/%3E%3C/svg%3E")] checked:bg-[length:16px_16px] checked:bg-center checked:bg-no-repeat disabled:cursor-not-allowed disabled:opacity-30';
 </script>
 
@@ -72,7 +74,7 @@
 										<span class="text-[15px] font-extrabold lg:text-[17px]">{#if it.lineAmount !== null}{won(it.lineAmount)}{:else if shop.quoteFailed}—{:else}<Spinner />{/if}</span>
 									</span>
 								</div>
-								{#if it.stockLeft !== null && it.qty > it.stockLeft}<p class="mt-1.5 text-[12px] font-bold text-[#ff8a8a] lg:text-[13px]">남은 수량 {it.stockLeft.toLocaleString('ko-KR')}개 — 수량을 줄여주세요</p>{/if}
+								{#if it.overStock && it.stockLeft !== null}<p class="mt-1.5 text-[12px] font-bold text-[#ff8a8a] lg:text-[13px]">남은 수량 {it.stockLeft.toLocaleString('ko-KR')}개 — 수량을 줄여주세요</p>{/if}
 							{:else}
 								<!-- 계정 장바구니(0057)에서 담은 뒤 품절·판매중지된 줄 — 합계에서 빠지고 삭제만 된다 -->
 								<p class="mt-1.5 text-[12px] font-bold text-white/45 lg:mt-2 lg:text-[13px]">지금은 살 수 없어요 · 합계에서 뺐어요</p>
@@ -96,7 +98,9 @@
 				<aside class="hidden rounded-3xl border border-white/8 bg-panel p-6 lg:sticky lg:top-[104px] lg:block">
 					<p class="mb-4 text-[16px] font-extrabold">주문 요약</p>
 					<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} />
-					{#if selectedCount}
+					{#if shop.linesOver}
+						<span class="mt-2 flex min-h-14 w-full items-center justify-center rounded-2xl bg-white/8 px-4 text-center text-[15px] font-extrabold text-white/55">{linesOverMsg}</span>
+					{:else if selectedCount}
 						<a href="/checkout" class="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-accent text-[16px] font-extrabold text-bg transition-colors hover:bg-[#ff8f5c]">{selectedCount}개 주문하기</a>
 					{:else}
 						<span class="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-white/8 text-[16px] font-extrabold text-white/40">주문할 상품을 선택해주세요</span>
@@ -111,7 +115,9 @@
 	{#if shop.cartItems.length}
 		<div class="w-full shrink-0 border-t border-white/6 bg-bg px-5 pt-4 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:hidden">
 			<PriceSummary subtotal={shop.subtotal} shipping={shop.shipping} total={shop.total} failed={shop.quoteFailed} />
-			{#if selectedCount}
+			{#if shop.linesOver}
+				<span class="flex min-h-[58px] w-full items-center justify-center rounded-2xl bg-white/8 px-4 text-center text-[15px] font-extrabold text-white/55">{linesOverMsg}</span>
+			{:else if selectedCount}
 				<a href="/checkout" class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-accent text-[17px] font-extrabold text-bg">{shop.total === null ? '' : `${won(shop.total)} `}주문하기 ({selectedCount}개)</a>
 			{:else}
 				<span class="flex h-[58px] w-full items-center justify-center rounded-2xl bg-white/8 text-[17px] font-extrabold text-white/40">주문할 상품을 선택해주세요</span>

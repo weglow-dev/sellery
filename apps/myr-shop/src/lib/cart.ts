@@ -16,9 +16,10 @@ export const canBuy = (l: CartLine): boolean => l.available !== false;
 export type QuoteRequestLine = { code: string; optionIndex: number; qty: number; gb?: string };
 export const quoteRequest = (lines: CartLine[]): QuoteRequestLine[] =>
 	lines.map((l) => ({ code: l.product.code, optionIndex: 0, qty: clampQty(l.qty), ...(l.gb ? { gb: l.gb.code } : {}) }));
-/** 견적 줄 — unitPrice null = 지금 살 수 없는 줄(샵에 없음 · 옵션 틀림) */
-export type QuoteLine = { code: string; qty: number; unitPrice: number | null; basePrice: number | null; lineAmount: number | null; baseAmount: number | null; stockLeft: number | null; gbState: GroupbuyState | null; gbCode: string | null };
-export type CartQuote = { lines: QuoteLine[]; itemsAmount: number; shippingFee: number; freeOver: number; freeShippingLeft: number };
+/** 견적 줄 — unitPrice null = 지금 살 수 없는 줄(샵에 없음 · 옵션 틀림) · overStock = 남은 수량보다 많이 담았나(0115 myr_stock_short · 결제 SOLD_OUT 과 같은 함수) */
+export type QuoteLine = { code: string; qty: number; unitPrice: number | null; basePrice: number | null; lineAmount: number | null; baseAmount: number | null; stockLeft: number | null; overStock: boolean; gbState: GroupbuyState | null; gbCode: string | null };
+/** 견적 — amount = 결제 금액(0115 myr_pay_amount · 결제 표 amount 와 같은 식) · linesMax · linesOver = 한 번에 결제할 수 있는 줄 수 · 넘었나(결제 BAD_LINES 와 같은 함수) */
+export type CartQuote = { lines: QuoteLine[]; itemsAmount: number; shippingFee: number; amount: number; freeOver: number; freeShippingLeft: number; linesMax: number; linesOver: boolean };
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const GB_STATES: readonly string[] = ['scheduled', 'active', 'ended'];
 /** RPC · API 응답 → 견적(형식이 다르면 null — 화면은 금액 대신 "확인 중") */
@@ -27,7 +28,8 @@ export function parseCartQuote(v: unknown): CartQuote | null {
 	if (!o || o.ok !== true || !Array.isArray(o.lines)) return null;
 	const items = numOrNull(o.items_amount);
 	const fee = numOrNull(o.shipping_fee);
-	if (items === null || fee === null) return null;
+	const amount = numOrNull(o.amount);
+	if (items === null || fee === null || amount === null) return null;
 	const lines = (o.lines as Record<string, unknown>[])
 		.filter((x) => x && typeof x === 'object' && typeof x.code === 'string')
 		.map((x) => ({
@@ -38,10 +40,20 @@ export function parseCartQuote(v: unknown): CartQuote | null {
 			lineAmount: numOrNull(x.line_amount),
 			baseAmount: numOrNull(x.base_amount),
 			stockLeft: numOrNull(x.stock_left),
+			overStock: x.over_stock === true,
 			gbState: typeof x.groupbuy_state === 'string' && GB_STATES.includes(x.groupbuy_state) ? (x.groupbuy_state as GroupbuyState) : null,
 			gbCode: typeof x.groupbuy_code === 'string' ? x.groupbuy_code : null
 		}));
-	return { lines, itemsAmount: items, shippingFee: fee, freeOver: numOrNull(o.free_over) ?? 0, freeShippingLeft: numOrNull(o.free_shipping_left) ?? 0 };
+	return {
+		lines,
+		itemsAmount: items,
+		shippingFee: fee,
+		amount,
+		freeOver: numOrNull(o.free_over) ?? 0,
+		freeShippingLeft: numOrNull(o.free_shipping_left) ?? 0,
+		linesMax: numOrNull(o.lines_max) ?? 0,
+		linesOver: o.lines_over === true
+	};
 }
 /** POST /api/cart/quote 본문 { all, selected } — 줄마다 code · optionIndex · qty(1 이상 정수) · gb? · 각 50줄까지. 형식이 틀리면 null */
 export type QuoteBody = { all: QuoteRequestLine[]; selected: QuoteRequestLine[] };
@@ -69,7 +81,7 @@ export function parseQuoteBody(v: unknown): QuoteBody | null {
 /** API 응답 { ok, all, selected }(이미 CartQuote 모양) 확인 — 틀리면 null */
 const isQuote = (q: unknown): q is CartQuote => {
 	const o = q as CartQuote | null;
-	return !!o && typeof o === 'object' && Array.isArray(o.lines) && Number.isFinite(o.itemsAmount) && Number.isFinite(o.shippingFee) && Number.isFinite(o.freeShippingLeft);
+	return !!o && typeof o === 'object' && Array.isArray(o.lines) && Number.isFinite(o.itemsAmount) && Number.isFinite(o.shippingFee) && Number.isFinite(o.amount) && Number.isFinite(o.freeShippingLeft);
 };
 export function parseQuoteResponse(v: unknown): { all: CartQuote; selected: CartQuote } | null {
 	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
@@ -82,12 +94,12 @@ export function nextGbBoundary(lines: CartLine[], now: number = Date.now()): num
 	const ts = lines.flatMap((l) => (l.gb ? [Date.parse(l.gb.startsAt), Date.parse(l.gb.endsAt)] : [])).filter((t) => Number.isFinite(t) && t > now);
 	return ts.length ? Math.min(...ts) : null;
 }
-/** 장바구니 합계 줄 — 서버 견적 그대로(무료배송까지 남은 금액도 서버 값) */
+/** 장바구니 합계 줄 — 서버 견적 그대로(결제 금액 amount · 무료배송까지 남은 금액도 서버 값 · 화면이 더하지 않는다) */
 export type CartTotals = { subtotal: number; shipping: number; total: number; shippingMsg: string };
 export const totalsFromQuote = (q: CartQuote): CartTotals => ({
 	subtotal: q.itemsAmount,
 	shipping: q.shippingFee,
-	total: q.itemsAmount + q.shippingFee,
+	total: q.amount,
 	shippingMsg: q.shippingFee ? `${won(q.freeShippingLeft)} 더 담으면 무료배송이에요` : '무료배송으로 보내드려요'
 });
 

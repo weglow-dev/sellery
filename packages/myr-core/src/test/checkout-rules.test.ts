@@ -66,7 +66,9 @@ describe('parseLines', () => {
 		).toBeNull();
 		expect(parseLines([{ code: 'a', qty: 9 }, { code: 'a', qty: 5 }])?.[0].qty).toBe(14);
 		expect(parseLines([{ code: 'a', qty: 1, optionIndex: -1 }])).toBeNull();
-		expect(parseLines(Array.from({ length: 21 }, (_, i) => ({ code: `c${i}`, qty: 1 })))).toBeNull();
+		// 줄 수 — 전송 형식 한도(50)만 본다 · 한 번에 결제할 줄 수(20)는 서버(0115 myr_checkout_lines_max · BAD_LINES)
+		expect(parseLines(Array.from({ length: 21 }, (_, i) => ({ code: `c${i}`, qty: 1 })))).toHaveLength(21);
+		expect(parseLines(Array.from({ length: 51 }, (_, i) => ({ code: `c${i}`, qty: 1 })))).toBeNull();
 	});
 	it('공구 코드 · 화면 단가(0086) — 있으면 싣고, 합칠 때는 처음 값 · 형식이 틀리면 null', () => {
 		expect(
