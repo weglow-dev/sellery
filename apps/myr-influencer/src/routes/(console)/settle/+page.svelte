@@ -54,7 +54,7 @@
 		}))
 	]);
 	// 남은 제조금액 합 · 돌려받을 보증금 합 · 다음 정산 상환 예정은 서버 값(0101) — 화면이 더하지 않는다
-	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 정산 확정 · 세금계산서 확인 다음 날 오후 1시 입금']);
+	const rightText = $derived(view === 'mfg' ? [`남은 제조금액 ${won(st.ledgerTotal.remaining)}`, `돌려받을 보증금 ${won(st.ledgerTotal.depositHeld)}`] : ['매월 1일 정산 확정, 세금계산서 확인 다음 날 오후 1시 입금']);
 	const ledgers = $derived(st.ledgers.map((l) => ({ l, c: ledgerCard(l, pv.month, won) })));
 
 	const CHIP: Record<SettleTone, string> = {
@@ -90,14 +90,14 @@
 
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 lg:overflow-visible lg:p-0">
 		{#if view === 'pay'}
-			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} nextDate={shortDate(nextAt)} /></div>{/if}
+			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} /></div>{/if}
 
 			<!-- 다음 정산 -->
 			<a href={next.href} class="relative block overflow-hidden rounded-3xl bg-panel p-5 text-fg lg:mt-5 lg:flex lg:items-center lg:gap-10 lg:px-7 lg:py-[26px]">
 				<span class="pointer-events-none absolute -top-[70px] -right-[70px] h-60 w-60 rounded-full bg-[radial-gradient(closest-side,rgba(255,122,61,.4),rgba(21,22,26,0))] lg:-top-[90px] lg:right-auto lg:-left-20 lg:h-[280px] lg:w-[280px]"></span>
 				<span class="relative block lg:min-w-[300px] lg:shrink-0">
 					<span class="flex items-center justify-between gap-2 lg:justify-start">
-						<span class="text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 확정 · {settleAtLabel(nextAt)}</span>
+						<span class="text-[12px] font-bold text-white/55 lg:text-[13px]">다음 정산 확정 : {settleAtLabel(nextAt)}</span>
 						<span class="text-[12px] font-extrabold text-accent lg:text-[13px]">{dDay(nextAt)}</span>
 					</span>
 					<span class="mt-1.5 flex items-center gap-2.5 lg:mt-2 lg:gap-3">

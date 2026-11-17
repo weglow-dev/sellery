@@ -1,7 +1,7 @@
 // 세금계산서(0104) — packages/myr-core/src/tax-invoice.ts
 import { describe, expect, it } from 'vitest';
 import { sellerSettlementsFromJson } from '../seller-settlement';
-import { approvalNoText, normalizeApprovalNo, parseTaxInvoiceBody, TAX_INVOICE_GUIDE, TAX_INVOICE_TONE, taxInvoiceFromJson, taxInvoiceMessage } from '../tax-invoice';
+import { approvalNoInput, approvalNoText, normalizeApprovalNo, parseTaxInvoiceBody, TAX_INVOICE_GUIDE, TAX_INVOICE_TONE, taxInvoiceFromJson, taxInvoiceMessage } from '../tax-invoice';
 
 const server = {
 	needed: true, show: true, total: 20000, supply: 18182, tax: 1818, write_date: '2034-01-31', due_date: '2034-02-10', overdue: false, todo: false,
@@ -42,6 +42,15 @@ describe('승인번호 형식(서버 myr_tax_invoice_no 와 같은 규칙)', () 
 	it('보여 줄 때는 8-8-8', () => {
 		expect(approvalNoText('2034020141000000a1b2c3d4')).toBe('20340201-41000000-a1b2c3d4');
 		expect(approvalNoText('짧음')).toBe('짧음');
+	});
+	it('입력 중에는 영문 · 숫자 24자리까지만 · 8자리마다 하이픈', () => {
+		expect(approvalNoInput('2034020141')).toBe('20340201-41');
+		expect(approvalNoInput('20340201-41000000-A1B2C3D4')).toBe('20340201-41000000-a1b2c3d4');
+		expect(approvalNoInput('20340201-41000000-a1b2c3d4999')).toBe('20340201-41000000-a1b2c3d4');
+		expect(approvalNoInput(' 20340201 - 41000000 - a1b2c3d4 ')).toBe('20340201-41000000-a1b2c3d4');
+		expect(approvalNoInput('2034!@#0201')).toBe('20340201');
+		expect(approvalNoInput('')).toBe('');
+		expect(normalizeApprovalNo(approvalNoInput('2034020141000000a1b2c3d4'))).toBe('2034020141000000a1b2c3d4');
 	});
 });
 

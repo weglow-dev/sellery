@@ -317,9 +317,10 @@ export function payoutNotice(transfer: PayoutTransfer | null, payDueAt: string |
 	return { tone: 'warn', title: '운영팀이 지급을 확인하고 있어요', body: '확인이 끝나면 이 화면에서 지급 상태가 바뀌어요.', cta: null };
 }
 
-/** 정산 보류 배너(사업자 · 정산 정보) — 보일지는 서버 보류 이유(nextHold.code === 'settle_info')가 정한다. 여기서는 입력 상태별 문구 · 버튼만 고른다 */
-export function holdBanner(settleStatus: string, nextDate: string): { title: string; body: string; cta: string | null } {
-	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: `운영팀 확인이 끝나야 정산금이 지급돼요. ${nextDate} 정산 확정분부터 받을 수 있어요.`, cta: null };
+/** 정산 보류 배너(사업자 · 정산 정보) — 보일지는 서버 보류 이유(nextHold.code === 'settle_info')가 정한다. 여기서는 입력 상태별 문구 · 버튼만 고른다.
+ *  보류는 확인이 끝나면 저절로 풀려 지난 달 정산금도 지급되므로(0102 · 0104 자동 보류) "○일 정산 확정분부터" 같은 날짜는 넣지 않는다 */
+export function holdBanner(settleStatus: string): { title: string; body: string; cta: string | null } {
+	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: '운영팀이 사업자 · 정산 계좌 정보를 확인하고 있어요. 확인이 끝나고 세금계산서까지 확인되면 정산금이 지급돼요.', cta: null };
 	if (settleStatus === 'rejected') return { title: '지급이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되기 전에는 정산금이 지급되지 않아요.', cta: '정산 정보 다시 입력하기' };
 	return { title: '지급이 보류 중이에요', body: '사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.', cta: '정산 정보 등록하기' };
 }

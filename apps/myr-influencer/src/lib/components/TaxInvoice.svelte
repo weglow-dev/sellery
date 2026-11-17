@@ -2,7 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { COMPANY } from '@sellery/myr-core/company';
 	import { shortDate } from '@sellery/myr-core/seller-settlement';
-	import { approvalNoText, normalizeApprovalNo, TAX_INVOICE_GUIDE, taxInvoiceMessage, type TaxInvoice } from '@sellery/myr-core/tax-invoice';
+	import { approvalNoInput, approvalNoText, normalizeApprovalNo, TAX_INVOICE_GUIDE, taxInvoiceMessage, type TaxInvoice } from '@sellery/myr-core/tax-invoice';
 	import { won } from '$lib/rules';
 	import { app } from '$lib/state.svelte';
 
@@ -97,8 +97,12 @@
 			inputmode="text"
 			autocomplete="off"
 			placeholder="승인번호 24자리"
-			maxlength="40"
-			bind:value={draft}
+			value={draft}
+			oninput={(e) => {
+				// 24자리를 넘으면 더 입력되지 않게 — 형식은 approvalNoInput(maxlength 를 두면 공백 섞인 붙여넣기가 잘려서 쓰지 않는다)
+				draft = approvalNoInput(e.currentTarget.value);
+				e.currentTarget.value = draft;
+			}}
 			onblur={() => (touched = true)}
 			class="h-[52px] w-full rounded-[14px] border-[1.5px] px-4 text-[16px] text-fg tabular-nums outline-none placeholder:text-white/35 focus:border-accent focus:bg-accent/5 lg:min-w-0 lg:flex-1 lg:text-[15px] {bad ? 'border-accent bg-accent/6' : 'border-white/10 bg-white/4'}"
 		/>

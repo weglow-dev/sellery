@@ -98,10 +98,11 @@ describe('시안 라벨', () => {
 		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 확인 중', transfer: { state: 'failed', kind: 'ops', tries: 1 } }).tone).toBe('warn');
 		expect(monthStatus({ upcoming: false, payoutStatus: 'pending', payoutLabel: '지급 중', transfer: { state: 'sending', kind: null, tries: 1 } }).tone).toBe('plan');
 		// 보류 배너 — 확인되지 않으면 지급되지 않는다는 것을 같이(2026-11-13)
-		expect(holdBanner('none', '12월 1일')?.body).toBe('사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.');
-		expect(holdBanner('rejected', '12월 1일')?.body).toContain('확인되기 전에는 정산금이 지급되지 않아요');
-		expect(holdBanner('pending', '12월 1일')?.body).toContain('12월 1일 정산 확정분부터');
-		expect(holdBanner('pending', '12월 1일')?.cta).toBeNull();
+		expect(holdBanner('none')?.body).toBe('사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.');
+		expect(holdBanner('rejected')?.body).toContain('확인되기 전에는 정산금이 지급되지 않아요');
+		expect(holdBanner('pending')?.body).toContain('세금계산서까지 확인되면');
+		expect(holdBanner('pending')?.body).not.toContain('정산 확정분부터');
+		expect(holdBanner('pending')?.cta).toBeNull();
 	});
 	it('자동 이체 안내(0111) — 종류별 문구 · 버튼 · 운영 쪽 원인은 이유 없이 확인 중', async () => {
 		const { payoutNotice } = await import('../seller-settlement');

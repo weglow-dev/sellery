@@ -73,6 +73,12 @@ export function normalizeApprovalNo(v: string): string | null {
 	return /^[0-9]{8}[0-9a-z]{16}$/.test(x) ? x : null;
 }
 
+/** 입력 중 승인번호 — 영문 · 숫자만 24자리까지 남기고 8자리마다 하이픈(입력 형식 규칙 · 붙여넣은 하이픈 · 공백도 정리). 그 이상은 입력되지 않는다 */
+export function approvalNoInput(v: string): string {
+	const x = v.replace(/[^0-9a-zA-Z]/g, '').toLowerCase().slice(0, 24);
+	return x.match(/.{1,8}/g)?.join('-') ?? '';
+}
+
 /** '2034020341000000a1b2c3d4' → '20340203-41000000-a1b2c3d4' */
 export const approvalNoText = (no: string): string => (no.length === 24 ? `${no.slice(0, 8)}-${no.slice(8, 16)}-${no.slice(16)}` : no);
 

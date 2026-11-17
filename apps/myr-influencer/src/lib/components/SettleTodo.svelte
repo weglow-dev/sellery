@@ -97,8 +97,8 @@
 
 	<!-- 정산 확정 · 지급 규칙(2026-11-13 · 자동 이체) — "정산일"을 돈이 들어오는 날로 읽지 않게 둘을 나눠 적고, 세금계산서가 없으면 지급되지 않는다는 것을 같이 -->
 	<div class="mt-4 border-t border-white/7 pt-3.5 text-[12px] leading-[1.65] text-white/50 lg:mt-[18px] lg:text-[12.5px]">
-		<p><b class="font-semibold text-white/70">정산 확정</b> · {SETTLE_CONFIRM_TEXT}</p>
-		<p><b class="font-semibold text-white/70">지급</b> · {PAYOUT_RULE_TEXT}</p>
+		<p><b class="font-semibold text-white/70">정산 확정</b> : {SETTLE_CONFIRM_TEXT}</p>
+		<p><b class="font-semibold text-white/70">지급</b> : {PAYOUT_RULE_TEXT}</p>
 		<p class="mt-0.5 font-semibold text-[#ff8a8a]">{PAYOUT_BLOCK_TEXT}</p>
 	</div>
 </section>
