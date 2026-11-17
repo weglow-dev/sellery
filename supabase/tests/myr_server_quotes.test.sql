@@ -4,9 +4,9 @@ begin;
 select plan(50);
 
 -- ---------- 권한 ----------
-select function_privs_are('public', 'myr_app_cart_quote', '{jsonb}'::text[], 'anon', '{}'::text[], 'anon 은 cart_quote 불가');
-select function_privs_are('public', 'myr_app_cart_quote', '{jsonb}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 cart_quote 불가');
-select function_privs_are('public', 'myr_app_cart_quote', '{jsonb}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 cart_quote 가능');
+select function_privs_are('public', 'myr_app_cart_quote', '{jsonb,uuid,uuid}'::text[], 'anon', '{}'::text[], 'anon 은 cart_quote 불가');
+select function_privs_are('public', 'myr_app_cart_quote', '{jsonb,uuid,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 cart_quote 불가');
+select function_privs_are('public', 'myr_app_cart_quote', '{jsonb,uuid,uuid}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 cart_quote 가능');
 select function_privs_are('public', 'myr_app_settlement_unit', '{integer}'::text[], 'anon', '{}'::text[], 'anon 은 settlement_unit 불가');
 select function_privs_are('public', 'myr_app_settlement_unit', '{integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settlement_unit 불가');
 select function_privs_are('public', 'myr_app_groupbuy_preview', '{uuid,uuid,integer}'::text[], 'anon', '{}'::text[], 'anon 은 groupbuy_preview 불가');

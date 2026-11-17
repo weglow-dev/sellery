@@ -3,7 +3,8 @@
 --
 --   점검(백엔드 원칙 1 · 샵 화면):
 --     장바구니 · 결제 화면 총 결제 금액     화면이 itemsAmount + shippingFee 로 더했다(결제 · 주문 표 amount 생성 칸과 같은 식)
---     장바구니 재고 초과 안내               화면이 qty > stockLeft 로 판정했다(결제 생성 · 승인의 SOLD_OUT 은 v_left < v_tot · v_left < v_need)
+--     장바구니 재고 초과 안내               화면이 qty > stockLeft 로 판정했다(결제 생성 · 승인의 SOLD_OUT 은 v_left < v_tot · v_left < v_need) ·
+--                                           견적의 남은 수량은 내 대기 결제 몫을 빼지 않아 결제 생성과 달랐다 → 견적이 누구의 것인지 받는다
 --     한 번에 결제할 줄 수                  장바구니 · 견적은 50줄까지 받는데 결제는 20줄(c_max_lines) — 21~50줄을 고르면 결제에서 BAD_LINES
 --     상품 페이지 [담기] 금액 · 무료배송 문구  화면이 단가 × 수량 · "5만원" 고정 — 견적 한 줄(line_amount · free_over)로 바꾼다(앱 코드)
 --   고침:
@@ -52,7 +53,11 @@ $$;
 revoke all on function public.myr_checkout_lines_over(integer) from public, anon, authenticated;
 
 -- 0099 정의 + over_stock · amount · lines_max · lines_over(칸만 더함)
-create or replace function public.myr_app_cart_quote(p_lines jsonb)
+--   + 누구의 견적인지(p_user_id · p_prev_checkout_id — 결제 생성과 같은 인자) — 남은 수량은 내 대기 결제 몫을 돌려받은 값(결제 생성과 같은
+--     myr_product_buyable(p, myr_checkout_own_held(…))). 전에는 내 결제가 대기 중이면 장바구니만 "모자람"으로 보이고 결제는 통과했다
+--   인자가 바뀌어 새 함수가 된다 — 예전 (jsonb) 는 지운다
+drop function if exists public.myr_app_cart_quote(jsonb);
+create or replace function public.myr_app_cart_quote(p_lines jsonb, p_user_id uuid default null, p_prev_checkout_id uuid default null)
 returns jsonb
 language plpgsql
 stable
@@ -70,6 +75,7 @@ declare
   v_items bigint := 0;
   v_rule  jsonb := public.myr_shipping_rule();
   v_fee   integer;
+  v_left  integer;
 begin
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) > 50 then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
   for l in select * from jsonb_array_elements(p_lines) loop
@@ -87,10 +93,12 @@ begin
     end if;
     v_price := public.myr_line_price(p, v_opt, nullif(l ->> 'gb', ''));
     v_unit := (v_price ->> 'unit_price')::integer;
+    -- 지금 살 수 있는 수량 — 내 대기 결제 몫은 돌려받는다(결제 생성 myr_app_create_checkout 과 같은 식 · 0107 myr_checkout_own_held)
+    v_left := public.myr_product_buyable(p, public.myr_checkout_own_held(p.id, p_user_id, p_prev_checkout_id));
     v_out := v_out || (jsonb_build_object('code', v_code, 'option_index', v_opt, 'qty', v_qty, 'line_amount', public.myr_line_amount(v_unit, v_qty),
-                                          'stock_left', public.myr_product_buyable(p),
+                                          'stock_left', v_left,
                                           -- 0115: 남은 수량보다 많이 담았는지 — 결제 생성 · 승인의 SOLD_OUT 과 같은 함수(myr_stock_short)
-                                          'over_stock', public.myr_stock_short(public.myr_product_buyable(p), v_qty),
+                                          'over_stock', public.myr_stock_short(v_left, v_qty),
                                           'base_amount', public.myr_line_amount((v_price ->> 'base_price')::integer, v_qty))
                        || (v_price - 'groupbuy_id'));
     v_items := v_items + coalesce(public.myr_line_amount(v_unit, v_qty), 0);
@@ -103,8 +111,8 @@ begin
                             'free_shipping_left', case when v_items > 0 and v_fee > 0 then greatest((v_rule ->> 'free_over')::int - v_items, 0) else 0 end);
 end;
 $$;
-revoke all on function public.myr_app_cart_quote(jsonb) from public, anon, authenticated;
-grant execute on function public.myr_app_cart_quote(jsonb) to service_role;
+revoke all on function public.myr_app_cart_quote(jsonb, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.myr_app_cart_quote(jsonb, uuid, uuid) to service_role;
 
 -- 0107 정의 → 줄 수 myr_checkout_lines_over · 재고 myr_stock_short
 create or replace function public.myr_app_create_checkout(

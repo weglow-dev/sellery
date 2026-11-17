@@ -47,11 +47,6 @@
 	});
 	/** 담기에 싣는 공구 — 끝난 공구는 싣지 않는다(add() · 서버 견적 +page.server.ts 와 같은 조건) */
 	const gbForCart = $derived(gb && gbState !== 'ended' ? gb : undefined);
-	// 지금 살 수 있는 수량(서버 0096 · 결제 대기 중인 다른 고객 몫 제외) — 수량 버튼 상한 · 표시. 모르면(null) 상한 없이
-	const left = $derived(p.soldOut ? 0 : p.stockLeft);
-	$effect(() => {
-		if (left !== null && left > 0 && qty > left) qty = left;
-	});
 
 	/** 사진 넘겨보기 — 지금 보는 사진 번호 · PC 썸네일 줄이 go(i) 로 옮긴다 */
 	let photo = $state(0);
@@ -73,10 +68,17 @@
 		const t = setTimeout(async () => {
 			const q = await shop.quoteOne(p, qty, gbForCart);
 			if (key === wantKey) live = { key, quote: q };
-		}, 250);
+		}, 150);
 		return () => clearTimeout(t);
 	});
-	const amount = $derived(cur.key === wantKey ? (cur.quote?.lines[0]?.lineAmount ?? null) : null);
+	/** 버튼 금액 — 새 견적을 받는 동안에는 직전 금액을 흐리게 둔다(금액 칸이 사라졌다 나타나지 않게 · 값은 늘 서버 견적) */
+	const amount = $derived(cur.quote?.lines[0]?.lineAmount ?? null);
+	const updating = $derived(cur.key !== wantKey);
+	// 지금 살 수 있는 수량(서버 0096 · 결제 대기 중인 다른 고객 몫 제외 · 견적이 있으면 내 대기 결제 몫을 돌려받은 값 0115) — 수량 버튼 상한 · 표시. 모르면(null) 상한 없이
+	const left = $derived(p.soldOut ? 0 : (cur.quote?.lines[0]?.stockLeft ?? p.stockLeft));
+	$effect(() => {
+		if (left !== null && left > 0 && qty > left) qty = left;
+	});
 	const freeOver = $derived(cur.quote?.freeOver || null);
 	let added = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -336,7 +338,7 @@
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
+				<span class="transition-opacity {updating && !p.soldOut ? 'opacity-55' : ''}" aria-busy={updating}>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
 			{/if}
 		</button>
 		<div class="flex flex-col gap-2.5 rounded-2xl border border-white/7 bg-white/3 p-4 text-[13px] text-fg-soft">
@@ -360,7 +362,7 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 				<span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
+				<span class="transition-opacity {updating && !p.soldOut ? 'opacity-55' : ''}" aria-busy={updating}>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
 			{/if}
 		</button>
 	</div>

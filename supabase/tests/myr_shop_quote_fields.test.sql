@@ -1,13 +1,15 @@
 -- pgTAP — 0115 샵 화면 숫자를 서버 견적에서: 결제 금액(myr_pay_amount) · 재고 초과(myr_stock_short) · 한 번에 결제할 줄 수(myr_checkout_lines_max · _over).
 --   견적(장바구니 · 상품 페이지)과 결제 생성(BAD_LINES · SOLD_OUT)이 같은 함수를 쓰는지 고정한다.
 begin;
-select plan(16);
+select plan(21);
 
 select function_privs_are('public', 'myr_pay_amount', '{bigint,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 pay_amount 불가');
 select function_privs_are('public', 'myr_stock_short', '{integer,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 stock_short 불가');
 select function_privs_are('public', 'myr_checkout_lines_max', '{}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 checkout_lines_max 불가');
 select function_privs_are('public', 'myr_checkout_lines_over', '{integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 checkout_lines_over 불가');
 
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('00000000-0000-4000-8000-00000000fe01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-shopq@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
 insert into public.sellers (id, name, handle, platform, active) values ('00000000-0000-4000-8000-00000000fe11', '민지 루틴', '@pgtap.shopq', 'instagram', true);
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon, options)
 values ('00000000-0000-4000-8000-00000000fe21', 'pgtap-sq2-a', '00000000-0000-4000-8000-00000000fe11', 'diet', '레몬 스틱', 36000, 5, 'listed', 'pill', '[]'::jsonb);
@@ -42,6 +44,19 @@ select isnt(public.myr_app_create_checkout(null, null, '{"name":"A"}'::jsonb, '{
 select is(public.myr_app_create_checkout(null, null, '{"name":"A"}'::jsonb, '{"recipient":"A","address1":"서울"}'::jsonb,
           '[{"code":"pgtap-sq2-a","qty":6}]', 'myr_sq2_000003') #>> '{items,0,reason}',
           'SOLD_OUT', '결제 6개(남은 수량 5) — SOLD_OUT(견적 over_stock 과 같은 함수)');
+
+-- ---------- 내 대기 결제 — 견적의 남은 수량도 결제 생성처럼 내 몫을 돌려받는다 ----------
+-- 회원 U 가 3개로 결제를 만들어 둠(PENDING · 재고를 잡음) → 남은 수량은 다른 사람에게 2 · U 에게 5
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000fe01', null, '{"name":"U"}'::jsonb, '{"recipient":"U","address1":"서울"}'::jsonb,
+          '[{"code":"pgtap-sq2-a","qty":3}]', 'myr_sq2_hold01') ->> 'ok', 'true', 'U 결제 대기 3개');
+select is((select jsonb_build_object('stock_left', q #> '{lines,0,stock_left}', 'over_stock', q #> '{lines,0,over_stock}') from (select public.myr_app_cart_quote('[{"code":"pgtap-sq2-a","qty":4}]') q) x),
+          '{"stock_left": 2, "over_stock": true}'::jsonb, '다른 사람 견적 4개 — 남은 수량 2 · 모자람');
+select is((select jsonb_build_object('stock_left', q #> '{lines,0,stock_left}', 'over_stock', q #> '{lines,0,over_stock}') from (select public.myr_app_cart_quote('[{"code":"pgtap-sq2-a","qty":4}]', '00000000-0000-4000-8000-00000000fe01') q) x),
+          '{"stock_left": 5, "over_stock": false}'::jsonb, 'U 견적 4개 — 내 대기 결제 몫을 돌려받아 남은 수량 5 · 모자라지 않음');
+select is(public.myr_app_create_checkout('00000000-0000-4000-8000-00000000fe01', null, '{"name":"U"}'::jsonb, '{"recipient":"U","address1":"서울"}'::jsonb,
+          '[{"code":"pgtap-sq2-a","qty":4}]', 'myr_sq2_hold02') ->> 'ok', 'true', 'U 결제 4개 — 견적처럼 통과(이전 대기 결제는 대체)');
+select is(public.myr_app_cart_quote('[{"code":"pgtap-sq2-a","qty":2}]', null, gen_random_uuid()) #>> '{lines,0,stock_left}', '1',
+          '비회원 — 모르는 이전 결제 id 면 돌려받을 몫 없음(남은 수량 1)');
 
 select * from finish();
 rollback;
