@@ -170,6 +170,7 @@ export async function refundItems(input: {
 				photoUrls: (photosById.get(i.item_id) ?? []).map((p) => signed.get(p)).filter((u): u is string => !!u)
 			})),
 			amount,
+			sellerGoods: pre.sellerGoods,
 			full: pre.full,
 			reason,
 			deposit: pre.deposit,

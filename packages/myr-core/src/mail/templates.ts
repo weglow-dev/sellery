@@ -43,8 +43,9 @@ export type MailOrder = {
 	deposit: MailDeposit;
 };
 /** 환불 1건 — record 가 돌려준 것 */
-/** items[].note = 고객이 제품별로 남긴 상세(0067) · photoUrls = 사진 서명 URL(0068 · 7일) — 둘 다 셀러 메일에만 · deduction = 왕복 배송비 차감(0078 부분 환불) */
-export type MailRefund = { items: { itemId: string; qty: number; amount: number; note?: string; photoUrls?: string[] }[]; amount: number; full: boolean; reason: string; deposit: boolean; deduction?: number };
+/** items[].note = 고객이 제품별로 남긴 상세(0067) · photoUrls = 사진 서명 URL(0068 · 7일) — 둘 다 셀러 메일에만 · deduction = 왕복 배송비 차감(0078 부분 환불) ·
+ *  sellerGoods = 크리에이터별 환불 상품 금액(차감 전 · 실적에서 빠지는 금액 · 서버 precheck seller_goods · 0118) */
+export type MailRefund = { sellerGoods?: Record<string, number>; items: { itemId: string; qty: number; amount: number; note?: string; photoUrls?: string[] }[]; amount: number; full: boolean; reason: string; deposit: boolean; deduction?: number };
 
 const url = (ctx: MailCtx, path: string): string => `${ctx.siteUrl.replace(/\/+$/, '')}${path}`;
 const upper = (code: string): string => code.toUpperCase();
@@ -193,8 +194,8 @@ export function orderRefundedSellerMail(o: MailOrder, r: MailRefund, sellerId: s
 	const code = upper(o.code);
 	const sellerName = (mine[0]?.i ?? mineAll[0]).sellerName;
 	const lines = r.deposit ? mineAll : mine.map((p) => ({ ...p.i, qty: p.x.qty }));
-	// 줄 환불 금액은 서버 precheck 가 준 값(MailRefund.items[].amount) — 여기서 단가 × 수량을 다시 계산하지 않는다
-	const amount = r.deposit ? 0 : mine.reduce((n, p) => n + p.x.amount, 0);
+	// 내 상품 환불 금액 = 실적에서 빠지는 금액(줄 금액 합 · 왕복 배송비 차감 전 · 2026-11-17 결정) — 서버 precheck 의 크리에이터별 합(seller_goods · 0118). 여기서 줄을 더하지 않는다
+	const amount = r.deposit ? 0 : (r.sellerGoods?.[sellerId] ?? 0);
 	const doc: MailDoc = {
 		title: r.deposit ? '주문이 취소되었어요' : '내 상품이 환불되었어요',
 		preheader: `${code} · ${itemLine(lines[0])}`,

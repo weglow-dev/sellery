@@ -185,8 +185,16 @@ export type PrecheckOk = {
 	deduction: number;
 	refundAmount: number;
 	cancelFull: boolean;
+	/** 0118 — 크리에이터별 환불 상품 금액(차감 전 · 실적에서 빠지는 금액 · 서버 myr_refund_seller_goods) — 크리에이터 환불 메일이 줄을 다시 더하지 않는다 */
+	sellerGoods: Record<string, number>;
 };
 export type PrecheckResult = PrecheckOk | { ok: false; code: string; status?: string; items?: { item_id: string; reason: string; left: number }[] };
+function sellerGoodsFrom(v: unknown): Record<string, number> {
+	const o = obj(v);
+	const out: Record<string, number> = {};
+	if (o) for (const [k, n] of Object.entries(o)) if (typeof n === 'number' && Number.isFinite(n)) out[k] = n;
+	return out;
+}
 export function parsePrecheckResult(json: unknown): PrecheckResult {
 	const o = obj(json);
 	if (!o) return { ok: false, code: 'BAD_RESULT' };
@@ -214,7 +222,8 @@ export function parsePrecheckResult(json: unknown): PrecheckResult {
 			items,
 			deduction: num(o, 'deduction') ?? 0,
 			refundAmount,
-			cancelFull: o.cancel_full === true
+			cancelFull: o.cancel_full === true,
+			sellerGoods: sellerGoodsFrom(o.seller_goods)
 		};
 	}
 	const items = (Array.isArray(o.items) ? o.items : [])
