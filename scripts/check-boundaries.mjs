@@ -230,9 +230,13 @@ const MYR_MIRROR_RULES = [
   { re: /\.reduce\(\([\w\s,]*\)\s*=>\s*\w+\s*\+\s*[\w.]*\.x\.amount\b/, why: "환불 줄 금액을 메일에서 더함 — 서버 sellerGoods(precheck seller_goods · myr_refund_seller_goods · 0118)를 쓴다" },
   // 줄 취소 여부(0120) — 배송 상자 표시는 서버 valid(myr_line_valid)
   { re: /\b(it|i|l|line)\.status\s*(===|!==)\s*'CANCELED'/, why: "줄 취소 여부를 줄 상태로 다시 판정 — 서버 valid(myr_line_valid · 0120)를 쓴다" },
+  // 상태 비교는 정규형으로만(x.status === 'X' · !==) — 판정별 규칙이 정규형으로 적혀 있으므로 다른 모양은 금지해 빠져나가지 못하게 한다(payoutStatus 같은 이름도)
+  { re: /['"][A-Za-z_]+['"]\s*(===|!==|==|!=)\s*[\w.]*(\bstatus|\bstate|[a-z]Status|[a-z]State)\b/, why: "상태 비교 순서를 바꿔 씀('X' === x.status) — x.status === 'X' 로 쓴다(판정이면 서버 값)" },
+  { re: /(\bstatus|\bstate|[a-z]Status|[a-z]State)\s*(==|!=)(?!=)\s*['"]/, why: "상태를 느슨하게 비교(== · !=) — === · !== 로 쓴다(판정이면 서버 값)" },
+  { re: /\.(includes|has)\([\w.]*(\bstatus|\bstate|[a-z]Status|[a-z]State)\)/, why: "상태 묶음을 배열 · Set 으로 다시 씀(PAID.includes(x.status) · S.has(x.status)) — 서버 값(myr_order_status_* · myr_ship_status_* 등)을 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
-  { re: /\b(unit|price)\s*\*\s*[\w.]*qty\b|\bqty\s*\*\s*[\w.]*(unit|price)\b/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
+  { re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
   { re: /\bqty\s*>\s*[\w.]*stockLeft\b|\bstockLeft\s*<\s*[\w.]*qty\b/, why: "재고 초과를 화면에서 판정 — 서버 견적 줄 overStock(myr_stock_short · 0115)을 쓴다" },
   { re: /\d+\s*만\s*원\s*이상\s*무료배송/, why: "무료배송 기준을 화면에 고정 — 서버 견적 freeOver(platform_settings myr_shipping · 0092)를 쓴다" },
   { re: /['"`](지급 중|지급 지연|지급 실패|지급 확인 중)['"`]/, why: "크리에이터 지급 상태 문구를 화면에서 다시 정함 — 서버 값 payoutLabel(myr_payout_creator_label · 0111)을 쓴다" },

@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(224);
+select plan(230);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -265,11 +265,11 @@ create temp table _fn as
     from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname like 'myr%';
 create temp table _rules (ord serial, label text, pat text, allowed text[]);
 insert into _rules (label, pat, allowed) values
-  ('줄의 남은 수량(수량 − 환불 수량 · 환불 수량 + n ≥ 수량 모양도)', $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty|refunded_qty\s*\+\s*[\w.]+\s*(>=|>|<=|<)\s*(\w+\.)?qty\M$p$, '{myr_line_left}'),
+  ('줄의 남은 수량(수량 − 환불 수량 · 환불 수량 + n ≥ 수량 · 수량 ≤ 환불 수량 + n 모양도)', $p$qty(,\s*0\))?\s*-\s*(coalesce\()?(\w+\.)?refunded_qty|refunded_qty\s*\+\s*[\w.]+\s*(>=|>|<=|<)\s*(\w+\.)?qty\M|qty\s*(<=|<|>=|>)\s*(coalesce\()?[\w.]*refunded_qty\s*\+$p$, '{myr_line_left}'),
   ('살아 있는 줄(남은 수량 > 0)',             $p$myr_line_left\(\w+\)\s*>\s*0$p$,                                '{myr_line_live}'),
   ('취소 줄 비교',                            $p$status\s*<>\s*'CANCELED'|\.status\s*=\s*'CANCELED'|'REFUNDED'\s*,\s*'CANCELED'$p$, '{myr_line_valid,myr_app_deposit_expire,myr_app_refund_record}'),
-  ('금액 − 환불(환불 + n ≤ 금액 모양도)',      $p$amount\s*-\s*(\w+\.)?refund_amount|refund_amount\s*\+[^;]*<=\s*(\w+\.)?amount\M$p$, '{myr_line_net,myr_order_net}'),
-  ('단가 × 수량',                             $p$unit_price(::bigint)?\s*\*|v_unit(::bigint)?\s*\*|\*\s*(\w+\.)?qty\M|\*\s*v_qty$p$, '{myr_line_amount}'),
+  ('금액 − 환불(환불 + n ≤ 금액 · 금액 ≥ 환불 + n 모양도)', $p$amount\s*-\s*(\w+\.)?refund_amount|refund_amount\s*\+[^;]*<=\s*(\w+\.)?amount\M|amount\s*(>=|<=|>|<)\s*(coalesce\()?[\w.]*refund_amount\s*\+$p$, '{myr_line_net,myr_order_net}'),
+  ('단가 × 수량(수량 × 단가 모양도)',           $p$unit_price(::bigint)?\s*\*|v_unit(::bigint)?\s*\*|\*\s*(\w+\.)?qty\M|\*\s*v_qty|\*\s*(\w+\.)?unit_price\M|\*\s*v_unit\M$p$, '{myr_line_amount}'),
   ('상품 남은 재고(입고 − 판매)',             $p$-\s*(coalesce\()?(\w+\.)?sold_qty$p$,                           '{myr_product_left}'),
   ('품절(남은 재고 0)',                       $p$myr_product_left\(\w+\)\s*(<=|>|<|=)$p$,                        '{myr_product_sold_out}'),
   ('판매 중 상태',                            $p$status\s*(=|<>)\s*'listed'|'listed'\s*,\s*'paused'$p$,          '{myr_product_listed,myr_product_status_approved}'),
@@ -367,7 +367,7 @@ insert into _rules (label, pat, allowed) values
   ('송금 중인지(이체 상태 sending)',            $p$transfer_state\s*=\s*'sending'$p$,                           '{myr_payout_sending}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
-  ('결제 금액(상품 합계 + 배송비) — 결제 · 주문 표 amount 생성 칸과 같은 식', $p$items_amount\s*\+\s*[\w.]*shipping_fee|v_items\w*\s*\+\s*v_fee$p$, '{myr_pay_amount}'),
+  ('결제 금액(상품 합계 + 배송비 · 배송비 + 상품 합계 모양도) — 결제 · 주문 표 amount 생성 칸과 같은 식', $p$items_amount\s*\+\s*[\w.]*shipping_fee|v_items\w*\s*\+\s*v_fee|shipping_fee\s*\+\s*[\w.]*items_amount|v_fee\s*\+\s*v_items$p$, '{myr_pay_amount}'),
   ('재고가 모자란지(남은 수량 < 필요 수량)',   $p$\w*left\s*<\s*\w*(need|tot)\M$p$,                               '{myr_stock_short}'),
   ('한 번에 결제할 수 있는 줄 수',              $p$c_max_lines|>\s*public\.myr_checkout_lines_max$p$,                  '{myr_checkout_lines_over}'),
   -- 0116 크리에이터 콘솔 화면 값
@@ -396,6 +396,15 @@ insert into _rules (label, pat, allowed) values
   ('받는 택배사 목록',                          $p$'CJ대한통운'$p$,                                                        '{myr_courier_ok}'),
   ('송장번호 형식(숫자 8~30자리)',               $p$\\d\{8,30\}$p$,                                                      '{myr_tracking_ok}'),
   ('번호 정리(공백 · 하이픈 빼기) — 세금계산서 번호는 다른 번호', $p$\[\\s-\]$p$,                                       '{myr_tracking_no,myr_tax_invoice_no}'),
+  -- 상태 비교는 정규형으로만(status = 'X' · <> · in (…) · 값이 빌 수 있으면 coalesce(status = 'X', false)) — 판정별 규칙이 정규형으로 적혀 있으므로
+  --   다른 모양(순서 바꾸기 · != · any(array) · is distinct from · 형 변환 · 값 하나짜리 in)은 금지해 빠져나가지 못하게 한다. 변수(v_status · p_ship_status)도 같다.
+  --   순서 바꾸기에서 JSON 키 비교(x ->> 'status' = p_status)는 상태 글자 비교가 아니라 뺀다(따옴표 앞이 >)
+  ('상태 비교 순서 바꾸기(''X'' = status) — 금지 · status = ''X'' 로', $p$(^|[^>\s])\s*'\w+'\s*(=|<>|!=)\s*[\w.]*status\M$p$, '{}'),
+  ('상태 비교 != — 금지 · <> 로',               $p$status\s*!=$p$,                                                         '{}'),
+  ('상태 비교 = any(array) — 금지 · in (…) 로', $p$status\s*=\s*any\s*\($p$,                                             '{}'),
+  ('상태 비교 is distinct from — 금지 · coalesce(status = ''X'', false) 로', $p$status\s+is\s+(not\s+)?distinct\s+from\s*'$p$, '{}'),
+  ('상태 비교 형 변환(status::text = ''X'') — 금지 · status = ''X'' 로', $p$status::\w+\s*(=|<>|!=)$p$,                         '{}'),
+  ('상태 비교 값 하나짜리 in(status in (''X'')) — 금지 · status = ''X'' 로', $p$status\s+(not\s+)?in\s*\(\s*'\w+'\s*\)$p$,    '{}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days}');
 
 -- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)

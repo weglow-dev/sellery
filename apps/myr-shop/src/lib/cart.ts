@@ -1,7 +1,7 @@
 /** 장바구니 줄 다루기 · API 입출력 검증 — 순수 모듈(테스트 `src/test/cart.test.ts`). 상태(`state.svelte.ts`)와 서버(`lib/server/cart.ts`)는 여기 함수로만 줄을 바꾼다.
  *  **가격 · 공구 적용 · 배송비는 여기서 계산하지 않는다** — 서버 견적(0092 `myr_app_cart_quote` · `POST /api/cart/quote`)이 체크아웃과 같은 함수로 정한다(백엔드 원칙 1).
  *  구매 수량 상한은 없다(0095) — QTY_INT_MAX 는 정수로 보낼 수 있는지(전송 형식)만 본다. 수량 형식 범위 · 재고 한도는 서버(0097 myr_qty_parse · 0096 myr_product_buyable). */
-import { GB_CODE_RE, groupbuyFromJson, type Groupbuy, type GroupbuyState } from '@sellery/myr-core/groupbuy';
+import { GB_CODE_RE, groupbuyFromJson, isGroupbuyState, type Groupbuy, type GroupbuyState } from '@sellery/myr-core/groupbuy';
 import type { PriceChange } from '@sellery/myr-core/checkout-rules';
 import { QTY_INT_MAX, won, type Product } from './data';
 import { fromRow, type Row } from './product-row';
@@ -21,7 +21,6 @@ export type QuoteLine = { code: string; qty: number; unitPrice: number | null; b
 /** 견적 — amount = 결제 금액(0115 myr_pay_amount · 결제 표 amount 와 같은 식) · linesMax · linesOver = 한 번에 결제할 수 있는 줄 수 · 넘었나(결제 BAD_LINES 와 같은 함수) */
 export type CartQuote = { lines: QuoteLine[]; itemsAmount: number; shippingFee: number; amount: number; freeOver: number; freeShippingLeft: number; linesMax: number; linesOver: boolean };
 const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-const GB_STATES: readonly string[] = ['scheduled', 'active', 'ended'];
 /** RPC · API 응답 → 견적(형식이 다르면 null — 화면은 금액 대신 "확인 중") */
 export function parseCartQuote(v: unknown): CartQuote | null {
 	const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
@@ -41,7 +40,7 @@ export function parseCartQuote(v: unknown): CartQuote | null {
 			baseAmount: numOrNull(x.base_amount),
 			stockLeft: numOrNull(x.stock_left),
 			overStock: x.over_stock === true,
-			gbState: typeof x.groupbuy_state === 'string' && GB_STATES.includes(x.groupbuy_state) ? (x.groupbuy_state as GroupbuyState) : null,
+			gbState: isGroupbuyState(x.groupbuy_state) ? x.groupbuy_state : null,
 			gbCode: typeof x.groupbuy_code === 'string' ? x.groupbuy_code : null
 		}));
 	return {
@@ -165,7 +164,7 @@ export const isProduct = (p: unknown): p is Product =>
 const isGroupbuy = (g: unknown): g is Groupbuy => {
 	const o = g as Groupbuy | null;
 	return (
-		!!o && typeof o === 'object' && typeof o.code === 'string' && GB_CODE_RE.test(o.code) && ['scheduled', 'active', 'ended'].includes(o.state) &&
+		!!o && typeof o === 'object' && typeof o.code === 'string' && GB_CODE_RE.test(o.code) && isGroupbuyState(o.state) &&
 		Number.isInteger(o.price) && Number.isInteger(o.discountPct) && !Number.isNaN(Date.parse(o.startsAt)) && !Number.isNaN(Date.parse(o.endsAt))
 	);
 };

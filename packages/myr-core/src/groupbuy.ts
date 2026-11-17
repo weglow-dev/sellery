@@ -30,12 +30,13 @@ export type GroupbuyOption = { index: number; name: string; price: number; group
 export type Groupbuy = { code: string; state: GroupbuyState; discountPct: number; startsAt: string; endsAt: string; price: number; options: GroupbuyOption[] };
 
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
-const isState = (v: unknown): v is GroupbuyState => v === 'scheduled' || v === 'active' || v === 'ended';
+/** 서버가 보내는 공구 상태 값인가(형식 검사 — 상태 판정은 서버 myr_groupbuy_state) · 응답 · 브라우저 저장값 파서가 같이 쓴다 */
+export const isGroupbuyState = (v: unknown): v is GroupbuyState => v === 'scheduled' || v === 'active' || v === 'ended';
 const isTime = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v));
 
 export function groupbuyFromJson(v: unknown): Groupbuy | null {
 	const o = obj(v);
-	if (!o || typeof o.code !== 'string' || !GB_CODE_RE.test(o.code) || !isState(o.state)) return null;
+	if (!o || typeof o.code !== 'string' || !GB_CODE_RE.test(o.code) || !isGroupbuyState(o.state)) return null;
 	if (!Number.isInteger(o.discount_pct) || !isTime(o.starts_at) || !isTime(o.ends_at) || !Number.isInteger(o.price)) return null;
 	const options = (Array.isArray(o.options) ? o.options : [])
 		.map(obj)
