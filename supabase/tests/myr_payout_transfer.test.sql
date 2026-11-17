@@ -2,7 +2,7 @@
 --   크리에이터에게 보이는 실패 종류(myr_payout_fail_kind — 운영 쪽은 ops 로 합친다) · 칸 제약 · 크리에이터 정산 응답.
 -- 2036년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(30);
+select plan(34);
 
 select function_privs_are('public', 'myr_payout_sending', '{myr_payouts}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 sending 불가');
 select function_privs_are('public', 'myr_payout_fail_kind', '{myr_payouts}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 fail_kind 불가');
@@ -82,6 +82,15 @@ select is(jsonb_build_array(public.myr_payout_creator_label(pg_temp.po('@pgtap.p
 select pg_temp.tr('@pgtap.pt1', 'failed', 'check');
 select is(jsonb_build_array(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt1')), public.myr_payout_fail_kind(pg_temp.po('@pgtap.pt1'))), '["지급 확인 중", "ops"]'::jsonb, '결과 불명도 크리에이터에게는 ops(이유를 싣지 않는다)');
 select is(public.myr_payout_pay_due_at(pg_temp.po('@pgtap.pt1'), '2036-02-05 10:00+09'), null, '운영 확인 중이면 예정 시각 없음');
+
+-- 보류가 먼저 — 지급 보류(Q2 · 사업자 정보 확인 전)에 실패 기록이 남아 있어도 크리에이터에게는 "지급 보류" · 실패 안내 없음 · 기록 칸은 그대로
+select pg_temp.tr('@pgtap.pt2', 'failed', 'account');
+select is(jsonb_build_array(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt2')), public.myr_payout_fail_kind(pg_temp.po('@pgtap.pt2'))), '["지급 보류", null]'::jsonb, '보류 + 계좌 실패 — 지급 보류 · 실패 종류 없음');
+select is(public.myr_payout_transfer_json(pg_temp.po('@pgtap.pt2')), null, '보류 중 실패는 이체 상태를 싣지 않는다(실패 안내 없음)');
+select is((select array[transfer_state, transfer_fail] from public.myr_payouts where id = (pg_temp.po('@pgtap.pt2')).id), array['failed', 'account'], '이체 기록 칸은 지우지 않는다(운영용)');
+-- 송금 중은 돈이 나가는 중이라 보류여도 지급 중
+select pg_temp.tr('@pgtap.pt2', 'sending', null);
+select is(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt2')), '지급 중', '보류 + 송금 중 — 지급 중');
 
 -- 지급 완료면 이체 상태가 남을 수 없다
 select throws_ok($$update public.myr_payouts set status = 'paid', paid_at = now(), paid_amount = 1, paid_on = '2036-02-06' where id = (pg_temp.po('@pgtap.pt1')).id$$, '23514', null, '이체 상태가 남은 채 지급 완료 거절');

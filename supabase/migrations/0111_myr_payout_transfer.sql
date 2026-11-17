@@ -10,10 +10,12 @@
 --     transfer_tries · transfer_at  시도 횟수 · 마지막 시도 시각
 --   함수:
 --     myr_payout_sending(p)          송금 중인지(transfer_state = 'sending') — 지급 예정 시각 · 상태 문구가 같이 쓴다
---     myr_payout_fail_kind(p)        크리에이터에게 보이는 실패 종류 — 운영 쪽(ops · check)은 이유 없이 ops 로 합친다(운영 확인 중)
+--     myr_payout_fail_kind(p)        크리에이터에게 보이는 실패 종류 — 운영 쪽(ops · check)은 이유 없이 ops 로 합친다(운영 확인 중) ·
+--                                    지급 보류면 비운다(보류가 먼저 — 계좌를 다시 입력해 정산 정보 확인 중 · 세금계산서 반려 · 운영 보류가 실패 기록 뒤에 걸려도
+--                                    "지급 보류"로 보인다. 이체 기록 칸은 지우지 않고 운영용으로 남긴다)
 --     myr_payout_pay_due_at(p, now)  지급 예정 시각 — 지급할 수 있고(myr_payout_payable) 송금 중 · 계좌 · 운영 실패가 아니면 다음 오후 1시(myr_settlement_next_cron)
 --     myr_payout_creator_label(p)    크리에이터 상태 문구 — 지급 중 · 지급 실패(계좌) · 지급 지연(재시도) · 지급 확인 중(운영) · 지급 예정(대기) · 그 밖은 myr_payout_status_label
---     myr_payout_transfer_json(p)    { state, kind, tries } · 이체 상태가 없으면 null
+--     myr_payout_transfer_json(p)    { state, kind, tries } · 송금 중도 아니고 보이는 실패 종류도 없으면(이체 상태 없음 · 보류 중 실패) null
 --   크리에이터 정산 응답(myr_app_seller_settlements_of_user) 달마다 payout_label · pay_due_at · transfer
 --   테스트: supabase/tests/myr_payout_transfer.test.sql
 -- ============================================================
@@ -50,6 +52,7 @@ language sql
 immutable
 as $$
   select case when p.transfer_state is distinct from 'failed' then null
+              when p.status = 'held' then null
               when p.transfer_fail in ('ops', 'check') then 'ops'
               else p.transfer_fail end
 $$;
@@ -86,7 +89,7 @@ returns jsonb
 language sql
 immutable
 as $$
-  select case when p.transfer_state is null then null
+  select case when not public.myr_payout_sending(p) and public.myr_payout_fail_kind(p) is null then null
               else jsonb_build_object('state', p.transfer_state, 'kind', public.myr_payout_fail_kind(p), 'tries', p.transfer_tries) end
 $$;
 revoke all on function public.myr_payout_transfer_json(public.myr_payouts) from public, anon, authenticated;
