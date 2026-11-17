@@ -22,11 +22,14 @@ describe('parseSellerSales', () => {
 });
 
 describe('CS 비율 · 7일 막대', () => {
-	it('환불 주문 ÷ 주문 · 소수 첫째 자리 · 주문 없으면 —', () => {
-		expect(csRateText({ orders: 4, refundedOrders: 2 })).toBe('50%');
-		expect(csRateText({ orders: 3, refundedOrders: 1 })).toBe('33.3%');
-		expect(csRateText({ orders: 10, refundedOrders: 0 })).toBe('0%');
-		expect(csRateText({ orders: 0, refundedOrders: 0 })).toBe('—');
+	it('CS 비율은 서버 값(0116 myr_cs_rate) — 화면은 글자만 · 주문 없으면(null) —', () => {
+		expect(parseSellerSales({ ...raw, cs_rate: 33.3 }).csRate).toBe(33.3);
+		expect(parseSellerSales({ ...raw, cs_rate: null }).csRate).toBeNull();
+		expect(parseSellerSales(raw).csRate).toBeNull(); // 서버가 주지 않으면 짐작하지 않는다
+		expect(csRateText({ csRate: 50 })).toBe('50%');
+		expect(csRateText({ csRate: 33.3 })).toBe('33.3%');
+		expect(csRateText({ csRate: 0 })).toBe('0%');
+		expect(csRateText({ csRate: null })).toBe('—');
 	});
 	it('요일은 날짜로(시간대 무관)', () => {
 		expect(['2026-11-09', '2026-11-15'].map(weekdayOf)).toEqual(['월', '일']);
@@ -36,5 +39,11 @@ describe('CS 비율 · 7일 막대', () => {
 		const b = weekBars(parseSellerSales(raw).week);
 		expect(b.map((x) => [x.day, x.value, x.height, x.top])).toEqual([['월', 0, 0, false], ['화', 1, 33, false], ['일', 3, 100, true]]);
 		expect(weekBars([{ date: '2026-11-09', orders: 0 }]).every((x) => !x.top && x.height === 0)).toBe(true);
+	});
+	it('이번 주 월 ~ 일 · 주 합계는 서버 값(0117 week_orders) · 일곱 요일을 똑같이 그린다', () => {
+		const s = parseSellerSales({ ...raw, week: [{ date: '2026-11-16', orders: 2 }, { date: '2026-11-17', orders: 1 }, { date: '2026-11-18', orders: 0 }], week_orders: 3 });
+		expect(s.weekOrders).toBe(3);
+		expect(weekBars(s.week).map((x) => [x.day, x.value, x.top])).toEqual([['월', 2, true], ['화', 1, false], ['수', 0, false]]);
+		expect(parseSellerSales(raw).weekOrders).toBe(0); // 서버가 주지 않으면 더해서 짐작하지 않는다
 	});
 });

@@ -36,10 +36,13 @@ export type SettleRow = {
 	counted: boolean;
 	/** 보류 줄인데 다음 회차가 풀 줄(제조금액이 들어옴) — 서버 myr_settlement_row_releasable */
 	releasable: boolean;
+	/** 이 줄의 정산 비율(%) — 회차 때 남긴 값 · 다음 정산 예상은 지금 설정(서버 · 모르면 null) */
+	pct: number | null;
 };
 /** netSales = 판매 − 정산 뒤 환불(서버 myr_settlement_net_sales) · payout = 지급 건 금액(서버 myr_payout_amount · 다음 정산은 예상 합) */
 export type SettleTotal = { sales: number; refundAdj: number; netSales: number; settle: number; offset: number; depositRefund: number; payout: number; held: number };
-export type SettlePreview = { month: string; settleAt: string | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
+/** pct = 지금 정산 비율(서버 myr_settlement_pct · platform_settings myr_settlement — 0116) · 모르면 null */
+export type SettlePreview = { month: string; settleAt: string | null; pct: number | null; rows: SettleRow[]; total: SettleTotal; undelivered: { lines: number; amount: number } };
 /** 지급 보류 이유(서버 0102 · 0104 — code settle_info · tax_invoice · manual · label = myr_payout_hold_label) */
 export type SettleHold = { code: string; label: string };
 /** 자동 이체 상태(0111 myr_payout_transfer_json) — state sending(송금 중) · failed(실패) · kind 는 크리에이터에게 보이는 실패 종류
@@ -62,6 +65,8 @@ export type SettleMonth = {
 	payDueAt: string | null;
 	transfer: PayoutTransfer | null;
 	invoice: TaxInvoice | null;
+	/** 이 달 합계의 정산 비율(서버 myr_settlement_card_pct · 0116 — 비율이 다른 줄이 섞이면 null) */
+	pct: number | null;
 	rows: SettleRow[];
 	total: SettleTotal;
 };
@@ -131,7 +136,8 @@ function rowFrom(v: unknown): SettleRow | null {
 		releasedIn: typeof o.released_in === 'string' ? o.released_in : null,
 		nextPayout: o.next_payout === true,
 		counted: o.counted === true,
-		releasable: o.releasable === true
+		releasable: o.releasable === true,
+		pct: nn(o.pct)
 	};
 }
 function totalFrom(v: unknown): SettleTotal {
@@ -143,7 +149,7 @@ const rows = (v: unknown): SettleRow[] => arr(v).map(rowFrom).filter((r): r is S
 export function settlePreviewFromJson(v: unknown): SettlePreview {
 	const o = obj(v) ?? {};
 	const u = obj(o.undelivered) ?? {};
-	return { month: s(o.month), settleAt: typeof o.settle_at === 'string' ? o.settle_at : null, rows: rows(o.rows), total: totalFrom(o.total), undelivered: { lines: n(u.lines), amount: n(u.amount) } };
+	return { month: s(o.month), settleAt: typeof o.settle_at === 'string' ? o.settle_at : null, pct: nn(o.pct), rows: rows(o.rows), total: totalFrom(o.total), undelivered: { lines: n(u.lines), amount: n(u.amount) } };
 }
 
 function holdFrom(v: unknown): SettleHold | null {
@@ -203,6 +209,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 				payDueAt: typeof x.pay_due_at === 'string' ? x.pay_due_at : null,
 				transfer: transferFrom(x.transfer),
 				invoice: taxInvoiceFromJson(x.invoice),
+				pct: nn(x.pct),
 				rows: rows(x.rows),
 				total: totalFrom(x.total)
 			}))
@@ -233,6 +240,9 @@ export function settleItemsFromJson(v: unknown): SettleItem[] {
 export const emptySellerSettlements = (): SellerSettlements => sellerSettlementsFromJson(null);
 
 /* ---------------- 라벨 ---------------- */
+
+/** "정산금 (60%)" · 길게 "정산금 (판매의 60%)" — 비율은 서버 값(0116) · 모르거나 섞이면 "정산금"만 */
+export const settlePctLabel = (pct: number | null, long = false): string => (pct === null ? '정산금' : long ? `정산금 (판매의 ${pct}%)` : `정산금 (${pct}%)`);
 
 /** 상품 줄 요약 — '판매 ₩64,000 · 정산 뒤 환불 −₩32,000 · 정산금 ₩38,400 · 상계 −₩30,000 · 보증금 +₩7,500' (0 인 칸은 뺀다) */
 export function settleRowText(r: Pick<SettleRow, 'sales' | 'refundAdj' | 'carryIn' | 'settle' | 'offset' | 'depositRefund'>, won: (n: number) => string): string {

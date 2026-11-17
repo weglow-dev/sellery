@@ -1,10 +1,9 @@
 /**
  * 크리에이터 콘솔 "주문"(6번 · 0081 · 읽기 전용) — 순수 파서 · 판정. 서버는 `server/seller-orders`, 화면은 콘솔 `lib/orders.ts`.
  *   - 주문 1건 = 결제된 주문 중 **내 줄**만(다른 크리에이터 줄 · 금액 · 송장은 DB 가 싣지 않는다). 고객은 가린 이름만.
- *   - 상태 칩 판정: 내 줄에 진행 중인 교환·환불 요청 → 요청 상태(샵 주문 칩과 같은 CLAIM_LABELS) · 남은 줄이 없으면 환불 완료 ·
- *     그 밖엔 내 줄의 배송 상태(SHIP_LABELS) — 서버 값 그대로(0099 myr_order_ship_status(주문, 크리에이터) · 화면이 줄을 훑어 다시 정하지 않는다).
+ *   - 상태 칩 · 탭은 서버 값 그대로(0116 state · tab — myr_seller_order_state · myr_seller_order_tab · 요청 상태 myr_order_claim_status(주문, 크리에이터)).
+ *     우선순위 요청 → 환불(남은 줄 없음 환불 완료 · 있음 부분 환불) → 내 줄 배송 상태 — 화면이 줄을 훑어 다시 정하지 않는다. 여기서는 글자만 고른다.
  *   - 금액(결제 · 환불 · 남은 금액)도 서버 값 그대로(amounts · 0099).
- *   - 탭: 교환·환불(진행 중 요청) → 환불(부분 포함) → 배송 상태 — 한 주문은 한 탭에만(sellerOrderTab).
  */
 import { CLAIM_LABELS, isOpenClaimStatus, isShipStatus, SHIP_LABELS, type OpenClaimStatus, type ShipStatus, type StatusLabel } from './order-view';
 
@@ -35,6 +34,9 @@ export type SellerOrderLine = {
 	groupbuy: boolean;
 };
 export type SellerOrderAmounts = { paid: number; refunded: number; net: number };
+/** 주문 상태(칩) — 서버 값(0116 myr_seller_order_state) */
+export type SellerOrderState = 'claim_pending' | 'claim_progress' | 'refunded' | 'partial_refunded' | ShipStatus;
+const ORDER_STATES: readonly string[] = ['claim_pending', 'claim_progress', 'refunded', 'partial_refunded', 'PAID', 'PREPARING', 'SHIPPING', 'DELIVERED'];
 export type SellerOrder = {
 	id: string;
 	code: string;
@@ -45,6 +47,10 @@ export type SellerOrder = {
 	shipStatus: ShipStatus | null;
 	/** 내 줄 금액 — 결제 · 환불 · 남은 금액(0099 서버 값 · net = myr_line_net 합) */
 	amounts: SellerOrderAmounts;
+	/** 내 줄의 열린 요청 상태(처리 대기 > 진행 중 · 없으면 null) · 주문 상태(칩) · 탭 — 서버 값(0116) */
+	claimStatus: OpenClaimStatus | null;
+	state: SellerOrderState;
+	tab: Exclude<SellerOrderTab, 'all'>;
 	items: SellerOrderLine[];
 };
 
@@ -96,6 +102,9 @@ export function sellerOrderFromJson(v: unknown): SellerOrder | null {
 		buyer: s(o.buyer, '고객'),
 		shipStatus: isShipStatus(o.ship_status) ? o.ship_status : null,
 		amounts: { paid: n(a?.paid), refunded: n(a?.refunded), net: n(a?.net) },
+		claimStatus: isOpenClaimStatus(o.claim_status) ? o.claim_status : null,
+		state: ORDER_STATES.includes(o.state as string) ? (o.state as SellerOrderState) : 'PAID',
+		tab: ORDER_TABS.includes(o.tab as string) ? (o.tab as Exclude<SellerOrderTab, 'all'>) : 'prep',
 		items
 	};
 }
@@ -103,24 +112,28 @@ export const sellerOrdersFromJson = (v: unknown): SellerOrder[] => (Array.isArra
 
 /** 남은 줄 — 서버가 정한 살아 있는 줄(0098 myr_line_live · 발송 · 정산과 같은 함수) */
 export const liveLines = (o: Pick<SellerOrder, 'items'>): SellerOrderLine[] => o.items.filter((i) => i.live);
-/** 진행 중인 요청 상태 — 처리 대기가 하나라도 있으면 pending */
-export function sellerClaimStatus(o: Pick<SellerOrder, 'items'>): OpenClaimStatus | null {
-	const st = o.items.map((i) => i.claim?.status).filter(Boolean);
-	return st.includes('pending') ? 'pending' : st.includes('progress') ? 'progress' : null;
-}
+/** 진행 중인 요청 상태 — 서버 값(0116 myr_order_claim_status(주문, 크리에이터) · 처리 대기 > 진행 중) */
+export const sellerClaimStatus = (o: Pick<SellerOrder, 'claimStatus'>): OpenClaimStatus | null => o.claimStatus;
 /** 이 줄에 환불이 있었나 — 서버 값 그대로(0100 myr_line_has_refund). 주문 탭 · 상태 칩 · 카드 줄 상태가 이 함수로 읽는다(화면이 수량으로 다시 판정하지 않는다) */
 export const lineHasRefund = (i: Pick<SellerOrderLine, 'hasRefund'>): boolean => i.hasRefund;
 /** 환불이 하나라도 있었나 — 내 줄 중 lineHasRefund 인 줄이 있으면 */
 export const hasSellerRefund = (o: Pick<SellerOrder, 'items'>): boolean => o.items.some(lineHasRefund);
 
-/** 상태 칩 — 탭과 같은 우선순위: 요청 → 환불(남은 줄이 없으면 환불 완료 · 있으면 부분 환불) → 배송 상태.
+/** 상태 칩 글자 — 서버 상태(0116 state · 탭과 같은 우선순위) 그대로 고른다.
  *  "환불 완료" 탭의 주문이 배송 상태 칩(배송 완료 등)으로 보이지 않게 — 남은 줄의 배송은 카드 아래 배송 줄이 보여 준다 */
-export function sellerOrderLabel(o: Pick<SellerOrder, 'items' | 'shipStatus'>): StatusLabel {
-	const claim = sellerClaimStatus(o);
-	if (claim) return CLAIM_LABELS[claim];
-	if (!o.shipStatus) return { text: '환불 완료', tone: 'muted' };
-	if (hasSellerRefund(o)) return { text: '부분 환불', tone: 'muted' };
-	return SHIP_LABELS[o.shipStatus];
+export function sellerOrderLabel(o: Pick<SellerOrder, 'state'>): StatusLabel {
+	switch (o.state) {
+		case 'claim_pending':
+			return CLAIM_LABELS.pending;
+		case 'claim_progress':
+			return CLAIM_LABELS.progress;
+		case 'refunded':
+			return { text: '환불 완료', tone: 'muted' };
+		case 'partial_refunded':
+			return { text: '부분 환불', tone: 'muted' };
+		default:
+			return SHIP_LABELS[o.state];
+	}
 }
 
 /** 목록 탭 — 한 주문은 한 탭에만(2026-11-09 대표 결정). 우선순위 교환·환불(진행 중 요청) → 환불 완료(부분 포함 · 2026-11-12 이름 "환불" → "환불 완료") → 배송 상태.
@@ -134,14 +147,11 @@ export const SELLER_ORDER_TABS: { id: SellerOrderTab; name: string }[] = [
 	{ id: 'claim', name: '교환·환불' },
 	{ id: 'refunded', name: '환불 완료' }
 ];
-export function sellerOrderTab(o: Pick<SellerOrder, 'items' | 'shipStatus'>): Exclude<SellerOrderTab, 'all'> {
-	if (sellerClaimStatus(o)) return 'claim';
-	if (hasSellerRefund(o)) return 'refunded';
-	if (!o.shipStatus) return 'refunded';
-	return o.shipStatus === 'SHIPPING' ? 'shipping' : o.shipStatus === 'DELIVERED' ? 'delivered' : 'prep';
-}
-export const filterSellerOrders = <T extends Pick<SellerOrder, 'items' | 'shipStatus'>>(list: T[], tab: SellerOrderTab): T[] => (tab === 'all' ? list : list.filter((o) => sellerOrderTab(o) === tab));
-export const sellerOrderTabCounts = (list: Pick<SellerOrder, 'items' | 'shipStatus'>[]) => SELLER_ORDER_TABS.map((t) => ({ ...t, count: filterSellerOrders(list, t.id).length }));
+const ORDER_TABS: readonly string[] = ['prep', 'shipping', 'delivered', 'claim', 'refunded'];
+/** 탭 — 서버 값(0116 myr_seller_order_tab) */
+export const sellerOrderTab = (o: Pick<SellerOrder, 'tab'>): Exclude<SellerOrderTab, 'all'> => o.tab;
+export const filterSellerOrders = <T extends Pick<SellerOrder, 'tab'>>(list: T[], tab: SellerOrderTab): T[] => (tab === 'all' ? list : list.filter((o) => o.tab === tab));
+export const sellerOrderTabCounts = (list: Pick<SellerOrder, 'tab'>[]) => SELLER_ORDER_TABS.map((t) => ({ ...t, count: filterSellerOrders(list, t.id).length }));
 
 /** 내 줄의 송장(박스) — 같은 택배사 + 송장이면 한 박스 */
 export function sellerOrderBoxes(o: Pick<SellerOrder, 'items'>): { courier: string | null; trackingNo: string }[] {

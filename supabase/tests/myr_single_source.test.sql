@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(203);
+select plan(210);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -274,7 +274,7 @@ insert into _rules (label, pat, allowed) values
   ('품절(남은 재고 0)',                       $p$myr_product_left\(\w+\)\s*(<=|>|<|=)$p$,                        '{myr_product_sold_out}'),
   ('판매 중 상태',                            $p$status\s*(=|<>)\s*'listed'|'listed'\s*,\s*'paused'$p$,          '{myr_product_listed,myr_product_status_approved}'),
   ('직접 수정 상태 묶음',                     $p$'draft'\s*,\s*'rejected'$p$,                                    '{myr_product_status_editable}'),
-  ('열린 수정본 상태 묶음',                   $p$'pending'\s*,\s*'rejected'$p$,                                  '{myr_revision_status_open}'),
+  ('열린 수정본 상태 묶음 — 콘솔 상품 탭의 심사 중(상품 상태 심사 · 반려)은 다른 묶음', $p$'pending'\s*,\s*'rejected'$p$, '{myr_revision_status_open,myr_seller_product_console}'),
   ('주문 상태 묶음',                          $p$'PAID'\s*,\s*'PARTIAL_REFUNDED'$p$,                             '{myr_order_status_paid,myr_order_status_alive}'),
   ('출고 전 상태 묶음',                       $p$'PAID'\s*,\s*'PREPARING'$p$,                                    '{myr_ship_status_unshipped}'),
   ('지급 건에 담을 줄',                        $p$payout_id\s+is\s+null$p$,                                         '{myr_settlement_row_payable}'),
@@ -287,7 +287,7 @@ insert into _rules (label, pat, allowed) values
   ('크리에이터 쪽 보류 이유',                  $p$then\s+'settle_info'$p$,                                        '{myr_seller_hold_reason}'),
   ('지급 가능(자동 상태가 지급 대기)',         $p$myr_payout_auto_state\([^)]*\)\s*a\)\s*=\s*'pending'$p$,         '{myr_payout_payable}'),
   ('정산월 → 회차 찾기',                       $p$month\s*=\s*(date_trunc\('month',\s*p_month\)|v_month)$p$,       '{myr_settlement_run_of}'),
-  ('제조금액 갚은 비율',                       $p$\*\s*100(\.0)?\s*/$p$,                                           '{myr_mfg_repaid_pct}'),
+  ('비율 %(제조금액 갚은 비율 · CS 비율)',     $p$\*\s*100(\.0)?\s*/$p$,                                           '{myr_mfg_repaid_pct,myr_cs_rate}'),
   ('한국 날짜',                                $p$\(\s*[\w.]+\s+at\s+time\s+zone\s+'Asia/Seoul'\)::date$p$,          '{myr_kst_date}'),
   ('계좌번호 가리기',                          $p$'\*\*\*\*'\s*\|\|$p$,                                            '{myr_mask_account}'),
   ('정산월 · 핸들로 지급 건 찾기',             $p$\.handle\s*=\s*p_handle$p$,                                      '{myr_payout_find}'),
@@ -370,7 +370,15 @@ insert into _rules (label, pat, allowed) values
   ('결제 금액(상품 합계 + 배송비) — 결제 · 주문 표 amount 생성 칸과 같은 식', $p$items_amount\s*\+\s*[\w.]*shipping_fee|v_items\w*\s*\+\s*v_fee$p$, '{myr_pay_amount}'),
   ('재고가 모자란지(남은 수량 < 필요 수량)',   $p$\w*left\s*<\s*\w*(need|tot)\M$p$,                               '{myr_stock_short}'),
   ('한 번에 결제할 수 있는 줄 수',              $p$c_max_lines|>\s*public\.myr_checkout_lines_max$p$,                  '{myr_checkout_lines_over}'),
-  ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee}');
+  -- 0116 크리에이터 콘솔 화면 값
+  ('크리에이터 답변을 기다리는 요청(처리 대기)', $p$\mr\.status\s*(=|<>)\s*'pending'$p$,                    '{myr_claim_waiting}'),
+  ('답변을 기다리는 문의(답변 대기)',          $p$\mstatus\s*(=|<>)\s*'OPEN'$p$,                              '{myr_cs_waiting}'),
+  ('답변 기한(접수 + 설정 일수)',               $p$make_interval\(days\s*=>\s*public\.myr_claim_answer_days$p$, '{myr_claim_due_json}'),
+  ('콘솔 주문 상태 · 탭(요청 → 환불 → 배송)',   $p$'claim_'\s*\|\||'partial_refunded'$p$,                     '{myr_seller_order_state,myr_seller_order_tab}'),
+  ('콘솔 상품 탭 · 홈 개수 · 메뉴 · 수정 화면',  $p$'home_pending'|'opens_review'$p$,                            '{myr_seller_product_console}'),
+  ('다음 정산 보류 이유 { code, label }',        $p$myr_payout_hold_label\(public\.myr_seller_hold_reason$p$,      '{myr_seller_next_hold_json}'),
+  ('이번 주(월요일 · KST) — 콘솔 홈 이번 주 판매',  $p$date_trunc\('week'|interval\s*'6 days'$p$,                  '{myr_kst_week,myr_app_seller_sales}'),
+  ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days}');
 
 -- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)
 select is((select count(*)::int from _fn f, regexp_matches(f.src, 'not\s+p_past_run', 'g') where f.proname = 'myr_payout_collect'), 1, '지급 건 만들기 — 담을 줄 조건은 한 번만');

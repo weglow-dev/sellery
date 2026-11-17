@@ -19,12 +19,16 @@ export const load: PageServerLoad = async (event) => {
 	const found = /^[0-9a-f-]{36}$/.test(id) ? await getSellerProduct(seller.id, id) : null;
 	if (!found) redirect(303, '/products');
 	const { product, revision } = found;
-	if (product.status === 'draft') return { product, revision: null, mode: 'new' as const, fixKind: null, step: null };
-	if (product.status === 'rejected') return { product, revision: null, mode: 'fix' as const, fixKind: 'new' as const, step };
-	// 수정 심사로 고치는 상품(판매 중 · 일시중지) — 서버 값 approved(0099 · 수정본 접수 myr_app_seller_submit_revision 와 같은 판정)
-	if (product.approved) {
-		if (revision?.status === 'rejected') return { product, revision, mode: 'fix' as const, fixKind: 'rev' as const, step };
-		if (!revision) return { product, revision: null, mode: 'edit' as const, fixKind: null, step };
+	// 어떤 화면으로 열지는 서버 값(0116 myr_seller_product_console edit_mode · 목록 메뉴와 같은 함수) — 상태로 다시 판정하지 않는다
+	switch (found.console.editMode) {
+		case 'new':
+			return { product, revision: null, mode: 'new' as const, fixKind: null, step: null };
+		case 'fix_new':
+			return { product, revision: null, mode: 'fix' as const, fixKind: 'new' as const, step };
+		case 'fix_rev':
+			return { product, revision, mode: 'fix' as const, fixKind: 'rev' as const, step };
+		case 'edit':
+			return { product, revision: null, mode: 'edit' as const, fixKind: null, step };
 	}
 	redirect(303, '/products');
 };

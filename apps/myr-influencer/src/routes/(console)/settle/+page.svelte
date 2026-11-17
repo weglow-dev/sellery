@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, settlePctLabel, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import Icon from '$lib/components/Icon.svelte';
@@ -30,6 +30,7 @@
 		held: pv.total.held,
 		sales: pv.total.netSales,
 		settle: pv.total.settle,
+		settleLabel: settlePctLabel(pv.pct),
 		offset: pv.total.offset,
 		refund: pv.total.depositRefund,
 		net: pv.total.payout
@@ -107,7 +108,7 @@
 					</span>
 				</span>
 				<span class="relative mt-4 flex gap-[22px] lg:mt-0 lg:flex-1 lg:gap-9 lg:border-l lg:border-white/8 lg:pl-10">
-					{#each [{ k: '판매 금액', v: won(next.sales), c: '', pc: false }, { k: '정산금 (60%)', v: won(next.settle), c: '', pc: false }, { k: '제조금액 상계', v: won(next.offset), c: 'text-accent', pc: false }, { k: '보증금 환급', v: won(next.refund), c: '', pc: true }] as x (x.k)}
+					{#each [{ k: '판매 금액', v: won(next.sales), c: '', pc: false }, { k: next.settleLabel, v: won(next.settle), c: '', pc: false }, { k: '제조금액 상계', v: won(next.offset), c: 'text-accent', pc: false }, { k: '보증금 환급', v: won(next.refund), c: '', pc: true }] as x (x.k)}
 						<span class={x.pc ? 'hidden lg:block' : ''}>
 							<span class="block text-[11px] text-white/50 lg:text-[12px]">{x.k}</span>
 							<span class="mt-0.5 block text-[15px] font-bold tabular-nums lg:mt-[3px] lg:text-[17px] {x.c}">{x.v}</span>
@@ -146,7 +147,7 @@
 		{:else}
 			<!-- 제조금액 · 보증금 -->
 			<div class="flex flex-col gap-[5px] rounded-2xl border border-accent/20 bg-accent/7 px-4 py-3.5 text-[12px] lg:text-[13px] leading-[1.5] text-white/80 lg:mt-5 lg:gap-[7px] lg:rounded-[20px] lg:px-5 lg:py-[18px] lg:text-[14px]">
-				{#each ['MYR이 먼저 낸 제조금액은 매달 정산금에서 나눠 상환해요', '제조금액이 모두 상계되면 보증금을 돌려드려요, 그 뒤 판매분부터는 정산금(판매의 60%)을 전액 지급해요'] as t (t)}
+				{#each ['MYR이 먼저 낸 제조금액은 매달 정산금에서 나눠 상환해요', `제조금액이 모두 상계되면 보증금을 돌려드려요, 그 뒤 판매분부터는 ${pv.pct === null ? '정산금' : `정산금(판매의 ${pv.pct}%)`}을 전액 지급해요`] as t (t)}
 					<span class="flex items-start gap-2 lg:gap-2.5"><span class="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent lg:mt-2"></span><span>{t}</span></span>
 				{/each}
 			</div>

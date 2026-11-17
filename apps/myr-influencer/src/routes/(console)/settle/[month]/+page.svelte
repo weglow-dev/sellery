@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { itemsByProduct, monthShort, monthStatus, rowKey, settleAtLabel, settlePctLabel, shortDate, type SettleRow, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { won } from '$lib/rules';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import PayoutNotice from '$lib/components/PayoutNotice.svelte';
@@ -53,7 +53,7 @@
 	};
 	const stat = (r: SettleRow) => [
 		{ k: '판매 금액', v: won(r.sales), c: '' },
-		{ k: '정산금 (60%)', v: won(r.settle), c: '' },
+		{ k: settlePctLabel(r.pct), v: won(r.settle), c: '' },
 		{ k: '제조금액 상계', v: r.offset ? `−${won(r.offset)}` : '—', c: r.offset ? 'text-accent' : 'text-white/35' },
 		{ k: '보증금 환급', v: r.depositRefund ? `+${won(r.depositRefund)}` : '—', c: r.depositRefund ? 'text-[#a8dcc8]' : 'text-white/35' }
 	];
@@ -61,7 +61,7 @@
 		[
 			{ k: '판매 금액', v: won(src.total.sales), c: 'text-fg', show: true },
 			{ k: '정산 뒤 환불', v: `−${won(src.total.refundAdj)}`, c: 'text-[#ff8a8a]', show: src.total.refundAdj > 0 },
-			{ k: '정산금 (판매의 60%)', v: won(src.total.settle), c: 'text-fg', show: true },
+			{ k: settlePctLabel(src.pct, true), v: won(src.total.settle), c: 'text-fg', show: true },
 			{ k: '제조금액 상계', v: `−${won(src.total.offset)}`, c: 'text-accent', show: true },
 			{ k: '보증금 환급', v: `+${won(src.total.depositRefund)}`, c: 'text-[#a8dcc8]', show: true }
 		].filter((x) => x.show)

@@ -14,14 +14,18 @@ export type SellerSales = {
 	orders: number;
 	units: number;
 	refundedOrders: number;
-	/** 오늘 포함 최근 7일(KST) · 오래된 날부터 */
+	/** CS 비율(%) = 환불이 생긴 주문 ÷ 주문 · 소수 첫째 자리 · 주문이 없으면 null — 서버 값(0116 myr_cs_rate) */
+	csRate: number | null;
+	/** 이번 주 월 ~ 일(KST · 서버 0117 myr_kst_week) — 요일 순서가 늘 같다 */
 	week: SellerSalesDay[];
+	/** 이번 주 주문 수(서로 다른 주문 · 서버 week_orders) — 화면이 날짜별 값을 더하지 않는다 */
+	weekOrders: number;
 };
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
 
 export function emptySellerSales(): SellerSales {
-	return { month: '', gross: 0, refunds: 0, net: 0, orders: 0, units: 0, refundedOrders: 0, week: [] };
+	return { month: '', gross: 0, refunds: 0, net: 0, orders: 0, units: 0, refundedOrders: 0, csRate: null, week: [], weekOrders: 0 };
 }
 
 /** RPC 응답 → 실적. 모양이 어긋나면 0 으로(홈이 깨지지 않게) */
@@ -39,16 +43,14 @@ export function parseSellerSales(v: unknown): SellerSales {
 		orders: num(r.orders),
 		units: num(r.units),
 		refundedOrders: num(r.refunded_orders),
-		week
+		csRate: typeof r.cs_rate === 'number' && Number.isFinite(r.cs_rate) ? r.cs_rate : null,
+		week,
+		weekOrders: num(r.week_orders)
 	};
 }
 
-/** CS 비율 = 환불이 생긴 주문 ÷ 주문(이번 달) — 주문이 없으면 "—" · 소수 첫째 자리 (2026-11-06 대표 결정: 교환·환불 요청(7번) 전까지 환불 기준) */
-export function csRateText(s: Pick<SellerSales, 'orders' | 'refundedOrders'>): string {
-	if (!s.orders) return '—';
-	const pct = Math.round((s.refundedOrders / s.orders) * 1000) / 10;
-	return `${pct}%`;
-}
+/** CS 비율 글자 — 비율은 서버 값(0116 myr_cs_rate · 환불이 생긴 주문 ÷ 주문 · 2026-11-06 대표 결정 환불 기준) · 주문이 없으면(null) "—" */
+export const csRateText = (s: Pick<SellerSales, 'csRate'>): string => (s.csRate === null ? '—' : `${s.csRate}%`);
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 /** 'YYYY-MM-DD' → 요일(날짜 자체로 계산 · 시간대 무관) */
@@ -58,7 +60,7 @@ export function weekdayOf(date: string): string {
 	return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
-/** 7일 막대 — 요일 · 값 · 높이(%) · 가장 많은 날 강조. 전부 0 이면 높이 0 */
+/** 이번 주 막대 — 요일 · 값 · 높이(%) · 가장 많은 날 강조. 일곱 요일을 똑같이 그린다(아직 오지 않은 날은 서버가 0 을 준다) · 전부 0 이면 높이 0 */
 export function weekBars(week: SellerSalesDay[]): { day: string; date: string; value: number; height: number; top: boolean }[] {
 	const max = Math.max(0, ...week.map((d) => d.orders));
 	return week.map((d) => ({ day: weekdayOf(d.date), date: d.date, value: d.orders, height: max ? Math.round((d.orders / max) * 100) : 0, top: max > 0 && d.orders === max }));

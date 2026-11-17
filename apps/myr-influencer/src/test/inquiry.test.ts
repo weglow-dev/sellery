@@ -3,13 +3,19 @@ import { describe, expect, it } from 'vitest';
 import type { CsThread } from '@sellery/myr-core/cs-rules';
 import { answerOf, canAnswer, filterInquiries, ieyo, inqOrderText, inqShipping, inqStatus, inqTabCounts, inquiryGuide, inquiryTemplates, questionOf } from '../lib/inquiry';
 
-const L = [{ status: 'OPEN' as const }, { status: 'ANSWERED' as const }, { status: 'CLOSED' as const }, { status: 'OPEN' as const }];
+// waiting = 서버 값(0116 myr_cs_waiting) — 서버가 OPEN 에 true 를 준다
+const L = [
+	{ status: 'OPEN' as const, waiting: true },
+	{ status: 'ANSWERED' as const, waiting: false },
+	{ status: 'CLOSED' as const, waiting: false },
+	{ status: 'OPEN' as const, waiting: true }
+];
 
 describe('탭 · 상태', () => {
-	it('답변 대기 = OPEN · 답변 완료 = ANSWERED + CLOSED(운영 종료) · 전체', () => {
+	it('답변 대기 = 서버 waiting · 답변 완료 = 나머지(ANSWERED · 운영 종료 CLOSED) · 전체', () => {
 		expect(inqTabCounts(L).map((t) => [t.id, t.count])).toEqual([['waiting', 2], ['answered', 2], ['all', 4]]);
 		expect(filterInquiries(L, 'answered').map((x) => x.status)).toEqual(['ANSWERED', 'CLOSED']);
-		expect([inqStatus({ status: 'OPEN' }).label, inqStatus({ status: 'CLOSED' }).label]).toEqual(['답변 대기', '답변 완료']);
+		expect([inqStatus({ waiting: true }).label, inqStatus({ waiting: false }).label]).toEqual(['답변 대기', '답변 완료']);
 	});
 	it('주문 줄 — 소유 확인된 주문만 번호 · 아니면 "주문 전 문의"', () => {
 		expect(inqOrderText({ order: { code: 'MYR-884102' } as never })).toBe('주문 MYR-884102');

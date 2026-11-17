@@ -151,7 +151,7 @@
 {#key c.id}
 	{@const tm = CS_TYPE_META[c.kind]}
 	{@const sm = CS_STATUS_META[c.status]}
-	{@const pendingNow = c.status === 'pending'}
+	{@const pendingNow = c.waiting}
 	{@const received = c.order.item.deliveredAt ? `수령 ${relativeTime(c.order.item.deliveredAt)}` : c.order.item.shippedAt ? `발송 ${relativeTime(c.order.item.shippedAt)}` : '출고 준비 중'}
 	<div class="flex min-h-0 flex-1 animate-slide-in flex-col lg:mx-auto lg:block lg:max-w-[1240px] lg:animate-fade-in lg:px-10 lg:pt-7 lg:pb-10">
 		<BackHeader title="{tm.label} 요청" fallback="/cs">

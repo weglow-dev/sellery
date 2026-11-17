@@ -121,7 +121,7 @@ export async function claimQuote(c: Pick<Claim, 'qty' | 'order'>, deduction: num
  *  환불 전 진행 중이면 승인된 처리(current · 저장된 deduction) */
 export async function claimQuotes(c: Claim): Promise<ClaimQuotes> {
 	const out: ClaimQuotes = {};
-	if (c.status === 'pending') {
+	if (c.waiting) {
 		const options: NonNullable<ClaimQuotes['options']> = {};
 		for (const r of c.options) {
 			if (!(r in c.optionDeductions)) continue;

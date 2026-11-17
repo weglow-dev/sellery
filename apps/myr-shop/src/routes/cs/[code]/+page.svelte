@@ -59,7 +59,7 @@
 				{:else}
 					<p class="text-center text-[13px] text-fg-faint">메시지가 없습니다</p>
 				{/each}
-				{#if c.status === 'OPEN'}<p class="text-center text-[12px] text-fg-faint">크리에이터가 답변하면 여기서 확인할 수 있어요</p>{/if}
+				{#if c.waiting}<p class="text-center text-[12px] text-fg-faint">크리에이터가 답변하면 여기서 확인할 수 있어요</p>{/if}
 				{#if closed}<p class="text-center text-[12px] text-fg-faint">처리 종료{c.closedAt ? ` · ${fmtTime(c.closedAt)}` : ''}</p>{/if}
 			</div>
 			{#if c.status !== 'OPEN'}

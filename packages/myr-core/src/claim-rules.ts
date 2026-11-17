@@ -209,6 +209,10 @@ export type Claim = {
 	createdAt: string;
 	/** 열린 요청인가(처리 대기 · 진행 중) — 서버 값(0099 myr_claim_status_open) */
 	open: boolean;
+	/** 크리에이터 답변을 기다리나(처리 대기) — 서버 값(0116 myr_claim_waiting · 대기 수 · 결정 가능과 같은 함수) */
+	waiting: boolean;
+	/** 답변 기한(기다리는 요청만 · 아니면 null) — 서버 값(0116 myr_claim_due_json · 설정 myr_claim_answer): at 기한 · days 남은 날(오늘 안 1 · 지나면 0) · overdue · urgent(하루 이하) */
+	due: { at: string; days: number; overdue: boolean; urgent: boolean } | null;
 	/** 단가 × 요청 수량(서버 값) */
 	amount: number;
 	buyerName: string;
@@ -254,6 +258,11 @@ const n = (v: unknown, d = 0): number => (typeof v === 'number' && Number.isFini
 const STEPS: readonly ClaimStep[] = ['decide', 'collect', 'refund', 'reship'];
 const STATUSES: readonly ClaimStatus[] = ['pending', 'progress', 'done', 'rejected'];
 
+function dueFrom(v: unknown): Claim['due'] {
+	const d = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+	if (!d || typeof d.at !== 'string' || typeof d.days !== 'number') return null;
+	return { at: d.at, days: d.days, overdue: d.overdue === true, urgent: d.urgent === true };
+}
 export function claimFromJson(v: unknown): Claim | null {
 	const o = obj(v);
 	if (!o || !sn(o.id) || !sn(o.code) || !STATUSES.includes(o.status as ClaimStatus) || !isClaimKind(o.kind) || !isClaimReason(o.reason)) return null;
@@ -292,6 +301,8 @@ export function claimFromJson(v: unknown): Claim | null {
 		refundPaid: typeof o.refund_paid === 'number' ? o.refund_paid : null,
 		shippingBack: n(o.shipping_back),
 		open: o.open === true,
+		waiting: o.waiting === true,
+		due: dueFrom(o.due),
 		refundedAt: sn(o.refunded_at),
 		doneAt: sn(o.done_at),
 		createdAt: s(o.created_at),
@@ -403,7 +414,7 @@ export type ClaimTimelineRow = { title: string; at: string | null; detail: strin
 /** 처리 내역 — 실제 기록(접수 · 승인/반려 · 회수 · 환불 · 재발송) + 아직 남은 일(빈 점) */
 export function claimTimeline(c: Claim): ClaimTimelineRow[] {
 	const rows: ClaimTimelineRow[] = [{ title: '요청 접수', at: c.createdAt, detail: null, done: true }];
-	if (c.status === 'pending') return [...rows, { title: '크리에이터 확인', at: null, detail: null, done: false }];
+	if (c.waiting) return [...rows, { title: '크리에이터 확인', at: null, detail: null, done: false }];
 	if (c.status === 'rejected') return [...rows, { title: '반려', at: c.decidedAt, detail: c.message, done: true }];
 	rows.push({ title: `${c.resolution ? RESOLUTION_NAMES[c.resolution] : '처리'} 승인`, at: c.decidedAt, detail: c.message, done: true });
 	if (c.needsCollect) rows.push({ title: '회수 완료', at: c.collectedAt, detail: null, done: !!c.collectedAt });

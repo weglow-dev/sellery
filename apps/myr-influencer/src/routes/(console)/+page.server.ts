@@ -6,14 +6,14 @@ import { settlePreviewFromJson, type SettlePreview } from '@sellery/myr-core/sel
 import { isWaiting } from '$lib/inquiry';
 import { productFromRow } from '$lib/product-row';
 import { homeProductCounts } from '$lib/rules';
-import { listSellerClaimsOfUser } from '$lib/server/claims';
-import { listSellerCsOfUser } from '$lib/server/cs';
+import { listSellerClaimsOfUser, myClaimWaiting } from '$lib/server/claims';
+import { listSellerCsOfUser, myInquiryWaiting } from '$lib/server/cs';
 import { getSellerSalesOfUser } from '$lib/server/sales';
 import { getSettleInfoOfUser } from '$lib/server/settle-info';
 import { getSellerSettlePreviewOfUser } from '$lib/server/settlement';
 import { myProducts } from '$lib/server/seller-products';
 
-/** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 최근 7일(0076) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
+/** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 이번 주 월 ~ 일(0117) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
  *  큰 숫자는 다음 정산 예정(0089 · 정산 탭과 같은 예상) · 그 아래 이번 달 순매출 · 주문 · 판매 수량 · CS 비율.
  *  크리에이터 게이트 · 상품 · 실적 · 문의 · 요청을 **동시에** 보낸다(게이트가 통과해야 쓴다 — myProducts 가 redirect 를 먼저 던진다). */
 export const load: PageServerLoad = async (event) => {
@@ -45,18 +45,22 @@ export const load: PageServerLoad = async (event) => {
 				return settlePreviewFromJson(null);
 			})
 		: Promise.resolve(settlePreviewFromJson(null));
+	// 처리 대기 수 — 서버 함수(0116 myr_claim_waiting · myr_cs_waiting · 레이아웃 뱃지와 같은 값) · 목록을 다시 세지 않는다
+	const claimWaitingP = myClaimWaiting(event);
+	const inqWaitingP = myInquiryWaiting(event);
 	const { rows } = await myProducts(event);
-	const [sales, inquiries, claims, settle, preview] = await Promise.all([salesP, inqP, claimP, settleP, previewP]);
-	const pendingClaims = claims.filter((c) => c.status === 'pending');
+	const [sales, inquiries, claims, settle, preview, claimWaiting, inqWaiting] = await Promise.all([salesP, inqP, claimP, settleP, previewP, claimWaitingP, inqWaitingP]);
+	// 오늘 처리할 일 후보 — 서버 값 waiting(처리 대기 요청 · 답변 대기 문의)
+	const pendingClaims = claims.filter((c) => c.waiting);
 	const waiting = inquiries.filter(isWaiting);
 	// 오늘 처리할 일 — 처리 대기 교환 · 환불(오래된 순) 먼저, 남는 자리에 답변 대기 문의(오래된 순) — 합쳐 3건
 	const todayClaims = [...pendingClaims]
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, 3)
-		.map((c) => ({ code: c.code, kind: c.kind, reason: c.reason, qty: c.qty, name: c.order.item.name, buyerName: c.buyerName, createdAt: c.createdAt, product: c.product }));
+		.map((c) => ({ code: c.code, kind: c.kind, reason: c.reason, qty: c.qty, name: c.order.item.name, buyerName: c.buyerName, createdAt: c.createdAt, due: c.due, product: c.product }));
 	const todayInquiries = [...waiting]
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, Math.max(0, 3 - todayClaims.length))
 		.map((c) => ({ code: c.code, type: c.type, buyerName: c.buyerName, question: c.firstBody ?? '', createdAt: c.createdAt, product: c.product }));
-	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting: waiting.length, claimWaiting: pendingClaims.length, sales, preview, todayInquiries, todayClaims, settleStatus: settle?.status ?? null };
+	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting, claimWaiting, sales, preview, todayInquiries, todayClaims, settleInfo: settle };
 };

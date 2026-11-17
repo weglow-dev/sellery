@@ -31,20 +31,14 @@ export const PRODUCT_TABS: { id: ProductTab; name: string }[] = [
 	{ id: 'draft', name: '임시저장' },
 	{ id: 'ended', name: '종료' }
 ];
-const PRODUCT_TAB_STATUSES: Record<Exclude<ProductTab, 'all'>, ProductStatus[]> = {
-	live: ['live', 'paused'],
-	review: ['review', 'rejected'],
-	draft: ['draft'],
-	ended: ['ended']
-};
-/** 수정 심사 중인 판매 중 상품은 "판매 중" 과 "심사 중" 탭에 함께(시안) */
-export const filterProducts = (list: Product[], tab: ProductTab) =>
-	tab === 'all' ? list : list.filter((p) => PRODUCT_TAB_STATUSES[tab].includes(p.status) || (tab === 'review' && !!p.revision));
+/** 탭 — 어느 탭에 들어가는지는 서버 값(0116 myr_seller_product_console tabs · 판매 중 = 판매 중 · 일시중지 · 심사 중 = 심사 · 반려 · 수정 심사 —
+ *  수정 심사 중인 판매 중 상품은 "판매 중" 과 "심사 중" 탭에 함께 · 시안) */
+export const filterProducts = <T extends Pick<Product, 'console'>>(list: T[], tab: ProductTab): T[] => (tab === 'all' ? list : list.filter((p) => p.console.tabs.includes(tab)));
 /** 재고를 보여줄 상품 — 심사를 통과한 것(판매 중 · 일시중지)만(나머지는 "—") · 서버 값 approved 그대로(0099 myr_product_status_approved) */
 export const showsStock = (p: Pick<Product, 'approved'>) => p.approved;
 /** 품절 칩 — 판매 중인 상품이 품절일 때(샵이 품절로 보여 준다 · 판매 상태는 그대로 · 재고가 들어오면 다시 팔린다 · §9-6). 품절 판정은 서버 값 soldOut(0099 myr_product_sold_out) */
 export const isSoldOut = (p: Pick<Product, 'status' | 'soldOut'>) => p.status === 'live' && p.soldOut;
-export const productTabCounts = (list: Product[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
+export const productTabCounts = (list: Pick<Product, 'console'>[]) => PRODUCT_TABS.map((t) => ({ ...t, count: filterProducts(list, t.id).length }));
 
 /* ---------- 상품 등록 에디터 ---------- */
 
@@ -151,10 +145,7 @@ export function imageHelp(count: number): string {
 	return '정사각형 또는 16:10 이미지를 권장해요. 여러 장 올릴 수 있고, 첫 번째가 대표 이미지예요.';
 }
 
-/** 홈 "판매 중 제품" 카드 — 판매 중 수 · 심사 중(반려 · 수정 심사 포함) + 임시저장 수 */
-export function homeProductCounts(list: Product[]): { live: number; pending: number } {
-	return {
-		live: list.filter((p) => p.status === 'live').length,
-		pending: list.filter((p) => p.status === 'review' || p.status === 'rejected' || p.status === 'draft' || !!p.revision).length
-	};
+/** 홈 "판매 중 제품" 카드 — 판매 중 수 · 심사 중(반려 · 수정 심사 포함) + 임시저장 수. 어느 쪽에 세는지는 서버 값(0116 home_live · home_pending) */
+export function homeProductCounts(list: Pick<Product, 'console'>[]): { live: number; pending: number } {
+	return { live: list.filter((p) => p.console.homeLive).length, pending: list.filter((p) => p.console.homePending).length };
 }

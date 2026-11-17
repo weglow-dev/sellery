@@ -1,6 +1,6 @@
 // 내 제품 — DB 행 → 화면(상태 · 보조 문구 · 비주얼) · 탭 · 홈 카운트 (0071 · docs/myr.md §4.2.1 3번)
 import { describe, expect, it } from 'vitest';
-import type { SellerProductRow } from '@sellery/myr-core/seller-products';
+import type { SellerProductConsole, SellerProductRow } from '@sellery/myr-core/seller-products';
 import { STATUS_FROM_DB, productFromRow, productMeta, relativeTime, reviewDay, revisionFromRow } from '../lib/product-row';
 import { PRODUCT_TABS, filterProducts, homeProductCounts, productTabCounts, showsStock } from '../lib/rules';
 
@@ -8,10 +8,20 @@ const NOW = new Date('2026-11-05T12:00:00Z');
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 const H = 3_600_000;
 const D = 24 * H;
+// console = 서버 값(0116 myr_seller_product_console) — 픽스처는 서버가 그 상태에 주는 값(pgTAP myr_console_server_values 가 고정)
+const C = (tabs: SellerProductConsole['tabs'], homeLive: boolean, homePending: boolean): SellerProductConsole => ({ tabs, homeLive, homePending, actions: [], opensReview: false, editMode: null });
+const CONSOLE_OF = {
+	listed: C(['live'], true, false),
+	paused: C(['live'], false, false),
+	pending: C(['review'], false, true),
+	rejected: C(['review'], false, true),
+	draft: C(['draft'], false, true),
+	ended: C(['ended'], false, false)
+} as const;
 const row = (o: Partial<SellerProductRow> = {}): SellerProductRow => ({
 	id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 0,
 	stock: 100, soldQty: 30, stockLeft: 70, soldOut: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null,
-	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), revision: null, ...o
+	submittedAt: ago(20 * D), reviewedAt: ago(14 * D), createdAt: ago(20 * D), updatedAt: ago(2 * H), revision: null, console: CONSOLE_OF[o.status ?? 'listed'], ...o
 });
 
 describe('relativeTime · reviewDay', () => {
@@ -48,7 +58,7 @@ describe('productFromRow · productMeta', () => {
 describe('탭 · 재고 표시 · 홈 카운트', () => {
 	// approved 는 서버 값(0099 myr_product_status_approved = 판매 중 · 일시중지) — 행에 실려 온 대로
 	const list = (['listed', 'paused', 'pending', 'rejected', 'draft', 'ended'] as const).map((s, i) => productFromRow(row({ id: `p${i}`, status: s, approved: s === 'listed' || s === 'paused' }), NOW));
-	it('탭 다섯 개 — 판매 중엔 일시중지, 심사 중엔 반려가 함께', () => {
+	it('탭 다섯 개 — 어느 탭인지는 서버 tabs 그대로(판매 중엔 일시중지, 심사 중엔 반려가 함께)', () => {
 		expect(PRODUCT_TABS.map((t) => t.name)).toEqual(['전체', '판매 중', '심사 중', '임시저장', '종료']);
 		expect(filterProducts(list, 'live').map((p) => p.status)).toEqual(['live', 'paused']);
 		expect(filterProducts(list, 'review').map((p) => p.status)).toEqual(['review', 'rejected']);
@@ -59,7 +69,7 @@ describe('탭 · 재고 표시 · 홈 카운트', () => {
 	it('재고는 서버가 심사 통과(approved)라고 한 상품만', () => {
 		expect(list.filter((p) => showsStock(p)).map((p) => p.status)).toEqual(['live', 'paused']);
 	});
-	it('홈 — 판매 중 수 · 심사(반려 포함) + 임시저장 수 · 빈 목록은 0', () => {
+	it('홈 — 서버 home_live · home_pending 으로 센다(판매 중 수 · 심사(반려 포함) + 임시저장 수) · 빈 목록은 0', () => {
 		expect(homeProductCounts(list)).toEqual({ live: 1, pending: 3 });
 		expect(homeProductCounts([])).toEqual({ live: 0, pending: 0 });
 	});
@@ -72,8 +82,11 @@ describe('수정 심사(0074 · 4-2) — 칩 문구 · 탭 · 홈 카운트', ()
 		expect(revisionFromRow(row({ revision: { status: 'rejected', rejectReason: '효능 표현', rejectItems: [{ step: 2, msg: '효능 표현' }, { step: 4, msg: '함량' }], submittedAt: ago(3 * D), reviewedAt: ago(D) } }), NOW)).toEqual({ state: 'rejected', meta: '어제 수정 반려 · 2건 수정 필요' });
 		expect(productFromRow(row({ revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(H), reviewedAt: null } }), NOW).revision?.state).toBe('review');
 	});
-	it('수정 심사 중인 판매 중 상품은 판매 중 · 심사 중 탭 둘 다 · 홈 심사 수에 포함', () => {
-		const p = productFromRow(row({ id: 'r1', status: 'listed', revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(H), reviewedAt: null } }), NOW);
+	it('수정 심사 중인 판매 중 상품은 판매 중 · 심사 중 탭 둘 다 · 홈 심사 수에 포함(서버 console 그대로)', () => {
+		const p = productFromRow(
+			row({ id: 'r1', status: 'listed', revision: { status: 'pending', rejectReason: null, rejectItems: [], submittedAt: ago(H), reviewedAt: null }, console: C(['live', 'review'], true, true) }),
+			NOW
+		);
 		expect(filterProducts([p], 'live')).toHaveLength(1);
 		expect(filterProducts([p], 'review')).toHaveLength(1);
 		expect(homeProductCounts([p])).toEqual({ live: 1, pending: 1 });

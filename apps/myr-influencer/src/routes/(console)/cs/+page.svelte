@@ -25,10 +25,10 @@
 
 	const claims = $derived(filterClaims(data.claims, claimTab));
 	const claimTabs = $derived(claimTabCounts(data.claims));
-	const claimWaiting = $derived(data.claims.filter((c) => c.status === 'pending').length);
+	const claimWaiting = $derived(data.claimWaiting);
 	const inquiries = $derived(filterInquiries(data.inquiries, inqTab));
 	const inqTabs = $derived(inqTabCounts(data.inquiries));
-	const inqWaiting = $derived(data.inquiries.filter(isWaiting).length);
+	const inqWaiting = $derived(data.inqWaiting);
 	// 이 화면이 읽은 대기 수로 뱃지를 맞춘다
 	$effect(() => {
 		app.inqWaiting = inqWaiting;

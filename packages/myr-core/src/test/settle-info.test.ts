@@ -1,6 +1,6 @@
 // 사업자 · 정산 정보(0085) — packages/myr-core/src/settle-info.ts (DB 0085 와 같은 규칙)
 import { describe, expect, it } from 'vitest';
-import { bizNoValid, formatBizNo, holderMatches, needsSettleInfo, parseSettleBody, settleErrors, settleInfoFromJson, settleSaveMessage, type SettleValues } from '../settle-info';
+import { bizNoValid, formatBizNo, holderMatches, homeSettleBanner, parseSettleBody, settleErrors, settleInfoFromJson, settleSaveMessage, type SettleValues } from '../settle-info';
 
 const ok: SettleValues = { company: '민지랩', ceo: '김민지', bizNo: '124-81-00998', bank: '신한은행', account: '110-123-456789', holder: '김민지' };
 
@@ -39,7 +39,15 @@ describe('API 본문 · 응답', () => {
 		const i = settleInfoFromJson({ company: '민지랩', ceo: '김민지', biz_no_masked: '***-**-00998', has_biz_no: true, bank: '신한은행', holder: '김민지', account_masked: '****6789', has_account: true, tax_email: 'a@b.c', status: 'rejected', note: '예금주 확인 불가' })!;
 		expect([i.status, i.note, i.accountMasked, i.taxEmail]).toEqual(['rejected', '예금주 확인 불가', '****6789', 'a@b.c']);
 		expect(settleInfoFromJson({ status: 'weird' })!.status).toBe('none');
-		expect([needsSettleInfo(null), needsSettleInfo({ status: 'none' }), needsSettleInfo({ status: 'rejected' }), needsSettleInfo({ status: 'pending' }), needsSettleInfo({ status: 'verified' })]).toEqual([true, true, true, false, false]);
+		// 홈 배너 — 보일지는 서버 보류 이유(hold · 0116) · 확인 중은 "확인 중"(정산 탭과 같은 값)
+		const hold = { code: 'settle_info', label: '사업자 · 정산 정보 확인 전' };
+		expect(i.hold).toBeNull();
+		expect(settleInfoFromJson({ status: 'pending', hold })!.hold).toEqual(hold);
+		expect(homeSettleBanner(null)).toBeNull();
+		expect(homeSettleBanner({ status: 'verified', hold: null })).toBeNull();
+		expect(homeSettleBanner({ status: 'pending', hold: { code: 'tax_invoice', label: '' } })).toBeNull();
+		expect([homeSettleBanner({ status: 'none', hold })?.tone, homeSettleBanner({ status: 'rejected', hold })?.title, homeSettleBanner({ status: 'pending', hold })])
+			.toEqual(['hold', '사업자 · 정산 정보를 다시 입력해 주세요', { title: '사업자 · 정산 정보를 확인하고 있어요', body: '운영팀이 확인하면 정산금이 지급돼요', tone: 'wait' }]);
 		expect(settleSaveMessage('HOLDER_MISMATCH')).toEqual({ field: 'holder', message: '예금주는 상호 또는 대표자와 같아야 해요' });
 		expect(settleSaveMessage('???').message).toContain('저장하지 못했어요');
 	});

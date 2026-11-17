@@ -11,8 +11,15 @@ const row = (o: Record<string, unknown> = {}) => ({
 describe('parseSellerProductRows', () => {
 	it('필드 이름을 화면 쪽 이름으로', () => {
 		expect(parseSellerProductRows([row()])).toEqual([
-			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, soldOut: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null }
+			{ id: 'p1', code: 'minji-jelly', name: '포도 젤리', status: 'listed', rejectReason: null, rejectItems: [], category: 'diet', price: 32000, optionCount: 2, stock: 100, soldQty: 30, stockLeft: 70, soldOut: false, editable: false, approved: true, tile: 'linear-gradient(145deg,#a,#b)', icon: 'grape', thumbUrl: null, submittedAt: '2026-10-29T00:00:00Z', reviewedAt: null, createdAt: '2026-10-29T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', revision: null, console: { tabs: [], homeLive: false, homePending: false, actions: [], opensReview: false, editMode: null } }
 		]);
+	});
+	it('콘솔 값은 서버 console 그대로(0116 myr_seller_product_console) — 모르는 탭 · 메뉴 · 수정 화면은 버린다', () => {
+		const [r] = parseSellerProductRows([
+			row({ console: { tabs: ['live', 'review', 'what'], home_live: true, home_pending: true, actions: ['revise', 'groupbuy', 'end'], opens_review: false, edit_mode: 'edit' } })
+		]);
+		expect(r.console).toEqual({ tabs: ['live', 'review'], homeLive: true, homePending: true, actions: ['revise', 'groupbuy'], opensReview: false, editMode: 'edit' });
+		expect(parseSellerProductRows([row({ console: { edit_mode: 'weird' } })])[0].console.editMode).toBeNull();
 	});
 	it('품절 · 직접 수정 · 심사 통과는 서버 값 그대로(0099) — 응답에 없으면 false(상태 · 재고로 짐작하지 않는다)', () => {
 		const [r] = parseSellerProductRows([row({ status: 'draft', stock_left: 0, sold_out: true, editable: true, approved: false })]);
