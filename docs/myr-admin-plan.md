@@ -115,7 +115,7 @@
 
 | 화면 동작 | RPC |
 |---|---|
-| 지급할 차례 · 금액 | `myr_payout_payable` · `myr_payout_amount` · (스크립트) `myr_payout_to_pay` |
+| 지급 대기(자동 이체 대상) · 금액 | `myr_payout_payable` · `myr_payout_amount` · (스크립트) `myr_payout_to_pay` |
 | 상태 문구 · 보류 이유 | `myr_payout_status_label` · `myr_payout_hold_label` · `myr_payout_auto_state` |
 | 보류 이유 전부(운영 보류 맨 앞) | `myr_payout_hold_reasons`(자동 이유 목록 · 첫 번째가 `myr_payout_hold_reason`) · `myr_payout_holds_json`(`[{code, label}]` — `myr_settlement_report` · 크리에이터 정산 탭 응답 `holds`) (0104) |
 | 지급 완료 기록 | `myr_payout_mark_paid(month, handle, amount, paid_on, note, actor)` — 거절 `NOT_FOUND` · `ALREADY_PAID`(paid_on) · `NOT_PAYABLE`(status · hold_label) · `AMOUNT_MISMATCH`(amount) · `BAD_DATE` · `FUTURE_DATE` · `BEFORE_RUN`(run_on) |
