@@ -9,6 +9,7 @@
 --     transfer_fail   실패 종류 — retry(잠깐 안 됨 · 다음 오후 1시 재시도) · account(계좌 문제 · 크리에이터가 다시 입력) · ops(잔액 · 한도 등 운영 쪽) · check(결과 불명 · 조회 먼저)
 --     transfer_tries · transfer_at  시도 횟수 · 마지막 시도 시각
 --   함수:
+--     myr_payout_sending(p)          송금 중인지(transfer_state = 'sending') — 지급 예정 시각 · 상태 문구가 같이 쓴다
 --     myr_payout_fail_kind(p)        크리에이터에게 보이는 실패 종류 — 운영 쪽(ops · check)은 이유 없이 ops 로 합친다(운영 확인 중)
 --     myr_payout_pay_due_at(p, now)  지급 예정 시각 — 지급할 수 있고(myr_payout_payable) 송금 중 · 계좌 · 운영 실패가 아니면 다음 오후 1시(myr_settlement_next_cron)
 --     myr_payout_creator_label(p)    크리에이터 상태 문구 — 지급 중 · 지급 실패(계좌) · 지급 지연(재시도) · 지급 확인 중(운영) · 지급 예정(대기) · 그 밖은 myr_payout_status_label
@@ -34,6 +35,15 @@ alter table public.myr_payouts add constraint myr_payouts_transfer_paid check (s
 alter table public.myr_payouts drop constraint if exists myr_payouts_transfer_tries;
 alter table public.myr_payouts add constraint myr_payouts_transfer_tries check (transfer_tries >= 0);
 
+create or replace function public.myr_payout_sending(p public.myr_payouts)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(p.transfer_state = 'sending', false)
+$$;
+revoke all on function public.myr_payout_sending(public.myr_payouts) from public, anon, authenticated;
+
 create or replace function public.myr_payout_fail_kind(p public.myr_payouts)
 returns text
 language sql
@@ -51,8 +61,8 @@ language sql
 stable
 as $$
   select case when not coalesce(public.myr_payout_payable(p), false) then null
-              when p.transfer_state = 'sending' then null
-              when p.transfer_state = 'failed' and public.myr_payout_fail_kind(p) <> 'retry' then null
+              when public.myr_payout_sending(p) then null
+              when public.myr_payout_fail_kind(p) in ('account', 'ops') then null
               else public.myr_settlement_next_cron(p_now) end
 $$;
 revoke all on function public.myr_payout_pay_due_at(public.myr_payouts, timestamptz) from public, anon, authenticated;
@@ -62,7 +72,7 @@ returns text
 language sql
 immutable
 as $$
-  select case when p.transfer_state = 'sending' then '지급 중'
+  select case when public.myr_payout_sending(p) then '지급 중'
               when public.myr_payout_fail_kind(p) = 'account' then '지급 실패'
               when public.myr_payout_fail_kind(p) = 'retry' then '지급 지연'
               when public.myr_payout_fail_kind(p) = 'ops' then '지급 확인 중'

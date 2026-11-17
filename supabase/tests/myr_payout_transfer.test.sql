@@ -2,8 +2,9 @@
 --   크리에이터에게 보이는 실패 종류(myr_payout_fail_kind — 운영 쪽은 ops 로 합친다) · 칸 제약 · 크리에이터 정산 응답.
 -- 2036년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(27);
+select plan(30);
 
+select function_privs_are('public', 'myr_payout_sending', '{myr_payouts}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 sending 불가');
 select function_privs_are('public', 'myr_payout_fail_kind', '{myr_payouts}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 fail_kind 불가');
 select function_privs_are('public', 'myr_payout_pay_due_at', '{myr_payouts,"timestamp with time zone"}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 pay_due_at 불가');
 select function_privs_are('public', 'myr_payout_creator_label', '{myr_payouts}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 creator_label 불가');
@@ -55,6 +56,7 @@ select is(public.myr_payout_pay_due_at(pg_temp.po('@pgtap.pt1'), '2036-02-05 10:
 select is(public.myr_payout_pay_due_at(pg_temp.po('@pgtap.pt1'), '2036-02-05 14:00+09'), '2036-02-06 13:00+09'::timestamptz, '오후 1시가 지났으면 다음 날 1시');
 select is(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt1')), '지급 예정', '크리에이터 상태 — 지급 예정');
 select is(public.myr_payout_transfer_json(pg_temp.po('@pgtap.pt1')), null, '이체 상태가 없으면 null');
+select is(public.myr_payout_sending(pg_temp.po('@pgtap.pt1')), false, '이체 상태가 없으면 송금 중 아님');
 -- 지급 보류(Q2 · 사업자 정보 확인 전) — 지급 예정 시각 없음
 select is(public.myr_payout_pay_due_at(pg_temp.po('@pgtap.pt2'), '2036-02-05 10:00+09'), null, '지급 보류면 지급 예정 시각 없음');
 select is(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt2')), '지급 보류', '크리에이터 상태 — 지급 보류');
@@ -62,6 +64,7 @@ select is(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt2')), '지급 보
 -- 송금 중
 select pg_temp.tr('@pgtap.pt1', 'sending', null);
 select is(public.myr_payout_creator_label(pg_temp.po('@pgtap.pt1')), '지급 중', '송금 중 — 지급 중');
+select is(public.myr_payout_sending(pg_temp.po('@pgtap.pt1')), true, '송금 중');
 select is(public.myr_payout_pay_due_at(pg_temp.po('@pgtap.pt1'), '2036-02-05 10:00+09'), null, '송금 중이면 예정 시각 없음');
 select is(public.myr_payout_transfer_json(pg_temp.po('@pgtap.pt1')), '{"state": "sending", "kind": null, "tries": 1}'::jsonb, '이체 상태 — 송금 중');
 -- 실패 · 잠깐 안 됨 — 다음 오후 1시 재시도

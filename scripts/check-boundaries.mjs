@@ -213,6 +213,9 @@ const MYR_MIRROR_RULES = [
   { re: /\b(payout|amount)\s*-\s*[\w.]*depositRefund\b/, why: "세금계산서 합계(지급액 − 보증금 환급)를 다시 계산 — 서버 값 invoice.total(myr_payout_invoice_total · 0104)을 쓴다" },
   { re: /\binv(oice)?\??\.status\s*(===|!==)/, why: "세금계산서 상태로 버튼 · 안내를 다시 판정 — 서버 값 canSubmit · todo · overdue(myr_payout_invoice_json · 0104)와 상태별 문구 표를 쓴다" },
   { re: /\bdueDate\s*(<|>|<=|>=)|(<|>|<=|>=)\s*[\w.]*dueDate\b/, why: "발행 기한 지남을 화면에서 판정 — 서버 값 overdue(myr_tax_invoice_overdue · 0104)를 쓴다" },
+  // 자동 이체(0111) — 운영 쪽 실패(ops · check)는 서버가 합쳐 보낸다 · 크리에이터 상태 문구는 서버 payoutLabel
+  { re: /\btransfer_fail\b|\btransferFail\b/, why: "이체 실패 종류 원본을 화면에서 읽음 — 운영 쪽 이유가 크리에이터에게 샌다. 서버 값 transfer.kind(myr_payout_fail_kind · 0111)를 쓴다" },
+  { re: /['"`](지급 중|지급 지연|지급 실패|지급 확인 중)['"`]/, why: "크리에이터 지급 상태 문구를 화면에서 다시 정함 — 서버 값 payoutLabel(myr_payout_creator_label · 0111)을 쓴다" },
 ];
 /** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
 function codeLines(file) {
