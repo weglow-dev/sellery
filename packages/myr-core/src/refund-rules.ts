@@ -68,15 +68,14 @@ export function parseCancelBody(v: unknown): { orderCode: string; items: RefundL
 /** 고객이 이 주문의 [교환 · 환불 신청] 페이지를 열 수 있나 — 서버가 줄마다 준 신청 길(refundPath · 0109 myr_line_customer_path)이 하나라도 있을 때.
  *  줄마다 길이 갈린다: instant = 셀프 바로 환불(서버 `myr_app_refund_precheck` 가 다시 막는다) · claim = 교환·환불 요청(`myr_app_claim_open` 도).
  *  열린 교환·환불 요청은 그 줄만 막는다(2026-11-13 결정 · 서버가 그 줄의 길을 비운다) — 같은 주문의 다른 상품은 신청할 수 있다.
- *  여기서는 판정하지 않고 서버 값과 주문 상태로 **안내 문구만** 고른다 */
+ *  여기서는 판정하지 않는다 — 열 수 있는지는 서버 값(refundPath)이 먼저 정하고, 주문 상태는 입금 전 취소 표시(deposit)와 **안내 문구만** 고른다 */
 export function customerCanRefund(
 	o: Pick<OrderView, 'status' | 'items'> & { claimStatus?: OrderView['claimStatus'] }
 ): { ok: true; deposit: boolean } | { ok: false; reason: string; claimOpen?: true } {
-	const any = o.items.some((i) => i.refundPath !== null);
-	if (o.status === 'WAITING_DEPOSIT' && any) return { ok: true, deposit: true };
+	// 열 수 있는지는 서버 값 하나 — 주문 상태는 아래에서 문구(입금 전 취소 · 이미 환불 · 취소)만 고른다
+	if (o.items.some((i) => i.refundPath !== null)) return { ok: true, deposit: o.status === 'WAITING_DEPOSIT' };
 	if (o.status === 'REFUNDED') return { ok: false, reason: '이미 환불된 주문이에요' };
 	if (o.status === 'CANCELED') return { ok: false, reason: '취소된 주문이에요' };
-	if (any) return { ok: true, deposit: false };
 	// 신청할 수 있는 상품이 없고 열린 요청(0078 myr_order_claim_status)이 있으면 — 남은 상품이 모두 요청 중이다. 버튼은 비활성 · 안내만
 	if (o.claimStatus) return { ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true };
 	return { ok: false, reason: '환불할 수 있는 상품이 없어요' };

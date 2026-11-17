@@ -140,8 +140,9 @@ describe('customerCanRefund · customerRefundableItems — 서버 refundPath 그
 		// 전부 배송준비중 이후(서버 refundPath = claim)여도 페이지는 열린다(그 줄은 교환 · 환불 요청)
 		expect(customerCanRefund(order({ items: [item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000, 0, 'PAID', 'SHIPPING')] }))).toEqual({ ok: true, deposit: false });
 		expect(customerRefundableItems([item(A, 2, 10000, 0, 'PAID', 'PREPARING'), item(B, 1, 20000), item('c', 1, 1, 1, 'REFUNDED')]).map((i) => i.id)).toEqual([B]);
-		expect(customerCanRefund(order({ status: 'REFUNDED' })).ok).toBe(false);
-		expect(customerCanRefund(order({ status: 'CANCELED' })).ok).toBe(false);
+		// 환불 · 취소 주문 — 서버가 줄에 신청 길을 주지 않는다(myr_line_refund_path) · 주문 상태는 문구만 고른다
+		expect(customerCanRefund(order({ status: 'REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED', 'PAID', null)] }))).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
+		expect(customerCanRefund(order({ status: 'CANCELED', items: [item(A, 2, 10000, 0, 'CANCELED', 'PAID', null)] }))).toEqual({ ok: false, reason: '취소된 주문이에요' });
 		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 2, 'REFUNDED')] })).ok).toBe(false);
 	});
 	it('화면은 판정하지 않는다 — 서버가 null 이면 배송 상태와 상관없이 불가 · instant 면 바로 환불 줄', () => {
@@ -158,7 +159,11 @@ describe('customerCanRefund · customerRefundableItems — 서버 refundPath 그
 		expect(customerCanRefund({ ...allOpen, claimStatus: 'pending' })).toEqual({ ok: false, reason: '진행 중인 교환 · 환불 요청이 끝나면 다시 신청할 수 있어요', claimOpen: true });
 		expect(customerCanRefund({ ...allOpen, claimStatus: 'progress' }).ok).toBe(false);
 		expect(customerCanRefund({ ...allOpen, claimStatus: null })).toEqual({ ok: false, reason: '환불할 수 있는 상품이 없어요' });
-		expect(customerCanRefund({ ...order({ status: 'REFUNDED' }), claimStatus: 'pending' })).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
+		expect(customerCanRefund({ ...order({ status: 'REFUNDED', items: [item(A, 1, 10000, 1, 'REFUNDED', 'DELIVERED', null)] }), claimStatus: 'pending' })).toEqual({ ok: false, reason: '이미 환불된 주문이에요' });
+	});
+	it('열 수 있는지는 서버 값이 먼저 — 주문 상태가 서버 신청 길을 뒤집지 않는다(문구만 고른다)', () => {
+		expect(customerCanRefund(order({ status: 'PARTIAL_REFUNDED', items: [item(A, 2, 10000, 1, 'PARTIAL_REFUNDED', 'PAID', 'instant')] }))).toEqual({ ok: true, deposit: false });
+		expect(customerCanRefund(order({ status: 'WAITING_DEPOSIT', items: [item(A, 1, 10000, 0, 'PAID', 'PAID', null)] })).ok).toBe(false);
 	});
 });
 

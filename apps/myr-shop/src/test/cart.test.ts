@@ -51,25 +51,35 @@ describe('mergeLine · setLineQty · removeLine', () => {
 	});
 });
 
-describe('서버 견적(0092 myr_app_cart_quote) — 화면은 계산하지 않고 읽기만', () => {
+describe('서버 견적(0092 · 0115 myr_app_cart_quote) — 화면은 계산하지 않고 읽기만', () => {
 	const raw = {
 		ok: true,
-		lines: [{ code: a.code, option_index: 0, qty: 1, unit_price: 25600, base_price: 32000, line_amount: 25600, base_amount: 32000, stock_left: 187, groupbuy_state: 'active', groupbuy_code: 'ab12cd34' }],
+		lines: [{ code: a.code, option_index: 0, qty: 1, unit_price: 25600, base_price: 32000, line_amount: 25600, base_amount: 32000, stock_left: 187, over_stock: false, groupbuy_state: 'active', groupbuy_code: 'ab12cd34' }],
 		items_amount: 25600,
 		shipping_fee: 3000,
+		amount: 28600,
 		free_over: 50000,
-		free_shipping_left: 24400
+		free_shipping_left: 24400,
+		lines_max: 20,
+		lines_over: false
 	};
 	it('응답 → 견적 · 합계 줄은 서버 값 그대로(무료배송까지 남은 금액도 서버 값)', () => {
 		const q = parseCartQuote(raw)!;
-		expect(q.lines[0]).toEqual({ code: a.code, qty: 1, unitPrice: 25600, basePrice: 32000, lineAmount: 25600, baseAmount: 32000, stockLeft: 187, gbState: 'active', gbCode: 'ab12cd34' });
+		expect(q.lines[0]).toEqual({ code: a.code, qty: 1, unitPrice: 25600, basePrice: 32000, lineAmount: 25600, baseAmount: 32000, stockLeft: 187, overStock: false, gbState: 'active', gbCode: 'ab12cd34' });
 		expect(totalsFromQuote(q)).toEqual({ subtotal: 25600, shipping: 3000, total: 28600, shippingMsg: '₩24,400 더 담으면 무료배송이에요' });
+		// 결제 금액 · 줄 수 한도 · 재고 초과는 서버 값 그대로(0115) — 화면이 더하거나 비교하지 않는다
+		expect(totalsFromQuote({ ...q, amount: 99999 }).total).toBe(99999);
+		expect([q.amount, q.linesMax, q.linesOver]).toEqual([28600, 20, false]);
+		expect(parseCartQuote({ ...raw, lines_over: true })!.linesOver).toBe(true);
+		expect(parseCartQuote({ ...raw, lines: [{ ...raw.lines[0], over_stock: true }] })!.lines[0].overStock).toBe(true);
 		expect(totalsFromQuote({ ...q, shippingFee: 0, freeShippingLeft: 0 }).shippingMsg).toBe('무료배송으로 보내드려요');
 	});
 	it('살 수 없는 줄 · 틀린 응답', () => {
 		expect(parseCartQuote({ ...raw, lines: [{ code: 'x', qty: 1, unit_price: null, line_amount: null }] })!.lines[0].unitPrice).toBeNull();
 		expect(parseCartQuote({ ok: false, code: 'BAD_LINES' })).toBeNull();
 		expect(parseCartQuote({ ok: true, lines: [] })).toBeNull();
+		// 결제 금액(amount)이 없으면 틀린 응답 — 화면은 금액 대신 "확인 중"
+		expect(parseCartQuote({ ...raw, amount: undefined })).toBeNull();
 	});
 	it('견적 요청 · 본문 검사 — 공구 코드는 그대로 싣는다(끝났는지는 서버가 본다)', () => {
 		const gb = { code: 'ab12cd34', state: 'ended' as const, discountPct: 20, startsAt: '2026-11-10T00:00:00Z', endsAt: '2026-11-12T00:00:00Z', price: 25600, options: [] };

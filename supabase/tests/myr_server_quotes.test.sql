@@ -47,13 +47,13 @@ select is((select public.myr_line_price(p, 5, null) from public.myr_products p w
 
 -- ---------- 장바구니 견적 ----------
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":1,"gb":"sqactive1"}]') - 'lines',
-  '{"ok": true, "items_amount": 28800, "shipping_fee": 3000, "free_over": 50000, "free_shipping_left": 21200}'::jsonb, '공구 1개 → 28,800 + 배송비 3,000 · 무료배송까지 21,200');
+  '{"ok": true, "items_amount": 28800, "shipping_fee": 3000, "amount": 31800, "lines_max": 20, "lines_over": false, "free_over": 50000, "free_shipping_left": 21200}'::jsonb, '공구 1개 → 28,800 + 배송비 3,000 · 무료배송까지 21,200');
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":2}]') - 'lines',
-  '{"ok": true, "items_amount": 72000, "shipping_fee": 0, "free_over": 50000, "free_shipping_left": 0}'::jsonb, '기본가 2개 → 72,000 · 무료배송');
+  '{"ok": true, "items_amount": 72000, "shipping_fee": 0, "amount": 72000, "lines_max": 20, "lines_over": false, "free_over": 50000, "free_shipping_left": 0}'::jsonb, '기본가 2개 → 72,000 · 무료배송');
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":1},{"code":"pgtap-sq-draft","qty":1},{"code":"no-such","qty":1}]') ->> 'items_amount', '36000', '샵에 없는 상품 · 심사 중 상품은 합계에서 뺀다');
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-draft","qty":1}]') -> 'lines' -> 0 ->> 'unit_price', null, '살 수 없는 줄 → unit_price null');
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":1,"gb":"sqsched01"}]') -> 'lines' -> 0 ->> 'groupbuy_state', 'scheduled', '줄에 공구 상태');
-select is(public.myr_app_cart_quote('[]') - 'lines', '{"ok": true, "items_amount": 0, "shipping_fee": 0, "free_over": 50000, "free_shipping_left": 0}'::jsonb, '빈 장바구니 → 0원 · 배송비 0');
+select is(public.myr_app_cart_quote('[]') - 'lines', '{"ok": true, "items_amount": 0, "shipping_fee": 0, "amount": 0, "lines_max": 20, "lines_over": false, "free_over": 50000, "free_shipping_left": 0}'::jsonb, '빈 장바구니 → 0원 · 배송비 0');
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":0}]') ->> 'code', 'BAD_LINES', '수량 0 → BAD_LINES');
 select is(public.myr_app_cart_quote('"x"') ->> 'code', 'BAD_LINES', '배열 아님 → BAD_LINES');
 
@@ -70,7 +70,7 @@ select is((select ci.unit_price from public.myr_checkout_items ci join public.my
 -- 설정을 바꾸면 견적 · 체크아웃 · 배송비가 같이 따라간다
 update public.platform_settings set value = '{"free_over": 30000, "fee": 2500}'::jsonb where key = 'myr_shipping';
 select is(public.myr_app_cart_quote('[{"code":"pgtap-sq-lemon","qty":1,"gb":"sqactive1"}]') - 'lines',
-  '{"ok": true, "items_amount": 28800, "shipping_fee": 2500, "free_over": 30000, "free_shipping_left": 1200}'::jsonb, '설정 변경 → 견적이 새 배송비 · 기준');
+  '{"ok": true, "items_amount": 28800, "shipping_fee": 2500, "amount": 31300, "lines_max": 20, "lines_over": false, "free_over": 30000, "free_shipping_left": 1200}'::jsonb, '설정 변경 → 견적이 새 배송비 · 기준');
 select is(public.myr_shipping_fee(28800), 2500, '설정 변경 → 체크아웃 배송비도 같은 값');
 
 -- ---------- 정산금 ----------

@@ -4,6 +4,7 @@
 	import { kstLabel, remainLabel } from '@sellery/myr-core/groupbuy';
 	import { DETAIL_ANCHORS, catName, handleSlug, infoRowsOf, won } from '$lib/data';
 	import { goBack } from '$lib/nav';
+	import type { CartQuote } from '$lib/cart';
 	import { shop } from '$lib/state.svelte';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import CsSheet from '$lib/components/CsSheet.svelte';
@@ -44,7 +45,8 @@
 		const t = setTimeout(() => void invalidateAll(), Math.min(Math.max(at - Date.now() + 1000, 0), 2_147_000_000));
 		return () => clearTimeout(t);
 	});
-	const unit = $derived(gb && gbState === 'active' ? gb.price : p.price);
+	/** 담기에 싣는 공구 — 끝난 공구는 싣지 않는다(add() · 서버 견적 +page.server.ts 와 같은 조건) */
+	const gbForCart = $derived(gb && gbState !== 'ended' ? gb : undefined);
 	// 지금 살 수 있는 수량(서버 0096 · 결제 대기 중인 다른 고객 몫 제외) — 수량 버튼 상한 · 표시. 모르면(null) 상한 없이
 	const left = $derived(p.soldOut ? 0 : p.stockLeft);
 	$effect(() => {
@@ -55,11 +57,32 @@
 	let photo = $state(0);
 	let gallery: ReturnType<typeof ProductGallery> | undefined = $state();
 	let qty = $state(1);
+	/** [담기] 금액 · 무료배송 기준 — 장바구니와 같은 서버 견적(0092 · 0115 · line_amount · free_over). 화면이 단가 × 수량을 하지 않는다.
+	 *  처음은 서버 로드의 1개 견적(data.quote) · 수량 · 공구가 바뀌면 잠깐 기다렸다 다시 받는다(live). key = 그 견적이 어느 수량 · 공구 것인지 */
+	const keyOf = (n: number) => `${p.code}:${n}:${gbForCart?.code ?? ''}:${gbState ?? ''}`;
+	let live = $state<{ key: string; quote: CartQuote | null } | null>(null);
+	$effect(() => {
+		void data.quote; // 페이지 데이터가 바뀌면(공구 시작 · 끝 invalidateAll) 서버 로드 견적부터 다시
+		live = null;
+	});
+	const cur = $derived(live ?? { key: data.quote ? keyOf(1) : '', quote: data.quote });
+	const wantKey = $derived(keyOf(qty));
+	$effect(() => {
+		const key = wantKey;
+		if (key === cur.key) return;
+		const t = setTimeout(async () => {
+			const q = await shop.quoteOne(p, qty, gbForCart);
+			if (key === wantKey) live = { key, quote: q };
+		}, 250);
+		return () => clearTimeout(t);
+	});
+	const amount = $derived(cur.key === wantKey ? (cur.quote?.lines[0]?.lineAmount ?? null) : null);
+	const freeOver = $derived(cur.quote?.freeOver || null);
 	let added = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	function add() {
 		if (added || p.soldOut) return;
-		shop.add(p, qty, gb && gbState !== 'ended' ? gb : undefined);
+		shop.add(p, qty, gbForCart);
 		added = true;
 		clearTimeout(timer);
 		timer = setTimeout(() => (added = false), 1600);
@@ -313,11 +336,12 @@
 			{#if added}
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg><span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : `${won(unit * qty)} 담기`}</span>
+				<span>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
 			{/if}
 		</button>
 		<div class="flex flex-col gap-2.5 rounded-2xl border border-white/7 bg-white/3 p-4 text-[13px] text-fg-soft">
-			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h13v10H3z" /><path d="M16 10h4l1 3v4h-5" /></svg>5만원 이상 무료배송</span>
+			<!-- 무료배송 기준 — 서버 견적 free_over(platform_settings myr_shipping · 0092) -->
+			{#if freeOver}<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h13v10H3z" /><path d="M16 10h4l1 3v4h-5" /></svg>{won(freeOver)} 이상 무료배송</span>{/if}
 			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>영업일 2~3일 도착</span>
 			<span class="flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a3d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></svg>식약처 인증 제조시설 생산</span>
 		</div>
@@ -336,7 +360,7 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
 				<span>담았어요</span>
 			{:else}
-				<span>{p.soldOut ? '품절' : `${won(unit * qty)} 담기`}</span>
+				<span>{p.soldOut ? '품절' : amount !== null ? `${won(amount)} 담기` : '담기'}</span>
 			{/if}
 		</button>
 	</div>
