@@ -7,7 +7,7 @@ import { filterSellerOrders, lineHasRefund, liveLines, SELLER_ORDER_TABS, seller
 const line = (o: Record<string, unknown> = {}) => {
 	const r = { id: 'i1', name: '포도 젤리', option: '', qty: 1, unit_price: 32000, amount: 32000, status: 'PAID', refunded_qty: 0, refund_amount: 0, ship_status: 'DELIVERED', courier: null, tracking_no: null, product: { code: 'p', tile: null, icon: 'grape', thumb_url: null }, claim: null, ...o };
 	const left = Math.max(0, Number(r.qty) - Number(r.refunded_qty));
-	return { left_qty: left, live: r.status !== 'CANCELED' && left > 0, has_refund: Number(r.refunded_qty) > 0, ...r };
+	return { left_qty: left, live: r.status !== 'CANCELED' && left > 0, valid: r.status !== 'CANCELED', has_refund: Number(r.refunded_qty) > 0, ...r };
 };
 const order = (items: unknown[], o: Record<string, unknown> = {}) => sellerOrderFromJson({ id: 'o1', code: 'myr1001', status: 'PAID', paid_at: '2026-11-04T00:00:00Z', buyer: '김*은', items, ...o })!;
 
@@ -79,5 +79,10 @@ describe('금액 · 송장', () => {
 	it('같은 송장은 한 박스', () => {
 		const o = order([line({ id: 'a', courier: 'CJ대한통운', tracking_no: '1' }), line({ id: 'b', courier: 'CJ대한통운', tracking_no: '1' }), line({ id: 'c', courier: '롯데택배', tracking_no: '2' }), line({ id: 'd' })]);
 		expect(sellerOrderBoxes(o)).toEqual([{ courier: 'CJ대한통운', trackingNo: '1' }, { courier: '롯데택배', trackingNo: '2' }]);
+	});
+	it('취소 줄은 박스에서 빠진다 — 서버 valid(0120 myr_line_valid) 그대로 · 줄 상태로 다시 판정하지 않는다', () => {
+		const o = order([line({ id: 'a', courier: 'CJ대한통운', tracking_no: '1' }), line({ id: 'b', courier: '롯데택배', tracking_no: '2', valid: false })]);
+		expect(sellerOrderBoxes(o)).toEqual([{ courier: 'CJ대한통운', trackingNo: '1' }]);
+		expect(order([line({ status: 'CANCELED', courier: 'CJ대한통운', tracking_no: '9' })]).items[0].valid).toBe(false);
 	});
 });

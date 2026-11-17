@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(216);
+select plan(224);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -386,6 +386,16 @@ insert into _rules (label, pat, allowed) values
   ('문의 주문 연결을 고객 행 id 로 직접 비교 — 금지 · myr_order_owned_by', $p$\mcustomer_id\s*=\s*p_customer_id$p$,       '{}'),
   ('초대 사용 · 취소 · 만료(초대 상태)',        $p$used_at\s+is\s+(not\s+)?null$p$,                                  '{myr_invite_state}'),
   ('환불 사진 한도(3장)',                       $p$cardinality\([^)]*photos[^)]*\)(,\s*0\))?\s*>|<>\s*''\s*limit\s*\d$p$,     '{myr_refund_photos_too_many}'),
+  -- 0120 상태 비교 · 한도 · 형식
+  ('입금 대기 주문(WAITING_DEPOSIT)',           $p$status\s*(=|<>)\s*'WAITING_DEPOSIT'$p$,                               '{myr_order_status_waiting_deposit}'),
+  ('요청 진행 중(progress)',                    $p$\mr\.status\s*(=|<>)\s*'progress'$p$,                                 '{myr_claim_in_progress}'),
+  ('수정본 심사 중(pending)',                   $p$product_revisions\M[^;]*\mwhere[^;]*\mstatus\s*=\s*'pending'|\mv\.status\s*=\s*'pending'$p$, '{myr_revision_pending}'),
+  ('줄 배송 상태 비교(상태를 바꾸는 쓰기는 제외)', $p$(?<!set )ship_status\s*(=|<>)\s*'(PAID|PREPARING|SHIPPING|DELIVERED)'|ship_status\s+(not\s+)?in\s*\($p$,
+                                                '{myr_ship_status_awaiting_prepare,myr_ship_status_preparing,myr_ship_status_shipping,myr_ship_status_delivered,myr_ship_status_syncing,myr_ship_status_unshipped}'),
+  ('상품 이미지 · 문의 본문 한도 숫자 — 금지 · myr_product_image_max · myr_cs_body_max', $p$image_urls'\)\s*>\s*\d|char_length\(v_body\)\s*>\s*\d$p$, '{}'),
+  ('받는 택배사 목록',                          $p$'CJ대한통운'$p$,                                                        '{myr_courier_ok}'),
+  ('송장번호 형식(숫자 8~30자리)',               $p$\\d\{8,30\}$p$,                                                      '{myr_tracking_ok}'),
+  ('번호 정리(공백 · 하이픈 빼기) — 세금계산서 번호는 다른 번호', $p$\[\\s-\]$p$,                                       '{myr_tracking_no,myr_tax_invoice_no}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days}');
 
 -- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)

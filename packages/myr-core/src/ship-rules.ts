@@ -2,6 +2,7 @@
  *  택배사 목록은 0069 RPC 와 같은 5곳(packages/db/src/carriers.ts 복사 · 한글명이 키). Svelte·DB import 없음. */
 import { ORDER_CODE_RE } from './checkout-rules';
 
+/** 받는 택배사 · 송장번호 형식(아래 TRACKING_RE) — 입력 형식 규칙(화면이 미리 알려 주고 서버 myr_courier_ok · myr_tracking_ok 가 최종 판정 · 0120). 둘이 다르면 CI 실패(check-boundaries (j)) */
 export const COURIERS = ['CJ대한통운', '우체국택배', '한진택배', '롯데택배', '로젠택배'] as const;
 export type Courier = (typeof COURIERS)[number];
 export const isCourier = (v: unknown): v is Courier => typeof v === 'string' && (COURIERS as readonly string[]).includes(v);

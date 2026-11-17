@@ -44,7 +44,8 @@ const item = (id: string, qty: number, unitPrice: number, refundedQty = 0, statu
 	changeMindOk: true,
 	leftQty: Math.max(0, qty - refundedQty), // 서버(0097 myr_line_left)가 줄 법한 값
 	leftAmount: Math.max(0, qty - refundedQty) * unitPrice, // 서버(0099 left_amount)가 줄 법한 값
-	live: status !== 'CANCELED' && qty - refundedQty > 0 // 서버(0099 myr_line_live)가 줄 법한 값
+	live: status !== 'CANCELED' && qty - refundedQty > 0, // 서버(0099 myr_line_live)가 줄 법한 값
+	valid: status !== 'CANCELED' // 서버(0120 myr_line_valid)가 줄 법한 값
 });
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
