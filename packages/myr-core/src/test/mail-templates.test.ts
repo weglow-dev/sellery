@@ -144,13 +144,21 @@ describe('환불(고객)', () => {
 });
 
 describe('환불(셀러) — 자기 줄만', () => {
-	it('환불된 줄의 셀러만 받고, 금액은 단가×수량', () => {
-		const r: MailRefund = { items: [{ itemId: 'i-a', qty: 1, amount: 16000 }], amount: 16000, full: false, reason: '고객 요청', deposit: false };
+	it('환불된 줄의 셀러만 받고, 금액은 서버 크리에이터별 합(seller_goods · 0118)', () => {
+		const r: MailRefund = { items: [{ itemId: 'i-a', qty: 1, amount: 16000 }], amount: 16000, full: false, reason: '고객 요청', deposit: false, sellerGoods: { 's-jiyu': 16000 } };
 		const m = orderRefundedSellerMail(order(), r, 's-jiyu', ctx)!;
 		expect(m.subject).toBe('[MYR] 환불 · MYR1007 · 지유 레시피 그래놀라');
 		expect(m.text).toContain('환불된 내 상품: 지유 레시피 그래놀라 · 2봉 × 1');
 		expect(m.text).toContain('내 상품 환불 금액: ₩16,000');
 		expect(orderRefundedSellerMail(order(), r, 's-hyerin', ctx)).toBeNull();
+	});
+	it('왕복 배송비 차감이 있어도 내 상품 환불 금액은 실적에서 빠지는 금액(차감 전 · 2026-11-17 결정) — 메일이 줄을 더하지 않는다', () => {
+		// 단순 변심 부분 환불 — 고객은 32,000 − 6,000 = 26,000 을 받고 크리에이터 실적에서는 32,000 이 빠진다
+		const r: MailRefund = { items: [{ itemId: 'i-a', qty: 2, amount: 32000 }], amount: 26000, full: false, reason: '단순 변심', deposit: false, deduction: 6000, sellerGoods: { 's-jiyu': 32000 } };
+		expect(orderRefundedSellerMail(order(), r, 's-jiyu', ctx)!.text).toContain('내 상품 환불 금액: ₩32,000');
+		expect(orderRefundedMail(order(), r, ctx).text).toContain('환불 금액: ₩26,000');
+		// 서버가 크리에이터 합을 주지 않으면 줄을 더해 짐작하지 않는다
+		expect(orderRefundedSellerMail(order(), { ...r, sellerGoods: undefined }, 's-jiyu', ctx)!.text).toContain('내 상품 환불 금액: ₩0');
 	});
 	it('입금 대기 취소는 모든 셀러에게 자기 줄 · 멱등 키가 셀러별로 다르다', () => {
 		const dep: MailRefund = { items: [{ itemId: 'i-a', qty: 2, amount: 32000 }, { itemId: 'i-b', qty: 1, amount: 29000 }], amount: 61000, full: true, reason: '', deposit: true };

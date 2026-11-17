@@ -73,7 +73,7 @@ select is(public.myr_app_admin_ship_line('00000000-0000-4000-8000-000000000ca1',
 select is(public.myr_app_admin_ship_line('00000000-0000-4000-8000-0000000000ff', null, '123456789012', false) ->> 'code', 'NOT_FOUND', '없는 줄 NOT_FOUND');
 select is(public.myr_app_admin_ship_line('00000000-0000-4000-8000-000000000ca3', null, '123456789012', false) ->> 'code', 'WRONG_STATUS', '전액 환불 줄 WRONG_STATUS');
 select is(public.myr_app_admin_ship_line('00000000-0000-4000-8000-000000000ca1', null, '6123-4567-8901', false) - 'order_id' - 'item_id' - 'shipped_at',
-  '{"ok": true, "newly_shipped": true, "order_code": "pgtap-ln-1", "ship_status": "SHIPPING", "courier": null, "tracking_no": "612345678901"}'::jsonb, '줄 송장 — 배송중 · 처음이면 newly_shipped');
+  '{"ok": true, "newly_shipped": true, "delivered": false, "order_code": "pgtap-ln-1", "ship_status": "SHIPPING", "courier": null, "tracking_no": "612345678901"}'::jsonb, '줄 송장 — 배송중 · 처음이면 newly_shipped · 배송 완료 아님(0118)');
 select ok((select not is_delayed and shipped_at is not null from public.myr_order_items where id = '00000000-0000-4000-8000-000000000ca1'), '송장이 오면 지연 해제 · 발송 시각');
 select is((select tracking_no from public.myr_orders where id = '00000000-0000-4000-8000-000000000c91'), '612345678901', '주문 칸이 비었으면 같이 채운다(옛 화면 · 메일)');
 select is((public.myr_app_admin_ship_line('00000000-0000-4000-8000-000000000ca1', null, '612345678901', false) ->> 'newly_shipped')::boolean, false, '같은 운송장 다시 → newly_shipped false');

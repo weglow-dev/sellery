@@ -41,11 +41,6 @@ export function kstDateTime(iso: string | null | undefined): string {
 	const k = new Date(t + KST);
 	return `${k.getUTCFullYear()}-${pad(k.getUTCMonth() + 1)}-${pad(k.getUTCDate())} ${pad(k.getUTCHours())}:${pad(k.getUTCMinutes())}:${pad(k.getUTCSeconds())}`;
 }
-/** 오늘(KST) 11시 정각 — 발주 컷오프("11시 전 첫 결제") */
-export function prepareCutoff(now: Date): Date {
-	const k = new Date(now.getTime() + KST);
-	return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate(), 11) - KST);
-}
 
 /* ---------------- 발주(ordercreatem) ---------------- */
 
@@ -161,12 +156,12 @@ export function parseSyncLines(v: unknown): SyncLine[] {
 		}));
 }
 
-export const DELIVERED_AFTER_DAYS = 10;
+/** delivered = 택배사가 배송 완료를 알려 줌(exprStatus '91'). 발송 10일 뒤 자동 배송 완료는 서버가 정한다(0118 myr_line_auto_delivered · ship_line) */
 export type LineShipUpdate = { itemId: string; trackingNo: string; delivered: boolean };
 
 /** orderstatus 의 data → 줄 갱신. 바인허브와 같다: orderCodeNo 로 묶고 orderStatus '0'(대기)|'1'(택배사 전달) · 송장 있는 행 중 마지막 →
- *  배송완료 = exprStatus '91' 또는 (지금 배송중이고 발송 10일 지남) */
-export function lineUpdatesFromStatus(data: unknown, lines: SyncLine[], now: Date): LineShipUpdate[] {
+ *  택배사 배송 완료 = exprStatus '91' — "발송 10일 지남"은 서버(0118)가 같은 호출에서 함께 판정한다 */
+export function lineUpdatesFromStatus(data: unknown, lines: SyncLine[]): LineShipUpdate[] {
 	if (!Array.isArray(data)) return [];
 	const last = new Map<string, Record<string, unknown>>();
 	for (const row of data as Record<string, unknown>[]) {
@@ -182,9 +177,7 @@ export function lineUpdatesFromStatus(data: unknown, lines: SyncLine[], now: Dat
 	for (const [no, row] of last) {
 		const line = byId.get(no);
 		if (!line) continue;
-		const shippedAt = line.shippedAt ? new Date(line.shippedAt).getTime() : NaN;
-		const old = line.shipStatus === 'SHIPPING' && Number.isFinite(shippedAt) && shippedAt <= now.getTime() - DELIVERED_AFTER_DAYS * 86_400_000;
-		out.push({ itemId: no, trackingNo: String(row.invcExprNo).replace(/[\s-]/g, ''), delivered: String(row.exprStatus ?? '') === '91' || old });
+		out.push({ itemId: no, trackingNo: String(row.invcExprNo).replace(/[\s-]/g, ''), delivered: String(row.exprStatus ?? '') === '91' });
 	}
 	return out;
 }

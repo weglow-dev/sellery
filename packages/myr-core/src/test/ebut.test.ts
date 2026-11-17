@@ -1,6 +1,6 @@
 // 이벗 연동 순수 규칙(0077 · docs/myr.md §6.8) — 바인허브 OrderStatusToPreparing · OrderStatusToDeliveringOrDelivered 와 같은 값 · 규칙
 import { describe, expect, it } from 'vitest';
-import { buildOrderList, ebutMissing, ebutReady, groupByOrder, kstDateTime, lineUpdatesFromStatus, parsePrepareLines, parseSyncLines, prepareCutoff, registeredItemIds } from '../ebut';
+import { buildOrderList, ebutMissing, ebutReady, groupByOrder, kstDateTime, lineUpdatesFromStatus, parsePrepareLines, parseSyncLines, registeredItemIds } from '../ebut';
 
 const CFG = { id: 'myr', custCode: 'C01', apiKey: 'k', ordShop: 'S01', senderName: 'MYR', senderPhone: '0212345678', senderZipcode: '06100', senderAddress: '서울 강남구 테헤란로 1' };
 const RAW = [
@@ -20,11 +20,9 @@ describe('설정', () => {
 });
 
 describe('시각', () => {
-	it('KST 날짜 시각 문자열 · 오늘 11시 컷오프', () => {
+	it('KST 날짜 시각 문자열(출고 마감 11시는 서버 0118 myr_prepare_cutoff — pgTAP)', () => {
 		expect(kstDateTime('2026-11-16T01:05:09Z')).toBe('2026-11-16 10:05:09');
 		expect(kstDateTime(null)).toBe('');
-		expect(prepareCutoff(new Date('2026-11-16T02:00:00Z')).toISOString()).toBe('2026-11-16T02:00:00.000Z'); // 11:00 KST
-		expect(prepareCutoff(new Date('2026-11-15T16:30:00Z')).toISOString()).toBe('2026-11-16T02:00:00.000Z'); // KST 16일 01:30 → 16일 11시
 	});
 });
 
@@ -57,7 +55,6 @@ describe('발주(ordercreatem)', () => {
 });
 
 describe('송장 수집(orderstatus)', () => {
-	const NOW = new Date('2026-11-20T09:00:00Z');
 	const lines = parseSyncLines([
 		{ item_id: 'i1', order_id: 'o1', ship_status: 'PREPARING', tracking_no: null, shipped_at: null },
 		{ item_id: 'i2', order_id: 'o1', ship_status: 'SHIPPING', tracking_no: '111', shipped_at: '2026-11-09T09:00:00Z' }, // 11일 전 발송
@@ -65,7 +62,7 @@ describe('송장 수집(orderstatus)', () => {
 		{ order_id: 'bad' }
 	]);
 	it('파서', () => expect(lines.map((l) => l.itemId)).toEqual(['i1', 'i2', 'i3']));
-	it('orderStatus 0|1 · 송장 있는 마지막 행 → 배송중 · 91 이면 배송완료 · 배송중 10일 지나면 배송완료', () => {
+	it('orderStatus 0|1 · 송장 있는 마지막 행 → 배송중 · 91 이면 택배사 배송완료(발송 10일 지남은 서버 0118 — 여기서 판정하지 않는다)', () => {
 		const data = [
 			{ orderCodeNo: 'i1', orderStatus: '0', invcExprNo: '', exprStatus: '' }, // 송장 없음 → 무시
 			{ orderCodeNo: 'i1', orderStatus: '1', invcExprNo: '6123-4567-8901', exprStatus: '11' },
@@ -74,11 +71,11 @@ describe('송장 수집(orderstatus)', () => {
 			{ orderCodeNo: 'i3', orderStatus: '9', invcExprNo: '333', exprStatus: '91' }, // 취소 등 다른 상태 → 무시
 			{ orderCodeNo: 'zz', orderStatus: '1', invcExprNo: '999', exprStatus: '91' } // 모르는 줄
 		];
-		expect(lineUpdatesFromStatus(data, lines, NOW)).toEqual([
+		expect(lineUpdatesFromStatus(data, lines)).toEqual([
 			{ itemId: 'i1', trackingNo: '612345678901', delivered: false },
-			{ itemId: 'i2', trackingNo: '111', delivered: true },
+			{ itemId: 'i2', trackingNo: '111', delivered: false }, // 11일 전 발송이어도 택배사 완료가 아니면 false — 서버 ship_line 이 10일 지남으로 완료 처리
 			{ itemId: 'i3', trackingNo: '222', delivered: true }
 		]);
-		expect(lineUpdatesFromStatus(null, lines, NOW)).toEqual([]);
+		expect(lineUpdatesFromStatus(null, lines)).toEqual([]);
 	});
 });

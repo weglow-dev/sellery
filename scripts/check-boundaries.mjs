@@ -225,6 +225,9 @@ const MYR_MIRROR_RULES = [
   { re: /\brefundedOrders\s*\//, why: "CS 비율을 화면에서 나눔 — 서버 csRate(myr_cs_rate · 0116)를 쓴다" },
   { re: /\.week\.reduce\(/, why: "이번 주 합계를 화면에서 더함 — 서버 weekOrders(week_orders · 0117)를 쓴다" },
   { re: /settleStatus\s*===\s*'none'\s*\|\|/, why: "사업자 · 정산 정보 배너를 입력 상태로 다시 판정 — 서버 hold(myr_seller_next_hold_json · 0116 · homeSettleBanner)를 쓴다" },
+  // 메일 · 발주 · 배송 완료(0118) — 크리에이터 환불 금액 · 출고 마감 · 자동 배송 완료는 서버
+  { re: /\bDELIVERED_AFTER_DAYS\b|\bprepareCutoff\b|getUTCDate\(\),\s*11\)/, why: "출고 마감 · 자동 배송 완료를 TS 에서 판정 — 서버 myr_prepare_cutoff · myr_line_auto_delivered(0118)를 쓴다" },
+  { re: /\.reduce\(\([\w\s,]*\)\s*=>\s*\w+\s*\+\s*[\w.]*\.x\.amount\b/, why: "환불 줄 금액을 메일에서 더함 — 서버 sellerGoods(precheck seller_goods · myr_refund_seller_goods · 0118)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
   { re: /\b(unit|price)\s*\*\s*[\w.]*qty\b|\bqty\s*\*\s*[\w.]*(unit|price)\b/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },

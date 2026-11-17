@@ -1,11 +1,11 @@
 /**
  * 발주 · 송장 수집(0077 · docs/myr.md §6.8 E2 · E3) — 바인허브 OrderStatusToPreparing · OrderStatusToDeliveringOrDelivered 를 MYR 로.
- *   runEbutPrepare(now)     평일 11시 크론 — 오늘 11시(KST) 전 결제 주문의 결제완료 줄 → 이벗 등록 → 성공한 줄만 배송준비중 · 주문 단위 3회 재시도
- *   runEbutShipSync(now)    매일 18시 크론 — 이벗에 등록된 배송준비중 · 배송중 줄 → 송장 · 배송완료 · 새 송장이면 고객 배송 시작 메일 → 남은 배송준비중 지연 표시
+ *   runEbutPrepare()        평일 11시 크론 — 오늘 11시(KST) 전 결제 주문의 결제완료 줄(마감 시각은 서버 0118 myr_prepare_cutoff) → 이벗 등록 → 성공한 줄만 배송준비중 · 주문 단위 3회 재시도
+ *   runEbutShipSync()       매일 18시 크론 — 이벗에 등록된 배송준비중 · 배송중 줄 → 송장 · 배송완료 · 새 송장이면 고객 배송 시작 메일 → 남은 배송준비중 지연 표시
  *   prepareManually(cutoff, dryRun)   이벗 연동 전 운영 수동 전환(운영 스크립트 `myr-ops.mjs prepare`) — 같은 대상 함수 · 이벗 등록 시각 없이
  * 이벗 키가 없으면 두 크론은 아무것도 하지 않고 { skipped: 'disabled' } — 판정 · 상태 전이는 전부 0077 RPC(백엔드 원칙 1).
  */
-import { buildOrderList, groupByOrder, lineUpdatesFromStatus, parsePrepareLines, parseSyncLines, prepareCutoff, registeredItemIds, type PrepareLine } from '../ebut';
+import { buildOrderList, groupByOrder, lineUpdatesFromStatus, parsePrepareLines, parseSyncLines, registeredItemIds, type PrepareLine } from '../ebut';
 import { isCourier } from '../ship-rules';
 import { admin } from './admin.server';
 import { ebutConfig, ebutOrderStatus, ebutRegisterOrders } from './ebut.server';
@@ -13,8 +13,9 @@ import { notifyOrderShipped } from './mail-events.server';
 
 const TRIES = 3;
 
-async function prepareCandidates(cutoff: Date): Promise<PrepareLine[]> {
-	const { data, error } = await admin().rpc('myr_app_admin_prepare_candidates', { p_cutoff: cutoff.toISOString() });
+/** cutoff = 운영이 고른 시각(수동 발주) · null = 서버가 출고 마감(오늘 오전 11시 KST · 0118 myr_prepare_cutoff)으로 정한다 */
+async function prepareCandidates(cutoff: Date | null): Promise<PrepareLine[]> {
+	const { data, error } = await admin().rpc('myr_app_admin_prepare_candidates', { p_cutoff: cutoff ? cutoff.toISOString() : null });
 	if (error) throw new Error(`myr_app_admin_prepare_candidates failed: ${error.message}`);
 	return parsePrepareLines(data);
 }
@@ -29,10 +30,10 @@ async function markPrepared(itemIds: string[], ebut: boolean): Promise<{ count: 
 
 export type PrepareRun = { skipped?: 'disabled'; candidates: number; registered: number; failedOrders: string[] };
 
-export async function runEbutPrepare(now = new Date()): Promise<PrepareRun> {
+export async function runEbutPrepare(): Promise<PrepareRun> {
 	const cfg = ebutConfig();
 	if (!cfg.ready) return { skipped: 'disabled', candidates: 0, registered: 0, failedOrders: [] };
-	const lines = await prepareCandidates(prepareCutoff(now));
+	const lines = await prepareCandidates(null);
 	let pending = groupByOrder(lines);
 	let registered = 0;
 	for (let t = 1; t <= TRIES && pending.size; t++) {
@@ -59,7 +60,7 @@ export async function runEbutPrepare(now = new Date()): Promise<PrepareRun> {
 
 export type ShipSyncRun = { skipped?: 'disabled'; checked: number; shipped: number; delivered: number; mailed: number; delayed: number; failedOrders: string[] };
 
-export async function runEbutShipSync(now = new Date()): Promise<ShipSyncRun> {
+export async function runEbutShipSync(): Promise<ShipSyncRun> {
 	const cfg = ebutConfig();
 	if (!cfg.ready) return { skipped: 'disabled', checked: 0, shipped: 0, delivered: 0, mailed: 0, delayed: 0, failedOrders: [] };
 	const db = admin();
@@ -77,11 +78,12 @@ export async function runEbutShipSync(now = new Date()): Promise<ShipSyncRun> {
 		for (const [orderId, lines] of pending) {
 			try {
 				const status = await ebutOrderStatus(lines.map((l) => ({ orderCodeNo: l.itemId })));
-				for (const u of lineUpdatesFromStatus(status, lines, now)) {
+				for (const u of lineUpdatesFromStatus(status, lines)) {
 					const { data: r, error: e } = await db.rpc('myr_app_admin_ship_line', { p_item_id: u.itemId, p_courier: courier, p_tracking_no: u.trackingNo, p_delivered: u.delivered });
 					if (e || !(r as { ok?: boolean })?.ok) throw new Error(`ship_line ${u.itemId}: ${e?.message ?? JSON.stringify(r)}`);
-					const res = r as { newly_shipped?: boolean; order_id: string; tracking_no: string; ship_status: string };
-					if (res.ship_status === 'DELIVERED' && u.delivered) delivered++;
+					// 배송 완료는 서버가 정한다 — 택배사 완료(u.delivered) 또는 발송 10일 지남(0118 myr_line_auto_delivered) · 응답 delivered
+					const res = r as { newly_shipped?: boolean; delivered?: boolean; order_id: string; tracking_no: string; ship_status: string };
+					if (res.delivered) delivered++;
 					if (res.newly_shipped) {
 						shipped++;
 						// 같은 주문 · 같은 송장(한 박스)은 메일 한 통
