@@ -298,6 +298,56 @@ for (const files of [...myrSrcDirs.map((dir) => walk(dir)), myrScriptFiles]) {
   }
 }
 
+// ---------- (j) 입력 형식 규칙 — 화면(TS)이 미리 알려 주는 값과 서버(SQL)가 최종으로 거절하는 값이 같은지 ----------
+// 택배사 · 송장번호 형식 · 한도 숫자는 원칙 1의 예외(입력 형식 규칙)라 화면과 서버에 둘 다 둔다. 한쪽만 바꾸면
+// 화면 목록에 안 나오거나 서버가 거절하므로, 각 SQL 함수의 마지막 정의(마이그레이션 번호가 가장 큰 것)와 TS 상수를 비교한다.
+{
+  const migDir = join(ROOT, "supabase", "migrations");
+  const migs = readdirSync(migDir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
+  /** 함수의 마지막 정의 본문 — 없으면 null */
+  const sqlBody = (name) => {
+    let body = null;
+    const re = new RegExp(`create or replace function public\\.${name}\\([\\s\\S]*?\\bas \\$\\$([\\s\\S]*?)\\$\\$;`, "gi");
+    for (const f of migs) for (const m of readFileSync(join(migDir, f), "utf8").matchAll(re)) body = m[1];
+    return body;
+  };
+  const tsText = (file) => readFileSync(join(ROOT, file), "utf8");
+  const PAIRS = [
+    {
+      what: "택배사 목록",
+      ts: ["packages/myr-core/src/ship-rules.ts", (t) => JSON.stringify([...(t.match(/export const COURIERS = \[([^\]]*)\]/)?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]))],
+      sql: ["myr_courier_ok", (b) => JSON.stringify([...(b.match(/\bin\s*\(([^)]*)\)/)?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]))]
+    },
+    {
+      what: "송장번호 형식",
+      ts: ["packages/myr-core/src/ship-rules.ts", (t) => t.match(/export const TRACKING_RE = \/(.*)\/;/)?.[1] ?? null],
+      sql: ["myr_tracking_ok", (b) => b.match(/~\s*'([^']*)'/)?.[1] ?? null]
+    },
+    {
+      what: "상품 이미지 장수",
+      ts: ["apps/myr-influencer/src/lib/rules.ts", (t) => t.match(/export const MAX_IMAGES = (\d+);/)?.[1] ?? null],
+      sql: ["myr_product_image_max", (b) => b.match(/select\s+(\d+)/)?.[1] ?? null]
+    },
+    {
+      what: "문의 본문 글자 수",
+      ts: ["packages/myr-core/src/cs-rules.ts", (t) => t.match(/export const CS_BODY_MAX = (\d+);/)?.[1] ?? null],
+      sql: ["myr_cs_body_max", (b) => b.match(/select\s+(\d+)/)?.[1] ?? null]
+    },
+    {
+      what: "환불 사진 장수",
+      ts: ["packages/myr-core/src/refund-rules.ts", (t) => t.match(/export const REFUND_PHOTO_MAX = (\d+);/)?.[1] ?? null],
+      sql: ["myr_refund_photos_too_many", (b) => b.match(/>\s*(\d+)/)?.[1] ?? null]
+    }
+  ];
+  for (const { what, ts: [tsFile, tsGet], sql: [fn, sqlGet] } of PAIRS) {
+    const body = sqlBody(fn);
+    const a = tsGet(tsText(tsFile));
+    const b = body === null ? null : sqlGet(body);
+    if (a === null || b === null || a === "[]" || b === "[]") report("error", join(ROOT, tsFile), 1, `(j) ${what} — 값을 읽지 못함(TS ${a} · SQL ${fn} ${b}) — 검사 정규식을 확인`);
+    else if (a !== b) report("error", join(ROOT, tsFile), 1, `(j) ${what}: 화면(TS ${a}) ≠ 서버(SQL ${fn} ${b}) — 둘을 같이 고친다`);
+  }
+}
+
 // ---------- packages/ui/src/site ----------
 const siteDir = join(ROOT, "packages", "ui", "src", "site");
 for (const file of walk(siteDir)) {
