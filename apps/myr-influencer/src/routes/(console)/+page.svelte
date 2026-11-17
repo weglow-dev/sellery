@@ -176,14 +176,13 @@
 				<span class="hidden text-[14px] text-white/50 lg:inline">합계 <b class="font-bold text-fg tabular-nums">{weekTotal}건</b></span>
 			</div>
 			<div class="rounded-[20px] border border-white/8 bg-white/3 px-4 pt-[18px] pb-3.5 lg:mt-3.5 lg:flex lg:flex-1 lg:flex-col lg:rounded-3xl lg:px-5 lg:pt-[22px] lg:pb-[18px]">
-				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="이번 주 주문 {bars.filter((b) => !b.future).map((b) => `${b.day} ${b.value}건`).join(', ')}">
+				<div class="flex h-[88px] items-end gap-2 lg:h-auto lg:min-h-[140px] lg:flex-1 lg:gap-2.5" role="img" aria-label="이번 주 주문 {bars.map((b) => `${b.day} ${b.value}건`).join(', ')}">
 					{#each bars as b (b.date)}
 						{@const top = b.top}
 						<div class="flex h-full flex-1 flex-col items-center justify-end gap-1.5 lg:gap-2">
-							<!-- 아직 오지 않은 날(서버 future) — 숫자 · 막대 없이 요일만 흐리게 -->
-							<span class="hidden text-[12px] font-bold tabular-nums lg:block {b.future ? 'invisible' : top ? 'text-accent' : 'text-white/45'}">{b.value}</span>
-							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {b.future ? 'bg-white/4' : top ? 'bg-accent' : 'bg-white/12'}" style:height="{b.future ? 2 : Math.max(b.height, 2)}%"></span>
-							<span class="text-[11px] font-semibold lg:text-[12px] {b.future ? 'text-white/22' : top ? 'text-accent' : 'text-white/45'}">{b.day}</span>
+							<span class="hidden text-[12px] font-bold tabular-nums lg:block {top ? 'text-accent' : 'text-white/45'}">{b.value}</span>
+							<span class="w-full rounded-t-md rounded-b-[3px] transition-[height] duration-600 lg:rounded-t-lg lg:rounded-b-sm {top ? 'bg-accent' : 'bg-white/12'}" style:height="{Math.max(b.height, 2)}%"></span>
+							<span class="text-[11px] font-semibold lg:text-[12px] {top ? 'text-accent' : 'text-white/45'}">{b.day}</span>
 						</div>
 					{/each}
 				</div>

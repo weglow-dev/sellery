@@ -1,7 +1,7 @@
--- pgTAP — 0117 콘솔 홈 "이번 주 판매": 이번 주 월 ~ 일(KST · myr_kst_week) · 아직 오지 않은 날 future · 주 합계 week_orders(서로 다른 주문).
+-- pgTAP — 0117 콘솔 홈 "이번 주 판매": 이번 주 월 ~ 일(KST · myr_kst_week) · 아직 오지 않은 날은 0 · 주 합계 week_orders(서로 다른 주문).
 --   기준 시각 2031-03-12(수) 12:00 KST — 이번 주 = 3월 10일(월) ~ 16일(일). 지난 일요일 주문은 빠진다.
 begin;
-select plan(6);
+select plan(5);
 
 select function_privs_are('public', 'myr_kst_week', '{timestamptz}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 kst_week 불가');
 select is(array[public.myr_kst_week('2031-03-12T12:00:00+09'), public.myr_kst_week('2031-03-16T23:59:00+09'), public.myr_kst_week('2031-03-09T23:59:00+09'), public.myr_kst_week('2031-03-09T15:30:00Z')],
@@ -27,9 +27,7 @@ create temp table _s on commit drop as select public.myr_app_seller_sales('00000
 select is((select jsonb_agg(e ->> 'date' order by e ->> 'date') from _s, jsonb_array_elements(_s.v -> 'week') e),
           '["2031-03-10", "2031-03-11", "2031-03-12", "2031-03-13", "2031-03-14", "2031-03-15", "2031-03-16"]'::jsonb, '이번 주 월 ~ 일 7일(요일 순서 고정)');
 select is((select jsonb_agg((e ->> 'orders')::int order by e ->> 'date') from _s, jsonb_array_elements(_s.v -> 'week') e),
-          '[1, 0, 2, 0, 0, 0, 0]'::jsonb, '날짜별 주문 — 월 1 · 수 2(두 줄 주문도 1건) · 지난 일요일 주문은 빠진다');
-select is((select jsonb_agg(e -> 'future' order by e ->> 'date') from _s, jsonb_array_elements(_s.v -> 'week') e),
-          '[false, false, false, true, true, true, true]'::jsonb, '오늘(수) 뒤 목 ~ 일은 아직 오지 않은 날');
+          '[1, 0, 2, 0, 0, 0, 0]'::jsonb, '날짜별 주문 — 월 1 · 수 2(두 줄 주문도 1건) · 아직 오지 않은 목 ~ 일은 0 · 지난 일요일 주문은 빠진다');
 select is((select (v ->> 'week_orders')::int from _s), 3, '이번 주 주문 3건(서로 다른 주문 · 날짜별 합과 같다)');
 
 select * from finish();

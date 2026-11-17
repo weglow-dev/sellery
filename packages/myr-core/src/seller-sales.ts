@@ -3,8 +3,7 @@
  * 크리에이터 콘솔 홈(8번)이 쓰고, 운영 콘솔 실적도 같은 응답을 쓴다. 순매출 · 주문 · 수량 판정 자체는 RPC 하나에만 있다(백엔드 원칙 1). 정산 예상은 여기 없다 — 정산 탭 · 홈이 `myr_settlement_preview` 를 쓴다(옛 payout 은 0099 에서 없앴다).
  */
 
-/** future = 아직 오지 않은 날(이번 주 오늘 뒤 · 서버 0117) */
-export type SellerSalesDay = { date: string; orders: number; future: boolean };
+export type SellerSalesDay = { date: string; orders: number };
 export type SellerSales = {
 	/** 'YYYY-MM' (KST) */
 	month: string;
@@ -34,7 +33,7 @@ export function parseSellerSales(v: unknown): SellerSales {
 	const r = v as Record<string, unknown> | null;
 	if (!r || typeof r !== 'object') return emptySellerSales();
 	const week = Array.isArray(r.week)
-		? (r.week as Record<string, unknown>[]).filter((d) => d && typeof d.date === 'string').map((d) => ({ date: d.date as string, orders: num(d.orders), future: d.future === true }))
+		? (r.week as Record<string, unknown>[]).filter((d) => d && typeof d.date === 'string').map((d) => ({ date: d.date as string, orders: num(d.orders) }))
 		: [];
 	return {
 		month: typeof r.month === 'string' ? r.month : '',
@@ -61,15 +60,8 @@ export function weekdayOf(date: string): string {
 	return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
-/** 이번 주 막대 — 요일 · 값 · 높이(%) · 가장 많은 날 강조 · 아직 오지 않은 날(future · 막대 없이 흐리게). 전부 0 이면 높이 0 */
-export function weekBars(week: SellerSalesDay[]): { day: string; date: string; value: number; height: number; top: boolean; future: boolean }[] {
+/** 이번 주 막대 — 요일 · 값 · 높이(%) · 가장 많은 날 강조. 일곱 요일을 똑같이 그린다(아직 오지 않은 날은 서버가 0 을 준다) · 전부 0 이면 높이 0 */
+export function weekBars(week: SellerSalesDay[]): { day: string; date: string; value: number; height: number; top: boolean }[] {
 	const max = Math.max(0, ...week.map((d) => d.orders));
-	return week.map((d) => ({
-		day: weekdayOf(d.date),
-		date: d.date,
-		value: d.orders,
-		height: max ? Math.round((d.orders / max) * 100) : 0,
-		top: max > 0 && d.orders === max,
-		future: d.future
-	}));
+	return week.map((d) => ({ day: weekdayOf(d.date), date: d.date, value: d.orders, height: max ? Math.round((d.orders / max) * 100) : 0, top: max > 0 && d.orders === max }));
 }
