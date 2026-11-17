@@ -1,7 +1,7 @@
 // CS 관리 › 교환 · 환불(7번 · 0078) — apps/myr-influencer/src/lib/claims.ts (탭 · 기한 · 승인 버튼 · 메시지 칩 · 처리 내역)
 import { describe, expect, it } from 'vitest';
 import { claimFromJson, type Claim } from '@sellery/myr-core/claim-rules';
-import { approveLabel, claimOrderedAmount, claimShipping, claimTabCounts, consoleTimeline, decideConfirm, dueDays, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
+import { approveLabel, claimOrderedAmount, claimShipping, claimTabCounts, consoleTimeline, decideConfirm, dueText, filterClaims, isUrgentPending, replyChips, resolutionOptions } from '../lib/claims';
 
 const NOW = new Date('2026-11-06T12:00:00Z');
 const claim = (o: Record<string, unknown> = {}) =>
@@ -9,6 +9,9 @@ const claim = (o: Record<string, unknown> = {}) =>
 		id: 'c1',
 		code: 'rq2001',
 		status: 'pending',
+		// open · waiting = 서버 값(0099 · 0116) — 픽스처는 서버가 그 상태에 주는 값
+		open: !['done', 'rejected'].includes(String(o.status ?? 'pending')),
+		waiting: (o.status ?? 'pending') === 'pending',
 		step: 'decide',
 		kind: 'refund',
 		reason: '단순 변심',
@@ -24,22 +27,31 @@ const claim = (o: Record<string, unknown> = {}) =>
 		...o
 	}) as Claim;
 
-describe('탭', () => {
-	it('완료 탭은 반려까지 · 전체 = 모두', () => {
-		const list = [claim(), claim({ id: 'c2', status: 'progress' }), claim({ id: 'c3', status: 'done' }), claim({ id: 'c4', status: 'rejected' })];
+describe('탭 — 서버 값 waiting · open(0116 myr_claim_waiting · 0099 myr_claim_status_open)', () => {
+	it('처리 대기 = waiting · 진행 중 = 열렸지만 기다리지 않음 · 완료 = 닫힘(반려 포함) · 전체 = 모두', () => {
+		const list = [
+			claim(),
+			claim({ id: 'c2', status: 'progress', waiting: false }),
+			claim({ id: 'c3', status: 'done', open: false, waiting: false }),
+			claim({ id: 'c4', status: 'rejected', open: false, waiting: false })
+		];
 		expect(claimTabCounts(list).map((t) => [t.id, t.count])).toEqual([['pending', 1], ['progress', 1], ['done', 2], ['all', 4]]);
 		expect(filterClaims(list, 'done').map((c) => c.id)).toEqual(['c3', 'c4']);
+		// 상태 글자로 다시 판정하지 않는다 — 서버가 waiting 이라 하면 처리 대기
+		expect(filterClaims([claim({ status: 'progress', waiting: true })], 'pending')).toHaveLength(1);
 	});
 });
 
-describe('답변 기한 — 접수 뒤 2일', () => {
-	it('오늘 접수 = 2일 · 하루 지나면 오늘 안 · 넘기면 지났어요 · 급함은 처리 대기만', () => {
-		expect(dueDays(claim(), NOW)).toBe(2);
-		expect(dueText(claim(), NOW)).toBe('2일 안에 답변');
-		expect(dueText(claim({ created_at: '2026-11-05T10:00:00Z' }), NOW)).toBe('오늘 안에 답변해주세요');
-		expect(dueText(claim({ created_at: '2026-11-01T10:00:00Z' }), NOW)).toBe('답변 기한이 지났어요');
-		expect(isUrgentPending(claim({ created_at: '2026-11-05T10:00:00Z' }), NOW)).toBe(true);
-		expect(isUrgentPending(claim({ created_at: '2026-11-05T10:00:00Z', status: 'progress' }), NOW)).toBe(false);
+describe('답변 기한 — 서버 값 due(0116 myr_claim_due_json · 설정 myr_claim_answer)', () => {
+	const due = (days: number) => ({ at: '2026-11-08T10:00:00Z', days, overdue: days === 0, urgent: days <= 1 });
+	it('문구만 고른다 — N일 안 · 오늘 안 · 지났어요 · 급함은 서버 urgent', () => {
+		expect(claim({ due: due(2) }).due).toEqual(due(2));
+		expect(dueText(claim({ due: due(2) }))).toBe('2일 안에 답변');
+		expect(dueText(claim({ due: due(1) }))).toBe('오늘 안에 답변해주세요');
+		expect(dueText(claim({ due: due(0) }))).toBe('답변 기한이 지났어요');
+		expect([isUrgentPending(claim({ due: due(1) })), isUrgentPending(claim({ due: due(2) }))]).toEqual([true, false]);
+		// 기다리지 않는 요청은 서버가 due 를 싣지 않는다 — 문구 · 강조 없음
+		expect([claim({ status: 'progress', waiting: false }).due, dueText(claim()), isUrgentPending(claim())]).toEqual([null, '', false]);
 	});
 });
 

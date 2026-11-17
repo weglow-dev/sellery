@@ -77,6 +77,8 @@ export type CsConversation = {
 	id: string;
 	code: string;
 	status: CsStatus;
+	/** 답변을 기다리나 — 서버 값(0116 myr_cs_waiting · 대기 수 myr_app_seller_cs_waiting_of_user 와 같은 함수) */
+	waiting: boolean;
 	type: string;
 	buyerName: string;
 	orderCode: string | null;
@@ -116,6 +118,7 @@ export function parseCsConversation(json: unknown): CsConversation | null {
 		id,
 		code,
 		status: o.status,
+		waiting: o.waiting === true,
 		type: str(o.type, '기타'),
 		buyerName: str(o.buyer_name, '고객'),
 		orderCode: strOrNull(o.order_code),

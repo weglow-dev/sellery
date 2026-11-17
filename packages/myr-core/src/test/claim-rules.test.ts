@@ -68,7 +68,8 @@ const json = (o: Record<string, unknown> = {}) => ({
 	seller: { id: 's1', name: '민지 루틴', handle: '@minji.routine' },
 	...o
 });
-const claim = (o: Record<string, unknown> = {}) => claimFromJson(json(o)) as Claim;
+// waiting = 서버 값(0116 myr_claim_waiting = 처리 대기) — 픽스처는 서버가 그 상태에 주는 값
+const claim = (o: Record<string, unknown> = {}) => claimFromJson({ waiting: (o.status ?? json({}).status) === 'pending', ...json(o) }) as Claim;
 
 describe('입력 — 요청 남기기', () => {
 	it('정상 — 코드 소문자 · 상세 정리 · 사진 중복 제거', () => {

@@ -74,7 +74,7 @@
 								</div>
 							{/if}
 						{/each}
-						{#if q.status === 'OPEN'}
+						{#if q.waiting}
 							<p class="flex items-center gap-1.5 px-1 text-[12px] text-fg-faint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>답변을 기다리고 있어요 · 보통 1영업일 안에 답변돼요</p>
 						{/if}
 					{/if}

@@ -215,6 +215,15 @@ const MYR_MIRROR_RULES = [
   { re: /\bdueDate\s*(<|>|<=|>=)|(<|>|<=|>=)\s*[\w.]*dueDate\b/, why: "발행 기한 지남을 화면에서 판정 — 서버 값 overdue(myr_tax_invoice_overdue · 0104)를 쓴다" },
   // 자동 이체(0111) — 운영 쪽 실패(ops · check)는 서버가 합쳐 보낸다 · 크리에이터 상태 문구는 서버 payoutLabel
   { re: /\btransfer_fail\b|\btransferFail\b/, why: "이체 실패 종류 원본을 화면에서 읽음 — 운영 쪽 이유가 크리에이터에게 샌다. 서버 값 transfer.kind(myr_payout_fail_kind · 0111)를 쓴다" },
+  // 크리에이터 콘솔 화면 값(0116) — 정산 비율 · 처리 대기 · 답변 기한 · 상태 묶음 · CS 비율 · 요청 순위 · 정산 보류 배너는 서버 값
+  { re: /정산금\s*\(\s*(판매의\s*)?\d+\s*%/, why: "정산 비율을 화면에 고정 — 서버 pct(myr_settlement_pct · myr_settlement_card_pct · 0116 · settlePctLabel)를 쓴다" },
+  { re: /\bANSWER_DAYS\b/, why: "답변 기한을 화면에서 계산 — 서버 due(myr_claim_due_json · 설정 myr_claim_answer · 0116)를 쓴다" },
+  { re: /\.status\s*===\s*'OPEN'/, why: "답변 대기를 문의 상태로 다시 판정 — 서버 waiting(myr_cs_waiting · 0116)을 쓴다" },
+  { re: /\bc\.status\s*===\s*'pending'|\bstatus\s*===\s*'pending'\s*\)\.length/, why: "처리 대기를 요청 상태로 다시 판정 — 서버 waiting · 대기 수(myr_claim_waiting · 0116)를 쓴다" },
+  { re: /===\s*'rejected'\s*\|\||\|\|\s*[\w.]*status\s*===\s*'rejected'/, why: "상태 묶음을 화면에서 다시 씀 — 서버 값(요청 open · 상품 console · 정산 hold · 0116)을 쓴다" },
+  { re: /includes\(\s*'pending'\s*\)\s*\?\s*'pending'/, why: "주문의 요청 상태 순위를 화면에서 정함 — 서버 claimStatus · state · tab(myr_order_claim_status · myr_seller_order_state · 0116)을 쓴다" },
+  { re: /\brefundedOrders\s*\//, why: "CS 비율을 화면에서 나눔 — 서버 csRate(myr_cs_rate · 0116)를 쓴다" },
+  { re: /settleStatus\s*===\s*'none'\s*\|\|/, why: "사업자 · 정산 정보 배너를 입력 상태로 다시 판정 — 서버 hold(myr_seller_next_hold_json · 0116 · homeSettleBanner)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
   { re: /\b(unit|price)\s*\*\s*[\w.]*qty\b|\bqty\s*\*\s*[\w.]*(unit|price)\b/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },

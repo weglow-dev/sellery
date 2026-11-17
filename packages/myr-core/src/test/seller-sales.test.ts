@@ -22,11 +22,14 @@ describe('parseSellerSales', () => {
 });
 
 describe('CS 비율 · 7일 막대', () => {
-	it('환불 주문 ÷ 주문 · 소수 첫째 자리 · 주문 없으면 —', () => {
-		expect(csRateText({ orders: 4, refundedOrders: 2 })).toBe('50%');
-		expect(csRateText({ orders: 3, refundedOrders: 1 })).toBe('33.3%');
-		expect(csRateText({ orders: 10, refundedOrders: 0 })).toBe('0%');
-		expect(csRateText({ orders: 0, refundedOrders: 0 })).toBe('—');
+	it('CS 비율은 서버 값(0116 myr_cs_rate) — 화면은 글자만 · 주문 없으면(null) —', () => {
+		expect(parseSellerSales({ ...raw, cs_rate: 33.3 }).csRate).toBe(33.3);
+		expect(parseSellerSales({ ...raw, cs_rate: null }).csRate).toBeNull();
+		expect(parseSellerSales(raw).csRate).toBeNull(); // 서버가 주지 않으면 짐작하지 않는다
+		expect(csRateText({ csRate: 50 })).toBe('50%');
+		expect(csRateText({ csRate: 33.3 })).toBe('33.3%');
+		expect(csRateText({ csRate: 0 })).toBe('0%');
+		expect(csRateText({ csRate: null })).toBe('—');
 	});
 	it('요일은 날짜로(시간대 무관)', () => {
 		expect(['2026-11-09', '2026-11-15'].map(weekdayOf)).toEqual(['월', '일']);

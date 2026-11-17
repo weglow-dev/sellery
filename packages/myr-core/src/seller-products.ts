@@ -11,6 +11,30 @@ export const isSellerProductStatus = (v: unknown): v is SellerProductStatus => S
 /** 반려 의견(0074 · 섹션별) — step 1~7 = 에디터 단계 · null = 상품 전체 */
 export type RejectItem = { step: number | null; msg: string };
 
+/** 콘솔 상품 화면 값(0116 myr_seller_product_console — 상태 · 수정본 상태로 서버가 한 곳에서 정한다 · 화면은 글자만 고른다)
+ *  tabs 내 제품 탭(판매 중 · 심사 중 · 임시저장 · 종료 — 수정 심사 중인 판매 상품은 둘) · homeLive · homePending 홈 개수 ·
+ *  actions 메뉴(continue 이어서 작성 · revise 내용 수정 · review 심사 결과 · groupbuy 공구 링크 · delete 삭제) · opensReview 누르면 바로 심사 결과 ·
+ *  editMode 수정 화면(new 새로 · fix_new 반려 고치기 · edit 수정 심사 · fix_rev 수정 반려 고치기 · null 열 수 없음) */
+export type ProductConsoleTab = 'live' | 'review' | 'draft' | 'ended';
+export type ProductConsoleAction = 'continue' | 'revise' | 'review' | 'groupbuy' | 'delete';
+export type ProductEditMode = 'new' | 'fix_new' | 'edit' | 'fix_rev';
+export type SellerProductConsole = { tabs: ProductConsoleTab[]; homeLive: boolean; homePending: boolean; actions: ProductConsoleAction[]; opensReview: boolean; editMode: ProductEditMode | null };
+const CONSOLE_TABS: readonly string[] = ['live', 'review', 'draft', 'ended'];
+const CONSOLE_ACTIONS: readonly string[] = ['continue', 'revise', 'review', 'groupbuy', 'delete'];
+const EDIT_MODES: readonly string[] = ['new', 'fix_new', 'edit', 'fix_rev'];
+export function parseProductConsole(v: unknown): SellerProductConsole {
+	const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+	const list = (x: unknown, ok: readonly string[]) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string' && ok.includes(y)) : []);
+	return {
+		tabs: list(o.tabs, CONSOLE_TABS) as ProductConsoleTab[],
+		homeLive: o.home_live === true,
+		homePending: o.home_pending === true,
+		actions: list(o.actions, CONSOLE_ACTIONS) as ProductConsoleAction[],
+		opensReview: o.opens_review === true,
+		editMode: typeof o.edit_mode === 'string' && EDIT_MODES.includes(o.edit_mode) ? (o.edit_mode as ProductEditMode) : null
+	};
+}
+
 export type SellerProductRow = {
 	id: string;
 	code: string;
@@ -41,6 +65,8 @@ export type SellerProductRow = {
 	updatedAt: string;
 	/** 판매 중 상품의 수정 심사(0074) — 가장 최근 수정본이 심사 중 · 반려일 때만(반영 · 취소면 null) */
 	revision: SellerProductRevisionState | null;
+	/** 콘솔 탭 · 홈 개수 · 메뉴 · 수정 화면(서버 0116) */
+	console: SellerProductConsole;
 };
 
 /** 수정본 상태(0074) — 목록 · 에디터가 보는 것은 심사 중 · 반려 둘뿐 */
@@ -98,7 +124,8 @@ export function parseSellerProductRows(data: unknown): SellerProductRow[] {
 			reviewedAt: strOrNull(r.reviewed_at),
 			createdAt: str(r.created_at),
 			updatedAt: str(r.updated_at),
-			revision: parseRevisionState(r.revision)
+			revision: parseRevisionState(r.revision),
+			console: parseProductConsole(r.console)
 		});
 	}
 	return out;

@@ -2,7 +2,7 @@
  *  순수 — $app · $env 를 import 하지 않는다(src/test/orders.test.ts). */
 import { KIND_LABEL, type ClaimKind } from '@sellery/myr-core/claim-rules';
 import { SHIP_LABELS, shortDate } from '@sellery/myr-core/order-view';
-import { hasSellerRefund, lineHasRefund, liveLines, sellerClaimStatus, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
+import { lineHasRefund, liveLines, sellerOrderBoxes, sellerOrderLabel, type SellerOrder, type SellerOrderLine } from '@sellery/myr-core/seller-orders';
 import { trackingUrl } from '@sellery/myr-core/ship-rules';
 
 export const ORDER_EMPTY: Record<string, string> = {
@@ -29,11 +29,11 @@ const CHIP_CLS = {
 	claim: 'bg-[#ff6b6b]/14 text-[#ff8a8a]',
 	refunded: 'bg-white/6 text-white/50'
 } as const;
-export function orderChip(o: Pick<SellerOrder, 'items' | 'shipStatus'>): { text: string; cls: string } {
+export function orderChip(o: Pick<SellerOrder, 'state'>): { text: string; cls: string } {
 	const text = sellerOrderLabel(o).text;
-	if (sellerClaimStatus(o)) return { text, cls: CHIP_CLS.claim };
-	if (!o.shipStatus || hasSellerRefund(o)) return { text, cls: CHIP_CLS.refunded };
-	return { text, cls: CHIP_CLS[o.shipStatus] };
+	if (o.state === 'claim_pending' || o.state === 'claim_progress') return { text, cls: CHIP_CLS.claim };
+	if (o.state === 'refunded' || o.state === 'partial_refunded') return { text, cls: CHIP_CLS.refunded };
+	return { text, cls: CHIP_CLS[o.state] };
 }
 
 /** 상품 줄 둘째 줄의 상태 — 진행 중인 요청 → 환불 → 그 줄 배송 상태. alert = 빨강(요청 · 환불) */

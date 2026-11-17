@@ -5,10 +5,12 @@
 import { PRODUCT_IMAGE_BUCKET, PRODUCT_IMAGE_MAX_BYTES, productImagePath } from '../product-images';
 import { sniffImageType } from '../refund-rules';
 import {
+	parseProductConsole,
 	parseSellerProductDetail,
 	parseSellerProductRevision,
 	parseSellerProductRows,
 	type SaveProductCode,
+	type SellerProductConsole,
 	type SellerProductDetail,
 	type SellerProductPayload,
 	type SellerProductRevision,
@@ -35,13 +37,16 @@ export async function listSellerProductsOfUser(userId: string): Promise<SellerPr
 
 /* ---------------- 상품 등록 저장(0073 · 4-1) — 판정은 전부 RPC 안에 있다 ---------------- */
 
-/** 에디터로 다시 열 상품 1건 + 열린 수정본(0074 · 심사 중 · 반려) — 내 상품이 아니면 null */
-export async function getSellerProduct(sellerId: string, productId: string): Promise<{ product: SellerProductDetail; revision: SellerProductRevision | null } | null> {
+/** 에디터로 다시 열 상품 1건 + 열린 수정본(0074 · 심사 중 · 반려) + 콘솔 값(0116 — 수정 화면 editMode) — 내 상품이 아니면 null */
+export async function getSellerProduct(
+	sellerId: string,
+	productId: string
+): Promise<{ product: SellerProductDetail; revision: SellerProductRevision | null; console: SellerProductConsole } | null> {
 	const { data, error } = await admin().rpc('myr_app_seller_product', { p_seller: sellerId, p_id: productId });
 	if (error) throw new Error(`myr_app_seller_product failed: ${error.message}`);
-	const r = data as { ok?: boolean; product?: unknown; revision?: unknown } | null;
+	const r = data as { ok?: boolean; product?: unknown; revision?: unknown; console?: unknown } | null;
 	const product = r?.ok ? parseSellerProductDetail(r.product) : null;
-	return product ? { product, revision: parseSellerProductRevision(r?.revision) } : null;
+	return product ? { product, revision: parseSellerProductRevision(r?.revision), console: parseProductConsole(r?.console) } : null;
 }
 
 /** max = 판매가 상한(0099 myr_product_price_max) — 판매가로 거절됐을 때만 실린다. 콘솔 안내 문구가 이 값을 쓴다(화면에 숫자를 두지 않는다) */

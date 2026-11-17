@@ -30,42 +30,38 @@ describe('줄 환불 판정 — lineHasRefund 하나(탭 · 칩 · 카드 줄 �
 	});
 });
 
-describe('상태 칩 · 탭', () => {
-	it('주문 배송 상태는 서버 값 그대로 — 줄을 훑어 다시 정하지 않는다(0099)', () => {
-		const o = order([line({ id: 'a', ship_status: 'DELIVERED' }), line({ id: 'b', ship_status: 'PREPARING' })], { ship_status: 'PREPARING' });
-		expect(o.shipStatus).toBe('PREPARING');
+describe('상태 칩 · 탭 — 서버 값 그대로(0116 state · tab · claim_status)', () => {
+	it('주문 배송 상태 · 칩 · 탭은 서버 값 — 줄을 훑어 다시 정하지 않는다(0099 · 0116)', () => {
+		const o = order([line({ id: 'a', ship_status: 'DELIVERED' }), line({ id: 'b', ship_status: 'PREPARING' })], { ship_status: 'PREPARING', state: 'PREPARING', tab: 'prep' });
+		expect([o.shipStatus, o.state, o.tab, o.claimStatus]).toEqual(['PREPARING', 'PREPARING', 'prep', null]);
 		expect(order([line({ ship_status: 'PREPARING' })]).shipStatus).toBeNull(); // 서버가 주지 않으면 줄에서 짐작하지 않는다
-		expect(order([line()], { ship_status: 'WHAT' }).shipStatus).toBeNull();
+		expect(order([line()], { ship_status: 'WHAT', state: 'WHAT', tab: 'WHAT' })).toMatchObject({ shipStatus: null, state: 'PAID', tab: 'prep' });
 		expect(sellerOrderLabel(o).text).toBe('배송 준비중');
 		expect(sellerOrderTab(o)).toBe('prep');
 	});
-	it('환불이 하나라도 있으면 환불 완료 탭(부분 포함) · 칩은 남은 줄이 있으면 부분 환불 · 없으면 환불 완료', () => {
-		const part = order([line({ id: 'a', ship_status: 'PAID', status: 'REFUNDED', refunded_qty: 1 }), line({ id: 'b', ship_status: 'SHIPPING' })], { ship_status: 'SHIPPING' });
-		expect(liveLines(part).map((i) => i.id)).toEqual(['b']);
-		expect(sellerOrderLabel(part).text).toBe('부분 환불'); // 환불 완료 탭 — 배송 상태 칩이 아니라 부분 환불(남은 줄 배송은 카드 배송 줄)
-		expect(sellerOrderTab(part)).toBe('refunded');
-		expect(sellerOrderTab(order([line({ qty: 2, refunded_qty: 1, status: 'PARTIAL_REFUNDED' })]))).toBe('refunded');
+	it('상태별 칩 글자 — 요청(처리 대기 · 진행 중) · 환불 완료 · 부분 환불 · 배송 상태', () => {
+		const label = (state: string) => sellerOrderLabel(order([line()], { state })).text;
+		expect(['claim_pending', 'claim_progress', 'refunded', 'partial_refunded', 'SHIPPING', 'DELIVERED'].map(label)).toEqual([
+			'교환 · 환불 요청',
+			'교환 · 환불 진행 중',
+			'환불 완료',
+			'부분 환불',
+			'배송 중',
+			'배송 완료'
+		]);
+		// 화면이 줄 요청 · 환불로 다시 판정하지 않는다 — 줄에 요청이 있어도 서버 상태가 배송이면 배송 칩
+		expect(sellerOrderLabel(order([line({ claim: { code: 'rq1', status: 'pending', kind: 'refund' } })], { state: 'DELIVERED' })).text).toBe('배송 완료');
+		expect(order([line()], { claim_status: 'pending' }).claimStatus).toBe('pending');
 		// 화면은 서버가 준 live 를 그대로 쓴다 — 수량으로 다시 판정하지 않는다(0098)
 		expect(liveLines(order([line({ qty: 2, refunded_qty: 0, live: false })]))).toEqual([]);
-		const all = order([line({ status: 'REFUNDED', refunded_qty: 1, refund_amount: 32000 })]);
-		expect(sellerOrderLabel(all)).toEqual({ text: '환불 완료', tone: 'muted' });
-		expect(sellerOrderTab(all)).toBe('refunded');
-		expect(sellerOrderTab(order([line({ ship_status: 'DELIVERED' })], { ship_status: 'DELIVERED' }))).toBe('delivered'); // 요청 · 환불 없이 끝난 주문만
 	});
-	it('진행 중인 요청이 있으면 칩 · 탭 모두 요청이 먼저(처리 대기 > 진행 중 · 부분 환불보다 먼저)', () => {
-		const o = order([line({ id: 'a', claim: { code: 'rq1', status: 'progress', kind: 'refund' } }), line({ id: 'b', claim: { code: 'rq2', status: 'pending', kind: 'exchange' } })]);
-		expect(sellerOrderLabel(o).text).toBe('교환 · 환불 요청');
-		expect(sellerOrderLabel(order([line({ claim: { code: 'rq1', status: 'progress', kind: 'refund' } })])).text).toBe('교환 · 환불 진행 중');
-		expect(sellerOrderTab(o)).toBe('claim');
-		expect(sellerOrderTab(order([line({ id: 'a', refunded_qty: 1, qty: 2 }), line({ id: 'b', claim: { code: 'rq3', status: 'pending', kind: 'refund' } })]))).toBe('claim');
-	});
-	it('탭 개수 · 필터 — 한 주문은 한 탭에만', () => {
+	it('탭 개수 · 필터 — 한 주문은 한 탭에만(서버 tab)', () => {
 		const list = [
-			order([line({ ship_status: 'PAID' })], { ship_status: 'PAID' }),
-			order([line({ ship_status: 'SHIPPING' })], { id: 'o2', ship_status: 'SHIPPING' }),
-			order([line({ status: 'REFUNDED', refunded_qty: 1 })], { id: 'o3' }),
-			order([line({ claim: { code: 'rq1', status: 'pending', kind: 'refund' } })], { id: 'o4' }),
-			order([line({})], { id: 'o5', ship_status: 'DELIVERED' })
+			order([line()], { state: 'PAID', tab: 'prep' }),
+			order([line()], { id: 'o2', state: 'SHIPPING', tab: 'shipping' }),
+			order([line()], { id: 'o3', state: 'refunded', tab: 'refunded' }),
+			order([line()], { id: 'o4', state: 'claim_pending', tab: 'claim' }),
+			order([line()], { id: 'o5', state: 'DELIVERED', tab: 'delivered' })
 		];
 		expect(sellerOrderTabCounts(list).map((t) => [t.id, t.count])).toEqual([['all', 5], ['prep', 1], ['shipping', 1], ['delivered', 1], ['claim', 1], ['refunded', 1]]);
 		expect(SELLER_ORDER_TABS.map((t) => t.name)).toEqual(['전체', '배송 준비', '배송 중', '배송 완료', '교환·환불', '환불 완료']);

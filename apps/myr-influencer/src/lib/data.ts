@@ -1,6 +1,7 @@
 /** 콘솔 데이터 모양 + 목 데이터 — 디자인(Claude Design "MYR Influencer Admin")의 seedProducts 를 그대로 옮겼다(교환 · 환불 목 seedCs 는 7번 · 0078 에서 서버로 바뀌어 지웠다).
  *  UI 단계라 서버가 없다. 인증·DB 를 붙이면 이 시드는 `myr_products` · `myr_cs_*` · `myr_orders` 조회로 바뀐다(docs/myr.md §3 · §4.2).
  *  $app · $env 를 import 하지 않는 순수 모듈 — vitest 가 읽는다. */
+import type { SellerProductConsole } from '@sellery/myr-core/seller-products';
 
 /** 제품 비주얼 타일 — 사진이 없을 때의 그라데이션 배경. 키마다 제형 아이콘이 정해져 있다(TILE_ICON) */
 export type TileKey = 'grape' | 'lemon' | 'peach' | 'plum' | 'slate' | 'teal';
@@ -86,15 +87,24 @@ export type Product = {
 	meta: string;
 	/** 임시저장 상품의 에디터 입력값 — 다시 열면 이어서 쓴다 */
 	draft?: ProductDraft;
+	/** 콘솔 탭 · 홈 개수 · 메뉴 · 바로 심사 결과 · 수정 화면 — 서버 값(0116 myr_seller_product_console) */
+	console: SellerProductConsole;
 };
 
+/** 목 콘솔 값 — 서버(myr_seller_product_console)가 그 상태에 주는 값 그대로 */
+const MOCK_CONSOLE: Record<'live' | 'review' | 'draft' | 'ended', SellerProductConsole> = {
+	live: { tabs: ['live'], homeLive: true, homePending: false, actions: ['revise', 'groupbuy'], opensReview: false, editMode: 'edit' },
+	review: { tabs: ['review'], homeLive: false, homePending: true, actions: [], opensReview: false, editMode: null },
+	draft: { tabs: ['draft'], homeLive: false, homePending: true, actions: ['continue', 'delete'], opensReview: false, editMode: 'new' },
+	ended: { tabs: ['ended'], homeLive: false, homePending: false, actions: [], opensReview: false, editMode: null }
+};
 export function seedProducts(): Product[] {
 	return [
-		{ id: 'p1', name: '민지의 포도 다이어트 젤리', price: 32000, stock: 184, status: 'live', approved: true, soldOut: false, tile: 'grape', sold: 412, meta: '2주 전 승인' },
-		{ id: 'p7', name: '민지 글루타치온 스틱 — 레몬', price: 36000, stock: 96, status: 'live', approved: true, soldOut: false, tile: 'lemon', sold: 231, meta: '5일 전 승인' },
-		{ id: 'p9', name: '민지 굿나잇 구미', price: 27000, stock: 0, status: 'review', approved: false, soldOut: true, tile: 'plum', sold: 0, meta: '심사 1일차' },
-		{ id: 'p10', name: '프로틴 스틱 (초안)', price: 0, stock: 0, status: 'draft', approved: false, soldOut: true, tile: 'slate', sold: 0, meta: '어제 저장' },
-		{ id: 'p11', name: '민지 콜라겐 필름 (1차)', price: 28000, stock: 0, status: 'ended', approved: false, soldOut: true, tile: 'peach', sold: 1020, meta: '판매 종료' }
+		{ id: 'p1', name: '민지의 포도 다이어트 젤리', price: 32000, stock: 184, status: 'live', approved: true, soldOut: false, tile: 'grape', sold: 412, meta: '2주 전 승인', console: MOCK_CONSOLE.live },
+		{ id: 'p7', name: '민지 글루타치온 스틱 — 레몬', price: 36000, stock: 96, status: 'live', approved: true, soldOut: false, tile: 'lemon', sold: 231, meta: '5일 전 승인', console: MOCK_CONSOLE.live },
+		{ id: 'p9', name: '민지 굿나잇 구미', price: 27000, stock: 0, status: 'review', approved: false, soldOut: true, tile: 'plum', sold: 0, meta: '심사 1일차', console: MOCK_CONSOLE.review },
+		{ id: 'p10', name: '프로틴 스틱 (초안)', price: 0, stock: 0, status: 'draft', approved: false, soldOut: true, tile: 'slate', sold: 0, meta: '어제 저장', console: MOCK_CONSOLE.draft },
+		{ id: 'p11', name: '민지 콜라겐 필름 (1차)', price: 28000, stock: 0, status: 'ended', approved: false, soldOut: true, tile: 'peach', sold: 1020, meta: '판매 종료', console: MOCK_CONSOLE.ended }
 	];
 }
 

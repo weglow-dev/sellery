@@ -81,6 +81,7 @@ export function productFromRow(r: SellerProductRow, now: Date = new Date()): Pro
 		sold: r.soldQty,
 		meta: productMeta(r, now),
 		rejectReason: r.rejectReason,
-		revision: revisionFromRow(r, now)
+		revision: revisionFromRow(r, now),
+		console: r.console
 	};
 }

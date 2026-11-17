@@ -3,7 +3,7 @@
  * 저장 실패 코드 → 문구 · 돌아갈 단계 · 내 제품에서 상품을 눌렀을 때의 메뉴. 순수 — src/test/product-draft.test.ts.
  * 서버(0073)가 길이 · 필수 · 이미지 폴더를 다시 본다 — 여기는 모양만 맞춘다.
  */
-import type { SellerProductDetail, SellerProductPayload, SetStatusAction } from '@sellery/myr-core/seller-products';
+import type { ProductConsoleAction, SellerProductConsole, SellerProductDetail, SellerProductPayload, SetStatusAction } from '@sellery/myr-core/seller-products';
 import { TILE_BG, TILE_ICON, TILE_KEYS, type ProductDraft, type ProductStatus, type TileKey } from './data';
 import { blankDraft, formatPriceInput, parsePrice } from './rules';
 
@@ -111,30 +111,22 @@ export function saveFailure(code: string, field?: string | null, priceMax?: numb
 }
 
 /** 목록에서 누르면 메뉴 없이 바로 "심사 결과" — 반려 · 일시중지 상품의 수정 반려(2026-11-09 수정 반려도 반려와 같게).
- *  판매 중 상품의 수정 반려는 메뉴(심사 결과 보기 · 공구 링크) — 판매 중이라 공구 링크를 만들 수 있다(2026-11-10) */
-export const opensReview = (s: ProductStatus, revision: 'review' | 'rejected' | null = null): boolean =>
-	s === 'rejected' || (revision === 'rejected' && s !== 'live');
+ *  판매 중 상품의 수정 반려는 메뉴(심사 결과 보기 · 공구 링크) — 판매 중이라 공구 링크를 만들 수 있다(2026-11-10). 서버 값(0116 opens_review) */
+export const opensReview = (c: Pick<SellerProductConsole, 'opensReview'>): boolean => c.opensReview;
 
 export type ProductMenuItem = { kind: 'edit' | 'review' | 'groupbuy' | SetStatusAction; label: string; danger?: boolean; confirm?: string };
 
-/** 내 제품에서 상품을 눌렀을 때 메뉴 — 비면 메뉴 없이 안내만. 일시중지 · 다시 판매 · 판매 종료는 메뉴에 없다(운영만 · 0082 · 0083 · §9-6). 판매 중 · 일시중지는 "내용 수정"(수정 심사) — 수정 심사 중이면 빠지고,
- *  수정 반려면 "심사 결과 보기"(운영팀 의견 → 반려 내용 고치기 · 시안). 반려 상품은 목록이 바로 심사 결과로 보낸다(메뉴는 같은 항목 하나).
- *  판매 중이면 "공구 링크"(0086 · 만들기 · 진행 중 실적 · 지난 공구) — 수정 심사 중에도 있다 */
-export function productMenu(s: ProductStatus, revision: 'review' | 'rejected' | null = null): ProductMenuItem[] {
-	const revise: ProductMenuItem[] = revision === 'review' ? [] : [revision === 'rejected' ? { kind: 'review', label: '심사 결과 보기' } : { kind: 'edit', label: '내용 수정' }];
-	switch (s) {
-		case 'draft':
-			return [{ kind: 'edit', label: '이어서 작성' }, { kind: 'delete', label: '삭제', danger: true, confirm: '임시저장한 내용을 지울까요?' }];
-		case 'rejected':
-			return [{ kind: 'review', label: '심사 결과 보기' }];
-		case 'live':
-			return [...revise, { kind: 'groupbuy', label: '공구 링크' }];
-		case 'paused':
-			return revise;
-		default:
-			return [];
-	}
-}
+/** 메뉴 항목 글자 — 어떤 항목이 있는지는 서버 값(0116 myr_seller_product_console actions). 비면 메뉴 없이 안내만.
+ *  일시중지 · 다시 판매 · 판매 종료는 메뉴에 없다(운영만 · 0082 · 0083 · §9-6) · 수정 심사 중이면 "내용 수정"이 빠지고 · 수정 반려면 "심사 결과 보기" ·
+ *  판매 중이면 "공구 링크"(0086) — 이 규칙은 서버 함수 하나가 정한다 */
+const MENU_ITEM: Record<ProductConsoleAction, ProductMenuItem> = {
+	continue: { kind: 'edit', label: '이어서 작성' },
+	revise: { kind: 'edit', label: '내용 수정' },
+	review: { kind: 'review', label: '심사 결과 보기' },
+	groupbuy: { kind: 'groupbuy', label: '공구 링크' },
+	delete: { kind: 'delete', label: '삭제', danger: true, confirm: '임시저장한 내용을 지울까요?' }
+};
+export const productMenu = (c: Pick<SellerProductConsole, 'actions'>): ProductMenuItem[] => c.actions.map((a) => MENU_ITEM[a]);
 
 export const STATUS_ACTION_DONE: Record<SetStatusAction, string> = {
 	delete: '임시저장을 지웠어요'

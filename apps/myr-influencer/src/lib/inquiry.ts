@@ -16,14 +16,15 @@ export const INQ_TABS: { id: InqTab; name: string }[] = [
 	{ id: 'all', name: '전체' }
 ];
 
-export const isWaiting = (c: Pick<CsConversation, 'status'>) => c.status === 'OPEN';
-export const filterInquiries = <T extends Pick<CsConversation, 'status'>>(list: T[], tab: InqTab): T[] =>
+/** 답변 대기 — 서버 값 waiting(0116 myr_cs_waiting · 대기 수와 같은 함수) */
+export const isWaiting = (c: Pick<CsConversation, 'waiting'>) => c.waiting;
+export const filterInquiries = <T extends Pick<CsConversation, 'waiting'>>(list: T[], tab: InqTab): T[] =>
 	tab === 'all' ? list : list.filter((c) => (tab === 'waiting') === isWaiting(c));
-export const inqTabCounts = (list: Pick<CsConversation, 'status'>[]) => INQ_TABS.map((t) => ({ ...t, count: filterInquiries(list, t.id).length }));
+export const inqTabCounts = (list: Pick<CsConversation, 'waiting'>[]) => INQ_TABS.map((t) => ({ ...t, count: filterInquiries(list, t.id).length }));
 export const INQ_EMPTY: Record<InqTab, string> = { waiting: '모든 문의에 답변했어요', answered: '아직 답변한 문의가 없어요', all: '아직 들어온 문의가 없어요' };
 
 /** 상태 칩 */
-export const inqStatus = (c: Pick<CsConversation, 'status'>) =>
+export const inqStatus = (c: Pick<CsConversation, 'waiting'>) =>
 	isWaiting(c) ? { label: '답변 대기', cls: 'bg-accent/16 text-accent' } : { label: '답변 완료', cls: 'bg-white/6 text-white/60' };
 
 /** 유형 칩 색 — 시안 inqTypeMeta */

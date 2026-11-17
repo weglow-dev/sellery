@@ -19,10 +19,12 @@ export const CS_STATUS_META: Record<ClaimStatus, { label: string; cls: string }>
 };
 
 export type CsTab = 'pending' | 'progress' | 'done' | 'all';
-const TAB_MATCH: Record<CsTab, (c: Pick<Claim, 'status'>) => boolean> = {
-	pending: (c) => c.status === 'pending',
-	progress: (c) => c.status === 'progress',
-	done: (c) => c.status === 'done' || c.status === 'rejected',
+/** 탭 — 서버 값으로만 나눈다: 처리 대기 = waiting(0116 myr_claim_waiting) · 진행 중 = 열렸지만 기다리지 않음 · 완료 = 닫힘(open · 0099 myr_claim_status_open) */
+type TabFields = Pick<Claim, 'waiting' | 'open'>;
+const TAB_MATCH: Record<CsTab, (c: TabFields) => boolean> = {
+	pending: (c) => c.waiting,
+	progress: (c) => c.open && !c.waiting,
+	done: (c) => !c.open,
 	all: () => true
 };
 export const CS_TABS: { id: CsTab; name: string }[] = [
@@ -31,24 +33,16 @@ export const CS_TABS: { id: CsTab; name: string }[] = [
 	{ id: 'done', name: '완료' },
 	{ id: 'all', name: '전체' }
 ];
-export const filterClaims = <T extends Pick<Claim, 'status'>>(list: T[], tab: CsTab): T[] => list.filter(TAB_MATCH[tab]);
-export const claimTabCounts = (list: Pick<Claim, 'status'>[]) => CS_TABS.map((t) => ({ ...t, count: filterClaims(list, t.id).length }));
+export const filterClaims = <T extends TabFields>(list: T[], tab: CsTab): T[] => list.filter(TAB_MATCH[tab]);
+export const claimTabCounts = (list: TabFields[]) => CS_TABS.map((t) => ({ ...t, count: filterClaims(list, t.id).length }));
 
-/** 답변 기한 — 접수 뒤 2일(시안 "오늘 안에 답변" · "2일 안에 답변"). 운영 정책이 정해지면 숫자만 바꾼다 */
-export const ANSWER_DAYS = 2;
-const DAY = 86_400_000;
-/** 남은 날(오늘 안 = 1 · 넘기면 0) */
-export function dueDays(c: Pick<Claim, 'createdAt'>, now: Date = new Date()): number {
-	const t = new Date(c.createdAt).getTime();
-	if (!Number.isFinite(t)) return ANSWER_DAYS;
-	return Math.max(0, Math.ceil((t + ANSWER_DAYS * DAY - now.getTime()) / DAY));
-}
-export const dueText = (c: Pick<Claim, 'createdAt'>, now?: Date): string => {
-	const d = dueDays(c, now);
-	return d === 0 ? '답변 기한이 지났어요' : d <= 1 ? '오늘 안에 답변해주세요' : `${d}일 안에 답변`;
+/** 답변 기한 문구 — 기한 · 남은 날 · 지남은 서버 값(0116 myr_claim_due_json · 설정 myr_claim_answer · 기본 2일). 여기서는 문구만 고른다 */
+export const dueText = (c: Pick<Claim, 'due'>): string => {
+	if (!c.due) return '';
+	return c.due.overdue ? '답변 기한이 지났어요' : c.due.urgent ? '오늘 안에 답변해주세요' : `${c.due.days}일 안에 답변`;
 };
-/** 목록 카드 강조 테두리 — 기한이 하루 이하 남은 처리 대기 요청만 */
-export const isUrgentPending = (c: Pick<Claim, 'status' | 'createdAt'>, now?: Date): boolean => c.status === 'pending' && dueDays(c, now) <= 1;
+/** 목록 카드 강조 테두리 — 기한이 하루 이하 남은 처리 대기 요청만(서버 값 due.urgent) */
+export const isUrgentPending = (c: Pick<Claim, 'due'>): boolean => c.due?.urgent === true;
 
 /** 처리 방법 선택지 — DB options 순서 그대로 · 이름은 요청 종류에 따라(claim-rules) · 금액은 서버 예상 금액(claimQuotes · 없으면 금액 없이).
  *  서버가 고를 수 없다고 한 처리(optionDeductions null · 0105 myr_claim_option_blocked — 승인이 BAD_RESOLUTION 으로 거절)는 빼고 보여 준다 */

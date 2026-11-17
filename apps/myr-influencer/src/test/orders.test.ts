@@ -18,16 +18,17 @@ describe('주문 카드', () => {
 		expect(orderMeta({ paidAt: null, buyer: '이*' })).toBe('이*');
 	});
 
-	it('상태 칩 — 글자는 판정 그대로 · 색은 시안(결제 완료 주황 · 배송 준비 흰 · 배송 중 민트 · 완료 흐림 · 요청 빨강)', () => {
-		expect(orderChip(order([line({ ship_status: 'PAID' })], { ship_status: 'PAID' }))).toEqual({ text: '결제 완료', cls: 'bg-accent/16 text-accent' });
-		expect(orderChip(order([line({ ship_status: 'PREPARING' })], { ship_status: 'PREPARING' })).cls).toBe('bg-white/8 text-white/85');
-		expect(orderChip(order([line()])).cls).toBe('bg-mint/16 text-mint');
-		expect(orderChip(order([line({ ship_status: 'DELIVERED' })], { ship_status: 'DELIVERED' })).cls).toBe('bg-white/6 text-white/50');
-		expect(orderChip(order([line({ live: false, left_qty: 0, refunded_qty: 1, status: 'REFUNDED' })], { ship_status: null }))).toEqual({ text: '환불 완료', cls: 'bg-white/6 text-white/50' });
-		// 일부 환불 + 남은 줄 배송 완료 — 환불 완료 탭이라 배송 완료가 아니라 부분 환불(흐림)
-		expect(orderChip(order([line({ qty: 2, left_qty: 1, refunded_qty: 1, status: 'PARTIAL_REFUNDED', ship_status: 'DELIVERED' })], { ship_status: 'DELIVERED' }))).toEqual({ text: '부분 환불', cls: 'bg-white/6 text-white/50' });
-		const claimed = order([line({ claim: { code: 'rq1', status: 'pending', kind: 'refund' } })]);
-		expect(orderChip(claimed)).toEqual({ text: '교환 · 환불 요청', cls: 'bg-[#ff6b6b]/14 text-[#ff8a8a]' });
+	it('상태 칩 — 글자는 서버 state(0116 myr_seller_order_state) 그대로 · 색은 시안(결제 완료 주황 · 배송 준비 흰 · 배송 중 민트 · 완료 흐림 · 요청 빨강)', () => {
+		const chip = (state: string) => orderChip(order([line()], { state }));
+		expect(chip('PAID')).toEqual({ text: '결제 완료', cls: 'bg-accent/16 text-accent' });
+		expect(chip('PREPARING').cls).toBe('bg-white/8 text-white/85');
+		expect(chip('SHIPPING').cls).toBe('bg-mint/16 text-mint');
+		expect(chip('DELIVERED').cls).toBe('bg-white/6 text-white/50');
+		expect(chip('refunded')).toEqual({ text: '환불 완료', cls: 'bg-white/6 text-white/50' });
+		// 일부 환불 + 남은 줄 배송 완료 — 서버가 부분 환불로 준다(환불 완료 탭)
+		expect(chip('partial_refunded')).toEqual({ text: '부분 환불', cls: 'bg-white/6 text-white/50' });
+		expect(chip('claim_pending')).toEqual({ text: '교환 · 환불 요청', cls: 'bg-[#ff6b6b]/14 text-[#ff8a8a]' });
+		expect(chip('claim_progress').cls).toBe('bg-[#ff6b6b]/14 text-[#ff8a8a]');
 	});
 
 	it('줄 상태 — 요청 → 환불(서버 has_refund) → 그 줄 배송 상태 · 요청 · 환불은 빨강', () => {

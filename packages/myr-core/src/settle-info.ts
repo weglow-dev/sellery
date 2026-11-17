@@ -33,6 +33,8 @@ export type SettleInfo = {
 	note: string | null;
 	submittedAt: string | null;
 	checkedAt: string | null;
+	/** 다음 정산 보류 이유(서버 myr_seller_next_hold_json · 정산 탭 next_hold 와 같은 함수 · 0116) — 홈 배너는 code === 'settle_info' 일 때 */
+	hold: { code: string; label: string } | null;
 };
 
 type Obj = Record<string, unknown>;
@@ -57,12 +59,22 @@ export function settleInfoFromJson(v: unknown): SettleInfo | null {
 		status: STATUSES.includes(o.status as SettleStatus) ? (o.status as SettleStatus) : 'none',
 		note: sn(o.note),
 		submittedAt: sn(o.submitted_at),
-		checkedAt: sn(o.checked_at)
+		checkedAt: sn(o.checked_at),
+		hold: holdFrom(o.hold)
 	};
 }
+function holdFrom(v: unknown): SettleInfo['hold'] {
+	const o = obj(v);
+	return o && typeof o.code === 'string' ? { code: o.code, label: s(o.label) } : null;
+}
 
-/** 정산이 막히는가(콘솔 홈 배너) — 미입력 · 다시 입력 필요 */
-export const needsSettleInfo = (i: Pick<SettleInfo, 'status'> | null): boolean => !i || i.status === 'none' || i.status === 'rejected';
+/** 콘솔 홈 사업자 · 정산 정보 배너 — 보일지는 서버 보류 이유(hold.code === 'settle_info' · 정산 탭과 같은 값)가 정한다. 여기서는 입력 상태별 문구 · 색만 고른다(확인 중은 "확인 중") */
+export function homeSettleBanner(i: Pick<SettleInfo, 'status' | 'hold'> | null): { title: string; body: string; tone: 'hold' | 'wait' } | null {
+	if (!i || i.hold?.code !== 'settle_info') return null;
+	if (i.status === 'pending') return { title: '사업자 · 정산 정보를 확인하고 있어요', body: '운영팀이 확인하면 정산금이 지급돼요', tone: 'wait' };
+	if (i.status === 'rejected') return { title: '사업자 · 정산 정보를 다시 입력해 주세요', body: '정보가 확인돼야 정산금이 지급돼요', tone: 'hold' };
+	return { title: '사업자 · 정산 정보를 입력해 주세요', body: '정보가 확인돼야 정산금이 지급돼요', tone: 'hold' };
+}
 
 /* ---------------- 칸 규칙 ---------------- */
 export const digitsOnly = (v: string): string => v.replace(/\D/g, '');

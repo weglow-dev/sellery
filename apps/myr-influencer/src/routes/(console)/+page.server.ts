@@ -6,8 +6,8 @@ import { settlePreviewFromJson, type SettlePreview } from '@sellery/myr-core/sel
 import { isWaiting } from '$lib/inquiry';
 import { productFromRow } from '$lib/product-row';
 import { homeProductCounts } from '$lib/rules';
-import { listSellerClaimsOfUser } from '$lib/server/claims';
-import { listSellerCsOfUser } from '$lib/server/cs';
+import { listSellerClaimsOfUser, myClaimWaiting } from '$lib/server/claims';
+import { listSellerCsOfUser, myInquiryWaiting } from '$lib/server/cs';
 import { getSellerSalesOfUser } from '$lib/server/sales';
 import { getSettleInfoOfUser } from '$lib/server/settle-info';
 import { getSellerSettlePreviewOfUser } from '$lib/server/settlement';
@@ -45,18 +45,22 @@ export const load: PageServerLoad = async (event) => {
 				return settlePreviewFromJson(null);
 			})
 		: Promise.resolve(settlePreviewFromJson(null));
+	// 처리 대기 수 — 서버 함수(0116 myr_claim_waiting · myr_cs_waiting · 레이아웃 뱃지와 같은 값) · 목록을 다시 세지 않는다
+	const claimWaitingP = myClaimWaiting(event);
+	const inqWaitingP = myInquiryWaiting(event);
 	const { rows } = await myProducts(event);
-	const [sales, inquiries, claims, settle, preview] = await Promise.all([salesP, inqP, claimP, settleP, previewP]);
-	const pendingClaims = claims.filter((c) => c.status === 'pending');
+	const [sales, inquiries, claims, settle, preview, claimWaiting, inqWaiting] = await Promise.all([salesP, inqP, claimP, settleP, previewP, claimWaitingP, inqWaitingP]);
+	// 오늘 처리할 일 후보 — 서버 값 waiting(처리 대기 요청 · 답변 대기 문의)
+	const pendingClaims = claims.filter((c) => c.waiting);
 	const waiting = inquiries.filter(isWaiting);
 	// 오늘 처리할 일 — 처리 대기 교환 · 환불(오래된 순) 먼저, 남는 자리에 답변 대기 문의(오래된 순) — 합쳐 3건
 	const todayClaims = [...pendingClaims]
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, 3)
-		.map((c) => ({ code: c.code, kind: c.kind, reason: c.reason, qty: c.qty, name: c.order.item.name, buyerName: c.buyerName, createdAt: c.createdAt, product: c.product }));
+		.map((c) => ({ code: c.code, kind: c.kind, reason: c.reason, qty: c.qty, name: c.order.item.name, buyerName: c.buyerName, createdAt: c.createdAt, due: c.due, product: c.product }));
 	const todayInquiries = [...waiting]
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, Math.max(0, 3 - todayClaims.length))
 		.map((c) => ({ code: c.code, type: c.type, buyerName: c.buyerName, question: c.firstBody ?? '', createdAt: c.createdAt, product: c.product }));
-	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting: waiting.length, claimWaiting: pendingClaims.length, sales, preview, todayInquiries, todayClaims, settleStatus: settle?.status ?? null };
+	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting, claimWaiting, sales, preview, todayInquiries, todayClaims, settleInfo: settle };
 };
