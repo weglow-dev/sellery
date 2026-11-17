@@ -295,7 +295,7 @@ insert into _rules (label, pat, allowed) values
   ('줄 지급액(정산금 − 상계 + 보증금 환급)',   $p$settle\s*-\s*[\w.]*offset$p$,                                   '{myr_settlement_row_payout}'),
   ('순매출(판매 − 정산 뒤 환불)',              $p$sales\w*(,\s*0\))?\s*-\s*(coalesce\()?[\w.]*refund_adj$p$,      '{myr_settlement_net_sales}'),
   ('정산 줄 판매 줄 수',                       $p$count\(\*\)(::integer)?\s+from\s+public\.myr_settlement_items\s+\w+\s+where\s+\w+\.row_id\s*=\s*[\w.]+\s+and\s+\w+\.kind\s*=\s*'sale'$p$, '{myr_settlement_row_lines}'),
-  ('다음 회차가 풀 보류 줄',                   $p$status\s*=\s*'held'\s+and\s+public\.myr_mfg_has_ledger$p$,        '{myr_settlement_row_releasable}'),
+  ('다음 회차가 풀 보류 줄 — 원장 확인 뒤 보류 줄을 따로 고르는 모양도', $p$status\s*=\s*'held'\s+and\s+public\.myr_mfg_has_ledger|myr_mfg_has_ledger\([^)]*\)[\s\S]{0,250}status\s*=\s*'held'$p$, '{myr_settlement_row_releasable}'),
   ('정산 탭 카드 줄(지급 건 회차 비교)',       $p$run_id\s*<>$p$,                                                 '{myr_settlement_card_rows}'),
   ('제조금액 합',                              $p$sum\(\s*(\w+\.)?amount\)\s+from\s+public\.myr_mfg_batches$p$,   '{myr_mfg_total}'),
   ('상계 합',                                  $p$sum\(\s*(\w+\.)?offset_amount\)(,\s*0\)\s*into\s+\w+)?\s+from\s+public\.myr_settlement_rows$p$, '{myr_mfg_offset_total}'),
