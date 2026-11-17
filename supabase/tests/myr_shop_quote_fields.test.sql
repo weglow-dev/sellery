@@ -1,7 +1,7 @@
 -- pgTAP — 0115 샵 화면 숫자를 서버 견적에서: 결제 금액(myr_pay_amount) · 재고 초과(myr_stock_short) · 한 번에 결제할 줄 수(myr_checkout_lines_max · _over).
 --   견적(장바구니 · 상품 페이지)과 결제 생성(BAD_LINES · SOLD_OUT)이 같은 함수를 쓰는지 고정한다.
 begin;
-select plan(21);
+select plan(24);
 
 select function_privs_are('public', 'myr_pay_amount', '{bigint,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 pay_amount 불가');
 select function_privs_are('public', 'myr_stock_short', '{integer,integer}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 stock_short 불가');
@@ -12,7 +12,9 @@ insert into auth.users (id, instance_id, aud, role, email, encrypted_password, e
 values ('00000000-0000-4000-8000-00000000fe01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-shopq@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
 insert into public.sellers (id, name, handle, platform, active) values ('00000000-0000-4000-8000-00000000fe11', '민지 루틴', '@pgtap.shopq', 'instagram', true);
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon, options)
-values ('00000000-0000-4000-8000-00000000fe21', 'pgtap-sq2-a', '00000000-0000-4000-8000-00000000fe11', 'diet', '레몬 스틱', 36000, 5, 'listed', 'pill', '[]'::jsonb);
+values ('00000000-0000-4000-8000-00000000fe21', 'pgtap-sq2-a', '00000000-0000-4000-8000-00000000fe11', 'diet', '레몬 스틱', 36000, 5, 'listed', 'pill', '[]'::jsonb),
+       ('00000000-0000-4000-8000-00000000fe22', 'pgtap-sq2-opt', '00000000-0000-4000-8000-00000000fe11', 'diet', '옵션 젤리', 20000, 5, 'listed', 'pill',
+        '[{"n":"A","price":"20000"},{"n":"B","price":"20000"}]'::jsonb);
 
 -- ---------- 함수 ----------
 select is(public.myr_pay_amount(47000, 3000), 50000::bigint, '결제 금액 = 상품 합계 + 배송비');
@@ -34,7 +36,16 @@ select is(public.myr_app_cart_quote('[{"code":"pgtap-sq2-none","qty":1}]') #> '{
 select is(public.myr_app_cart_quote((select jsonb_agg(jsonb_build_object('code', 'pgtap-sq2-x' || g, 'qty', 1)) from generate_series(1, 21) g)) ->> 'lines_over', 'true',
           '견적 21줄 — lines_over true(견적은 50줄까지 받는다)');
 
+-- 같은 상품의 옵션은 합쳐서 본다(재고는 상품 하나 · 결제 생성 0097 과 같은 값) — A 3 + B 3 > 남은 5 → 두 줄 다 모자람
+select is((select jsonb_agg(e -> 'over_stock') from jsonb_array_elements(public.myr_app_cart_quote('[{"code":"pgtap-sq2-opt","option_index":0,"qty":3},{"code":"pgtap-sq2-opt","option_index":1,"qty":3}]') -> 'lines') e),
+          '[true, true]'::jsonb, '옵션 A 3 · B 3(남은 5) — 상품별 합 6 이라 두 줄 다 over_stock');
+select is((select jsonb_agg(e -> 'over_stock') from jsonb_array_elements(public.myr_app_cart_quote('[{"code":"pgtap-sq2-opt","option_index":0,"qty":3},{"code":"pgtap-sq2-opt","option_index":1,"qty":2}]') -> 'lines') e),
+          '[false, false]'::jsonb, '옵션 A 3 · B 2(남은 5) — 합 5 라 모자라지 않음');
+
 -- ---------- 결제 생성 — 같은 함수로 거절 ----------
+select is(public.myr_app_create_checkout(null, null, '{"name":"A"}'::jsonb, '{"recipient":"A","address1":"서울"}'::jsonb,
+          '[{"code":"pgtap-sq2-opt","option_index":0,"qty":3},{"code":"pgtap-sq2-opt","option_index":1,"qty":3}]', 'myr_sq2_opt001') #>> '{items,0,reason}',
+          'SOLD_OUT', '결제 옵션 A 3 · B 3(남은 5) — SOLD_OUT(견적 over_stock 과 같은 값)');
 select is(public.myr_app_create_checkout(null, null, '{"name":"A"}'::jsonb, '{"recipient":"A","address1":"서울"}'::jsonb,
           (select jsonb_agg(jsonb_build_object('code', 'pgtap-sq2-x' || g, 'qty', 1)) from generate_series(1, 21) g), 'myr_sq2_000001') ->> 'code',
           'BAD_LINES', '결제 21줄 — BAD_LINES(견적 lines_over 와 같은 함수)');

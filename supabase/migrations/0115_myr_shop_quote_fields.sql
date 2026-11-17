@@ -4,7 +4,8 @@
 --   점검(백엔드 원칙 1 · 샵 화면):
 --     장바구니 · 결제 화면 총 결제 금액     화면이 itemsAmount + shippingFee 로 더했다(결제 · 주문 표 amount 생성 칸과 같은 식)
 --     장바구니 재고 초과 안내               화면이 qty > stockLeft 로 판정했다(결제 생성 · 승인의 SOLD_OUT 은 v_left < v_tot · v_left < v_need) ·
---                                           견적의 남은 수량은 내 대기 결제 몫을 빼지 않아 결제 생성과 달랐다 → 견적이 누구의 것인지 받는다
+--                                           견적의 남은 수량은 내 대기 결제 몫을 빼지 않아 결제 생성과 달랐다 → 견적이 누구의 것인지 받는다 ·
+--                                           결제 생성은 같은 상품의 옵션 수량을 합쳐 비교한다 → 견적도 상품별 합으로(그 상품의 줄 모두 over_stock)
 --     한 번에 결제할 줄 수                  장바구니 · 견적은 50줄까지 받는데 결제는 20줄(c_max_lines) — 21~50줄을 고르면 결제에서 BAD_LINES
 --     상품 페이지 [담기] 금액 · 무료배송 문구  화면이 단가 × 수량 · "5만원" 고정 — 견적 한 줄(line_amount · free_over)로 바꾼다(앱 코드)
 --   고침:
@@ -76,8 +77,13 @@ declare
   v_rule  jsonb := public.myr_shipping_rule();
   v_fee   integer;
   v_left  integer;
+  v_need  jsonb;
 begin
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) > 50 then return jsonb_build_object('ok', false, 'code', 'BAD_LINES'); end if;
+  -- 상품별로 담은 수량 합(옵션을 합친다) — 재고는 상품 하나에 걸려 있다(결제 생성이 옵션을 합쳐 SOLD_OUT 을 보는 것과 같은 값 · 0097)
+  select coalesce(jsonb_object_agg(x.code, x.qty), '{}'::jsonb) into v_need
+    from (select lower(btrim(coalesce(e ->> 'code', ''))) as code, sum(greatest(public.myr_qty_parse(e ->> 'qty'), 0)) as qty
+            from jsonb_array_elements(p_lines) e group by 1) x;
   for l in select * from jsonb_array_elements(p_lines) loop
     v_code := lower(btrim(coalesce(l ->> 'code', '')));
     v_opt  := case when (l ->> 'option_index') is null then 0 when (l ->> 'option_index') ~ '^\d{1,3}$' then (l ->> 'option_index')::int else -1 end;
@@ -97,8 +103,8 @@ begin
     v_left := public.myr_product_buyable(p, public.myr_checkout_own_held(p.id, p_user_id, p_prev_checkout_id));
     v_out := v_out || (jsonb_build_object('code', v_code, 'option_index', v_opt, 'qty', v_qty, 'line_amount', public.myr_line_amount(v_unit, v_qty),
                                           'stock_left', v_left,
-                                          -- 0115: 남은 수량보다 많이 담았는지 — 결제 생성 · 승인의 SOLD_OUT 과 같은 함수(myr_stock_short)
-                                          'over_stock', public.myr_stock_short(v_left, v_qty),
+                                          -- 0115: 남은 수량보다 많이 담았는지 — 결제 생성 · 승인의 SOLD_OUT 과 같은 함수 · 같은 값(상품별 합 · myr_stock_short)
+                                          'over_stock', public.myr_stock_short(v_left, (v_need ->> v_code)::int),
                                           'base_amount', public.myr_line_amount((v_price ->> 'base_price')::integer, v_qty))
                        || (v_price - 'groupbuy_id'));
     v_items := v_items + coalesce(public.myr_line_amount(v_unit, v_qty), 0);
