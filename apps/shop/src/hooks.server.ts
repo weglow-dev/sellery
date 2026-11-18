@@ -19,7 +19,13 @@ const supabase: Handle = async ({ event, resolve }) => {
 					cookies: {
 						getAll: () => event.cookies.getAll(),
 						setAll: (cookiesToSet, headers) => {
-							for (const { name, value, options } of cookiesToSet) event.cookies.set(name, value, { ...options, path: '/' });
+							try {
+								for (const { name, value, options } of cookiesToSet) event.cookies.set(name, value, { ...options, path: '/' });
+							} catch (e) {
+								// 응답이 나간 뒤의 쿠키 쓰기는 SvelteKit 이 throw 한다 — 갱신 콜백 안의 처리되지 않은 에러라 dev 서버(Node)가 통째로 죽는다.
+								// 아래에서 resolve 전에 토큰 갱신을 끝내 두므로 정상 경로에선 오지 않는다. 와도 서버는 살리고 로그만(apps/myr-shop 과 같은 처리)
+								console.warn('[hooks] 응답 뒤 세션 쿠키 쓰기 무시', e);
+							}
 							authHeaders = headers; // Cache-Control: private, no-store … — 쿠키를 쓴 응답을 CDN 이 캐시하지 않게 (§8.3)
 						}
 					}
@@ -35,6 +41,10 @@ const supabase: Handle = async ({ event, resolve }) => {
 		if (error || !user) return { session: null, user: null };
 		return { session, user };
 	};
+	// 토큰 갱신(=새 쿠키 쓰기)을 응답 생성 전에 끝낸다. load 에서만 부르면 갱신이 응답보다 늦게 끝나는 경우가 있어 cookies.set 이 throw 하고(위)
+	// 새 토큰이 브라우저에 안 가 다음 요청에서 이미 쓴 refresh token 으로 로그아웃된다. getSession 은 토큰이 살아 있으면 네트워크 없이 끝나고
+	// 만료됐을 때만 갱신한다 — getUser(Auth 왕복)는 부르지 않으므로 요청 비용은 그대로다(apps/myr-shop 과 같은 처리)
+	if (event.locals.supabase) await event.locals.supabase.auth.getSession().catch(() => undefined);
 	const response = await resolve(event, {
 		filterSerializedResponseHeaders: (name) => name === 'content-range' || name === 'x-supabase-api-version'
 	});
