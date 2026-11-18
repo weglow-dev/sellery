@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(230);
+select plan(237);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -396,6 +396,12 @@ insert into _rules (label, pat, allowed) values
   ('받는 택배사 목록',                          $p$'CJ대한통운'$p$,                                                        '{myr_courier_ok}'),
   ('송장번호 형식(숫자 8~30자리)',               $p$\\d\{8,30\}$p$,                                                      '{myr_tracking_ok}'),
   ('번호 정리(공백 · 하이픈 빼기) — 세금계산서 번호는 다른 번호', $p$\[\\s-\]$p$,                                       '{myr_tracking_no,myr_tax_invoice_no}'),
+  ('휴대폰 번호 형식(01x + 7~8자리) — 가입 연락처 · 대표자 휴대폰', $p$01\[016789\]$p$,                                   '{myr_mobile_ok}'),
+  ('개인사업자 · 법인(사업자번호 가운데 두 자리 80~89)', $p$between\s+80\s+and\s+89|substr\([^)]*,\s*4,\s*2\)$p$,   '{myr_biz_kind}'),
+  ('토스 셀러 상태 → 카드 상태(본인인증 전 · 추가 인증 · 한도 없음 · 인증 완료)', $p$toss_seller_status\s*(=|<>)\s*'$p$,                  '{myr_toss_card_state}'),
+  ('저장 뒤 토스 셀러에 할 일(register · update)', $p$then\s+'register'$p$,                                              '{myr_app_seller_settle_info_save}'),
+  ('사업자번호가 들어 있나(숫자 10자리)',       $p$biz_no\s*~\s*'$p$,                                                     '{myr_has_biz_no}'),
+  ('숫자만 남기기(''\D'' · ''[^0-9]'')',       $p$'(\\D|\[\^0-9\])'\s*,\s*''\s*,\s*'g'$p$,                          '{myr_digits}'),
   -- 상태 비교는 정규형으로만(status = 'X' · <> · in (…) · 값이 빌 수 있으면 coalesce(status = 'X', false)) — 판정별 규칙이 정규형으로 적혀 있으므로
   --   다른 모양(순서 바꾸기 · != · any(array) · is distinct from · 형 변환 · 값 하나짜리 in)은 금지해 빠져나가지 못하게 한다. 변수(v_status · p_ship_status)도 같다.
   --   순서 바꾸기에서 JSON 키 비교(x ->> 'status' = p_status)는 상태 글자 비교가 아니라 뺀다(따옴표 앞이 >)
@@ -407,6 +413,9 @@ insert into _rules (label, pat, allowed) values
   ('상태 비교 값 하나짜리 in(status in (''X'')) — 금지 · status = ''X'' 로', $p$status\s+(not\s+)?in\s*\(\s*'\w+'\s*\)$p$,    '{}'),
   ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days}');
 
+-- 표 제약도 같은 형식 규칙을 따로 쓰지 않는다(함수 본문 검사가 못 보는 곳) — 휴대폰 형식은 myr_mobile_ok
+select is((select string_agg(c.conrelid::regclass || '.' || c.conname, ', ') from pg_constraint c where c.contype = 'c' and pg_get_constraintdef(c.oid) ~ '01\[016789\]'), null,
+          '표 제약에 휴대폰 정규식이 없다(myr_mobile_ok 를 부른다)');
 -- 한 함수 안에서 같은 조건을 두 번 쓰지 않는다(지급 건 만들기 — 담을 줄은 한 번만 고른다)
 select is((select count(*)::int from _fn f, regexp_matches(f.src, 'not\s+p_past_run', 'g') where f.proname = 'myr_payout_collect'), 1, '지급 건 만들기 — 담을 줄 조건은 한 번만');
 select is(coalesce((select string_agg(f.proname, ', ' order by f.proname) from _fn f where f.src ~ r.pat and not (f.proname = any (r.allowed))), ''), '',

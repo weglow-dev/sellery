@@ -103,6 +103,27 @@ export function parseSignupForm(fd: { get(name: string): unknown }): SignupValue
 
 /** 서버가 가입을 거절했을 때 화면이 할 일 — 링크가 닫혔으면 만료 화면 · 칸 문제면 그 칸 · 그 밖은 폼 위 안내 */
 export type SignupFailure = { screen: 'expired' } | { field: SignupField | 'terms'; message: string } | { message: string };
+/**
+ * 가입이 시스템 쪽에서 실패했을 때(입력 문제가 아닐 때) — 원인에 따라 할 일이 달라 문구를 나눈다.
+ *   network  요청이 서버에 닿지 못함(인터넷 끊김 · 서버 꺼짐) — 다시 누르면 된다
+ *   server   서버 · DB 오류(계정 만들기 실패 · DB 호출 실패 · 서버 예외) — 잠시 뒤 다시, 계속되면 파트너팀
+ * 둘 다 입력한 내용은 화면에 그대로 남는다.
+ */
+export const SIGNUP_SYSTEM_ERROR = {
+	network: '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 눌러주세요 · 입력한 내용은 그대로 있어요',
+	server: '일시적인 문제로 가입하지 못했어요. 입력한 내용은 그대로 있으니 잠시 뒤 다시 눌러주세요 · 계속되면 MYR 파트너팀에 알려주세요'
+} as const;
+
+/** 서버가 칸 입력을 거절했을 때(INVALID_INPUT · 화면 검사를 건너뛴 요청 등) 그 칸에 띄울 안내 — 서버 규칙(0070 · 0121)을 말로 */
+export const SERVER_FIELD_MESSAGE: Record<SignupField, string> = {
+	password: `비밀번호는 ${PASSWORD_MIN}~72자로 써주세요`,
+	confirm: '비밀번호를 한 번 더 똑같이 입력해주세요',
+	name: `활동명은 1~${NAME_MAX}자로 써주세요`,
+	handle: `핸들은 영문 소문자 · 숫자 · . _ 로 ${HANDLE_MIN}~${HANDLE_MAX}자예요`,
+	platform: '대표 채널을 하나 골라주세요',
+	phone: '휴대폰 번호를 확인해주세요 · 01로 시작하는 숫자 10~11자리예요'
+};
+
 export function acceptFailure(code: AcceptCode | string, field?: string | null): SignupFailure {
 	switch (code) {
 		case 'NOT_FOUND':
@@ -118,7 +139,7 @@ export function acceptFailure(code: AcceptCode | string, field?: string | null):
 			return { field: 'password', message: '더 길거나 복잡한 비밀번호를 써주세요' };
 		case 'INVALID_INPUT':
 			if (field === 'terms') return { field: 'terms', message: '약관과 개인정보 수집 · 이용에 동의해주세요' };
-			if (field && (SIGNUP_FIELDS as string[]).includes(field)) return { field: field as SignupField, message: '입력한 값을 다시 확인해주세요' };
+			if (field && (SIGNUP_FIELDS as string[]).includes(field)) return { field: field as SignupField, message: SERVER_FIELD_MESSAGE[field as SignupField] };
 			return { message: '입력한 값을 다시 확인해주세요' };
 		case 'EMAIL_HAS_ACCOUNT':
 			return { message: '이 이메일로 만든 계정이 이미 있어요. 로그인하거나 MYR 파트너팀에 알려주세요' };
@@ -127,7 +148,7 @@ export function acceptFailure(code: AcceptCode | string, field?: string | null):
 		case 'EMAIL_MISMATCH':
 			return { message: '이미 크리에이터로 등록된 이메일이에요. 로그인해주세요' };
 		default:
-			return { message: '가입을 마치지 못했어요. 잠시 후 다시 시도해주세요' };
+			return { message: SIGNUP_SYSTEM_ERROR.server };
 	}
 }
 

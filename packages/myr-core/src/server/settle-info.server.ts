@@ -13,7 +13,9 @@ export async function getSettleInfoOfUser(userId: string): Promise<SettleInfo | 
 	return settleInfoFromJson(data);
 }
 
-export type SettleSaveResult = { ok: true; recheck: boolean; info: SettleInfo } | { ok: false; code: string };
+/** tossAction — 저장 뒤 토스 셀러에 할 일(서버 0121 판정): register (다시) 등록 → 새로 본인인증 · update 셀러 수정 → 인증 유지 · null 할 일 없음 */
+export type TossSellerAction = 'register' | 'update' | null;
+export type SettleSaveResult = { ok: true; recheck: boolean; tossAction: TossSellerAction; info: SettleInfo } | { ok: false; code: string };
 export async function saveSettleInfoOfUser(userId: string, b: SettleSaveBody): Promise<SettleSaveResult> {
 	const { data, error } = await admin().rpc('myr_app_seller_settle_info_save', {
 		p_user: userId,
@@ -22,16 +24,18 @@ export async function saveSettleInfoOfUser(userId: string, b: SettleSaveBody): P
 		p_biz_no: b.bizNo,
 		p_bank: b.bank,
 		p_account: b.account,
-		p_holder: b.holder
+		p_holder: b.holder,
+		p_ceo_phone: b.ceoPhone,
+		p_toss_agreed: b.tossAgreed
 	});
 	if (error) {
 		console.error('[settle-info] save failed:', error.message);
 		return { ok: false, code: 'DB_ERROR' };
 	}
-	const r = data as { ok?: boolean; code?: string; recheck?: boolean; info?: unknown } | null;
+	const r = data as { ok?: boolean; code?: string; recheck?: boolean; toss_action?: unknown; info?: unknown } | null;
 	const info = settleInfoFromJson(r?.info);
 	if (!r?.ok || !info) return { ok: false, code: typeof r?.code === 'string' ? r.code : 'DB_ERROR' };
-	return { ok: true, recheck: r.recheck === true, info };
+	return { ok: true, recheck: r.recheck === true, tossAction: r.toss_action === 'register' || r.toss_action === 'update' ? r.toss_action : null, info };
 }
 
 /* ---------------- 운영(콘솔 전까지 myr-creators.mjs 가 같은 RPC 를 부른다) ---------------- */

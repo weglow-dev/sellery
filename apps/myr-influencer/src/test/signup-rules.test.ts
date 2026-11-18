@@ -1,6 +1,6 @@
 // 크리에이터 초대 가입 규칙 — apps/myr-influencer/src/lib/signup-rules.ts
 import { describe, expect, it } from 'vitest';
-import { HANDLE_MAX, HANDLE_STATUS_MESSAGE, PLATFORMS, SIGNUP_FIELDS, TERMS, acceptFailure, allAgreed, cleanHandleInput, inviteValidity, isPlatform, missingCount, parseSignupForm, platformName, signupErrors, submitLabel, type SignupValues } from '../lib/signup-rules';
+import { HANDLE_MAX, HANDLE_STATUS_MESSAGE, PLATFORMS, SERVER_FIELD_MESSAGE, SIGNUP_FIELDS, SIGNUP_SYSTEM_ERROR, TERMS, acceptFailure, allAgreed, cleanHandleInput, inviteValidity, isPlatform, missingCount, parseSignupForm, platformName, signupErrors, submitLabel, type SignupValues } from '../lib/signup-rules';
 
 const ok: SignupValues = {
 	password: 'abcd1234',
@@ -105,14 +105,19 @@ describe('acceptFailure — 서버 거절 코드 → 화면이 할 일', () => {
 		expect(acceptFailure('HANDLE_TAKEN')).toEqual({ field: 'handle', message: HANDLE_STATUS_MESSAGE.taken });
 		expect(acceptFailure('RESERVED_HANDLE')).toEqual({ field: 'handle', message: HANDLE_STATUS_MESSAGE.reserved });
 		expect(acceptFailure('WEAK_PASSWORD')).toMatchObject({ field: 'password' });
-		expect(acceptFailure('INVALID_INPUT', 'phone')).toMatchObject({ field: 'phone' });
+		expect(acceptFailure('INVALID_INPUT', 'phone')).toEqual({ field: 'phone', message: SERVER_FIELD_MESSAGE.phone });
+		expect(acceptFailure('INVALID_INPUT', 'name')).toEqual({ field: 'name', message: '활동명은 1~30자로 써주세요' });
+		// 칸마다 그 칸 규칙을 말한다(뭉뚱그린 "다시 확인" 없음)
+		expect(new Set(SIGNUP_FIELDS.map((f) => SERVER_FIELD_MESSAGE[f])).size).toBe(SIGNUP_FIELDS.length);
 		expect(acceptFailure('INVALID_INPUT', 'terms')).toMatchObject({ field: 'terms' });
 		expect(acceptFailure('INVALID_INPUT', 'evil')).not.toHaveProperty('field');
 	});
 	it('계정 문제 · 그 밖은 칸 없는 안내', () => {
 		expect(acceptFailure('EMAIL_HAS_ACCOUNT')).toEqual({ message: expect.stringContaining('계정이 이미') });
 		for (const c of ['ALREADY_CREATOR', 'ALREADY_LINKED', 'EMAIL_MISMATCH']) expect(acceptFailure(c), c).toEqual({ message: expect.stringContaining('로그인') });
-		expect(acceptFailure('DB_ERROR')).toEqual({ message: expect.stringContaining('잠시 후') });
-		expect(acceptFailure('???')).toEqual({ message: expect.stringContaining('잠시 후') });
+		// 시스템 오류는 "입력 그대로 · 잠시 뒤 · 계속되면 파트너팀" — 인터넷 끊김(화면이 정한다)과 문구가 다르다
+		expect(acceptFailure('DB_ERROR')).toEqual({ message: SIGNUP_SYSTEM_ERROR.server });
+		expect(acceptFailure('???')).toEqual({ message: SIGNUP_SYSTEM_ERROR.server });
+		expect(SIGNUP_SYSTEM_ERROR.network).not.toBe(SIGNUP_SYSTEM_ERROR.server);
 	});
 });
