@@ -14,6 +14,7 @@
 		NAME_MAX,
 		PLATFORMS,
 		SIGNUP_FIELDS,
+		SIGNUP_SYSTEM_ERROR,
 		TERMS,
 		allAgreed,
 		cleanHandleInput,
@@ -31,7 +32,8 @@
 	import ErrorText from '$lib/components/auth/ErrorText.svelte';
 	import PasswordToggle from '$lib/components/auth/PasswordToggle.svelte';
 	import SettleFields from '$lib/components/SettleFields.svelte';
-	import { SETTLE_FIELDS, settleErrors, type SettleField, type SettleValues } from '@sellery/myr-core/settle-info';
+	import TossConsent from '$lib/components/TossConsent.svelte';
+	import { SETTLE_FIELDS, SETTLE_USED_FIELDS, settleErrors, type SettleField, type SettleValues } from '@sellery/myr-core/settle-info';
 
 	/**
 	 * 크리에이터 초대 가입 — 시안 "MYR Influencer Signup"(모바일) · "… PC". 화면 넷: 초대장 → 가입 폼 → 환영 / 만료.
@@ -42,11 +44,15 @@
 	 * 시안과 다른 점(정한 가입 방식에 맞춤 · docs/myr.md §4.2.1):
 	 *   - 이메일은 초대받은 주소로 **고정**(초대 링크가 이메일 소유를 증명) — 시안은 입력 칸이었다
 	 *   - 환영 화면에 "인증 메일을 보냈어요 · 다시 보내기" 가 없다 — 초대 링크가 이미 인증이라 메일이 필요 없다
+	 *   - 토스 본인인증(2026-11-18 · 토스페이먼츠 지급대행): 04 에 **대표자 휴대폰**(연락처와 같으면 체크) · 04 를 쓰면 토스페이먼츠 제3자 제공 동의(필수).
+	 *     가입 뒤 서버가 toss 를 주면 토스 화면(개인사업자 — 문자 본인인증 · 법인은 건너뜀) → 환영. 지금은 미리보기만 toss 를 준다(연동 전 · lib/server/toss-auth.ts).
+	 *     시안과 다른 점: 뒤로(가입 폼) 없음(계정이 이미 만들어졌다) · "아직 인증 전" 상태 · 번호 고치기는 내 정보에서 · 성공 문구는 "토스 인증은 끝났어요"
+	 *     (사업자 정보 확인 · 세금계산서가 남아 있다) · 한도는 토스 문구 "한 주에 1,000만 원 미만"(서버 값)
 	 * 모바일은 콘솔 셸과 같은 방식(화면 높이 고정 · 안에서만 스크롤 · 하단 버튼 줄은 보통 흐름 — 모바일 브라우저에서 fixed/sticky bottom 이 잘린다), PC(lg~)는 문서 흐름 2단.
 	 */
 	let { data, form } = $props();
 
-	type Screen = 'invite' | 'form' | 'done' | 'expired';
+	type Screen = 'invite' | 'form' | 'toss' | 'done' | 'expired';
 	// 첫 화면 · 칸 초기값은 서버 데이터로 한 번만(이후는 이 화면 안에서 바뀐다)
 	let screen = $state<Screen>(untrack(() => (data.state === 'valid' ? 'invite' : 'expired')));
 
@@ -65,10 +71,14 @@
 	let touched = $state<Partial<Record<SignupField, boolean>>>({});
 	let attempted = $state(false);
 	// 04 사업자 · 정산 정보(선택) — 하나라도 쓰면 전부 검사
-	let settle = $state<SettleValues>({ company: '', ceo: '', bizNo: '', bank: '', account: '', holder: '' });
+	let settle = $state<SettleValues>({ company: '', ceo: '', ceoPhone: '', bizNo: '', bank: '', account: '', holder: '' });
 	let settleServerErr = $state<Partial<Record<SettleField, string>>>({});
-	const settleUsed = $derived(SETTLE_FIELDS.some((k) => settle[k].trim() !== ''));
-	const settleErrs = $derived(settleUsed ? { ...settleErrors(settle), ...settleServerErr } : settleServerErr);
+	/** 대표자 휴대폰 = 03 연락처(기본) — 체크를 풀면 따로 입력 */
+	let ceoSame = $state(true);
+	let tossAgreed = $state(false);
+	const settleUsed = $derived(SETTLE_USED_FIELDS.some((k) => settle[k].trim() !== ''));
+	const settleEff = $derived(ceoSame ? { ...settle, ceoPhone: values.phone } : settle);
+	const settleErrs = $derived(settleUsed ? { ...settleErrors(settleEff), ...settleServerErr } : settleServerErr);
 	const settleBad = $derived(SETTLE_FIELDS.find((k) => !!settleErrs[k]));
 	const settleShow = (k: SettleField) => (attempted || settleServerErr[k] ? settleErrs[k] : undefined);
 	const settleClear = (k: SettleField) => {
@@ -89,14 +99,27 @@
 	let formError = $state<string | null>(null);
 
 	const errs = $derived(signupErrors(values, checked));
-	const missing = $derived(missingCount(errs, values.agreed));
+	// 04 를 썼으면 토스페이먼츠 제3자 제공 동의도 필수(서버도 같은 조건으로 막는다)
+	const consentMissing = $derived(settleUsed && !tossAgreed);
+	const missing = $derived(missingCount(errs, values.agreed) + (consentMissing ? 1 : 0));
 	const shown = (k: SignupField) => ((touched[k] || attempted) && !!errs[k]) || !!serverErr[k];
 	const errText = (k: SignupField) => errs[k] || serverErr[k] || '';
 	const handle = $derived(cleanHandleInput(values.handle));
 	const handleOk = $derived(!!handle && !errs.handle && !serverErr.handle && checked[handle] === 'available');
 	const confirmOk = $derived(!!values.confirm && !errs.confirm && !errs.password);
-	const termsAll = $derived(allAgreed(values.agreed));
+	const termsAll = $derived(allAgreed(values.agreed) && (!settleUsed || tossAgreed));
 	const termsErr = $derived(attempted && !termsAll);
+
+	/** 가입 뒤 토스 본인인증(서버 값 · 연동 전 실서비스는 null) · 정산 계좌 요약 · [인증을 마쳤어요] 확인 */
+	type TossAuth = { kind: 'individual' | 'corporate'; verified: boolean; label: string; phone: string; limit: string | null };
+	let toss = $state<TossAuth | null>(null);
+	let account = $state<{ bank: string; masked: string | null } | null>(null);
+	let tossChecking = $state(false);
+	let tossTries = $state(0);
+	let tossNotYet = $state(false);
+	let helpOpen = $state(false);
+	const tossWaiting = $derived(!!toss && !toss.verified);
+	const acctSummary = $derived(account ? `${account.bank} ${account.masked ?? ''}`.trim() : '');
 
 	/** 샵 미리보기 — 샵 상품 카드와 같은 아바타 계산(이니셜 · 핸들 색). 비었으면 회색 · ? */
 	const preview = $derived.by(() => {
@@ -167,6 +190,7 @@
 	const toggleAll = () => {
 		const on = !termsAll;
 		values.agreed = { tos: on, privacy: on };
+		if (settleUsed) tossAgreed = on;
 	};
 
 	/** 칸으로 — 화면 밖에 있으면 스크롤 · 입력 칸이면 포커스 */
@@ -198,7 +222,10 @@
 			busy = false;
 			if (result.type === 'success' && result.data?.ok) {
 				signedIn = result.data.signedIn === true;
-				screen = 'done';
+				toss = (result.data.toss as TossAuth | null) ?? null;
+				account = (result.data.account as typeof account) ?? null;
+				// 개인사업자 본인인증이 남았으면 토스 화면 · 법인(바로 지급 가능) · 정보 없음 · 연동 전이면 환영
+				screen = toss && !toss.verified ? 'toss' : 'done';
 				if (result.data.settleSaved === false) showToast('정산 정보는 저장하지 못했어요 · 내 정보에서 다시 넣어주세요');
 				window.scrollTo(0, 0);
 				return;
@@ -220,8 +247,28 @@
 				goToField(d.field);
 				return;
 			}
-			formError = d?.message ?? '가입을 마치지 못했어요. 잠시 후 다시 시도해주세요';
+			// 요청이 서버에 닿지 못함(인터넷 끊김 · 서버 꺼짐 — 상태 코드 없음) · 서버 예외(500) · 그 밖은 서버 안내
+			formError = d?.message ?? (result.type === 'error' && !result.status ? SIGNUP_SYSTEM_ERROR.network : SIGNUP_SYSTEM_ERROR.server);
 			showToast(formError);
+		};
+	};
+
+	/** [인증을 마쳤어요] — 서버에 토스 상태를 묻는다(지금은 미리보기만). 아직이면 "아직 인증 전" */
+	const submitTossCheck: SubmitFunction = ({ formData }) => {
+		tossTries += 1;
+		formData.set('attempt', String(tossTries));
+		formData.set('phone', toss?.phone ?? '');
+		tossChecking = true;
+		tossNotYet = false;
+		return async ({ result }) => {
+			tossChecking = false;
+			const next = result.type === 'success' ? ((result.data?.toss as TossAuth | undefined) ?? null) : null;
+			if (!next) {
+				showToast('지금은 확인하지 못했어요. 잠시 후 다시 눌러 주세요');
+				return;
+			}
+			toss = next;
+			tossNotYet = !next.verified;
 		};
 	};
 
@@ -243,7 +290,7 @@
 	<header class="relative z-[2] hidden h-[72px] shrink-0 border-b border-white/7 lg:block">
 		<div class="mx-auto flex h-full max-w-[1240px] items-center gap-2.5 px-10">
 			<AuthLogo large />
-			{#if screen !== 'done'}
+			{#if screen !== 'done' && screen !== 'toss'}
 				<span class="ml-auto text-[14px] text-white/55">이미 계정이 있나요? <a href="/login" class="font-bold text-accent hover:text-[#ffa06f]"> 로그인</a></span>
 			{/if}
 		</div>
@@ -458,8 +505,15 @@
 					<p class="mt-8 mb-1.5 lg:mt-9 {sectionLabel}">04 · 사업자 · 정산 정보 <span class="font-semibold text-white/45">(선택)</span></p>
 					<p class="mb-4 {AUTH_HINT}">MYR 은 사업자 크리에이터와 함께해요. 지금 비워 두고 가입한 뒤 <b class="font-bold text-white/70">내 정보</b>에서 넣어도 돼요 — 정보가 확인돼야 정산금이 지급돼요.</p>
 					<div class="flex flex-col gap-6">
-						<SettleFields bind:values={settle} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null, hold: null }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
+						<SettleFields bind:values={settle} bind:same={ceoSame} contactPhone={values.phone} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null, hold: null, ceoPhone: null, tossAgreed: false, bizKind: null, tossState: null, tossFix: null }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
 					</div>
+					{#if data.tossLive}
+						<!-- 토스 지급대행 안내(연동이 켜졌을 때만 — 지금은 미리보기) -->
+						<div class="mt-4 flex items-start gap-2.5 rounded-[14px] border border-accent/18 bg-accent/7 px-3.5 py-3">
+							<svg class="mt-px shrink-0 text-[#ff9a66]" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.2h3" /><path d="M9.5 8h5M9.5 11h3" /></svg>
+							<span class="text-[12.5px] leading-[1.55] text-white/70">정보를 넣고 가입하면 토스페이먼츠가 대표자 휴대폰으로 <b class="font-bold text-fg">본인인증 문자</b>를 보내요. 인증을 마쳐야 정산금을 받을 수 있어요(법인은 문자 없이 등록돼요).</span>
+						</div>
+					{/if}
 
 					<!-- 약관 -->
 					<div id="f-terms" class="mt-7 rounded-2xl border bg-white/3 px-4 py-1 lg:mt-8 {termsErr ? 'border-accent' : 'border-white/8'}">
@@ -473,8 +527,10 @@
 								<button type="button" onclick={() => showToast('약관 문서를 준비하고 있어요')} class="shrink-0 py-2 text-[12px] text-white/45 underline underline-offset-2">보기</button>
 							</div>
 						{/each}
+						<!-- 04 를 썼으면 토스페이먼츠 제3자 제공 동의(필수 · 0121) -->
+						{#if settleUsed}<TossConsent row name="agree_toss" bind:checked={tossAgreed} />{/if}
 					</div>
-					{#if termsErr}<div class="mt-2"><ErrorText text="약관과 개인정보 수집 · 이용에 동의해주세요" /></div>{/if}
+					{#if termsErr}<div class="mt-2"><ErrorText text={settleUsed ? '약관 · 개인정보 수집 · 토스페이먼츠 정보 제공에 동의해주세요' : '약관과 개인정보 수집 · 이용에 동의해주세요'} /></div>{/if}
 				</div>
 
 				<div class="shrink-0 border-t border-white/6 bg-bg px-6 pt-3 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:border-white/7 lg:px-1 lg:pt-4 lg:pb-7">
@@ -483,6 +539,73 @@
 				</div>
 			</div>
 		</form>
+	{:else if screen === 'toss' && toss}
+		<!-- 토스 본인인증 — 개인사업자만(법인은 본인인증 없이 등록) · 계정은 이미 만들어졌으니 가입 폼으로 돌아가지 않는다
+		     PC(lg~)는 세로 스크롤이 생기지 않게 카드를 두 단으로 — 왼쪽 안내 · 상태 · 도움말, 오른쪽 3단계(완료면 요약) · 버튼은 아래 한 줄 -->
+		<div class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 animate-up-in flex-col lg:max-w-none lg:items-center lg:justify-center lg:px-10 lg:py-10">
+			<div class="flex h-[60px] shrink-0 items-center px-6 lg:hidden"><span class="text-[16px] font-bold">토스 본인인증</span></div>
+			<div class="flex min-h-0 flex-1 flex-col lg:w-full lg:max-w-[880px] lg:flex-none lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-[#111216] lg:px-12 lg:py-10">
+				<div class="no-bar min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start lg:gap-x-12 lg:overflow-visible lg:p-0">
+					<div class="flex h-[60px] w-[60px] animate-pop items-center justify-center rounded-[20px] lg:col-start-1 {toss.verified ? 'bg-mint/14 text-mint' : 'bg-accent/12 text-[#ff9a66]'}" aria-hidden="true">
+						{#if toss.verified}
+							<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+						{:else}
+							<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.2h3" /><path d="M9.5 8h5M9.5 11h3" /></svg>
+						{/if}
+					</div>
+					{#if toss.verified}
+						<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] text-balance lg:col-start-1 lg:text-[32px]">본인인증을 마쳤어요</h1>
+						<p class="mt-3 text-[15px] leading-[1.65] text-white/65 lg:col-start-1">토스 인증은 끝났어요. 사업자 · 정산 정보는 {INVITER}이 확인한 뒤 알려드려요.</p>
+						<div class="lg:col-start-2 lg:row-span-6 lg:row-start-1 lg:self-center">
+						<dl class="mt-6 animate-up-in rounded-[20px] border border-white/8 bg-white/3 px-[18px] py-1 lg:mt-0">
+							{#if acctSummary}<div class="flex justify-between gap-3 border-b border-white/6 py-[15px] text-[14px]"><dt class="text-white/55">정산 계좌</dt><dd class="font-bold tabular-nums">{acctSummary}</dd></div>{/if}
+							<div class="flex justify-between gap-3 border-b border-white/6 py-[15px] text-[14px]"><dt class="text-white/55">토스 본인인증</dt><dd class="font-bold text-mint">완료</dd></div>
+							{#if toss.limit}<div class="flex justify-between gap-3 py-[15px] text-[14px]"><dt class="text-white/55">받을 수 있는 정산금</dt><dd class="font-bold">{toss.limit}</dd></div>{/if}
+						</dl>
+						<p class="mx-1 mt-3 text-[12.5px] leading-[1.55] text-white/50">한 주에 1,000만 원 이상 받게 되면 토스페이먼츠가 추가 인증을 이메일로 안내해요.</p>
+						</div>
+					{:else}
+						<h1 class="mt-[22px] text-[28px] leading-[1.3] font-extrabold tracking-[-0.03em] text-balance lg:col-start-1 lg:text-[32px]">문자로 온 토스 본인인증을 마쳐 주세요</h1>
+						<p class="mt-3 text-[15px] leading-[1.65] text-white/65 lg:col-start-1">토스페이먼츠가 <b class="font-bold text-fg tabular-nums">{formatPhone(toss.phone)}</b>로 본인인증 문자를 보냈어요. 인증은 한 번만 하면 돼요.</p>
+						<ol class="mt-6 rounded-[20px] border border-white/8 bg-white/3 px-[18px] py-1.5 lg:col-start-2 lg:row-span-6 lg:row-start-1 lg:mt-0 lg:self-center">
+							{#each [['문자에 있는 링크를 눌러요', '보낸 곳은 토스페이먼츠예요'], ['토스 화면에서 본인인증을 해요', '대표자 본인 명의로 인증해요'], ['이 화면으로 돌아와요', '아래 버튼을 누르면 결과를 확인해요']] as [t, sub], i (t)}
+								<li class="flex items-center gap-3.5 py-3.5 {i ? 'border-t border-white/6' : ''}">
+									<span class="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-accent/14 text-[12px] font-extrabold text-accent" aria-hidden="true">{i + 1}</span>
+									<span class="min-w-0 flex-1"><b class="block text-[14.5px] font-bold">{t}</b><span class="mt-0.5 block text-[12.5px] leading-[1.45] text-white/55">{sub}</span></span>
+								</li>
+							{/each}
+						</ol>
+						<p class="mt-3.5 flex items-center gap-2.5 px-1 lg:col-start-1 lg:mt-5" role="status">
+							<span class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden="true"></span>
+							<span class="text-[13px] font-semibold text-white/70">{tossChecking ? '토스페이먼츠에 인증 결과를 확인하고 있어요' : tossNotYet ? '아직 인증 전이에요 · 문자의 링크에서 인증을 마치고 다시 눌러 주세요' : '인증을 기다리고 있어요'}</span>
+						</p>
+						<button type="button" onclick={() => (helpOpen = !helpOpen)} aria-expanded={helpOpen} class="mt-[18px] flex w-fit items-center gap-1 px-1 py-2 text-[13px] font-bold text-white/60 hover:text-fg lg:col-start-1 lg:mt-2">
+							문자를 못 받았어요
+							<svg class="transition-transform {helpOpen ? 'rotate-180' : ''}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+						</button>
+						{#if helpOpen}
+							<div class="mt-1.5 animate-up-in rounded-2xl bg-white/4 p-4 lg:col-start-1">
+								<!-- 토스는 문자 다시 보내기 API 가 없다 — 번호를 고치면(셀러 수정) 다시 오는지는 연동 때 확인 -->
+								<p class="text-[13px] leading-[1.65] text-white/70">번호가 맞는지 확인하고 스팸 문자함도 살펴봐 주세요. 문자는 토스페이먼츠 이름으로 와요. 번호가 틀렸다면 가입을 마친 뒤 <b class="font-bold text-fg">내 정보</b>에서 대표자 휴대폰을 고쳐 주세요.</p>
+							</div>
+						{/if}
+					{/if}
+				</div>
+				<div class="shrink-0 border-t border-white/6 bg-bg px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] lg:mt-8 lg:flex lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0">
+					{#if toss.verified}
+						<button type="button" onclick={() => (screen = 'done')} class={authButton(true)}>
+							가입 마치기
+							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+						</button>
+					{:else}
+						<form method="POST" action="?/tossCheck" use:enhance={submitTossCheck} class="lg:flex-1">
+							<button type="submit" disabled={tossChecking} aria-busy={tossChecking} class={authButton(!tossChecking)}>{tossChecking ? '확인하는 중…' : '인증을 마쳤어요'}</button>
+						</form>
+						<button type="button" onclick={() => (screen = 'done')} class="mt-1.5 h-11 w-full rounded-[14px] text-[14px] font-bold text-white/60 hover:text-fg lg:mt-0 lg:h-14 lg:flex-1 lg:rounded-2xl lg:border lg:border-white/14 lg:hover:border-white/30">나중에 할게요</button>
+					{/if}
+				</div>
+			</div>
+		</div>
 	{:else if screen === 'done'}
 		<!-- 환영 -->
 		<div class="relative mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-6 pt-[72px] pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:max-w-none lg:items-center lg:justify-center lg:px-10 lg:py-20">
@@ -497,7 +620,25 @@
 					<div class="flex justify-between gap-3 border-b border-white/6 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="text-white/55">핸들</dt><dd class="font-bold">@{preview.handle}</dd></div>
 					<div class="flex justify-between gap-3 border-b border-white/6 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="text-white/55">대표 채널</dt><dd class="font-bold">{preview.platform}</dd></div>
 					<div class="flex justify-between gap-3 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="text-white/55">연락처</dt><dd class="font-bold tabular-nums">{values.phone}</dd></div>
+					{#if acctSummary}<div class="flex items-center justify-between gap-3 border-t border-white/6 py-[13px] text-[14px] lg:py-4 lg:text-[15px]"><dt class="shrink-0 text-white/55">정산 계좌</dt><dd class="min-w-0 truncate font-bold tabular-nums">{acctSummary}</dd></div>{/if}
+					{#if toss}
+						<div class="flex items-center justify-between gap-3 border-t border-white/6 py-[13px] text-[14px] lg:py-4 lg:text-[15px]">
+							<dt class="text-white/55">토스 본인인증</dt>
+							<dd class="rounded-lg px-[9px] py-1 text-[12px] font-bold {toss.verified ? 'bg-mint/12 text-mint' : 'bg-accent/14 text-[#ff9a66]'}">{toss.label}</dd>
+						</div>
+					{/if}
 				</dl>
+				{#if tossWaiting}
+					<div class="mt-3 flex items-center gap-3 rounded-2xl border border-accent/22 bg-accent/8 px-4 py-3.5">
+						<span class="min-w-0 flex-1"><b class="block text-[14px] font-bold">토스 본인인증이 남았어요</b><span class="mt-[3px] block text-[12.5px] leading-[1.5] text-white/60">인증을 마쳐야 정산금을 받을 수 있어요</span></span>
+						<button type="button" onclick={() => ((screen = 'toss'), (helpOpen = false))} class="h-[38px] shrink-0 rounded-xl bg-accent px-3.5 text-[13px] font-extrabold whitespace-nowrap text-bg hover:bg-[#ff8f5c]">이어서 인증</button>
+					</div>
+				{:else if data.tossLive && !account}
+					<div class="mt-3 flex items-start gap-3 rounded-2xl border border-accent/18 bg-accent/7 px-4 py-3.5">
+						<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-accent/14 text-[#ff9a66]" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.2h3" /></svg></span>
+						<span class="min-w-0 flex-1"><b class="block text-[14px] font-bold">정산금을 받으려면 토스 본인인증이 필요해요</b><span class="mt-1 block text-[12.5px] leading-[1.55] text-white/62">내 정보에서 사업자 · 정산 정보를 넣으면 토스페이먼츠가 대표자 휴대폰으로 본인인증 문자를 보내요.</span></span>
+					</div>
+				{/if}
 				<!-- 가입 action 이 바로 로그인해 둔다 — 로그인이 실패했으면 로그인 화면으로 -->
 				<a href={signedIn ? '/' : '/login'} class="{authButton(true)} mt-auto lg:mt-6">
 					{signedIn ? '크리에이터 스튜디오로' : '로그인하러 가기'}

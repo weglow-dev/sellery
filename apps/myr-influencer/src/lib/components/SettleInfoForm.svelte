@@ -2,18 +2,24 @@
 	import type { Snippet } from 'svelte';
 	import { untrack } from 'svelte';
 	import { digitsOnly, SETTLE_FIELDS, settleErrors, type SettleField, type SettleInfo, type SettleValues } from '@sellery/myr-core/settle-info';
+	import { formatPhone } from '@sellery/myr-core/phone';
 	import { authButton } from '$lib/auth-ui';
 	import SettleFields from './SettleFields.svelte';
+	import TossConsent from './TossConsent.svelte';
 
 	/**
 	 * 사업자 · 정산 정보 입력(9번 · 0085) — 내 정보 `/my` 의 입력 폼(칸은 SettleFields · 초대 가입 폼도 같은 칸을 쓴다). 저장은 POST /api/my/settle(서버가 같은 규칙으로 다시 막는다).
 	 * 저장된 사업자번호 · 계좌는 가린 값만 보여 주고, 비워 두면 그대로 둔다(바꿀 때만 입력). 세금계산서 이메일은 초대 이메일(입력 없음).
 	 * 칸 규칙 · 문구는 `@sellery/myr-core/settle-info`. 오류는 [저장]을 누른 뒤부터 보인다.
+	 * 대표자 휴대폰 · 토스페이먼츠 제3자 제공 동의(0121) — 동의는 아직 안 했을 때만 묻는다(서버 TOSS_CONSENT_REQUIRED).
 	 */
 	let { info, submitLabel = '저장하기', onsaved, footer }: { info: SettleInfo | null; submitLabel?: string; onsaved?: (info: SettleInfo, recheck: boolean) => void; footer?: Snippet } = $props();
 
-	let values = $state<SettleValues>(untrack(() => ({ company: info?.company ?? '', ceo: info?.ceo ?? '', bizNo: '', bank: info?.bank ?? '', account: '', holder: info?.holder ?? '' })));
+	let values = $state<SettleValues>(untrack(() => ({ company: info?.company ?? '', ceo: info?.ceo ?? '', ceoPhone: formatPhone(info?.ceoPhone ?? ''), bizNo: '', bank: info?.bank ?? '', account: '', holder: info?.holder ?? '' })));
 	let attempted = $state(false);
+	let tossAgreed = $state(false);
+	const needConsent = $derived(!info?.tossAgreed);
+	const consentErr = $derived(attempted && needConsent && !tossAgreed);
 	let busy = $state(false);
 	let serverErr = $state<Partial<Record<SettleField, string>>>({});
 	let formError = $state<string | null>(null);
@@ -26,6 +32,7 @@
 			values.ceo.trim() !== (info?.ceo ?? '') ||
 			values.bank !== (info?.bank ?? '') ||
 			values.holder.trim() !== (info?.holder ?? '') ||
+			digitsOnly(values.ceoPhone) !== (info?.ceoPhone ?? '') ||
 			values.bizNo.trim() !== '' ||
 			values.account.trim() !== ''
 	);
@@ -44,13 +51,17 @@
 			document.getElementById(`s-${bad}`)?.focus();
 			return;
 		}
+		if (needConsent && !tossAgreed) {
+			document.getElementById('toss-consent')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			return;
+		}
 		busy = true;
 		formError = null;
 		try {
 			const res = await fetch('/api/my/settle', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ ...values, bizNo: digitsOnly(values.bizNo), account: digitsOnly(values.account) })
+				body: JSON.stringify({ ...values, bizNo: digitsOnly(values.bizNo), account: digitsOnly(values.account), ceoPhone: digitsOnly(values.ceoPhone), tossAgreed })
 			});
 			const r = (await res.json().catch(() => null)) as { ok?: boolean; recheck?: boolean; info?: SettleInfo; field?: SettleField; message?: string } | null;
 			if (r?.ok && r.info) {
@@ -72,6 +83,7 @@
 
 <form class="flex flex-col gap-5" onsubmit={(e) => (e.preventDefault(), save())} novalidate>
 	<SettleFields bind:values {info} {show} {clear} />
+	{#if needConsent}<TossConsent bind:checked={tossAgreed} invalid={consentErr} />{/if}
 
 	{#if formError}<p class="text-center text-[13px] font-semibold text-accent" role="alert">{formError}</p>{/if}
 	<button type="submit" disabled={busy || !changed} class="{authButton(!busy && changed)} disabled:cursor-not-allowed">{busy ? '저장하는 중…' : changed ? submitLabel : '바뀐 내용이 없어요'}</button>

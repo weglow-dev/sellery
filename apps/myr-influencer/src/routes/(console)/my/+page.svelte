@@ -5,17 +5,22 @@
 	import { formatPhone } from '@sellery/myr-core/phone';
 	import { shortDate } from '@sellery/myr-core/order-view';
 	import { platformName } from '$lib/signup-rules';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SETTLE_STATUS_META, type SettleInfo } from '@sellery/myr-core/settle-info';
 	import { app } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import SettleInfoForm from '$lib/components/SettleInfoForm.svelte';
+	import TossAuthCard from '$lib/components/TossAuthCard.svelte';
 
 	/** 내 정보(9번 · 0085 · 시안 없음 — 콘솔 카드 톤). 프로필(읽기) · 사업자 · 정산 정보 상태(미입력 · 확인 중 · 확인 완료 · 다시 입력 필요).
 	 *  오른쪽: 입력한 정보를 읽기 전용으로 모두 보여 주고 [수정하기] → 입력 폼(취소 가능). 미입력이면 바로 입력 폼(2026-11-09 대표 요청).
 	 *  가입 2단계에서 건너뛴 정보도 여기서 넣는다. 저장은 SettleInfoForm → POST /api/my/settle. 계좌 · 사업자번호 · 대표자를 바꾸면 운영팀이 다시 확인한다(0085).
-	 *  모바일: 뒤로 헤더 · 한 줄 / PC(lg~): 1240px · 왼쪽 프로필 · 상태 / 오른쪽 입력 */
+	 *  모바일: 뒤로 헤더 · 한 줄 / PC(lg~): 1240px · 왼쪽 프로필 · 상태 / 오른쪽 입력
+	 *  PC 는 펼치기 전(문자를 못 받았어요 · 수정하기) 세로 스크롤이 없게 여백을 줄이고, 오른쪽 읽기 카드는 왼쪽 세 카드의 **펼치기 전** 높이에 맞춘다
+	 *  (왼쪽 토스 카드가 늘어나도(문자를 못 받았어요 · 확인 상태 줄) 오른쪽은 늘어나지 않는다 — 늘어난 동안은 왼쪽 높이를 재지 않는다)
+	 *  토스 본인인증 카드(2026-11-18) — 상태 카드 바로 아래 · 값은 서버 data.toss. 토스 연동 전에는 개발 서버 · Vercel Preview 에서만 보인다:
+	 *  이 계정의 실제 상태(가짜 토스 — 정보를 저장하면 등록 · [인증을 마쳤어요] 두 번째에 인증 · lib/server/toss-sim.ts) · 주소 ?toss=<상태> 면 그 상태 미리보기(목) */
 	let { data } = $props();
 	// 저장 응답으로 바로 바꾼다(처음 값만 서버에서)
 	let info = $state<SettleInfo | null>(untrack(() => data.info));
@@ -66,6 +71,32 @@
 	}
 	const TONE: Record<string, string> = { muted: 'bg-white/8 text-white/70', accent: 'bg-accent/16 text-accent', ok: 'bg-mint/16 text-mint', danger: 'bg-[#ff6b6b]/16 text-[#ff8a8a]' };
 
+	/** 토스 카드 미리보기 상태(주소 ?toss= · 개발 서버 · Vercel Preview) — 없으면 이 계정의 실제 상태(가짜 토스) */
+	const tossState = $derived(page.url.searchParams.get('toss'));
+	/** 오른쪽 읽기 카드 높이(PC) — 왼쪽 세 카드의 늘어나기 전 높이. 토스 카드가 늘어난 동안은 재지 않는다 */
+	let leftCol = $state<HTMLElement | null>(null);
+	let leftH = $state(0);
+	let tossHelp = $state(false);
+	$effect(() => {
+		const el = leftCol;
+		if (!el) return;
+		const measure = () => {
+			if (!tossHelp) leftH = el.offsetHeight;
+		};
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		return () => ro.disconnect();
+	});
+	/** 토스 카드 [수정하기] · [대표자 휴대폰 고치기] — 입력 폼을 열고 그 칸으로 */
+	async function fixField(field: 'bizNo' | 'account' | 'ceoPhone') {
+		editing = true;
+		await tick();
+		const el = document.getElementById(`s-${field}`);
+		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		el?.focus({ preventScroll: true });
+	}
+
 	async function saved(next: SettleInfo, recheck: boolean) {
 		info = next;
 		editing = false;
@@ -76,12 +107,12 @@
 
 <svelte:head><title>내 정보 — MYR Creator</title></svelte:head>
 
-<div class="flex min-h-0 flex-1 animate-up-in flex-col lg:mx-auto lg:block lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-10">
+<div class="flex min-h-0 flex-1 animate-up-in flex-col lg:mx-auto lg:block lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-6">
 	<BackHeader title="내 정보" fallback="/" />
 	<h1 class="hidden text-[32px] font-extrabold tracking-[-0.03em] lg:block">내 정보</h1>
 
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-10 lg:mt-6 lg:grid lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start lg:gap-8 lg:overflow-visible lg:px-0 lg:pb-0">
-		<div class="flex flex-col gap-3 lg:sticky lg:top-6">
+		<div bind:this={leftCol} class="flex flex-col gap-3">
 			<section aria-label="프로필" class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">
 				<div class="flex items-center gap-3.5">
 					<label class="relative h-16 w-16 shrink-0 cursor-pointer" aria-label="프로필 사진 바꾸기">
@@ -100,7 +131,7 @@
 						</span>
 					</span>
 				</div>
-				<dl class="mt-4 flex flex-col gap-2.5 border-t border-white/8 pt-3.5 text-[13px]">
+				<dl class="mt-4 flex flex-col gap-2.5 border-t border-white/8 pt-3.5 text-[13px] lg:mt-3.5 lg:gap-2">
 					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">활동명</dt><dd class="min-w-0 truncate font-semibold">{data.seller.name}</dd></div>
 					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">핸들</dt><dd class="min-w-0 truncate font-semibold">{data.seller.handle}</dd></div>
 					<div class="flex justify-between gap-3"><dt class="shrink-0 text-white/55">대표 채널</dt><dd class="font-semibold">{platformName(data.seller.platform) || '—'}</dd></div>
@@ -121,6 +152,10 @@
 				{/if}
 				<p class="mt-3 text-[12px] leading-[1.55] text-white/45">계좌 · 사업자등록번호 · 대표자를 바꾸면 운영팀이 다시 확인해요. 확인이 끝나기 전에는 정산금 지급이 잠시 미뤄져요.</p>
 			</section>
+
+			{#if data.toss}
+				{#key data.toss}<TossAuthCard initial={data.toss} preview={tossState} onfix={fixField} bind:expanded={tossHelp} />{/key}
+			{/if}
 		</div>
 
 		{#if editing}
@@ -135,7 +170,7 @@
 			</section>
 		{:else if info}
 			<!-- 입력한 정보 — 읽기 전용(사업자번호 · 계좌는 가린 값) -->
-			<section aria-label="사업자 · 정산 정보" class="mt-3 flex flex-col gap-5 rounded-[20px] border border-white/8 bg-white/3 p-4 lg:mt-0 lg:p-6">
+			<section aria-label="사업자 · 정산 정보" style:--left-h={leftH ? `${leftH}px` : undefined} class="mt-3 flex flex-col gap-5 rounded-[20px] border border-white/8 bg-white/3 p-4 lg:mt-0 lg:min-h-(--left-h) lg:justify-between lg:p-6">
 				{#snippet rows(title: string, items: [string, string][])}
 					<div>
 						<h2 class="text-[15px] font-extrabold lg:text-[16px]">{title}</h2>
@@ -146,7 +181,7 @@
 						</dl>
 					</div>
 				{/snippet}
-				{@render rows('사업자 정보', [['상호', info.company], ['사업자등록번호', info.bizNoMasked ?? ''], ['대표자', info.ceo], ['세금계산서 이메일', info.taxEmail]])}
+				{@render rows('사업자 정보', [['상호', info.company], ['사업자등록번호', info.bizNoMasked ?? ''], ['대표자', info.ceo], ['대표자 휴대폰', info.ceoPhone ? formatPhone(info.ceoPhone) : ''], ['세금계산서 이메일', info.taxEmail]])}
 				{@render rows('정산 계좌', [['은행', info.bank], ['계좌번호', info.accountMasked ?? ''], ['예금주', info.holder]])}
 				<button type="button" onclick={() => (editing = true)} class="flex h-14 w-full items-center justify-center rounded-2xl border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:h-[60px] lg:text-[16px]">수정하기</button>
 			</section>

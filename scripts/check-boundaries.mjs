@@ -234,6 +234,12 @@ const MYR_MIRROR_RULES = [
   { re: /['"][A-Za-z_]+['"]\s*(===|!==|==|!=)\s*[\w.]*(\bstatus|\bstate|[a-z]Status|[a-z]State)\b/, why: "상태 비교 순서를 바꿔 씀('X' === x.status) — x.status === 'X' 로 쓴다(판정이면 서버 값)" },
   { re: /(\bstatus|\bstate|[a-z]Status|[a-z]State)\s*(==|!=)(?!=)\s*['"]/, why: "상태를 느슨하게 비교(== · !=) — === · !== 로 쓴다(판정이면 서버 값)" },
   { re: /\.(includes|has)\([\w.]*(\bstatus|\bstate|[a-z]Status|[a-z]State)\)/, why: "상태 묶음을 배열 · Set 으로 다시 씀(PAID.includes(x.status) · S.has(x.status)) — 서버 값(myr_order_status_* · myr_ship_status_* 등)을 쓴다" },
+  // 개인사업자 · 법인(0121) — 토스 본인인증 단계를 건너뛸지는 서버 bizKind
+  { re: /(>=|>)\s*80\b[^\n]*(<=|<)\s*(89|90)\b|\bbiz_?[nN]o\w*\.(slice|substring|substr)\(\s*3\s*,\s*5\s*\)/, why: "개인사업자 · 법인을 사업자번호로 다시 판정 — 서버 bizKind(myr_biz_kind · 0121)를 쓴다" },
+  // 계좌번호 가리기(0085 myr_mask_account) — 응답의 accountMasked · masked 를 쓴다(운영 콘솔 목 데이터만 예외)
+  { re: /['"`]\*{4}['"`]?\s*\+|\*{4}\$\{[^}]*slice\(\s*-4\s*\)/, why: "계좌번호 가리기를 TS 에서 다시 만듦 — 서버 myr_mask_account(0085 · 응답 accountMasked · masked)를 쓴다", allow: ["apps/myr-admin/src/lib/mock/seed.ts"] },
+  // 토스 본인인증(0121) — 카드 상태로 버튼 · 문구를 고르지 않는다(서버 tossCardOf 의 canCheck · phoneHelp · fixField · chip · label). 가짜 토스(토스 쪽 동작 흉내)만 예외
+  { re: /\b(tossState|toss\.state)\s*(===|!==|==|!=)\s*['"]/, why: "토스 카드 상태로 화면을 다시 판정 — 서버 값(canCheck · phoneHelp · fixField · chip · 0121 myr_toss_card_state)을 쓴다", allow: ["apps/myr-influencer/src/lib/server/toss-sim.ts"] },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
   { re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },

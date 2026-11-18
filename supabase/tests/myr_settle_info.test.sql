@@ -5,11 +5,11 @@ select plan(47);
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_of_user 불가');
 select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settle_info_of_user 불가');
-select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_save 불가');
-select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settle_info_save 불가');
+select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text,text,boolean}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_save 불가');
+select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text,text,boolean}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 settle_info_save 불가');
 select function_privs_are('public', 'myr_app_admin_settle_infos', '{text}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 admin_settle_infos 불가');
 select function_privs_are('public', 'myr_app_admin_settle_info_check', '{uuid,text,timestamptz,text,uuid}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 admin_settle_info_check 불가');
-select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settle_info_save 가능');
+select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text,text,boolean}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 settle_info_save 가능');
 
 -- ---------- 사업자번호 체크섬 ----------
 select is(array[public.myr_biz_no_valid('124-81-00998'), public.myr_biz_no_valid('2208162517'), public.myr_biz_no_valid('1248100999'), public.myr_biz_no_valid('12481'), public.myr_biz_no_valid(null)],
@@ -24,15 +24,16 @@ create temp table u as select '00000000-0000-4000-8000-000000000e01'::uuid as id
 -- 운영 확인 — 지금 제출 시각을 같이(운영이 목록에서 본 값)
 create function pg_temp.chk(d text, note text default null) returns jsonb language sql as
   $$ select public.myr_app_admin_settle_info_check('00000000-0000-4000-8000-000000000e11', d, (select myr_settle_submitted_at from public.sellers where id = '00000000-0000-4000-8000-000000000e11'), note) $$;
+-- 0121: 대표자 휴대폰 · 토스 동의 — 이 파일은 0085 규칙을 보므로 맞는 값을 넣는다(새 칸은 myr_settle_toss_prep.test.sql)
 create function pg_temp.save(c text, ceo text, biz text, bank text, acc text, holder text) returns jsonb language sql as
-  $$ select public.myr_app_seller_settle_info_save((select id from u), c, ceo, biz, bank, acc, holder) $$;
+  $$ select public.myr_app_seller_settle_info_save((select id from u), c, ceo, biz, bank, acc, holder, '010-1234-5678', true) $$;
 
 select is(public.myr_app_seller_settle_info_of_user((select id from u)) ->> 'status', 'none', '처음은 미입력(none)');
 select is(public.myr_app_seller_settle_info_of_user((select id from u)) ->> 'tax_email', 'pgtap-settle@myr.test', '세금계산서 이메일 = 초대 이메일');
 select is(public.myr_app_seller_settle_info_of_user(null), null, '계정 없으면 null');
 
 -- ---------- 저장 — 거부 ----------
-select is(public.myr_app_seller_settle_info_save('00000000-0000-4000-8000-0000000000ff', '민지랩', '김민지', '124-81-00998', '신한', '110123456789', '김민지') ->> 'code', 'NOT_FOUND', '크리에이터가 아니면 NOT_FOUND');
+select is(public.myr_app_seller_settle_info_save('00000000-0000-4000-8000-0000000000ff', '민지랩', '김민지', '124-81-00998', '신한', '110123456789', '김민지', '010-1234-5678', true) ->> 'code', 'NOT_FOUND', '크리에이터가 아니면 NOT_FOUND');
 select is(pg_temp.save('', '김민지', '124-81-00998', '신한', '110123456789', '김민지') ->> 'code', 'BAD_COMPANY', '상호 없음 BAD_COMPANY');
 select is(pg_temp.save('민지랩', ' ', '124-81-00998', '신한', '110123456789', '김민지') ->> 'code', 'BAD_CEO', '대표자 없음 BAD_CEO');
 select is(pg_temp.save('민지랩', '김민지', '124-81-00999', '신한', '110123456789', '김민지') ->> 'code', 'BAD_BIZ_NO', '체크섬 틀림 BAD_BIZ_NO');
