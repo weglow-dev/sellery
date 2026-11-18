@@ -1,0 +1,39 @@
+<script lang="ts">
+	import '../app.css';
+	import { afterNavigate } from '$app/navigation';
+	import MenuSheet from '$lib/components/MenuSheet.svelte';
+	import PayoutModals from '$lib/components/PayoutModals.svelte';
+	import MobileTop from '$lib/components/MobileTop.svelte';
+	import SideNav from '$lib/components/SideNav.svelte';
+	import TabBar from '$lib/components/TabBar.svelte';
+	import Toast from '$lib/components/Toast.svelte';
+
+	let { children } = $props();
+	let main: HTMLElement | undefined = $state();
+
+	// 화면이 바뀌면 맨 위로 — 같은 화면에서 탭 · 서랍(?tab= · ?id=)만 바뀌면 그대로
+	afterNavigate(({ from, to, type }) => {
+		if (type === 'enter' || !from?.url) return;
+		if (from.url.pathname !== to?.url.pathname) main?.scrollTo(0, 0);
+	});
+</script>
+
+<svelte:head>
+	<title>MYR Admin — 운영 콘솔</title>
+</svelte:head>
+
+<!--
+	모바일(~lg): 앱 셸 — 높이 100dvh · 최대 폭 430px(크리에이터 콘솔과 같은 셸). 상단(제목 · 알림 · 전체 메뉴) → <main> 스크롤 → 하단 플로팅 탭.
+	PC(lg~): 왼쪽 메뉴 240px + <main> 한 곳이 스크롤 · 화면은 1200px 컨테이너. 상세는 오른쪽 서랍(Drawer · fixed).
+-->
+<div class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-bg sm:border-x sm:border-white/8 lg:max-w-none lg:flex-row lg:border-x-0">
+	<SideNav />
+	<MobileTop />
+	<main bind:this={main} class="no-bar min-h-0 flex-1 overflow-y-auto">
+		{@render children()}
+	</main>
+	<TabBar />
+	<MenuSheet />
+	<PayoutModals />
+	<Toast />
+</div>

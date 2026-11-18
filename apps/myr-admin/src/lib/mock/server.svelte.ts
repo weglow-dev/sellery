@@ -1,0 +1,673 @@
+/** 서버 흉내 — UI 단계라 지급 · 세금계산서 · 크리에이터 판정과 동작을 여기서 대신한다(메모리 · 새로고침하면 시드로).
+ *  기능 단계에서 이 파일은 RPC 호출로 바뀌고 판정은 DB 함수가 한다(0102 보류 이유 · 0104 세금계산서 · 0111 이체 상태 — docs/myr-admin-plan.md).
+ *  화면(routes · components)은 여기서 받은 이름 · 칩 · 안내 · 버튼 목록 · 건수만 그린다 — 화면에서 상태를 다시 판정하지 않는다. */
+import { NOW, ME, OTHER_COUNTS, seedCreators, seedPayouts, seedProvider, seedTaxes } from './seed';
+import type {
+	Chip,
+	CreatorRaw,
+	CreatorTab,
+	CreatorView,
+	FailKind,
+	FlowStep,
+	HoldKind,
+	HomeGroup,
+	HomeTask,
+	NavBadge,
+	PayoutAction,
+	PayoutRaw,
+	PayoutTab,
+	PayoutView,
+	TaxRaw,
+	TaxView,
+	Tone
+} from './types';
+
+const won = (n: number) => `₩${n.toLocaleString('ko-KR')}`;
+/** 목의 오늘 · 10월분 정산 계산일 — 지급 완료 기록 날짜 거절 */
+export const TODAY = '2026-11-17';
+const SETTLED_ON = '2026-11-01';
+const stamp = () => `11월 17일 ${NOW.time}`;
+const me = () => `${ME.role} ${ME.name}`;
+/** 다음 실행일 — 토스 바로지급은 영업일만(주말 · 공휴일 건너뜀) */
+const runDay = () => (NOW.beforeRun ? '오늘' : NOW.nextBizDay);
+
+/** 용어집(§1-3) — 운영 콘솔 이름 */
+export const FAIL_META: Record<FailKind, { label: string; tone: Tone; what: string; auto: string }> = {
+	check: { label: '결과 확인 필요', tone: 'red', what: '하루 넘게 확인했지만 은행이 답을 안 줘요', auto: '지급대행에 확인하고 지급 완료 기록으로 남겨요' },
+	ops: { label: '운영 조치 필요', tone: 'red', what: '이체 한도 초과 같은 운영 쪽 문제예요', auto: '다시 보내지 않아요 · 한도를 조정한 뒤 다시 보내요' },
+	account: { label: '계좌 확인 필요', tone: 'red', what: '예금주 불일치 · 없는 계좌예요', auto: '크리에이터가 계좌를 다시 입력하고 확인되면 다음 자동 이체(영업일 오후 1시)에 보내요' },
+	retry: { label: '재시도 대기', tone: 'orange', what: '은행 점검처럼 잠깐 안 됐어요', auto: '다음 자동 이체(영업일 오후 1시)에 다시 보내요' }
+};
+const HOLD_LABEL: Record<HoldKind, string> = { ops: '운영팀 확인 중', settle: '사업자 · 정산 정보 확인 전', toss: '토스 본인인증 전', tax: '세금계산서 확인 전' };
+const HOLD_ORDER: HoldKind[] = ['ops', 'settle', 'toss', 'tax'];
+/** 토스 바로지급(EXPRESS) 접수 시간 밖에 [다시 보내기]를 누르면 — 영업일 08:00~15:00 만 받는다 */
+const EXPRESS_CLOSED = '토스 바로지급은 영업일 오전 8시~오후 3시에만 받아요';
+const SETTLE_CHIP: Record<CreatorRaw['settle'], Chip> = {
+	none: { label: '미입력', tone: 'grey' },
+	wait: { label: '확인 대기', tone: 'orange' },
+	ok: { label: '확인 완료', tone: 'mint' },
+	redo: { label: '다시 입력 요청', tone: 'red' }
+};
+/** 사업자 정보는 확인됐지만 토스 본인인증 전 — 크리에이터 목록 칩(확인 완료 대신) */
+const TOSS_CHIP: Chip = { label: '토스 인증 전', tone: 'red' };
+const TAX_CHIP: Record<TaxRaw['status'], Chip> = {
+	none: { label: '제출 전', tone: 'grey' },
+	chk: { label: '확인 중', tone: 'orange' },
+	ok: { label: '확인 완료', tone: 'mint' },
+	redo: { label: '다시 제출 필요', tone: 'red' }
+};
+
+class MockServer {
+	creatorsRaw = $state<CreatorRaw[]>(seedCreators());
+	payoutsRaw = $state<PayoutRaw[]>(seedPayouts());
+	taxesRaw = $state<TaxRaw[]>(seedTaxes());
+	provider = $state(seedProvider());
+
+	// ───────── 판정(서버 함수 자리) ─────────
+
+	private creator(id: string) {
+		return this.creatorsRaw.find((c) => c.id === id)!;
+	}
+	/** 토스 본인인증 전 — 사업자 정보는 확인됐고 토스 셀러가 APPROVAL_REQUIRED · KYC_REQUIRED(지급 보류 이유 · 크리에이터 탭이 같이 쓴다) */
+	private tossPending(c: CreatorRaw) {
+		return c.settle === 'ok' && (c.toss === 'APPROVAL_REQUIRED' || c.toss === 'KYC_REQUIRED');
+	}
+	private taxOf(creatorId: string) {
+		return this.taxesRaw.find((t) => t.creatorId === creatorId) ?? null;
+	}
+
+	/** 보류 이유 — 운영 보류 → 사업자 정보 → 토스 본인인증 → 세금계산서 순(0102 myr_payout_hold_reasons 자리).
+	 *  토스 본인인증 전 = 토스 셀러가 APPROVAL_REQUIRED · KYC_REQUIRED — 그대로 보내면 토스가 FORBIDDEN_SELLER_PAYOUT 으로 거절(묶음 전체 실패)이라 실행에 담지 않는다.
+	 *  사업자 정보 확인 전이면 아직 토스 등록 전이라 사업자 정보 이유만 */
+	private holdKinds(p: PayoutRaw): HoldKind[] {
+		if (!p.amount || p.paid) return [];
+		const c = this.creator(p.creatorId);
+		const k: HoldKind[] = [];
+		if (p.opsHold) k.push('ops');
+		if (c.settle !== 'ok') k.push('settle');
+		else if (this.tossPending(c)) k.push('toss');
+		if (this.taxOf(p.creatorId)?.status !== 'ok') k.push('tax');
+		return k;
+	}
+
+	/** [다시 보내기] 막힘 — 토스 바로지급 접수 시간 밖이면 문구 · 아니면 null */
+	get resendClosed(): string | null {
+		return NOW.expressOpen ? null : EXPRESS_CLOSED;
+	}
+
+	/** 다음 실행 계획 — 보낼 수 있는 건(재시도 대기 → 지급 대기 · 오래 기다린 순)을 토스 지급 가능 금액(available) 안에서만 담는다.
+	 *  안 들어가는 건은 실패가 아니라 지급 대기 그대로 — 토스 정산 뒤 다음 영업일에 보낸다(운영 할 일 없음) */
+	private get runPlan() {
+		const due = this.payoutsRaw.filter((p) => p.amount && !p.paid && !p.sending && !this.holdKinds(p).length && (!p.fail || p.fail.kind === 'retry'));
+		let left = this.provider.available;
+		const send: string[] = [];
+		const defer: string[] = [];
+		for (const p of [...due.filter((x) => x.fail), ...due.filter((x) => !x.fail)]) {
+			if (p.amount <= left) {
+				send.push(p.id);
+				left -= p.amount;
+			} else defer.push(p.id);
+		}
+		return { send, defer };
+	}
+
+	payoutView = (p: PayoutRaw): PayoutView => {
+		const c = this.creator(p.creatorId);
+		const holds = p.paid || p.sending ? [] : this.holdKinds(p);
+		const fail = p.paid || p.sending ? null : p.fail;
+		const tabs: PayoutTab[] = [];
+		const chips: Chip[] = [];
+		let note: string | null = null;
+		let noteTone: Tone = 'plain';
+		const actions: PayoutAction[] = [];
+		let nextTry: string | null = null;
+		// 토스 지급 가능 금액이 모자라 이번 실행에서 빠지는 건 — 다음 영업일(오늘 실행 전이면 NOW.nextBizDay)
+		const deferred = this.runPlan.defer.includes(p.id);
+		const deferDay = NOW.nextBizDay;
+		const deferNote = `토스 지급 가능 금액이 모자라 ${deferDay} 오후 1시에 보내요 · 토스 정산이 들어오면 자동으로`;
+
+		if (!p.amount) {
+			tabs.push('none');
+			chips.push({ label: '지급 없음', tone: 'grey' });
+			note = '정산금이 전부 제조금액 상계에 쓰였어요';
+		} else if (p.paid) {
+			tabs.push('paid');
+			chips.push({ label: '지급 완료', tone: 'grey' });
+			note = `${p.paid.at} · ${p.paid.by}`;
+			if (p.paid.manual) actions.push('cancelPaid');
+		} else if (p.sending) {
+			tabs.push('sending');
+			chips.push({ label: '송금 중', tone: 'mint' });
+			// 은행 답 없음은 바로 결과 확인 필요로 보내지 않는다 — 웹훅을 기다리며 매시간 자동 확인 · 24시간이 지나도 모르면 운영에게(§11)
+			const nr = p.sending.noReply;
+			note = nr ? `은행이 아직 답을 안 줬어요 · ${nr.waited} · 매시간 자동으로 확인해요 · 다음 확인 ${nr.nextCheck}` : `은행 처리 중이에요 · ${p.sending.at} 보냄`;
+			noteTone = nr ? 'orange' : 'mint';
+		} else {
+			if (fail) {
+				tabs.push('fail');
+				chips.push({ label: FAIL_META[fail.kind].label, tone: FAIL_META[fail.kind].tone });
+			}
+			if (holds.length) {
+				tabs.push('hold');
+				chips.push({ label: '지급 보류', tone: 'red' });
+			}
+			// 계좌 실패 뒤 계좌를 다시 내서 정산 정보 확인 대기(보류 이유 = 사업자 정보뿐)면 계좌 안내가 먼저
+			const acctOnly = fail?.kind === 'account' && holds.length === 1 && holds[0] === 'settle';
+			if (fail && holds.length && !acctOnly) {
+				note = '보류 중이라 자동으로 다시 보내지 않아요';
+				noteTone = 'red';
+			} else if (fail) {
+				if (fail.kind === 'check') {
+					note = `${fail.why} · 지급대행에 확인하고 지급 완료 기록으로 남겨요`;
+					noteTone = 'red';
+				} else if (fail.kind === 'retry') {
+					nextTry = `${deferred ? deferDay : runDay()} 오후 1시`;
+					note = deferred ? `${p.tries}번 시도 · ${deferNote}` : `${p.tries}번 시도 · ${nextTry}에 자동으로 다시 보내요`;
+					noteTone = 'orange';
+				} else if (fail.kind === 'account') {
+					note = c.settle === 'wait' ? '크리에이터가 계좌를 다시 입력했어요 — 정산 정보를 확인하면 다음 자동 이체(영업일 오후 1시)에 보내요' : '크리에이터가 계좌를 다시 입력해야 해요';
+					noteTone = c.settle === 'wait' ? 'orange' : 'red';
+				} else {
+					note = `${fail.why} · 조치한 뒤 다시 보내거나 다음 자동 이체를 기다려요`;
+					noteTone = 'red';
+				}
+			} else if (holds.length) {
+				note = holds.includes('ops')
+					? (p.opsHold?.memo ?? null)
+					: holds.length === 1 && holds[0] === 'toss'
+						? '크리에이터가 토스 본인인증을 하면 자동으로 지급 대기가 돼요'
+						: '정보가 확인되면 자동으로 지급 대기가 돼요';
+				noteTone = holds.includes('ops') ? 'red' : 'plain';
+			} else {
+				tabs.push('ready');
+				chips.push({ label: '지급 대기', tone: 'mint' });
+				note = deferred ? deferNote : `${runDay()} 오후 1시에 자동으로 보내요`;
+				noteTone = deferred ? 'orange' : 'mint';
+			}
+
+			// 줄 끝 버튼 — §11-1 (실패 버튼이 먼저 · 보류 중이면 다시 보내기 없음)
+			// 결과 확인 필요 — 다시 보내기 없음 · 지급 완료 기록이 주 버튼(맨 앞에 두면 버튼으로 보인다)
+			if (fail?.kind === 'check') actions.push('record');
+			if (fail?.kind === 'ops' && !holds.length) actions.push('resend');
+			if (fail?.kind === 'account' || holds.includes('settle') || holds.includes('toss')) actions.push('openCreator');
+			if (holds.includes('ops')) actions.push('release');
+			if (holds.includes('tax')) actions.push('openTax');
+			if (!holds.includes('ops') && (tabs.includes('ready') || fail?.kind === 'retry')) actions.push('hold');
+			if (fail?.kind === 'ops') actions.push('record');
+		}
+
+		const left = holds.filter((h) => h !== 'ops');
+		return {
+			...p,
+			name: c.name,
+			handle: c.handle,
+			initial: c.initial,
+			avatarBg: c.avatarBg,
+			tabs,
+			failKind: fail?.kind ?? null,
+			holdKinds: holds,
+			chips,
+			holdText: holds.length ? holds.map((h) => HOLD_LABEL[h]).join(' · ') : null,
+			note,
+			noteTone,
+			nextTry,
+			actions,
+			releaseLeft: holds.includes('ops') && left.length ? `해제해도 ${left.map((h) => HOLD_LABEL[h]).join(' · ')}이라 계속 보류돼요` : null,
+			taxId: this.taxOf(p.creatorId)?.id ?? null,
+			linesText: `${p.lines.length}줄${p.lines.some((l) => l.month.includes('보류 해제')) ? ' · 지난 달 보류분 포함' : ''}`
+		};
+	};
+
+	/** 지급 목록 — 실패(결과 확인 → 운영 조치 → 계좌 → 재시도) · 보류 · 대기 · 송금 중 · 완료 · 없음 순 */
+	get payouts(): PayoutView[] {
+		const rank = (v: PayoutView) => {
+			const f: Record<FailKind, number> = { check: 0, ops: 1, account: 2, retry: 3 };
+			if (v.failKind) return f[v.failKind];
+			const order: PayoutTab[] = ['hold', 'ready', 'sending', 'paid', 'none'];
+			return 4 + order.indexOf(v.tabs[0]);
+		};
+		return this.payoutsRaw.map(this.payoutView).sort((a, b) => rank(a) - rank(b));
+	}
+
+	payoutTabs() {
+		const v = this.payouts;
+		const n = (t: PayoutTab) => v.filter((x) => x.tabs.includes(t)).length;
+		const fk = (k: FailKind) => v.filter((x) => x.failKind === k).length;
+		const hk = (k: HoldKind) => v.filter((x) => x.holdKinds.includes(k)).length;
+		return {
+			tabs: [
+				{ id: 'fail', name: '지급 실패', count: n('fail'), hot: n('fail') > 0 },
+				{ id: 'hold', name: '지급 보류', count: n('hold') },
+				{ id: 'ready', name: '지급 대기', count: n('ready') },
+				{ id: 'sending', name: '송금 중', count: n('sending') },
+				{ id: 'paid', name: '지급 완료', count: n('paid') },
+				{ id: 'none', name: '지급 없음', count: n('none') },
+				{ id: 'all', name: '전체', count: v.length }
+			],
+			subs: {
+				fail: (['check', 'ops', 'account', 'retry'] as FailKind[]).map((k) => ({ id: k, name: FAIL_META[k].label, count: fk(k), tone: FAIL_META[k].tone })),
+				hold: HOLD_ORDER.map((k) => ({ id: k, name: HOLD_LABEL[k], count: hk(k), tone: 'red' as Tone }))
+			},
+			defaultTab: n('fail') ? 'fail' : 'hold'
+		};
+	}
+
+	/** 영업일 오후 1시 자동 이체 — 다음 실행에 나갈 건 = 지급 대기 + 재시도 대기(보류 없는 것) 중 토스 지급 가능 금액 안에 드는 것(runPlan).
+	 *  잔액은 충전하는 돈이 아니라 토스 정산대금이라 평소엔 홈에 보이지 않고, 모자라서 빠지는 건이 있을 때만 deferText(주황 · 운영 할 일 없음) */
+	get schedule() {
+		const plan = this.runPlan;
+		const v = this.payouts.filter((x) => plan.send.includes(x.id));
+		const d = this.payouts.filter((x) => plan.defer.includes(x.id));
+		const sum = v.reduce((a, x) => a + x.amount, 0);
+		const { available, pending } = this.provider;
+		return {
+			n: v.length,
+			sum,
+			sumText: won(sum),
+			availableText: won(available),
+			pendingText: won(pending),
+			deferN: d.length,
+			deferText: d.length
+				? `토스 지급 가능 금액(${won(available)})이 모자라 ${d.map((x) => `${x.name} ${won(x.amount)}`).join(' · ')}은 토스 정산 뒤 ${NOW.nextBizDay} 오후 1시에 보내요 · 정산 전 ${won(pending)}`
+				: null,
+			title: '영업일 오후 1시 자동 이체',
+			rule: '정산이 확정된 뒤 세금계산서까지 확인된 지급 건을 영업일 오후 1시에 보내요 · 주말 · 공휴일은 다음 영업일',
+			when: NOW.beforeRun ? `다음 실행 오늘 오후 1시 · ${NOW.runLeft}` : `오늘 실행 끝 · 다음 실행 ${NOW.nextBizDay} 오후 1시`,
+			namesText: v.length ? `이번에 보낼 건 · ${v.map((x) => x.name).join(' · ')}` : '이번에 보낼 건이 없어요',
+			lastRunText: (({ n, ok, fail, unknown }) => `${n}건 중 성공 ${ok} · 실패 ${fail}${unknown ? ` · 결과 모름 ${unknown}` : ''}`)(this.provider.lastRun),
+			lastRunBad: this.provider.lastRun.fail + this.provider.lastRun.unknown > 0,
+			names: v.map((x) => x.name)
+		};
+	}
+
+	get monthSummary() {
+		const v = this.payouts.filter((x) => x.amount);
+		const total = v.reduce((a, x) => a + x.amount, 0);
+		const paid = v.filter((x) => x.tabs.includes('paid'));
+		return {
+			month: '10월분',
+			totalText: won(total),
+			paidN: paid.length,
+			n: v.length,
+			failN: v.filter((x) => x.tabs.includes('fail')).length,
+			holdN: v.filter((x) => x.tabs.includes('hold')).length,
+			sendingN: v.filter((x) => x.tabs.includes('sending')).length,
+			readyN: v.filter((x) => x.tabs.includes('ready')).length
+		};
+	}
+
+	selection(ids: string[]) {
+		const v = this.payouts.filter((x) => ids.includes(x.id));
+		return {
+			n: v.length,
+			sumText: won(v.reduce((a, x) => a + x.amount, 0)),
+			canHold: v.length > 0 && v.every((x) => x.actions.includes('hold')),
+			canResend: v.length > 0 && v.every((x) => x.failKind === 'ops' && x.actions.includes('resend'))
+		};
+	}
+
+	taxView = (t: TaxRaw): TaxView => {
+		const c = this.creator(t.creatorId);
+		const p = this.payoutsRaw.find((x) => x.id === t.payoutId)!;
+		const pv = this.payoutView(p);
+		const blocked = t.status === 'chk' && t.sentTotal !== null ? `낸 합계 ${won(t.sentTotal)} · 지금 합계 ${won(t.total)} — 다시 발행을 요청하세요` : null;
+		let confirmNote: string | null = null;
+		let confirmNoteTone: Tone = 'mint';
+		if (t.status === 'chk' && !blocked) {
+			const otherHold = pv.holdKinds.filter((h) => h !== 'tax');
+			if (otherHold.length) {
+				confirmNote = `확인해도 ${otherHold.map((h) => HOLD_LABEL[h]).join(' · ')}이라 계속 보류돼요`;
+				confirmNoteTone = 'orange';
+			} else confirmNote = `지금 확인하면 ${runDay()} 오후 1시 지급`;
+		}
+		const actions: TaxView['actions'] = [];
+		if (t.status === 'chk' && !blocked) actions.push('confirm');
+		if (t.status === 'chk' || (t.status === 'ok' && !p.paid && !p.sending)) actions.push('redo');
+		return {
+			...t,
+			name: c.name,
+			handle: c.handle,
+			initial: c.initial,
+			avatarBg: c.avatarBg,
+			firm: c.biz?.firm ?? '—',
+			bizNo: c.biz?.bizNo ?? '',
+			bizNoMasked: c.biz?.bizNoMasked ?? '—',
+			chip: TAX_CHIP[t.status],
+			payChips: pv.chips,
+			confirmNote,
+			confirmNoteTone,
+			blocked,
+			actions
+		};
+	};
+
+	get taxes(): TaxView[] {
+		return this.taxesRaw.map(this.taxView);
+	}
+
+	taxTabs() {
+		const v = this.taxesRaw;
+		const n = (s: TaxRaw['status']) => v.filter((t) => t.status === s).length;
+		return [
+			{ id: 'chk', name: '확인 중', count: n('chk') },
+			{ id: 'redo', name: '다시 제출 필요', count: n('redo') },
+			{ id: 'ok', name: '확인 완료', count: n('ok') },
+			{ id: 'none', name: '제출 전', count: n('none') }
+		];
+	}
+
+	creatorView = (c: CreatorRaw): CreatorView => {
+		const ps = this.payoutsRaw.filter((p) => p.creatorId === c.id).map(this.payoutView);
+		const acctFail = ps.find((p) => p.failKind === 'account');
+		const toss = this.tossPending(c);
+		const tabs: CreatorTab[] = [toss ? 'toss' : c.settle];
+		let payNote: string | null = null;
+		let payNoteTone: Tone = 'orange';
+		if (acctFail && c.settle === 'wait') payNote = '계좌 확인 필요로 이체 실패 · 확인하면 다음 자동 이체(영업일 오후 1시)에 다시 보내요';
+		else if (acctFail) {
+			payNote = '계좌 확인 필요로 이체 실패 · 크리에이터가 계좌를 다시 입력해야 해요';
+			payNoteTone = 'red';
+		} else if (c.settle !== 'ok' && ps.some((p) => p.holdKinds.includes('settle'))) payNote = '이 정보가 확인돼야 지급 보류가 풀려요';
+		else if (ps.some((p) => p.holdKinds.includes('toss'))) {
+			// 토스 셀러 APPROVAL_REQUIRED · KYC_REQUIRED — 운영 할 일 없음 · 크리에이터가 인증하면 웹훅(seller.changed)으로 풀린다
+			payNote = '토스 본인인증 전이라 지급 보류 · 크리에이터가 인증하면 자동으로 지급 대기가 돼요';
+			payNoteTone = 'red';
+		}
+		return {
+			...c,
+			settleChip: toss ? TOSS_CHIP : SETTLE_CHIP[c.settle],
+			payNote,
+			payNoteTone,
+			verifyNote: acctFail
+				? '확인하면 계좌 확인 필요 실패가 풀려 다음 자동 이체(영업일 오후 1시)에 새 계좌로 보내요'
+				: '확인하면 사업자 정보 때문에 걸린 지급 보류가 풀려요(다른 이유가 있으면 계속 보류)',
+			tabs,
+			payouts: ps.map((p) => ({ id: p.id, month: p.month, amount: p.amount, chips: p.chips, holdText: p.holdText, paidAt: p.paid?.at ?? null }))
+		};
+	};
+
+	get creators(): CreatorView[] {
+		const rank: Record<CreatorTab, number> = { wait: 0, redo: 1, none: 2, toss: 3, ok: 4 };
+		return this.creatorsRaw.map(this.creatorView).sort((a, b) => rank[a.tabs[0]] - rank[b.tabs[0]]);
+	}
+
+	creatorTabs() {
+		const v = this.creators;
+		const n = (t: CreatorTab) => v.filter((c) => c.tabs.includes(t)).length;
+		return [
+			{ id: 'wait', name: '확인 대기', count: n('wait') },
+			{ id: 'redo', name: '다시 입력 요청', count: n('redo') },
+			{ id: 'none', name: '미입력', count: n('none') },
+			{ id: 'toss', name: '토스 인증 전', count: n('toss') },
+			{ id: 'ok', name: '확인 완료', count: n('ok') },
+			{ id: 'all', name: '전체', count: this.creatorsRaw.length }
+		];
+	}
+
+	// ───────── 홈 · 메뉴 숫자(배지 = 홈 숫자 · §1-1) ─────────
+
+	get counts() {
+		const v = this.payouts;
+		const fk = (k: FailKind) => v.filter((x) => x.failKind === k);
+		const tx = this.taxesRaw;
+		return {
+			check: fk('check'),
+			ops: fk('ops'),
+			account: fk('account'),
+			retry: fk('retry').length,
+			hold: v.filter((x) => x.tabs.includes('hold')),
+			sending: v.filter((x) => x.tabs.includes('sending')).length,
+			taxChk: this.taxes.filter((t) => t.status === 'chk'),
+			taxOverdue: tx.filter((t) => t.overdue).length,
+			taxRedo: tx.filter((t) => t.status === 'redo').length,
+			settleWait: this.creatorsRaw.filter((c) => c.settle === 'wait').length,
+			/** 정산 정보 확인 대기 중 계좌 확인 필요 실패가 걸린 크리에이터 — 확인하면 다음 자동 이체(영업일 오후 1시)에 다시 보낸다 */
+			settleAcct: fk('account').filter((p) => this.creator(p.creatorId).settle === 'wait').length
+		};
+	}
+
+	get nav(): Record<string, NavBadge> {
+		const c = this.counts;
+		const o = OTHER_COUNTS;
+		return {
+			products: { n: o.products.newReview + o.products.revReview, hot: false },
+			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
+			orders: { n: o.orders.toShip, hot: false },
+			cs: { n: o.cs.inqOpen + o.cs.refundRetry + o.cs.pickup + o.cs.resend, hot: o.cs.inqLate + o.cs.refundRetry + o.cs.creatorLate > 0 },
+			settle: { n: o.settle.noLedger + o.settle.heldLines, hot: false },
+			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
+			tax: { n: c.taxChk.length + c.taxOverdue, hot: c.taxOverdue > 0 }
+		};
+	}
+
+	/** 홈 맨 위 카드 안의 "운영 확인 필요" — 자동으로 다시 보내지 않아 운영이 풀어야 하는 실패만(결과 확인 · 운영 조치).
+	 *  재시도 대기는 다음 자동 이체에 자동으로 · 계좌 확인 필요는 정산 정보 확인 카드 · 응답 없음은 웹훅을 기다리는 송금 중이라 넣지 않는다 */
+	get blocked() {
+		const c = this.counts;
+		return [...c.check, ...c.ops].map((p) => ({
+			id: p.id,
+			label: FAIL_META[p.failKind!].label,
+			who: `${p.name} ${won(p.amount)}`,
+			why: p.failKind === 'check' ? `${p.fail!.why} · 지급대행에 확인하고 지급 완료 기록으로 남겨요` : `${p.fail!.why} · 조치한 뒤 다시 보내요`,
+			action: p.actions[0] as 'record' | 'resend'
+		}));
+	}
+
+	get taxCard() {
+		const chk = this.counts.taxChk;
+		return {
+			n: chk.length,
+			oldest: chk.length ? `가장 오래 ${chk[0].waited} · ${chk[0].name}` : '확인할 세금계산서가 없어요',
+			when: chk.length ? `지금 확인하면 ${runDay()} 오후 1시 지급` : null
+		};
+	}
+
+	get homeGroups(): HomeGroup[] {
+		const c = this.counts;
+		const o = OTHER_COUNTS;
+		const t = (label: string, n: number, tone: HomeTask['tone'], href: string, oldest: string | null = null, x: Partial<HomeTask> = {}): HomeTask | null =>
+			n ? { label, n, tone, href, oldest, ...x } : null;
+		const holdReasons = HOLD_ORDER
+			.map((k) => [k, c.hold.filter((p) => p.holdKinds.includes(k)).length] as const)
+			.filter(([, n]) => n)
+			.map(([k, n]) => `${HOLD_LABEL[k].replace(' 확인 전', '').replace('운영팀 확인 중', '운영 보류').replace('사업자 · 정산 정보', '사업자 정보')} ${n}`)
+			.join(' · ');
+		const groups: Omit<HomeGroup, 'hot'>[] = [
+			{
+				key: 'cs',
+				name: '문의 · 교환/환불',
+				icon: 'cs',
+				href: '/cs',
+				tasks: [
+					t('답변 없는 문의 24시간 넘음', o.cs.inqLate, 'red', '/cs', o.cs.inqLateOldest),
+					t('환불 다시 필요', o.cs.refundRetry, 'red', '/cs', o.cs.refundOldest, { hint: '카드사 환불 실패' }),
+					t('크리에이터 답변 기한 넘김', o.cs.creatorLate, 'red', '/cs', o.cs.creatorLateOldest),
+					t('회수 대기', o.cs.pickup, 'plain', '/cs'),
+					t('재발송 대기', o.cs.resend, 'plain', '/cs')
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'tax',
+				name: '세금계산서',
+				icon: 'doc',
+				href: '/tax',
+				tasks: [
+					t('발행 기한 지남', c.taxOverdue, 'red', '/tax?tab=none', '11월 10일까지'),
+					t('다시 제출 요청 뒤 아직 안 냄', c.taxRedo, 'orange', '/tax?tab=redo')
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'payouts',
+				name: '지급',
+				icon: 'wallet',
+				href: '/payouts',
+				tasks: [
+					t('계좌 확인 필요', c.account.length, 'red', '/payouts?tab=fail&sub=account', null, { hint: '크리에이터가 계좌를 다시 입력해야 보내요' }),
+					t('재시도 대기', c.retry, 'grey', '/payouts?tab=fail&sub=retry', null, { hint: '다음 자동 이체(영업일 오후 1시)에 다시 보내요' }),
+					t('지급 보류', c.hold.length, 'grey', '/payouts?tab=hold', null, { hint: holdReasons }),
+					t('송금 중', c.sending, 'grey', '/payouts?tab=sending', null, { hint: '은행 처리 중' })
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'creators',
+				name: '크리에이터',
+				icon: 'user',
+				href: '/creators',
+				tasks: [
+					t('사업자 · 정산 정보 확인 대기', c.settleWait, 'orange', '/creators?tab=wait', '3일째', {
+						hint: this.creatorsRaw.some((x) => x.settle === 'wait' && x.resubmitNote) ? '계좌 다시 입력 1명 · 확인하면 다음 자동 이체(영업일 오후 1시)에 다시 보내요' : undefined
+					}),
+					t('새 초대 요청', o.creators.inviteAsk, 'plain', '/creators', o.creators.inviteOldest)
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'orders',
+				name: '주문 · 배송',
+				icon: 'order',
+				href: '/orders',
+				tasks: [
+					t('발송 대기', o.orders.toShip, 'plain', '/orders', o.orders.toShipOldest),
+					t('배송 완료 기록 없는 출고', o.orders.noDelivered, 'orange', '/orders', o.orders.noDeliveredOldest, { hint: '정산 확정 3일 전부터 빨강' })
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'products',
+				name: '상품',
+				icon: 'box',
+				href: '/products',
+				tasks: [
+					t('신규 심사 대기', o.products.newReview, 'plain', '/products', o.products.newOldest, { pcOnly: true }),
+					t('수정 심사 대기', o.products.revReview, 'plain', '/products', o.products.revOldest, { pcOnly: true }),
+					t('재고 0 · 판매 중', o.products.soldOutLive, 'orange', '/products')
+				].filter((x): x is HomeTask => !!x)
+			},
+			{
+				key: 'settle',
+				name: '정산',
+				icon: 'chart',
+				href: '/settle',
+				tasks: [
+					t(`다음 정산 확정 D-${o.settle.dday}`, 1, 'plain', '/settle', null, { value: o.settle.nextAt.replace(' 오후 1시', '') }),
+					t('제조금액 미입력 판매 상품', o.settle.noLedger, 'orange', '/settle', null, { hint: '이대로면 다음 정산에서 보류돼요', pcOnly: true }),
+					t('보류된 정산', o.settle.heldLines, 'plain', '/settle')
+				].filter((x): x is HomeTask => !!x)
+			}
+		];
+		return groups
+			.map((g) => ({ ...g, hot: g.tasks.some((x) => x.tone === 'red') }))
+			.sort((a, b) => Number(b.hot) - Number(a.hot));
+	}
+
+	get hotCount() {
+		return this.homeGroups.reduce((a, g) => a + g.tasks.filter((x) => x.tone === 'red').length, 0) + this.blocked.length;
+	}
+
+	get flow(): FlowStep[] {
+		const v = this.payouts.filter((x) => x.amount);
+		const tx = this.taxesRaw;
+		const submitted = tx.filter((t) => t.status === 'chk' || t.status === 'ok').length;
+		const okN = tx.filter((t) => t.status === 'ok').length;
+		const chkN = tx.filter((t) => t.status === 'chk').length;
+		const m = this.monthSummary;
+		const o = OTHER_COUNTS.settle;
+		const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
+		return [
+			{ title: '정산 확정', when: '11월 1일 오후 1시 · 자동', value: String(this.payoutsRaw.length), of: '건', pct: null, desc: `지급 건 ${this.payoutsRaw.length} · 지급 없음 1 · 보류 상품 ${o.heldLines}`, tone: 'plain', href: '/settle' },
+			{ title: '세금계산서 제출', when: '11월 10일까지 · 크리에이터', value: String(submitted), of: ` / ${tx.length}`, pct: pct(submitted, tx.length), desc: `기한 지남 ${tx.filter((t) => t.overdue).length}명`, tone: 'red', href: '/tax?tab=none' },
+			{ title: '수취 확인', when: '제출되는 대로 · 운영', value: String(okN), of: ` / ${tx.length}`, pct: pct(okN, tx.length), desc: chkN ? `확인 대기 ${chkN}건 · 가장 오래 ${this.counts.taxChk[0]?.waited}` : '확인할 게 없어요', tone: chkN ? 'orange' : 'plain', href: '/tax' },
+			{ title: '자동 이체', when: '영업일 오후 1시 · 자동', value: String(m.paidN), of: ` / ${v.length}`, pct: pct(m.paidN, v.length), desc: `실패 ${m.failN} · 보류 ${m.holdN} · 송금 중 ${m.sendingN} · 대기 ${m.readyN}`, tone: m.failN ? 'red' : 'plain', href: '/payouts' },
+			{ title: '다음 정산 확정', when: o.nextAt, value: `D-${o.dday}`, of: '', pct: null, desc: '11월분 · 자동으로 확정돼요', tone: 'plain', href: '/settle' }
+		];
+	}
+
+	// ───────── 동작(RPC 자리) — 결과 문구를 돌려준다 ─────────
+
+	private patchPayout(id: string, f: (p: PayoutRaw) => Partial<PayoutRaw>, log: { text: string; who?: string }) {
+		this.payoutsRaw = this.payoutsRaw.map((p) => (p.id === id ? { ...p, ...f(p), log: [...p.log, { at: stamp(), text: log.text, who: log.who ?? me() }] } : p));
+	}
+
+	/** 토스 잔액 새로고침(GET /v2/balances) — 목: 정산 전이던 돈이 정산돼 지급 가능으로 넘어온 것으로 */
+	refreshBalance() {
+		const { available, pending } = this.provider;
+		this.provider = { ...this.provider, available: available + pending, pending: 0 };
+		return `토스 잔액을 다시 불러왔어요 · 지급 가능 ${won(available + pending)}`;
+	}
+
+	resend(id: string): { ok: boolean; msg: string } {
+		if (this.resendClosed) return { ok: false, msg: this.resendClosed };
+		const p = this.payoutsRaw.find((x) => x.id === id)!;
+		const { available, pending } = this.provider;
+		if (available < p.amount) return { ok: false, msg: `토스 지급 가능 금액이 모자라요 — 지급 가능 ${won(available)} · 필요 ${won(p.amount)} · 정산 전 ${won(pending)}은 토스 정산 뒤 쓸 수 있어요` };
+		this.provider = { ...this.provider, available: available - p.amount };
+		this.patchPayout(
+			id,
+			(x) => ({ fail: null, sending: { at: stamp() }, tries: x.tries + 1, attempts: [...x.attempts, { at: stamp(), result: '송금 중', tone: 'mint', raw: `POST /v2/payouts · REQUESTED · Idempotency-Key PAY-${x.creatorId}-1017` }] }),
+			{ text: '다시 보내기 · 송금 중' }
+		);
+		return { ok: true, msg: `${this.creator(p.creatorId).name}에게 다시 보냈어요 · 송금 중` };
+	}
+
+	hold(ids: string[], memo: string) {
+		ids.forEach((id) => this.patchPayout(id, () => ({ opsHold: { memo, by: `${me()} · ${stamp()}` } }), { text: `운영 보류 · ${memo}` }));
+		const out = `${runDay()} 오후 1시 이체에서 빠져요`;
+		return ids.length > 1 ? `${ids.length}건을 운영 보류했어요 · ${out}` : `운영 보류했어요 · ${out}`;
+	}
+
+	release(id: string) {
+		this.patchPayout(id, () => ({ opsHold: null }), { text: '운영 보류 해제' });
+		const v = this.payoutView(this.payoutsRaw.find((x) => x.id === id)!);
+		return v.holdKinds.length ? `보류를 해제했어요 · ${v.holdText}이라 계속 보류돼요` : v.failKind ? '보류를 해제했어요 · 실패 건은 그대로예요' : `보류를 해제했어요 · ${runDay()} 오후 1시에 자동으로 보내요`;
+	}
+
+	/** 지급 완료 기록(예외 처리 · §11-2) — 거절은 문구로 돌려준다 */
+	recordPaid(id: string, date: string, typed: number, memo: string): { ok: boolean; msg: string } {
+		const p = this.payoutsRaw.find((x) => x.id === id)!;
+		if (p.paid) return { ok: false, msg: `이미 ${p.paid.at}에 지급 완료로 기록됐어요` };
+		if (typed !== p.amount) return { ok: false, msg: `보낸 금액이 지급 건 금액(${won(p.amount)})과 달라요` };
+		if (date > TODAY) return { ok: false, msg: '오늘 이후 날짜는 기록할 수 없어요' };
+		if (date < SETTLED_ON) return { ok: false, msg: '이체한 날이 정산 계산일(11월 1일) 전이에요' };
+		const [, m, d] = date.split('-').map(Number);
+		this.patchPayout(id, () => ({ fail: null, paid: { at: `${m}월 ${d}일 이체`, by: `수동 기록 · ${me()}`, manual: true }, memo: memo || null }), { text: `지급 완료 기록 · ${memo || '직접 이체'}` });
+		return { ok: true, msg: '지급 완료로 기록했어요 · 크리에이터 화면에 바로 보여요' };
+	}
+
+	cancelPaid(id: string, why: string) {
+		this.patchPayout(id, () => ({ paid: null }), { text: `지급 완료 취소 · ${why}` });
+		return '지급 완료 기록을 취소했어요 · 이미 보낸 돈은 돌아오지 않아요';
+	}
+
+	confirmTax(id: string) {
+		const t = this.taxesRaw.find((x) => x.id === id)!;
+		this.taxesRaw = this.taxesRaw.map((x) => (x.id === id ? { ...x, status: 'ok', waited: null, log: [...x.log, { at: stamp(), text: '수취 확인', who: me() }] } : x));
+		const v = this.payoutView(this.payoutsRaw.find((p) => p.id === t.payoutId)!);
+		this.patchPayout(t.payoutId, () => ({}), { text: v.holdKinds.length ? `세금계산서 확인 · ${v.holdText}으로 계속 보류` : `세금계산서 확인 · 지급 대기 · ${runDay()} 오후 1시 자동 이체 예정` });
+		return v.holdKinds.length ? `확인했어요 · ${v.holdText}이라 계속 보류돼요` : `확인했어요 · ${runDay()} 오후 1시에 자동으로 지급돼요`;
+	}
+
+	redoTax(id: string, why: string) {
+		this.taxesRaw = this.taxesRaw.map((x) => (x.id === id ? { ...x, status: 'redo', redoWhy: why, sentTotal: null, waited: null, log: [...x.log, { at: stamp(), text: `다시 제출 요청 · ${why}`, who: me() }] } : x));
+		return '다시 제출을 요청했어요 · 크리에이터 정산 화면에 사유가 보여요';
+	}
+
+	verifySettle(id: string) {
+		this.creatorsRaw = this.creatorsRaw.map((c) => (c.id === id ? { ...c, settle: 'ok', resubmitNote: null, log: [...c.log, { at: stamp(), text: '사업자 · 정산 정보 확인 완료', who: me() }] } : c));
+		// 계좌 확인 필요 실패는 확인된 새 계좌로 다음 자동 이체(영업일 오후 1시)에 다시 보낸다(실패 기록은 지우고 대기로)
+		const moved: string[] = [];
+		this.payoutsRaw.filter((p) => p.creatorId === id && p.fail?.kind === 'account').forEach((p) => {
+			this.patchPayout(p.id, () => ({ fail: null }), { text: '정산 정보 확인 · 새 계좌로 다음 자동 이체(영업일 오후 1시)에 다시 보내요' });
+		});
+		this.payoutsRaw.filter((p) => p.creatorId === id && p.amount && !p.paid).forEach((p) => {
+			const v = this.payoutView(p);
+			moved.push(v.chips.map((x) => x.label).join(' · '));
+		});
+		return moved.length ? `확인했어요 · 이 크리에이터의 지급 건 ${moved.length}건이 ${moved[0]}로 바뀌었어요` : '확인했어요';
+	}
+
+	redoSettle(id: string, why: string) {
+		this.creatorsRaw = this.creatorsRaw.map((c) => (c.id === id ? { ...c, settle: 'redo', redoWhy: why, log: [...c.log, { at: stamp(), text: `다시 입력 요청 · ${why}`, who: me() }] } : c));
+		return '다시 입력을 요청했어요 · 크리에이터 콘솔에 사유가 보여요';
+	}
+}
+
+export const server = new MockServer();
+export { NOW, ME };

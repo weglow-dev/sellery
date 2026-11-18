@@ -239,7 +239,12 @@ const MYR_MIRROR_RULES = [
   { re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
   { re: /\bqty\s*>\s*[\w.]*stockLeft\b|\bstockLeft\s*<\s*[\w.]*qty\b/, why: "재고 초과를 화면에서 판정 — 서버 견적 줄 overStock(myr_stock_short · 0115)을 쓴다" },
   { re: /\d+\s*만\s*원\s*이상\s*무료배송/, why: "무료배송 기준을 화면에 고정 — 서버 견적 freeOver(platform_settings myr_shipping · 0092)를 쓴다" },
-  { re: /['"`](지급 중|지급 지연|지급 실패|지급 확인 중)['"`]/, why: "크리에이터 지급 상태 문구를 화면에서 다시 정함 — 서버 값 payoutLabel(myr_payout_creator_label · 0111)을 쓴다" },
+  {
+    re: /['"`](지급 중|지급 지연|지급 실패|지급 확인 중)['"`]/,
+    why: "크리에이터 지급 상태 문구를 화면에서 다시 정함 — 서버 값 payoutLabel(myr_payout_creator_label · 0111)을 쓴다",
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 운영 탭 이름 "지급 실패"(§11)를 서버 자리에서 정한다. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/server.svelte.ts"],
+  },
 ];
 /** 주석을 뺀 코드 줄 — 줄 주석 · 블록 주석 줄 · 줄 끝 주석(URL 의 :// 는 남긴다) */
 function codeLines(file) {
