@@ -1,11 +1,11 @@
 -- pgTAP — 0121 토스 지급대행 준비: 휴대폰 형식(myr_mobile_ok) · 개인사업자/법인(myr_biz_kind) · 대표자 휴대폰 · 토스페이먼츠 제3자 제공 동의 · 응답 칸
---   · 내 정보 토스 카드 상태(myr_toss_card_state) · 토스 셀러 상태 적기(myr_app_seller_toss_sync)
+--   · 내 정보 토스 카드 상태(myr_toss_card_state) · 토스 셀러 상태 적기(0121 myr_app_seller_toss_sync → 0124 에서 지우고 myr_app_seller_toss_record 하나로)
 begin;
-select plan(42);
+select plan(41);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', f, a::text[], 'authenticated', '{}'::text[], 'authenticated 는 ' || f || ' 불가')
-  from (values ('myr_digits', '{text}'), ('myr_mobile_ok', '{text}'), ('myr_biz_kind', '{text}'), ('myr_has_biz_no', '{text}'), ('myr_toss_card_state', '{sellers}'), ('myr_app_seller_toss_sync', '{uuid,text,jsonb}'),
+  from (values ('myr_digits', '{text}'), ('myr_mobile_ok', '{text}'), ('myr_biz_kind', '{text}'), ('myr_has_biz_no', '{text}'), ('myr_toss_card_state', '{sellers}'),
                ('myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text,text,boolean}')) v(f, a);
 select function_privs_are('public', 'myr_app_seller_settle_info_save', '{uuid,text,text,text,text,text,text,text,boolean}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_save 불가');
 
@@ -48,13 +48,14 @@ select is((select myr_toss_agreed_at from public.sellers where id = '00000000-00
 
 -- ---------- 저장 ----------
 select is((pg_temp.save('010-1234-5678', true) #> '{info}') - array['hold', 'submitted_at', 'company', 'ceo', 'bank', 'holder', 'account_masked', 'has_account', 'tax_email', 'note', 'checked_at', 'biz_no_masked', 'has_biz_no', 'status'],
-          '{"ceo_phone": "01012345678", "toss_agreed": true, "biz_kind": "individual", "toss_state": "none", "toss_fix": null}'::jsonb, '저장 — 대표자 휴대폰(숫자만) · 동의 · 개인사업자 · 토스 등록 전(none)');
+          '{"ceo_phone": "01012345678", "toss_agreed": true, "biz_kind": "individual", "toss_state": "none", "toss_fix": null, "toss_ready": false}'::jsonb, '저장 — 대표자 휴대폰(숫자만) · 동의 · 개인사업자 · 토스 등록 전(none) · 토스로 지급 가능 아님(0124 toss_ready)');
 select is((select settle_phone from public.sellers where id = '00000000-0000-4000-8000-000000000e12'), '01012345678', '대표자 휴대폰은 settle_phone(셀러리 0042 토스 본인인증 번호 칸)');
 select ok(pg_temp.save('010-1234-5678', false) ->> 'ok' = 'true', '이미 동의했으면 다시 묻지 않는다');
 
 -- ---------- 저장 뒤 토스 셀러에 할 일(toss_action) · 운영 재확인(recheck) ----------
+-- 토스 셀러 상태 적기 — 0124 myr_app_seller_toss_record(상태가 있으면 셀러 id 도 · 등록 전이면 비운다)
 create function pg_temp.sync(st text, err jsonb default null) returns jsonb language sql as
-  $$ select public.myr_app_seller_toss_sync('00000000-0000-4000-8000-000000000e12', st, err) $$;
+  $$ select public.myr_app_seller_toss_record('00000000-0000-4000-8000-000000000e12', case when st is not null then 'seller_pgtap_e12' end, st, err) $$;
 create function pg_temp.save2(ceo text, acct text, holder text, phone text, biz text default '1230145670') returns jsonb language sql as
   $$ select public.myr_app_seller_settle_info_save('00000000-0000-4000-8000-000000000e02', '민지랩', ceo, biz, '신한', acct, holder, phone, false) - array['info', 'ok'] $$;
 update public.sellers set myr_settle_status = 'verified' where id = '00000000-0000-4000-8000-000000000e12';
@@ -74,7 +75,7 @@ select ok(pg_temp.sync(null) ->> 'ok' = 'true', '토스 등록 전 상태로');
 select is(pg_temp.save2('박하루', '220123456789', '박하루', '010-1111-2222', '1248100998') ->> 'toss_action', 'register', '토스 등록 전이면 등록');
 
 -- ---------- 토스 카드 상태 · 셀러 상태 적기 ----------
-select is(public.myr_app_seller_toss_sync('00000000-0000-4000-8000-0000000000ff', 'APPROVED', null) ->> 'code', 'NOT_FOUND', '없는 크리에이터 NOT_FOUND');
+select is(public.myr_app_seller_toss_record('00000000-0000-4000-8000-0000000000ff', null, 'APPROVED', null) ->> 'code', 'NOT_FOUND', '없는 크리에이터 NOT_FOUND');
 select is(pg_temp.sync('WEIRD') ->> 'code', 'BAD_STATUS', '토스에 없는 상태 BAD_STATUS(셀러리 0042 check)');
 -- 지금 픽스처는 법인 번호(1248100998) — 개인사업자로 되돌려 상태별로 본다(예금주 = 대표자 김민지)
 select ok(pg_temp.save('010-9876-5432', false) ->> 'ok' = 'true', '개인사업자 번호로 저장');

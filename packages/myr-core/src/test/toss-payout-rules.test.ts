@@ -13,6 +13,8 @@ import {
 	parseTossPayout,
 	parseTossSeller,
 	tossBankCodeOf,
+	tossBuildErrorOf,
+	tossSellerErrorOf,
 	type TossSellerInput
 } from '../toss-payout-rules';
 
@@ -142,5 +144,31 @@ describe('응답 · 웹훅 읽기', () => {
 		expect(parseSellerWebhook({ eventType: 'payout.changed', data: { id: 's', status: 'X' } })).toBeNull();
 		expect(parsePayoutWebhook({ eventType: 'payout.changed', data: { id: 'p', status: 'COMPLETED' } })?.data.id).toBe('p');
 		expect(parsePayoutWebhook({ eventType: 'payout.changed', data: {} })).toBeNull();
+	});
+});
+
+describe('셀러 등록 · 수정 실패 → 카드 오류(0124)', () => {
+	it('토스 거절 — 크리에이터 정보 문제만 적는다 · 고칠 칸은 코드 이름으로', () => {
+		expect(tossSellerErrorOf(400, { code: 'INVALID_ACCOUNT_NUMBER', message: '계좌번호가 올바르지 않습니다' })).toEqual({ code: 'INVALID_ACCOUNT_NUMBER', message: '계좌번호가 올바르지 않습니다', field: 'account' });
+		expect(tossSellerErrorOf(400, { code: 'INVALID_BUSINESS_REGISTRATION_NUMBER', message: 'x' })?.field).toBe('bizNo');
+		expect(tossSellerErrorOf(422, { code: 'INVALID_PHONE', message: 'x' })?.field).toBe('ceoPhone');
+		expect(tossSellerErrorOf(400, { code: 'NOT_SUPPORTED_BUSINESS_TYPE', message: '' })).toEqual({ code: 'NOT_SUPPORTED_BUSINESS_TYPE', message: '토스페이먼츠가 정보를 받지 않았어요', field: 'bizNo' });
+		expect(tossSellerErrorOf(409, { code: 'ALREADY_EXISTS', message: 'dup' })).toEqual({ code: 'ALREADY_EXISTS', message: 'dup', field: null });
+	});
+	it('우리 쪽 문제(키 · 권한 · 접근 정책 · 암호화) · 불명(네트워크 · 5xx)은 카드에 적지 않는다', () => {
+		expect([
+			tossSellerErrorOf(401, { code: 'UNAUTHORIZED_KEY', message: '' }),
+			tossSellerErrorOf(403, { code: 'API_KEY_ACCESS_DENIED', message: '' }),
+			tossSellerErrorOf(400, { code: 'INVALID_API_KEY', message: '' }),
+			tossSellerErrorOf(400, { code: 'INVALID_ENCRYPTION', message: '' }),
+			tossSellerErrorOf(0, { code: 'NETWORK_ERROR', message: '' }),
+			tossSellerErrorOf(503, { code: 'X', message: '' })
+		]).toEqual([null, null, null, null, null, null]);
+	});
+	it('본문을 만들 수 없음 — 크리에이터가 고칠 오류 · 저장된 15 · 16자리 계좌는 다시 입력 안내', () => {
+		expect(tossBuildErrorOf('BAD_ACCOUNT', 'account')).toEqual({ code: 'PAYLOAD_BAD_ACCOUNT', message: '계좌번호는 숫자 8~14자리예요. 계좌번호를 다시 입력해 주세요', field: 'account' });
+		expect(tossBuildErrorOf('EMAIL_REQUIRED').field).toBeNull();
+		const long = buildTossSellerBody({ ...seller, bank: { bank: '신한은행', account: '1'.repeat(16), holder: '김민지' } });
+		expect(!long.ok && tossBuildErrorOf(long.code, long.field).field).toBe('account');
 	});
 });

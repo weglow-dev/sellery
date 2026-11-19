@@ -67,6 +67,8 @@ describe('API 본문 · 응답', () => {
 		// 0121 — 대표자 휴대폰 · 동의 · 개인사업자/법인은 서버 값 그대로(모르는 값은 null)
 		expect(settleInfoFromJson({ ceo_phone: '01012345678', toss_agreed: true, biz_kind: 'corporate' })).toMatchObject({ ceoPhone: '01012345678', tossAgreed: true, bizKind: 'corporate' });
 		expect(settleInfoFromJson({ biz_kind: 'weird' })).toMatchObject({ ceoPhone: null, tossAgreed: false, bizKind: null });
+		// 0124 — 토스로 지급 가능은 서버 값(toss_ready · 0122 myr_toss_ready) · true 일 때만
+		expect([settleInfoFromJson({ toss_ready: true })!.tossReady, settleInfoFromJson({ toss_ready: 'true' })!.tossReady, settleInfoFromJson({})!.tossReady]).toEqual([true, false, false]);
 		// 홈 배너 — 보일지는 서버 보류 이유(hold · 0116) · 확인 중은 "확인 중"(정산 탭과 같은 값)
 		const hold = { code: 'settle_info', label: '사업자 · 정산 정보 확인 전' };
 		expect(i.hold).toBeNull();

@@ -9,7 +9,10 @@ import { previewInvite } from '$lib/invite-preview';
 import { HANDLE_STATUS_MESSAGE } from '$lib/signup-rules';
 import { parseSettleBody, SETTLE_FIELDS, SETTLE_USED_FIELDS, settleErrors, type SettleValues } from '@sellery/myr-core/settle-info';
 import { saveSettleInfoOfUser } from '$lib/server/settle-info';
-import { previewAccount, previewTossAfterSignup, previewTossCheck, tossLive, type TossAuth } from '$lib/server/toss-auth';
+import { previewAccount, previewTossAfterSignup, previewTossCheck, tossAuthOf, tossLive, type TossAuth } from '$lib/server/toss-auth';
+import { getSettleInfoOfUser } from '$lib/server/settle-info';
+import { sellerOfUser } from '@sellery/myr-core/server/seller';
+import { hasTossPayouts, linkTossSeller, refreshTossSeller } from '$lib/server/toss-sellers';
 
 /** 가입 폼 04 사업자 · 정산 정보(선택 · 0085 · 0121 대표자 휴대폰 · 토스 동의) — 비었으면 null · 하나라도 썼으면 칸 검사(화면과 같은 규칙) */
 function parseSettleForm(fd: FormData): { values: SettleValues; used: boolean; tossAgreed: boolean } {
@@ -23,8 +26,8 @@ function parseSettleForm(fd: FormData): { values: SettleValues; used: boolean; t
  *   load     토큰 → 초대(0070 myr_app_invite_view). 열리지 않으면(없음 · 만료 · 사용됨 · 취소) 만료 화면
  *   signup   가입 — 칸 검증(signup-rules · 화면과 같은 함수) → 계정 생성 + 크리에이터 연결(myr-core acceptInvite) → (04 사업자 · 정산 정보를 썼으면 저장 · 0085) → 바로 로그인
  *   request  만료 화면 "새 초대 요청하기" → 그 초대에 요청 기록(운영 목록 requested)
- *   tossCheck 토스 본인인증 화면 [인증을 마쳤어요] — 지금은 미리보기만(토스 연동 전 · lib/server/toss-auth.ts)
- * 가입 응답 toss: 토스 본인인증 화면 값(연동 전 실서비스는 null — 환영 화면으로 바로) · account: 정산 계좌 요약(저장된 가린 값)
+ *   tossCheck 토스 본인인증 화면 [인증을 마쳤어요] — 방금 가입한 계정(세션)의 토스 셀러를 다시 조회해 상태를 적는다(0124 · 미리보기는 목)
+ * 가입 응답 toss: 토스 본인인증 화면 값(04 를 저장하고 토스 셀러 등록을 했으면 · 지급대행 키가 없으면 null — 환영 화면으로 바로) · account: 정산 계좌 요약(저장된 가린 값)
  * 토큰은 이 경로에만 실린다(로그 · 응답에 다시 싣지 않는다). 레이트리밋은 IP 기준(함수 인스턴스 메모리 — 느슨한 상한).
  * 미리보기 주소(dev · Vercel Preview 만 — lib/invite-preview.ts): /invite/preview · preview-used · preview-expired — 저장하지 않는다.
  */
@@ -91,14 +94,20 @@ export const actions: Actions = {
 		// 3. 사업자 · 정산 정보(썼으면) — 실패해도 가입은 끝났다(환영 화면이 내 정보에서 다시 넣으라고 알린다)
 		let settleSaved: boolean | null = null;
 		let account: { bank: string; masked: string | null } | null = null;
+		let toss: TossAuth | null = null;
 		if (settleBody) {
 			const sr = await saveSettleInfoOfUser(r.userId, settleBody);
 			settleSaved = sr.ok;
-			if (sr.ok) account = { bank: sr.info.bank, masked: sr.info.accountMasked };
-			else console.warn('[invite] settle info save failed:', sr.code);
+			if (sr.ok) {
+				account = { bank: sr.info.bank, masked: sr.info.accountMasked };
+				// 토스 셀러 등록(0124) — 저장 응답 toss_action(0121)대로 · 실패해도 가입은 끝났다(카드 상태로 보인다)
+				if (sr.tossAction && hasTossPayouts()) {
+					const t = await linkTossSeller(r.sellerId, sr.tossAction);
+					if (!t.ok) console.warn('[invite] toss link:', t.code);
+					toss = tossAuthOf(t.info ?? sr.info, settleBody.ceoPhone);
+				}
+			} else console.warn('[invite] settle info save failed:', sr.code);
 		}
-		// 토스 셀러 등록은 연동 단계에서(정보 저장 직후) — 그 전까지는 토스 화면 없이 환영 화면
-		const toss: TossAuth | null = null;
 
 		// 4. 바로 로그인(실패해도 가입은 끝났다 — 환영 화면의 버튼이 로그인으로 보낸다)
 		let signedIn = false;
@@ -110,12 +119,18 @@ export const actions: Actions = {
 		return { action: 'signup' as const, ok: true as const, signedIn, handle: r.handle, settleSaved, toss, account };
 	},
 
-	tossCheck: async ({ params, request }) => {
-		if (!previewTokenOf(params.token)) return fail(404, { action: 'tossCheck' as const, message: '토스 본인인증은 아직 준비 중이에요' });
+	tossCheck: async ({ params, request, locals }) => {
 		const fd = await request.formData();
-		const attempt = Number(fd.get('attempt')) || 1;
 		const phone = String(fd.get('phone') ?? '').replace(/\D/g, '').slice(0, 11);
-		return { action: 'tossCheck' as const, toss: previewTossCheck(attempt, phone) };
+		if (previewTokenOf(params.token)) return { action: 'tossCheck' as const, toss: previewTossCheck(Number(fd.get('attempt')) || 1, phone) };
+		// 방금 가입한 계정(가입 직후 로그인한 세션) — 계정 · 크리에이터는 세션에서만(결정 3)
+		const user = locals.supabase ? (await locals.safeGetSession()).user : null;
+		const seller = user ? await sellerOfUser(user.id) : null;
+		if (!user || !seller || !hasTossPayouts()) return fail(401, { action: 'tossCheck' as const, message: '로그인한 뒤 내 정보에서 확인해 주세요' });
+		const r = await refreshTossSeller(seller.id);
+		const info = r.ok ? r.info : await getSettleInfoOfUser(user.id);
+		if (!info) return fail(502, { action: 'tossCheck' as const, message: '지금은 확인하지 못했어요. 잠시 후 다시 눌러 주세요' });
+		return { action: 'tossCheck' as const, toss: tossAuthOf(info, phone) };
 	},
 
 	request: async ({ params, getClientAddress }) => {

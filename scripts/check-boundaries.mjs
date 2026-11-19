@@ -238,8 +238,10 @@ const MYR_MIRROR_RULES = [
   { re: /(>=|>)\s*80\b[^\n]*(<=|<)\s*(89|90)\b|\bbiz_?[nN]o\w*\.(slice|substring|substr)\(\s*3\s*,\s*5\s*\)/, why: "개인사업자 · 법인을 사업자번호로 다시 판정 — 서버 bizKind(myr_biz_kind · 0121)를 쓴다" },
   // 계좌번호 가리기(0085 myr_mask_account) — 응답의 accountMasked · masked 를 쓴다(운영 콘솔 목 데이터만 예외)
   { re: /['"`]\*{4}['"`]?\s*\+|\*{4}\$\{[^}]*slice\(\s*-4\s*\)/, why: "계좌번호 가리기를 TS 에서 다시 만듦 — 서버 myr_mask_account(0085 · 응답 accountMasked · masked)를 쓴다", allow: ["apps/myr-admin/src/lib/mock/seed.ts"] },
-  // 토스 본인인증(0121) — 카드 상태로 버튼 · 문구를 고르지 않는다(서버 tossCardOf 의 canCheck · phoneHelp · fixField · chip · label). 가짜 토스(토스 쪽 동작 흉내)만 예외
-  { re: /\b(tossState|toss\.state)\s*(===|!==|==|!=)\s*['"]/, why: "토스 카드 상태로 화면을 다시 판정 — 서버 값(canCheck · phoneHelp · fixField · chip · 0121 myr_toss_card_state)을 쓴다", allow: ["apps/myr-influencer/src/lib/server/toss-sim.ts"] },
+  // 토스 본인인증(0121) — 카드 상태로 버튼 · 문구를 고르지 않는다(서버 tossCardOf 의 canCheck · phoneHelp · fixField · chip · label). 가짜 토스는 0124 에서 지웠다(예외 없음)
+  { re: /\b(tossState|toss\.state)\s*(===|!==|==|!=)\s*['"]/, why: "토스 카드 상태로 화면을 다시 판정 — 서버 값(canCheck · phoneHelp · fixField · chip · 0121 myr_toss_card_state)을 쓴다" },
+  // 토스 셀러 등록 연결(0124) — 할 일 · 최종 동작 · 다시 등록 막기는 서버(저장 응답 toss_action · myr_app_seller_toss_begin), 지급 가능은 info.tossReady
+  { re: /\btossReady\s*=\s*[^=]|\b(toss_seller_id|tossSellerId)\s*\?\s*['"](update|register)['"]/, why: "토스 셀러 할 일 · 지급 가능을 TS 에서 다시 정함 — 서버 toss_action · myr_app_seller_toss_begin 의 action · 정보 응답 toss_ready(0124)를 쓴다" },
   // 토스 지급대행 판정(0122) — 지급 가능 · 영업일 · 잔액 가드 · 하루 한도는 DB(myr_toss_ready · myr_payout_next_run · myr_payout_guard)
   { re: /\bstatus\s*===\s*['"]PARTIALLY_APPROVED['"]\s*\|\||\btossSellerReady\b/, why: "토스로 지급 가능을 셀러 상태로 다시 판정 — 서버 myr_toss_ready · 보류 이유 toss_auth(0122)를 쓴다" },
   { re: /\.getDay\(\)\s*(===|!==|%|>=|<=|>|<)|\b(isBusinessDay|nextBusinessDay|businessDaysAfter)\b/, why: "영업일을 TS 에서 판정 — 서버 지급 예정 시각 payDueAt(myr_payout_next_run · 0122)을 쓴다" },

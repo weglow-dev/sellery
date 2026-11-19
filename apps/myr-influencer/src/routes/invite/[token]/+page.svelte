@@ -45,7 +45,7 @@
 	 *   - 이메일은 초대받은 주소로 **고정**(초대 링크가 이메일 소유를 증명) — 시안은 입력 칸이었다
 	 *   - 환영 화면에 "인증 메일을 보냈어요 · 다시 보내기" 가 없다 — 초대 링크가 이미 인증이라 메일이 필요 없다
 	 *   - 토스 본인인증(2026-11-18 · 토스페이먼츠 지급대행): 04 에 **대표자 휴대폰**(연락처와 같으면 체크) · 04 를 쓰면 토스페이먼츠 제3자 제공 동의(필수).
-	 *     가입 뒤 서버가 toss 를 주면 토스 화면(개인사업자 — 문자 본인인증 · 법인은 건너뜀) → 환영. 지금은 미리보기만 toss 를 준다(연동 전 · lib/server/toss-auth.ts).
+	 *     가입 뒤 서버가 toss 를 주면(04 저장 + 토스 셀러 등록 · 0124) 본인인증을 기다릴 때(waiting — 서버 카드 값) 토스 화면 → 환영. 법인 · 토스가 정보를 거절함 · 키 없음은 환영으로 바로.
 	 *     시안과 다른 점: 뒤로(가입 폼) 없음(계정이 이미 만들어졌다) · "아직 인증 전" 상태 · 번호 고치기는 내 정보에서 · 성공 문구는 "토스 인증은 끝났어요"
 	 *     (사업자 정보 확인 · 세금계산서가 남아 있다) · 한도는 토스 문구 "한 주에 1,000만 원 미만"(서버 값)
 	 * 모바일은 콘솔 셸과 같은 방식(화면 높이 고정 · 안에서만 스크롤 · 하단 버튼 줄은 보통 흐름 — 모바일 브라우저에서 fixed/sticky bottom 이 잘린다), PC(lg~)는 문서 흐름 2단.
@@ -110,15 +110,15 @@
 	const termsAll = $derived(allAgreed(values.agreed) && (!settleUsed || tossAgreed));
 	const termsErr = $derived(attempted && !termsAll);
 
-	/** 가입 뒤 토스 본인인증(서버 값 · 연동 전 실서비스는 null) · 정산 계좌 요약 · [인증을 마쳤어요] 확인 */
-	type TossAuth = { kind: 'individual' | 'corporate'; verified: boolean; label: string; phone: string; limit: string | null };
+	/** 가입 뒤 토스 본인인증(서버 값 · 키가 없으면 null) · 정산 계좌 요약 · [인증을 마쳤어요] 확인 — waiting = 본인인증을 기다리는 중(서버 카드 canCheck) */
+	type TossAuth = { kind: 'individual' | 'corporate'; verified: boolean; waiting: boolean; label: string; phone: string; limit: string | null };
 	let toss = $state<TossAuth | null>(null);
 	let account = $state<{ bank: string; masked: string | null } | null>(null);
 	let tossChecking = $state(false);
 	let tossTries = $state(0);
 	let tossNotYet = $state(false);
 	let helpOpen = $state(false);
-	const tossWaiting = $derived(!!toss && !toss.verified);
+	const tossWaiting = $derived(!!toss?.waiting);
 	const acctSummary = $derived(account ? `${account.bank} ${account.masked ?? ''}`.trim() : '');
 
 	/** 샵 미리보기 — 샵 상품 카드와 같은 아바타 계산(이니셜 · 핸들 색). 비었으면 회색 · ? */
@@ -224,8 +224,8 @@
 				signedIn = result.data.signedIn === true;
 				toss = (result.data.toss as TossAuth | null) ?? null;
 				account = (result.data.account as typeof account) ?? null;
-				// 개인사업자 본인인증이 남았으면 토스 화면 · 법인(바로 지급 가능) · 정보 없음 · 연동 전이면 환영
-				screen = toss && !toss.verified ? 'toss' : 'done';
+				// 본인인증을 기다리면(서버 waiting) 토스 화면 · 법인(바로 지급 가능) · 토스가 정보를 거절함 · 정보 없음 · 키 없음이면 환영
+				screen = toss?.waiting ? 'toss' : 'done';
 				if (result.data.settleSaved === false) showToast('정산 정보는 저장하지 못했어요 · 내 정보에서 다시 넣어주세요');
 				window.scrollTo(0, 0);
 				return;
@@ -253,7 +253,7 @@
 		};
 	};
 
-	/** [인증을 마쳤어요] — 서버에 토스 상태를 묻는다(지금은 미리보기만). 아직이면 "아직 인증 전" */
+	/** [인증을 마쳤어요] — 서버가 토스에 다시 조회한다(0124 · 미리보기는 목). 아직이면 "아직 인증 전" */
 	const submitTossCheck: SubmitFunction = ({ formData }) => {
 		tossTries += 1;
 		formData.set('attempt', String(tossTries));
@@ -268,7 +268,7 @@
 				return;
 			}
 			toss = next;
-			tossNotYet = !next.verified;
+			tossNotYet = next.waiting;
 		};
 	};
 
@@ -505,10 +505,10 @@
 					<p class="mt-8 mb-1.5 lg:mt-9 {sectionLabel}">04 · 사업자 · 정산 정보 <span class="font-semibold text-white/45">(선택)</span></p>
 					<p class="mb-4 {AUTH_HINT}">MYR 은 사업자 크리에이터와 함께해요. 지금 비워 두고 가입한 뒤 <b class="font-bold text-white/70">내 정보</b>에서 넣어도 돼요 — 정보가 확인돼야 정산금이 지급돼요.</p>
 					<div class="flex flex-col gap-6">
-						<SettleFields bind:values={settle} bind:same={ceoSame} contactPhone={values.phone} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null, hold: null, ceoPhone: null, tossAgreed: false, bizKind: null, tossState: null, tossFix: null }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
+						<SettleFields bind:values={settle} bind:same={ceoSame} contactPhone={values.phone} info={{ company: '', ceo: '', bizNoMasked: null, hasBizNo: false, bank: '', holder: '', accountMasked: null, hasAccount: false, taxEmail: invite.email, status: 'none', note: null, submittedAt: null, checkedAt: null, hold: null, ceoPhone: null, tossAgreed: false, bizKind: null, tossState: null, tossFix: null, tossReady: false }} show={settleShow} clear={settleClear} named heading="text-[14px] font-extrabold text-white/85 lg:text-[15px]" />
 					</div>
 					{#if data.tossLive}
-						<!-- 토스 지급대행 안내(연동이 켜졌을 때만 — 지금은 미리보기) -->
+						<!-- 토스 지급대행 안내(지급대행 키가 있을 때 · 미리보기) -->
 						<div class="mt-4 flex items-start gap-2.5 rounded-[14px] border border-accent/18 bg-accent/7 px-3.5 py-3">
 							<svg class="mt-px shrink-0 text-[#ff9a66]" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" /><path d="M10.5 18.2h3" /><path d="M9.5 8h5M9.5 11h3" /></svg>
 							<span class="text-[12.5px] leading-[1.55] text-white/70">정보를 넣고 가입하면 토스페이먼츠가 대표자 휴대폰으로 <b class="font-bold text-fg">본인인증 문자</b>를 보내요. 인증을 마쳐야 정산금을 받을 수 있어요(법인은 문자 없이 등록돼요).</span>

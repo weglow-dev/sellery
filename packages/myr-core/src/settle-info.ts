@@ -51,6 +51,8 @@ export type SettleInfo = {
 	/** 내 정보 "토스 본인인증" 카드 상태(서버 0121 myr_toss_card_state) · 토스가 거절한 칸(toss_seller_error.field) */
 	tossState: TossState | null;
 	tossFix: 'account' | 'bizNo' | null;
+	/** 토스로 지급 가능(서버 0122 myr_toss_ready · 응답 toss_ready · 0124) — 가입 토스 화면 "인증 완료" */
+	tossReady: boolean;
 };
 /** 토스 카드 상태 — none 시작 전 · rejected 토스가 정보 거절 · wait 본인인증 전 · partial 인증 완료 · kyc 추가 인증 · approved 한도 없음 · corporate 법인 */
 export type TossState = 'none' | 'rejected' | 'wait' | 'partial' | 'kyc' | 'approved' | 'corporate';
@@ -88,7 +90,8 @@ export function settleInfoFromJson(v: unknown): SettleInfo | null {
 		tossAgreed: o.toss_agreed === true,
 		bizKind: isBizKind(o.biz_kind) ? o.biz_kind : null,
 		tossState: isTossState(o.toss_state) ? o.toss_state : null,
-		tossFix: o.toss_fix === 'account' || o.toss_fix === 'bizNo' ? o.toss_fix : null
+		tossFix: o.toss_fix === 'account' || o.toss_fix === 'bizNo' ? o.toss_fix : null,
+		tossReady: o.toss_ready === true
 	};
 }
 function holdFrom(v: unknown): SettleInfo['hold'] {
