@@ -13,6 +13,9 @@ import { configureMyrCore } from '@sellery/myr-core/server/config';
 configureMyrCore({
 	supabaseUrl: PUBLIC_SUPABASE_URL,
 	serviceKey: env.SUPABASE_SERVICE_ROLE_KEY,
+	// 토스 지급대행(셀러 등록 · 수정 — 정산 정보 저장 직후) — API 개별 연동 키 짝. 결제 키(TOSS_SECRET_KEY)는 넣지 않는다(2026-11-06 결정)
+	tossPayoutSecretKey: env.TOSS_PAYOUT_SECRET_KEY,
+	tossPayoutSecurityKey: env.TOSS_PAYOUT_SECURITY_KEY,
 	resendApiKey: env.RESEND_API_KEY,
 	resendApiUrl: env.RESEND_API_URL,
 	mailFrom: env.MAIL_FROM,

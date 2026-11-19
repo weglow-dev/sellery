@@ -15,6 +15,10 @@ export type MyrCoreConfig = {
 	serviceKey?: string;
 	/** TOSS_SECRET_KEY — 없으면 토스 호출이 CONFIG_ERROR */
 	tossSecretKey?: string;
+	/** TOSS_PAYOUT_SECRET_KEY — 토스 지급대행 API 개별 연동 시크릿 키(`test_sk_` · `live_sk_` · 결제위젯 gsk 와 다른 키). 없으면 지급대행 호출이 CONFIG_ERROR */
+	tossPayoutSecretKey?: string;
+	/** TOSS_PAYOUT_SECURITY_KEY — 지급대행 보안 키(64자 16진수 · 셀러 등록 · 수정 · 지급 요청 본문 JWE). 같은 상점의 짝 */
+	tossPayoutSecurityKey?: string;
 	/** RESEND_API_KEY — 없으면 메일 비활성(프로세스당 1회 안내) */
 	resendApiKey?: string;
 	/** RESEND_API_URL — 로컬 목 서버 검증용(기본 https://api.resend.com) */
@@ -42,6 +46,8 @@ const KEYS = [
 	'supabaseUrl',
 	'serviceKey',
 	'tossSecretKey',
+	'tossPayoutSecretKey',
+	'tossPayoutSecurityKey',
 	'resendApiKey',
 	'resendApiUrl',
 	'mailFrom',

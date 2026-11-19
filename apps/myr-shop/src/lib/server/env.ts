@@ -12,6 +12,9 @@ configureMyrCore({
 	supabaseUrl: PUBLIC_SUPABASE_URL,
 	serviceKey: env.SUPABASE_SERVICE_ROLE_KEY,
 	tossSecretKey: env.TOSS_SECRET_KEY,
+	// 토스 지급대행(웹훅 재조회 · 자동 이체 크론) — API 개별 연동 키 짝(결제위젯 키와 다른 키)
+	tossPayoutSecretKey: env.TOSS_PAYOUT_SECRET_KEY,
+	tossPayoutSecurityKey: env.TOSS_PAYOUT_SECURITY_KEY,
 	resendApiKey: env.RESEND_API_KEY,
 	resendApiUrl: env.RESEND_API_URL,
 	mailFrom: env.MAIL_FROM,
