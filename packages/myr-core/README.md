@@ -17,6 +17,8 @@ MYR 세 앱(`apps/myr-shop` · `apps/myr-influencer` · `apps/myr-admin`)이 같
 | `server/config` | `configureMyrCore` — 키·주소 주입 | ✓ |
 | `server/admin` | service role Supabase 클라이언트 | ✓ |
 | `server/toss` | 토스 승인 · 취소 · 조회 | ✓ |
+| `toss-jwe` · `toss-payout-rules` · `toss-payouts-client` | 토스 **지급대행** — 암호화(JWE) · 셀러 등록/지급 요청 본문 · 응답/웹훅 읽기 · 은행 코드 / 호출(순수 · 키 · fetch 를 받는다 · 가짜 응답 테스트). 셀러리 `packages/payments` 복사 · 판정(지급 가능 · 영업일 · 가드)은 DB | |
+| `server/toss-payouts` | 지급대행 기본 인스턴스(`tossPayoutSecretKey` · `tossPayoutSecurityKey`) · `hasTossPayouts` | ✓ |
 | `server/payment-events` | 결제 감사 로그 `payment_events` | ✓ |
 | `server/refund` · `server/refund-photos` | 줄 단위 환불(precheck → 토스 부분 취소 → record) · 환불 사진 | ✓ |
 | `server/cs` · `server/ship` · `server/mail` · `server/mail-events` | 문의 · 발송 · 메일 발송 · 메일 훅 | ✓ |
@@ -32,7 +34,7 @@ MYR 세 앱(`apps/myr-shop` · `apps/myr-influencer` · `apps/myr-admin`)이 같
 
    ```ts
    import { configureMyrCore } from '@sellery/myr-core/server/config';
-   configureMyrCore({ supabaseUrl, serviceKey, tossSecretKey, resendApiKey, resendApiUrl, mailFrom, shopUrl });
+   configureMyrCore({ supabaseUrl, serviceKey, tossSecretKey, tossPayoutSecretKey, tossPayoutSecurityKey, resendApiKey, resendApiUrl, mailFrom, shopUrl });
    ```
 
    `shopUrl` 은 메일 링크가 가리키는 **샵** 주소 — 샵은 자기 `PUBLIC_SITE_URL`, 콘솔은 샵 주소를 담은 환경변수.
