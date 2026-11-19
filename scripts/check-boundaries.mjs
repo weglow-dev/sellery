@@ -240,6 +240,10 @@ const MYR_MIRROR_RULES = [
   { re: /['"`]\*{4}['"`]?\s*\+|\*{4}\$\{[^}]*slice\(\s*-4\s*\)/, why: "계좌번호 가리기를 TS 에서 다시 만듦 — 서버 myr_mask_account(0085 · 응답 accountMasked · masked)를 쓴다", allow: ["apps/myr-admin/src/lib/mock/seed.ts"] },
   // 토스 본인인증(0121) — 카드 상태로 버튼 · 문구를 고르지 않는다(서버 tossCardOf 의 canCheck · phoneHelp · fixField · chip · label). 가짜 토스(토스 쪽 동작 흉내)만 예외
   { re: /\b(tossState|toss\.state)\s*(===|!==|==|!=)\s*['"]/, why: "토스 카드 상태로 화면을 다시 판정 — 서버 값(canCheck · phoneHelp · fixField · chip · 0121 myr_toss_card_state)을 쓴다", allow: ["apps/myr-influencer/src/lib/server/toss-sim.ts"] },
+  // 토스 지급대행 판정(0122) — 지급 가능 · 영업일 · 잔액 가드 · 하루 한도는 DB(myr_toss_ready · myr_payout_next_run · myr_payout_guard)
+  { re: /\bstatus\s*===\s*['"]PARTIALLY_APPROVED['"]\s*\|\||\btossSellerReady\b/, why: "토스로 지급 가능을 셀러 상태로 다시 판정 — 서버 myr_toss_ready · 보류 이유 toss_auth(0122)를 쓴다" },
+  { re: /\.getDay\(\)\s*(===|!==|%|>=|<=|>|<)|\b(isBusinessDay|nextBusinessDay|businessDaysAfter)\b/, why: "영업일을 TS 에서 판정 — 서버 지급 예정 시각 payDueAt(myr_payout_next_run · 0122)을 쓴다" },
+  { re: /\bcheckPayoutGuard\b|\bavailableAmount\s*(<|>|<=|>=)|(<|>|<=|>=)\s*[\w.]*\bavailableAmount\b|\b5_?000_?000\b/, why: "공유 잔액 가드 · 하루 한도를 TS 에서 판정 — 서버 myr_payout_guard(잔액만 넘긴다 · 한도는 platform_settings myr_payout · 0122)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
   { re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
@@ -347,6 +351,11 @@ for (const files of [...myrSrcDirs.map((dir) => walk(dir)), myrScriptFiles]) {
       what: "문의 본문 글자 수",
       ts: ["packages/myr-core/src/cs-rules.ts", (t) => t.match(/export const CS_BODY_MAX = (\d+);/)?.[1] ?? null],
       sql: ["myr_cs_body_max", (b) => b.match(/select\s+(\d+)/)?.[1] ?? null]
+    },
+    {
+      what: "계좌번호 형식(숫자 8~14자리 · 토스 최대 14)",
+      ts: ["packages/myr-core/src/settle-info.ts", (t) => t.match(/export const ACCOUNT_RE = \/(.*)\/;/)?.[1] ?? null],
+      sql: ["myr_account_ok", (b) => b.match(/~\s*'([^']*)'/)?.[1] ?? null]
     },
     {
       what: "환불 사진 장수",

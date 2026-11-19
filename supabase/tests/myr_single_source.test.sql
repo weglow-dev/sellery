@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(237);
+select plan(247);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -284,7 +284,7 @@ insert into _rules (label, pat, allowed) values
   ('지급 완료 지급 건(비교 — set 은 값 넣기)',  $p$(\(|and|or|where|when|not)\s*(\w+\.)?status\s*(=|<>)\s*'paid'$p$,   '{myr_payout_is_paid}'),
   ('운영 보류 지급 건',                        $p$and\s+(\w+\.)?hold_reason\s*=\s*'manual'$p$,                     '{myr_payout_manual_held}'),
   ('사업자 · 정산 정보 확인 완료',             $p$(settle_status|p_status)\s*(<>|=|is\s+distinct\s+from)\s*'verified'$p$, '{myr_seller_settle_verified}'),
-  ('크리에이터 쪽 보류 이유',                  $p$then\s+'settle_info'$p$,                                        '{myr_seller_hold_reason}'),
+  ('크리에이터 쪽 보류 이유',                  $p$then\s+'settle_info'$p$,                                        '{myr_seller_hold_reasons}'),
   ('지급 가능(자동 상태가 지급 대기)',         $p$myr_payout_auto_state\([^)]*\)\s*a\)\s*=\s*'pending'$p$,         '{myr_payout_payable}'),
   ('정산월 → 회차 찾기',                       $p$month\s*=\s*(date_trunc\('month',\s*p_month\)|v_month)$p$,       '{myr_settlement_run_of}'),
   ('비율 %(제조금액 갚은 비율 · CS 비율)',     $p$\*\s*100(\.0)?\s*/$p$,                                           '{myr_mfg_repaid_pct,myr_cs_rate}'),
@@ -376,7 +376,9 @@ insert into _rules (label, pat, allowed) values
   ('답변 기한(접수 + 설정 일수)',               $p$make_interval\(days\s*=>\s*public\.myr_claim_answer_days$p$, '{myr_claim_due_json}'),
   ('콘솔 주문 상태 · 탭(요청 → 환불 → 배송)',   $p$'claim_'\s*\|\||'partial_refunded'$p$,                     '{myr_seller_order_state,myr_seller_order_tab}'),
   ('콘솔 상품 탭 · 홈 개수 · 메뉴 · 수정 화면',  $p$'home_pending'|'opens_review'$p$,                            '{myr_seller_product_console}'),
-  ('다음 정산 보류 이유 { code, label }',        $p$myr_payout_hold_label\(public\.myr_seller_hold_reason$p$,      '{myr_seller_next_hold_json}'),
+  ('다음 정산 보류 이유 { code, label, all }',   $p$myr_seller_hold_reasons\(p_seller\)$p$,                          '{myr_seller_next_hold_json}'),
+  ('보류 이유 목록 [{ code, label }](0122)',     $p$'code',\s*c,\s*'label'$p$,                                      '{myr_payout_hold_list_json}'),
+  ('크리에이터 쪽 첫 보류 이유',                 $p$myr_seller_hold_reasons\([^)]*\)\)\[1\]$p$,                       '{myr_seller_hold_reason}'),
   ('이번 주(월요일 · KST) — 콘솔 홈 이번 주 판매',  $p$date_trunc\('week'|interval\s*'6 days'$p$,                  '{myr_kst_week,myr_app_seller_sales}'),
   -- 0118 메일 · 발주 · 배송 완료
   ('출고 마감(그날 KST 오전 11시)',           $p$interval\s*'11 hours'$p$,                                         '{myr_prepare_cutoff}'),
@@ -402,6 +404,15 @@ insert into _rules (label, pat, allowed) values
   ('저장 뒤 토스 셀러에 할 일(register · update)', $p$then\s+'register'$p$,                                              '{myr_app_seller_settle_info_save}'),
   ('사업자번호가 들어 있나(숫자 10자리)',       $p$biz_no\s*~\s*'$p$,                                                     '{myr_has_biz_no}'),
   ('숫자만 남기기(''\D'' · ''[^0-9]'')',       $p$'(\\D|\[\^0-9\])'\s*,\s*''\s*,\s*'g'$p$,                          '{myr_digits}'),
+  -- 0122 토스 지급대행 판정
+  ('토스로 지급 가능(카드 상태 인증 완료 · 한도 없음 · 법인)', $p$'partial'\s*,\s*'approved'$p$,                        '{myr_toss_ready}'),
+  ('크리에이터 쪽 보류 이유(토스 본인인증 전)',   $p$then\s+'toss_auth'$p$,                                             '{myr_seller_hold_reasons}'),
+  ('영업일(주말 · 공휴일 표)',                   $p$isodow|myr_holidays$p$,                                            '{myr_is_business_day}'),
+  ('첫 영업일 찾기',                             $p$myr_is_business_day\(\w+::date\)$p$,                               '{myr_business_day_from}'),
+  ('다음 지급 시각(영업일 오후 1시)',            $p$myr_business_day_from\(public\.myr_kst_date$p$,                   '{myr_payout_next_run}'),
+  ('지금 보낼 지급 건(지급 가능 · 송금 중 아님 · 계좌 · 운영 실패 아님)', $p$'account'\s*,\s*'ops'$p$,                   '{myr_payout_sendable}'),
+  ('그날 요청한 지급 건(시도한 날 · 실패 확정 아님)', $p$myr_kst_date\(\w+\.transfer_at\)|transfer_fail\s*=\s*'check'$p$, '{myr_payout_requested_on}'),
+  ('계좌번호 형식(숫자 8~14자리 · 토스 최대 14)', $p$\\d\{8,1[46]\}$p$,                                              '{myr_account_ok}'),
   -- 상태 비교는 정규형으로만(status = 'X' · <> · in (…) · 값이 빌 수 있으면 coalesce(status = 'X', false)) — 판정별 규칙이 정규형으로 적혀 있으므로
   --   다른 모양(순서 바꾸기 · != · any(array) · is distinct from · 형 변환 · 값 하나짜리 in)은 금지해 빠져나가지 못하게 한다. 변수(v_status · p_ship_status)도 같다.
   --   순서 바꾸기에서 JSON 키 비교(x ->> 'status' = p_status)는 상태 글자 비교가 아니라 뺀다(따옴표 앞이 >)
@@ -411,7 +422,7 @@ insert into _rules (label, pat, allowed) values
   ('상태 비교 is distinct from — 금지 · coalesce(status = ''X'', false) 로', $p$status\s+is\s+(not\s+)?distinct\s+from\s*'$p$, '{}'),
   ('상태 비교 형 변환(status::text = ''X'') — 금지 · status = ''X'' 로', $p$status::\w+\s*(=|<>|!=)$p$,                         '{}'),
   ('상태 비교 값 하나짜리 in(status in (''X'')) — 금지 · status = ''X'' 로', $p$status\s+(not\s+)?in\s*\(\s*'\w+'\s*\)$p$,    '{}'),
-  ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days}');
+  ('운영 설정 읽기',                          $p$platform_settings$p$,                                           '{myr_shipping_rule,myr_settlement_pct,myr_deposit_pct,myr_claim_return_fee,myr_claim_answer_days,myr_payout_toss_on,myr_payout_daily_cap}');
 
 -- 표 제약도 같은 형식 규칙을 따로 쓰지 않는다(함수 본문 검사가 못 보는 곳) — 휴대폰 형식은 myr_mobile_ok
 select is((select string_agg(c.conrelid::regclass || '.' || c.conname, ', ') from pg_constraint c where c.contype = 'c' and pg_get_constraintdef(c.oid) ~ '01\[016789\]'), null,

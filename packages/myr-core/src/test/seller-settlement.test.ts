@@ -44,6 +44,11 @@ describe('파서', () => {
 			[{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, { code: 'tax_invoice', label: '세금계산서 확인 전' }]
 		]);
 		expect([t.nextHold, t.months[0].payoutStatus, t.months[0].holds]).toEqual([null, null, []]);
+		// 다음 정산 이유 전부(0122 next_hold.all) — 사업자 정보 확인 전 + 토스 본인인증 전이면 둘 다 · all 이 없으면 빈 목록
+		const a = sellerSettlementsFromJson({
+			next_hold: { code: 'settle_info', label: '사업자 · 정산 정보 확인 전', all: [{ code: 'settle_info', label: '사업자 · 정산 정보 확인 전' }, { code: 'toss_auth', label: '토스 본인인증 전' }, { bad: 1 }] }
+		});
+		expect([a.nextHold?.code, a.nextHolds.map((x) => x.code), h.nextHolds, t.nextHolds]).toEqual(['settle_info', ['settle_info', 'toss_auth'], [], []]);
 		// 이체한 날(서버 paid_on · 0103) — 지급 완료일 때만
 		expect(sellerSettlementsFromJson({ months: [{ month: '2026-11', payout_status: 'paid', paid_on: '2026-12-02', rows: [], total: {} }] }).months[0].paidOn).toBe('2026-12-02');
 		// 0111 — 지급 예정 시각 · 이체 상태(모르는 종류는 버린다 · 상태가 없으면 null)

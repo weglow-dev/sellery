@@ -94,8 +94,8 @@ export type SettleLedger = {
 };
 /** 제조금액 · 보증금 탭 머리 — 남은 제조금액 합 · 돌려받을 보증금 합(서버 0101) */
 export type SettleLedgerTotal = { remaining: number; depositHeld: number };
-/** nextHold = 다음 정산 보류 이유(크리에이터 쪽 · 서버 myr_seller_hold_reason) — 없으면 null */
-export type SellerSettlements = { settleStatus: string; nextHold: SettleHold | null; preview: SettlePreview; ledgers: SettleLedger[]; ledgerTotal: SettleLedgerTotal; months: SettleMonth[] };
+/** nextHold = 다음 정산 첫 보류 이유(크리에이터 쪽 · 서버 myr_seller_next_hold_json) — 없으면 null · nextHolds = 이유 전부(같은 응답의 all · 0122 — 사업자 정보 확인 전 + 토스 본인인증 전) */
+export type SellerSettlements = { settleStatus: string; nextHold: SettleHold | null; nextHolds: SettleHold[]; preview: SettlePreview; ledgers: SettleLedger[]; ledgerTotal: SettleLedgerTotal; months: SettleMonth[] };
 export type SettleItem = {
 	orderCode: string;
 	buyer: string;
@@ -170,6 +170,7 @@ export function sellerSettlementsFromJson(v: unknown): SellerSettlements {
 	return {
 		settleStatus: s(o.settle_status, 'none'),
 		nextHold: holdFrom(o.next_hold),
+		nextHolds: arr(obj(o.next_hold)?.all).map(holdFrom).filter((h): h is SettleHold => !!h),
 		preview: settlePreviewFromJson(o.preview),
 		ledgers: arr(o.ledgers)
 			.map(obj)
