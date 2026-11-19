@@ -30,5 +30,7 @@ configureMyrCore({
 	ebutSenderZipcode: env.EBUT_SENDER_ZIPCODE,
 	ebutSenderAddress: env.EBUT_SENDER_ADDRESS,
 	ebutCourier: env.EBUT_COURIER,
-	ebutApiUrl: env.EBUT_API_URL
+	ebutApiUrl: env.EBUT_API_URL,
+	// 공공데이터포털 일반 인증키(공용 계정) — 공휴일 동기화 크론(0123). 없으면 크론이 NO_KEY 로 건너뛴다
+	dataGoKrServiceKey: env.DATA_GO_KR_SERVICE_KEY
 });

@@ -40,6 +40,8 @@ export type MyrCoreConfig = {
 	ebutCourier?: string;
 	/** EBUT_API_URL — 로컬 목 서버 검증용(기본 이벗 OrderSheet v2 주소 · resendApiUrl 과 같은 용도) */
 	ebutApiUrl?: string;
+	/** DATA_GO_KR_SERVICE_KEY — 공공데이터포털 일반 인증키(공용 계정 · 계정당 하나 · Decoding 키). 특일 정보(공휴일 · 0123 크론)에 쓴다. 없으면 동기화 꺼짐 */
+	dataGoKrServiceKey?: string;
 };
 
 const KEYS = [
@@ -61,7 +63,8 @@ const KEYS = [
 	'ebutSenderZipcode',
 	'ebutSenderAddress',
 	'ebutCourier',
-	'ebutApiUrl'
+	'ebutApiUrl',
+	'dataGoKrServiceKey'
 ] as const;
 let config: MyrCoreConfig = {};
 

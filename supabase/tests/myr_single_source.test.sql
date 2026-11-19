@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(247);
+select plan(252);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -407,7 +407,13 @@ insert into _rules (label, pat, allowed) values
   -- 0122 토스 지급대행 판정
   ('토스로 지급 가능(카드 상태 인증 완료 · 한도 없음 · 법인)', $p$'partial'\s*,\s*'approved'$p$,                        '{myr_toss_ready}'),
   ('크리에이터 쪽 보류 이유(토스 본인인증 전)',   $p$then\s+'toss_auth'$p$,                                             '{myr_seller_hold_reasons}'),
-  ('영업일(주말 · 공휴일 표)',                   $p$isodow|myr_holidays$p$,                                            '{myr_is_business_day}'),
+  ('영업일(주말 · 공휴일 표) — 동기화 · 개수는 표를 쓰는 쪽', $p$isodow|myr_holidays\M$p$,                            '{myr_is_business_day,myr_holidays_sync,myr_holiday_count}'),
+  -- 0123 공휴일 동기화
+  ('KST 올해(동기화할 연도 · 올해 빈 목록 · 올해 비었나)', $p$extract\(year\s+from\s+public\.myr_kst_date$p$,           '{myr_holiday_this_year}'),
+  ('올해를 동기화 연도 첫 칸으로 고르기 — 금지 · myr_holiday_this_year', $p$myr_holiday_sync_years\([^)]*\)\)\[1\]$p$,   '{}'),
+  ('공휴일 이름 글자 수(1~40) — 표 제약도 이 함수', $p$char_length\([^;]*\)\s+between\s+1\s+and\s+40$p$,                '{myr_holiday_name_ok}'),
+  ('그해 날짜인가',                              $p$extract\(year\s+from\s+(p_day|[\w.]*day)\)$p$,               '{myr_holiday_in_year}'),
+  ('올해 공휴일이 비었나',                       $p$myr_holiday_count\([^;]*\)\s*=\s*0$p$,                             '{myr_holidays_missing}'),
   ('첫 영업일 찾기',                             $p$myr_is_business_day\(\w+::date\)$p$,                               '{myr_business_day_from}'),
   ('다음 지급 시각(영업일 오후 1시)',            $p$myr_business_day_from\(public\.myr_kst_date$p$,                   '{myr_payout_next_run}'),
   ('지금 보낼 지급 건(지급 가능 · 송금 중 아님 · 계좌 · 운영 실패 아님)', $p$'account'\s*,\s*'ops'$p$,                   '{myr_payout_sendable}'),
