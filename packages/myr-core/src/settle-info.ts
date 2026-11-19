@@ -1,13 +1,18 @@
 /**
  * 크리에이터 사업자 · 정산 정보(0085 · docs/myr.md §4.2.1 9번 · §9-6) — 순수. 화면(초대 가입 2단계 · 내 정보) · API 가 같은 규칙을 쓴다.
  * 서버(0085 `myr_app_seller_settle_info_save`)가 같은 규칙으로 다시 막는다 — 여기는 바로 보여 줄 칸 오류 · 응답 파서 · 문구.
- *   - 상호 1~50 · 대표자 1~30 · 사업자등록번호 10자리 체크섬 · 은행 · 계좌 숫자 8~16자리 · 예금주 = 상호 또는 대표자(공백 · (주) · ㈜ · 주식회사 무시)
+ *   - 상호 1~50 · 대표자 1~30 · 사업자등록번호 10자리 체크섬 · 은행 · 계좌 숫자 8~14자리(0122 · 토스 최대 14) · 예금주 = 상호 또는 대표자(공백 · (주) · ㈜ · 주식회사 무시)
  *   - 세금계산서 이메일 = 초대받은 이메일(입력 없음)
  *   - 대표자 휴대폰(0121) — 토스페이먼츠 지급대행 본인인증 문자를 받는 번호(대표자 본인 명의) · 처음 저장 때 토스페이먼츠 제3자 제공 동의(TOSS_CONSENT)
  *   - 개인사업자 · 법인(bizKind)은 서버(0121 myr_biz_kind)가 정해 응답에 싣는다 — 화면은 그 값을 읽는다
  *   - 저장된 사업자번호 · 계좌는 가린 값만 받는다 — 다시 입력하지 않으면(빈 칸) 저장된 값 그대로
  */
 import { PHONE_RE, formatPhone, phoneDigits } from './phone';
+
+/** 계좌번호 형식 — 숫자 8~14자리(토스 지급대행 accountNumber 최대 14). 서버 0122 myr_account_ok 와 짝(check-boundaries (j)) */
+export const ACCOUNT_RE = /^\d{8,14}$/;
+/** 계좌 입력 칸 최대 자릿수 — ACCOUNT_RE 의 위 한도(테스트가 같은지 본다) */
+export const ACCOUNT_MAX = 14;
 
 export const BANKS = [
 	'KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', 'SC제일은행', '카카오뱅크', '토스뱅크', '케이뱅크',
@@ -144,7 +149,7 @@ export function settleErrors(v: SettleValues, saved: { hasBizNo: boolean; hasAcc
 	if (v.bizNo.trim() === '' ? !saved.hasBizNo : !bizNoValid(v.bizNo)) e.bizNo = v.bizNo.trim() === '' ? '사업자등록번호를 입력해 주세요' : '사업자등록번호를 다시 확인해 주세요';
 	if (!v.bank.trim()) e.bank = '은행을 골라 주세요';
 	const acc = digitsOnly(v.account);
-	if (v.account.trim() === '' ? !saved.hasAccount : !/^\d{8,16}$/.test(acc)) e.account = v.account.trim() === '' ? '계좌번호를 입력해 주세요' : '계좌번호는 숫자 8~16자리예요';
+	if (v.account.trim() === '' ? !saved.hasAccount : !ACCOUNT_RE.test(acc)) e.account = v.account.trim() === '' ? '계좌번호를 입력해 주세요' : '계좌번호는 숫자 8~14자리예요';
 	if (!v.holder.trim()) e.holder = '예금주를 입력해 주세요';
 	else if (company && ceo && !holderMatches(v.holder, company, ceo)) e.holder = '예금주는 상호 또는 대표자와 같아야 해요';
 	return e;
@@ -173,7 +178,8 @@ export const SETTLE_SAVE_MESSAGES: Record<string, { field?: SettleField; message
 	BAD_CEO: { field: 'ceo', message: '대표자 이름을 확인해 주세요' },
 	BAD_BIZ_NO: { field: 'bizNo', message: '사업자등록번호를 다시 확인해 주세요' },
 	BAD_BANK: { field: 'bank', message: '은행을 골라 주세요' },
-	BAD_ACCOUNT: { field: 'account', message: '계좌번호는 숫자 8~16자리예요' },
+	BAD_ACCOUNT: { field: 'account', message: '계좌번호는 숫자 8~14자리예요' },
+	ACCOUNT_REENTER: { field: 'account', message: '저장된 계좌번호는 14자리가 넘어 지급할 수 없어요. 계좌번호를 다시 입력해 주세요' },
 	BAD_HOLDER: { field: 'holder', message: '예금주를 입력해 주세요' },
 	HOLDER_MISMATCH: { field: 'holder', message: '예금주는 상호 또는 대표자와 같아야 해요' },
 	BAD_CEO_PHONE: { field: 'ceoPhone', message: '대표자 휴대폰 번호를 확인해 주세요' },

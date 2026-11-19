@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { digitsOnly, formatBizNo, type SettleField, type SettleInfo, type SettleValues } from '@sellery/myr-core/settle-info';
+	import { ACCOUNT_MAX, digitsOnly, formatBizNo, type SettleField, type SettleInfo, type SettleValues } from '@sellery/myr-core/settle-info';
 	import { formatPhone } from '@sellery/myr-core/phone';
 	import CheckBox from './auth/CheckBox.svelte';
 	import { AUTH_HINT, AUTH_LABEL, authInput } from '$lib/auth-ui';
@@ -108,7 +108,7 @@
 				placeholder={info?.accountMasked ? `${info.accountMasked}` : '숫자만 입력'}
 				value={values.account}
 				oninput={(e) => {
-					values.account = digitsOnly(e.currentTarget.value).slice(0, 16);
+					values.account = digitsOnly(e.currentTarget.value).slice(0, ACCOUNT_MAX);
 					e.currentTarget.value = values.account;
 					clear('account');
 				}}

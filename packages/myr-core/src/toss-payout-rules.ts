@@ -5,7 +5,7 @@
  *   - MYR 크리에이터는 사업자만 받는다(docs/myr.md §9-6) — 셀러 본문은 늘 company(개인사업자 · 법인) 모양.
  * 문서: docs.tosspayments.com/guides/v2/payouts · /reference/additional. 실측(2026-11-19 · tpeerkeamf5 테스트 키): 셀러 목록 응답은 { hasMore, size, nextCursor, items }.
  */
-import type { BizKind } from './settle-info';
+import { ACCOUNT_MAX, ACCOUNT_RE, type BizKind } from './settle-info';
 
 /* ---------------- 상태 값(읽기용 이름표 — 판정 아님) ---------------- */
 
@@ -108,8 +108,8 @@ export type TossSellerBuild = { ok: true; body: TossSellerBody } | { ok: false; 
 const digits = (v: unknown) => String(v ?? '').replace(/\D/g, '');
 const clean = (v: unknown, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-/** 토스 계좌번호 칸은 최대 14자리 — MYR 입력(0085)은 8~16자리를 받으므로 15 · 16자리는 여기서 BAD_ACCOUNT(입력 규칙 맞추기는 DB 0122) */
-export const TOSS_ACCOUNT_MAX = 14;
+/** 토스 계좌번호 칸은 최대 14자리 — MYR 입력 규칙(settle-info ACCOUNT_RE · 0122 myr_account_ok)이 이 한도를 따른다. 0122 전에 저장된 15 · 16자리 계좌는 여기서 BAD_ACCOUNT */
+export const TOSS_ACCOUNT_MAX = ACCOUNT_MAX;
 
 export function buildTossSellerBody(input: TossSellerInput): TossSellerBuild {
 	const refSellerId = String(input.refSellerId ?? '');
@@ -122,7 +122,7 @@ export function buildTossSellerBody(input: TossSellerInput): TossSellerBuild {
 	const bankCode = tossBankCodeOf(bank.bank);
 	if (!bankCode) return { ok: false, code: 'BANK_CODE_UNKNOWN', field: 'bank' };
 	const accountNumber = digits(bank.account);
-	if (accountNumber.length < 8 || accountNumber.length > TOSS_ACCOUNT_MAX) return { ok: false, code: 'BAD_ACCOUNT', field: 'account' };
+	if (!ACCOUNT_RE.test(accountNumber)) return { ok: false, code: 'BAD_ACCOUNT', field: 'account' };
 	const holderName = clean(bank.holder, 50);
 	if (!holderName) return { ok: false, code: 'HOLDER_REQUIRED', field: 'holder' };
 	const email = clean(input.email, 100).toLowerCase();

@@ -27,8 +27,8 @@
 	const transfer = $derived(mon?.transfer ?? null);
 	// 세금계산서(0104) — 서버 값 그대로(show = 칸을 그린다)
 	const inv = $derived(mon?.invoice?.show ? mon.invoice : null);
-	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold · 지난 회차 지급 건 payout_status · holds — 0102 · 0104). 이유가 여럿이면 전부 보여 준다
-	const holds = $derived(upcoming ? (st.nextHold ? [st.nextHold] : []) : (mon?.holds ?? []));
+	// 상태 · 보류 이유는 서버 값(다음 정산 next_hold.all · 지난 회차 지급 건 payout_status · holds — 0102 · 0104 · 0122). 이유가 여럿이면 전부 보여 준다
+	const holds = $derived(upcoming ? st.nextHolds : (mon?.holds ?? []));
 	const holdText = $derived(holds.map((h) => h.label).join(', '));
 	// 지급까지 할 일 ① — 사업자 · 정산 정보 이유가 있으면 아직(서버 코드로 고른다)
 	const settleInfoHold = $derived(holds.some((h) => h.code === 'settle_info'));
