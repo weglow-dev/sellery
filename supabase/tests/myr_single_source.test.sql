@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(257);
+select plan(273);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -400,8 +400,11 @@ insert into _rules (label, pat, allowed) values
   ('번호 정리(공백 · 하이픈 빼기) — 세금계산서 번호는 다른 번호', $p$\[\\s-\]$p$,                                       '{myr_tracking_no,myr_tax_invoice_no}'),
   ('휴대폰 번호 형식(01x + 7~8자리) — 가입 연락처 · 대표자 휴대폰', $p$01\[016789\]$p$,                                   '{myr_mobile_ok}'),
   ('개인사업자 · 법인(사업자번호 가운데 두 자리 80~89)', $p$between\s+80\s+and\s+89|substr\([^)]*,\s*4,\s*2\)$p$,   '{myr_biz_kind}'),
-  ('토스 셀러 상태 → 카드 상태(본인인증 전 · 추가 인증 · 한도 없음 · 인증 완료)', $p$toss_seller_status\s*(=|<>)\s*'$p$,                  '{myr_toss_card_state}'),
-  ('저장 뒤 토스 셀러에 할 일(register · update)', $p$then\s+'register'$p$,                                              '{myr_app_seller_settle_info_save}'),
+  -- 2026-11-20: 토스 상태 목록은 myr_toss_status_state 한 곳 — 상태 비교(= · <> · in ( )와 토스 상태 글자 둘 다 막는다
+  ('토스 셀러 상태 비교(= · <> · in)',                $p$toss_seller_status\s*(=\s*'|<>\s*'|(not\s+)?in\s*\()$p$,                '{}'),
+  ('토스 셀러 상태 → 상태 이름(본인인증 전 · 추가 인증 · 한도 없음 · 인증 완료)', $p$'(APPROVAL_REQUIRED|KYC_REQUIRED|PARTIALLY_APPROVED|APPROVED)'$p$, '{myr_toss_status_state}'),
+  -- myr_toss_creator_ask 의 'register' 는 크리에이터에게 보일 할 일(다시 등록 버튼 · 2026-11-20) — 같은 글자라 주인에 넣는다(판정은 카드 상태 none + 사업자번호)
+  ('저장 뒤 토스 셀러에 할 일(register · update)', $p$then\s+'register'$p$,                                              '{myr_app_seller_settle_info_save,myr_toss_todo_merge,myr_toss_creator_ask}'),
   ('사업자번호가 들어 있나(숫자 10자리)',       $p$biz_no\s*~\s*'$p$,                                                     '{myr_has_biz_no}'),
   ('숫자만 남기기(''\D'' · ''[^0-9]'')',       $p$'(\\D|\[\^0-9\])'\s*,\s*''\s*,\s*'g'$p$,                          '{myr_digits}'),
   -- 0122 토스 지급대행 판정
@@ -413,6 +416,21 @@ insert into _rules (label, pat, allowed) values
   ('토스 셀러 다시 등록 막기(송금 중인 지급 건)', $p$exists\s*\(select[^;]*myr_payouts[^;]*myr_payout_sending$p$,       '{myr_seller_toss_sending}'),
   ('MYR refSellerId 만들기',                     $p$'m'\s*\|\|$p$,                                                    '{myr_toss_ref_new}'),
   ('MYR 이 등록한 셀러만(셀러리 쪽 셀러는 건드리지 않는다)', $p$myr_toss_ref\s+is\s+not\s+null$p$,                     '{myr_app_seller_toss_status}'),
+  ('승인 때 토스에 반영할 할 일이 남았나',        $p$myr_toss_todo\s+is\s+(not\s+)?null$p$,                           '{myr_seller_toss_todo_open}'),
+  ('지금 바로 토스에 할 일(본인인증 전) — 마친 뒤는 운영 승인 때', $p$v_now\s*:=$p$,               '{myr_app_seller_settle_info_save}'),
+  ('토스에 등록된 크리에이터(등록 전 · 거절 아님)',  $p$toss_seller_id\s+is\s+not\s+null\s+and\s+s\.toss_seller_status\s+is\s+not\s+null$p$, '{myr_toss_registered}'),
+  ('토스 인증 대기였는데 본인인증을 마침 → 확인 완료', $p$myr_settle_status\s*=\s*'toss'\s*,\s*false\)\s+and$p$,           '{myr_settle_toss_done}'),
+  ('확인 중 + 본인인증 마침 → 고칠 수 없음',           $p$myr_settle_reviewing\(s\)\s+and\s+public\.myr_toss_verified$p$,       '{myr_settle_edit_locked}'),
+  ('사업자 · 정산 정보 확인 중(pending)인가',          $p$myr_settle_status\s*=\s*'pending'$p$,                               '{myr_settle_reviewing}'),
+  ('승인 때 할 일이 다시 등록(register)인가',          $p$myr_toss_todo\s*=\s*'register'$p$,                                  '{myr_toss_todo_register}'),
+  ('승인 뒤 토스 재인증(할 일 register · 법인 제외)',  $p$myr_toss_todo_register\(s\)\s+and\s+public\.myr_biz_kind$p$,        '{myr_toss_reauth_pending}'),
+  ('등록 진행 중(마지막 등록 시도 뒤 5분)',              $p$myr_toss_ref_at\s*>\s*now\(\)$p$,                                    '{myr_toss_register_in_flight}'),
+  ('크리에이터가 토스에서 할 일(본인인증 · 추가 인증 · 고치기)', $p$when\s+'wait'\s+then\s+'auth'$p$,                         '{myr_toss_creator_ask}'),
+  ('요약 카드 연락처 = 확인 완료면 대표자 휴대폰',     $p$settle_verified\(s\.myr_settle_status\)\s+and\s+s\.settle_phone\s+is\s+not\s+null$p$, '{myr_seller_contact_phone}'),
+  ('확인 완료가 남길 상태(확인 중 + 본인인증 전 → toss)', $p$myr_toss_creator_ask\(s\)\s*=\s*'auth'$p$,                     '{myr_settle_verify_status}'),
+  ('토스 본인인증을 마쳤나(인증 완료 · 추가 인증 · 한도 없음 · 법인)', $p$'partial'\s*,\s*'kyc'\s*,\s*'approved'\s*,\s*'corporate'$p$, '{myr_toss_verified}'),
+  ('토스 반영 전에는 확인 완료 아님(TOSS_PENDING)', $p$'TOSS_PENDING'$p$,                                                  '{myr_app_admin_settle_info_check}'),
+  ('토스 refSellerId = 마지막 등록 시도의 것인가',     $p$p_ref\s*=\s*\w+\.myr_toss_ref$p$,                                  '{myr_toss_ref_is_last}'),
   ('세금계산서 · 토스 등록 이메일(크리에이터 이메일 · 없으면 계정 이메일)', $p$coalesce\(\s*\w+\.email\s*,\s*\(select\s+\w+\.email\s+from\s+auth\.users$p$, '{myr_seller_tax_email}'),
   -- 0123 공휴일 동기화
   ('KST 올해(동기화할 연도 · 올해 빈 목록 · 올해 비었나)', $p$extract\(year\s+from\s+public\.myr_kst_date$p$,           '{myr_holiday_this_year}'),

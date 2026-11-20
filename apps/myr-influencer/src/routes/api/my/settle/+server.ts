@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { parseSettleBody, settleSaveMessage } from '@sellery/myr-core/settle-info';
-import { saveSettleInfoOfUser } from '$lib/server/settle-info';
+import { getSettleInfoOfUser, saveSettleInfoOfUser } from '$lib/server/settle-info';
 import { apiSeller } from '$lib/server/seller';
 import { hasTossPayouts, linkTossSeller } from '$lib/server/toss-sellers';
 
@@ -26,6 +26,9 @@ export const POST: RequestHandler = async (event) => {
 		const t = await linkTossSeller(seller.id, r.tossAction);
 		if (!t.ok) console.warn('[my/settle] toss link:', t.code);
 		if (t.info) return json({ ...r, info: t.info });
+		// 결과 불명 · 우리 쪽 거절 · 응답 대기(WAITING) — 저장 응답의 정보는 등록 시도 전 값이라 다시 읽는다(토스 카드가 "응답을 기다리고 있어요"로 · 2026-11-20)
+		const now = await getSettleInfoOfUser(user.id);
+		if (now) return json({ ...r, info: now });
 	}
 	return json(r);
 };

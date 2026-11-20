@@ -29,4 +29,10 @@ export type TossCard = {
 	phoneHelp: boolean;
 	/** 마지막 확인 결과가 "아직" 이었는지 */
 	notYet: boolean;
+	/** 승인 때 토스에 반영할 변경이 있을 때 한 줄(서버 tossAfterReview · 0124) */
+	review: string | null;
+	/** [토스페이먼츠에 다시 등록하기] — 토스 셀러가 없을 때(서버 toss_ask register · 동의함 · 2026-11-20) */
+	canRegister: boolean;
+	/** 토스페이먼츠 제공 동의가 없어 등록할 수 없음 — [수정하기]에서 동의하고 저장(0124 전에 저장한 크리에이터) */
+	needConsent: boolean;
 };

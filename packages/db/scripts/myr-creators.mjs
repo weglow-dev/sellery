@@ -15,8 +15,11 @@
 //   unlink <@handle>                             로그인 계정 연결만 끊는다(계정 · 상품은 그대로)
 //   suspend <@handle> · reactivate <@handle>     콘솔 이용 정지/해제(sellers.active) — 정지되면 콘솔 모든 화면이 /suspended. 샵의 상품 노출도 같이 멈춘다(0056 공개 RPC 가 active 를 본다)
 //   settle-info [--all]                          사업자 · 정산 정보 확인 대기(0085 · --all = 미입력 빼고 전부) — 원문 출력(확인용 · 화면 공유 주의)
+//                                                토스 인증 대기(toss · 본인인증 전)는 확인 대기에 안 나온다 — --all 로 보고 시범운영 동안 직접 확인할 수 있다(0124)
 //                                                확인: 홈택스 사업자 상태(휴 · 폐업 아님) · 상호 · 대표자 일치 / 은행 "예금주 조회"로 예금주 = 상호 또는 대표자
-//   settle-verify <@handle> --at <제출 시각>       확인 완료(확인 중만) — 정산금 지급 가능
+//   settle-verify <@handle> --at <제출 시각>       확인 완료(확인 중 · 토스 인증 대기) — 정산금 지급 가능. 토스가 정보를 거절한 상태면 TOSS_REJECTED(→ settle-reject). 승인 때 토스에 반영할 할 일(0124 toss_todo)이 있으면
+//                                                크리에이터 콘솔 운영 API(/api/ops/settle · 토스 키가 콘솔에 있다)를 불러 토스에 반영한 뒤 확인한다
+//                                                — CRON_SECRET(콘솔 값) · 선택 MYR_INFLUENCER_URL(기본 https://myr-influencer.vercel.app · 로컬 http://localhost:5179)
 //   settle-reject <@handle> "<사유>" --at <제출 시각>   다시 입력 요청(사유 필수 · 크리에이터 콘솔 홈 배너 · 내 정보에 사유)
 //                                                --at = settle-info 가 보여 준 제출 시각(그 줄 아래에 명령이 그대로 찍힌다) — 그사이 크리에이터가 다시 저장했으면 거절(STALE · 보지 않은 값을 확인하지 않게)
 //
@@ -30,6 +33,7 @@ import { createClient } from "@supabase/supabase-js";
 import { parseArgs } from "./lib/myr-ops-plan.mjs";
 import { normHandle } from "./lib/myr-products-plan.mjs";
 import { formatCreatorsTable, generatePassword, inviteRedirect, normEmail, passwordProblem } from "./lib/myr-creators-plan.mjs";
+import { DEFAULT_CONSOLE_URL, consoleBase } from "./lib/myr-invites-plan.mjs";
 
 function loadEnv() {
   if (process.env.PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
@@ -190,22 +194,49 @@ async function cmdSettleInfo() {
     console.log(`  상호 ${r.company ?? "—"} · 대표자 ${r.ceo ?? "—"} · 사업자번호 ${r.biz_no ? r.biz_no.replace(/^(\d{3})(\d{2})(\d{5})$/, "$1-$2-$3") : "—"}`);
     console.log(`  계좌 ${r.bank ?? "—"} ${r.account ?? ""} · 예금주 ${r.holder ?? "—"} · 세금계산서 ${r.tax_email ?? "—"}`);
     if (r.note) console.log(`  요청 사유: ${r.note}`);
-    if (r.status === "pending" && r.submitted_at) {
+    // 서버 값(toss_todo)에 맞는 문구만 고른다 — 할 일 판정은 서버(0124)
+    const TODO_LABEL = { register: "다시 등록(이전 셀러 삭제)", update: "셀러 수정(인증 유지)" };
+    if (r.toss_todo) console.log(`  토스 반영: 확인 완료 때 ${TODO_LABEL[r.toss_todo] ?? r.toss_todo}`);
+    // 0124 myr_toss_reauth_pending — 사업자번호 · 대표자 변경(법인 제외): 확인하면 토스 인증 대기가 되고 크리에이터가 새로 본인인증해야 확인 완료
+    if (r.reauth) console.log("  ⚠ 재인증 필요 — 확인하면 토스에 다시 등록되고, 크리에이터가 대표자 휴대폰으로 본인인증을 마쳐야 확인 완료(그때까지 토스 인증 대기 · 지급 보류)");
+    if (r.status === "toss") console.log("  토스 인증 대기 — 본인인증을 마치면 자동으로 확인 완료(0124). 시범운영(테스트 키 · 개인사업자 문자 없음)에서 수동 지급하려면 아래 확인 완료로 직접 확인");
+    if ((r.status === "pending" || r.status === "toss") && r.submitted_at) {
       console.log(`  확인 완료:   node packages/db/scripts/myr-creators.mjs settle-verify ${r.handle} --at ${r.submitted_at}`);
       console.log(`  다시 입력:   node packages/db/scripts/myr-creators.mjs settle-reject ${r.handle} "사유" --at ${r.submitted_at}`);
     }
   }
 }
 
+async function verifyViaConsole(handle, at) {
+  const secret = (process.env.CRON_SECRET || "").trim();
+  if (!secret) fail("토스에 반영할 변경이 있어 크리에이터 콘솔 운영 API 로 확인해야 해요 — CRON_SECRET(콘솔 값)이 필요합니다(.env.local)");
+  const base = consoleBase(process.env.MYR_INFLUENCER_URL || DEFAULT_CONSOLE_URL) ?? fail(`MYR_INFLUENCER_URL 형식이 아닙니다: ${process.env.MYR_INFLUENCER_URL}`);
+  console.log(`[${where}] 토스 반영이 필요한 변경 — ${base}/api/ops/settle 로 토스에 반영한 뒤 확인합니다`);
+  const res = await fetch(`${base}/api/ops/settle`, { method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: JSON.stringify({ handle, at }) });
+  if (res.status === 401) fail("CRON_SECRET 이 콘솔의 값과 다릅니다");
+  const json = await res.json().catch(() => null);
+  // 0124(2026-11-20) — 다른 승인 · 저장 · 버튼으로 토스 등록이 진행 중(등록 시도 뒤 5분 · myr_toss_register_in_flight) — 토스 셀러가 둘 생기지 않게 막았다
+  if (json?.code === "TOSS_FAILED" && json.toss?.code === "WAITING") fail("토스 등록이 이미 진행 중이에요(다른 승인 · 저장) — 몇 분 뒤 settle-info 로 다시 보고 확인하세요. 확인 중 그대로(지급 보류)");
+  if (json?.code === "TOSS_FAILED") fail(`토스 반영 실패(${json.toss?.code ?? "?"}) — 확인 중 그대로(지급 보류). 결과 불명 · 우리 쪽 문제면 잠시 뒤 다시, 토스가 크리에이터 정보를 거절했으면 settle-reject 로 다시 입력을 요청하세요`);
+  if (json?.ok) console.log(`[${where}] 토스 ${json.toss === "synced" ? "반영 완료" : "반영할 것 없음"}`);
+  return json;
+}
+
 async function settleCheck(decision) {
   const seller = await sellerByHandle(args[0] ?? fail(`usage: settle-${decision} <@handle>${decision === "reject" ? ' "<사유>"' : ""} --at <제출 시각>`));
   const note = decision === "reject" ? (args[1] ?? fail('usage: settle-reject <@handle> "<사유>" --at <제출 시각>')) : null;
   const at = typeof flags.at === "string" ? flags.at : fail(`--at <제출 시각> 이 필요합니다 — settle-info 로 지금 값을 본 뒤 그 줄에 찍힌 명령을 그대로 쓰세요`);
-  const { data, error } = await db.rpc("myr_app_admin_settle_info_check", { p_seller: seller.id, p_decision: decision, p_submitted_at: at, p_note: note, p_admin: null });
+  const { data: first, error } = await db.rpc("myr_app_admin_settle_info_check", { p_seller: seller.id, p_decision: decision, p_submitted_at: at, p_note: note, p_admin: null });
   if (error) fail(error.message);
+  // 0124 — 토스에 반영할 할 일이 남았으면 콘솔 운영 API 가 토스에 반영한 뒤 확인한다(토스 키는 콘솔에만 있다)
+  const data = decision === "verify" && first?.code === "TOSS_PENDING" ? await verifyViaConsole(seller.handle, at) : first;
+  // 0124(2026-11-20) — 토스가 크리에이터 정보를 거절한 상태면 확인 완료가 아니다(수동 지급이면 틀린 계좌로 이체하게 된다)
+  if (data?.code === "TOSS_REJECTED") fail(`토스페이먼츠가 크리에이터 정보를 거절한 상태예요(${data.toss_error ?? "?"}) — 확인 완료할 수 없어요. settle-reject 로 다시 입력을 요청하세요`);
   if (data?.code === "STALE") fail(`그사이 크리에이터가 정보를 다시 저장했어요(지금 제출 ${data.submitted_at ?? "—"}) — settle-info 로 새 값을 보고 다시 확인하세요`);
   if (!data?.ok) fail(`거부: ${data?.code}${data?.status ? ` (지금 ${data.status})` : ""}`);
-  console.log(`[${where}] ${seller.handle} 정산 정보 → ${data.status === "verified" ? "확인 완료" : "다시 입력 요청"}`);
+  // 0124 myr_settle_verify_status — 승인 때 다시 등록돼 본인인증 전이면 토스 인증 대기(가입 직후와 같다)
+  const label = { verified: "확인 완료", toss: "토스 인증 대기(크리에이터 본인인증을 마치면 자동으로 확인 완료 · 시범운영 테스트 키 개인사업자는 settle-info --all 로 보고 한 번 더 settle-verify)", rejected: "다시 입력 요청" };
+  console.log(`[${where}] ${seller.handle} 정산 정보 → ${label[data.status] ?? data.status}`);
 }
 
 const commands = { "settle-info": cmdSettleInfo, "settle-verify": () => settleCheck("verify"), "settle-reject": () => settleCheck("reject"), list: cmdList, account: cmdAccount, invite: cmdInvite, unlink: cmdUnlink, suspend: () => setActive(false), reactivate: () => setActive(true) };

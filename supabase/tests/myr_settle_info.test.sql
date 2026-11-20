@@ -1,6 +1,6 @@
 -- pgTAP — 0085 크리에이터 사업자 · 정산 정보: 권한 · 사업자번호 체크섬 · 저장 거부 코드 전부 · 가린 값 · 예금주 규칙 · 다시 확인 규칙 · 운영 확인/요청
 begin;
-select plan(47);
+select plan(50);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_app_seller_settle_info_of_user', '{uuid}'::text[], 'anon', '{}'::text[], 'anon 은 settle_info_of_user 불가');
@@ -47,11 +47,19 @@ select is((select myr_settle_status from public.sellers where id = '00000000-000
 -- ---------- 저장 — 성공 ----------
 select is((select jsonb_build_object('status', j #>> '{info,status}', 'biz', j #>> '{info,biz_no_masked}', 'acc', j #>> '{info,account_masked}', 'holder', j #>> '{info,holder}')
              from (select pg_temp.save('민지랩', '김민지', '124-81-00998', '신한은행', '110-123-456789', '김민지') as j) x),
-  '{"status": "pending", "biz": "***-**-00998", "acc": "****6789", "holder": "김민지"}'::jsonb, '개인 계좌(예금주 = 대표자) 저장 → 확인 중 · 가린 값');
+  '{"status": "toss", "biz": "***-**-00998", "acc": "****6789", "holder": "김민지"}'::jsonb, '개인 계좌(예금주 = 대표자) 저장 → 본인인증 전이라 토스 인증 대기(운영 확인 없음 · 0124) · 가린 값');
 select is((select jsonb_build_object('biz', biz_no, 'type', settle_type, 'acc', bank_info ->> 'account') from public.sellers where id = '00000000-0000-4000-8000-000000000e11'),
   '{"biz": "1248100998", "acc": "110123456789", "type": "biz"}'::jsonb, '원문은 숫자만 저장 · settle_type biz');
 select ok(not (public.myr_app_seller_settle_info_of_user((select id from u))::text ~ '110123456789|1248100998'), '크리에이터 응답에 계좌 · 사업자번호 원문 없음');
 select is(pg_temp.save('(주) 민지 랩', '김민지', '124-81-00998', '국민', '987654321012', '민지랩') #>> '{info,holder}', '민지랩', '사업자 계좌(예금주 = 상호 · (주) · 공백 무시)');
+select is((select e ->> 'biz_no' from jsonb_array_elements(public.myr_app_admin_settle_infos('pending')) e where e ->> 'handle' = '@pgtap.settle'), null, '토스 인증 대기는 운영 확인 목록에 안 잡힌다(0124)');
+-- 0124: 본인인증을 마치면 운영 확인 없이 확인 완료(트리거) — 그 뒤의 변경부터 운영이 확인한다
+update public.sellers set toss_seller_id = 'seller_e11', toss_seller_status = 'APPROVED' where id = '00000000-0000-4000-8000-000000000e11';
+select is((select myr_settle_status from public.sellers where id = '00000000-0000-4000-8000-000000000e11'), 'verified', '본인인증을 마치면 사업자 · 정산 정보 확인 완료(운영 확인 없이)');
+select is(pg_temp.save('(주) 민지 랩', '김민지', null, '국민', '987654321099', '민지랩') #>> '{info,status}', 'pending', '본인인증 뒤 계좌 변경 → 확인 중(운영 확인)');
+-- 운영 승인 때 토스에 반영했다고 치자(승인 때 할 일 비움 — 0124 approveSettleInfo 가 토스 반영 뒤 확인한다)
+create function pg_temp.toss_done() returns void language sql as $$ update public.sellers set myr_toss_todo = null, myr_toss_todo_at = null where id = '00000000-0000-4000-8000-000000000e11' $$;
+select pg_temp.toss_done();
 
 -- ---------- 운영 확인 ----------
 select is(pg_temp.chk('ok') ->> 'code', 'BAD_DECISION', 'BAD_DECISION');
@@ -65,12 +73,14 @@ select is(pg_temp.chk('verify') ->> 'code', 'NOT_PENDING', '확인 중이 아니
 
 -- ---------- 다시 확인 규칙 ----------
 select is((pg_temp.save('민지 랩 스튜디오', '김민지', null, '국민', null, '민지 랩 스튜디오') ->> 'recheck')::boolean, true, '예금주가 바뀌면 다시 확인');
+select pg_temp.toss_done();
 select is(pg_temp.chk('verify') ->> 'status', 'verified', '(다시) 확인 완료');
 select is((select jsonb_build_object('recheck', (j ->> 'recheck')::boolean, 'status', j #>> '{info,status}') from (select pg_temp.save('민지 랩 스튜디오2', '김민지', null, '국민', null, '김민지') as j) x),
   '{"recheck": true, "status": "pending"}'::jsonb, '상호 · 예금주가 같이 바뀌면 다시 확인');
+select pg_temp.toss_done();
 select is(pg_temp.chk('verify') ->> 'status', 'verified', '확인 완료(예금주 = 대표자)');
 select is((select jsonb_build_object('recheck', (j ->> 'recheck')::boolean, 'status', j #>> '{info,status}') from (select pg_temp.save('민지 랩 3', '김민지', null, '국민', null, '김민지') as j) x),
-  '{"recheck": false, "status": "verified"}'::jsonb, '상호만 바꾸면 확인 완료 그대로(계좌 · 번호는 null = 그대로)');
+  '{"recheck": true, "status": "pending"}'::jsonb, '본인인증 뒤에는 상호만 바꿔도 다시 확인(토스에 보낼 칸 · 승인 때 반영 · 0124)');
 select is(pg_temp.chk('reject', '예금주 확인이 안 돼요') ->> 'status', 'rejected', '다시 입력 요청');
 select is(public.myr_app_seller_settle_info_of_user((select id from u)) ->> 'note', '예금주 확인이 안 돼요', '크리에이터가 다시 입력 요청 사유를 본다');
 
