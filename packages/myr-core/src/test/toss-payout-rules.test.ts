@@ -15,8 +15,7 @@ import {
 	tossBankCodeOf,
 	tossBuildErrorOf,
 	tossSellerErrorOf,
-	type TossSellerInput
-} from '../toss-payout-rules';
+	type TossSellerInput, tossWebhookTarget } from '../toss-payout-rules';
 
 const seller: TossSellerInput = {
 	refSellerId: 'm1a2b3c4d5e6f7g8h9',
@@ -138,6 +137,18 @@ describe('응답 · 웹훅 읽기', () => {
 		expect(parseTossList([{ id: 'a', status: 'APPROVED' }], parseTossSeller)?.items.length).toBe(1);
 		expect(parseTossList({ data: [{ id: 'a', status: 'APPROVED' }] }, parseTossSeller)?.items.length).toBe(1);
 		expect(parseTossList({ nope: true }, parseTossSeller)).toBeNull();
+	});
+	it('웹훅 — 토스 v2 실측 본문(entityBody · 2026-11-20 개발자센터 전송 내역)', () => {
+		const seller = { eventType: 'seller.changed', createdAt: '2026-11-20T15:57:48+09:00', version: '2022-11-16', eventId: 'whevt_a01m7vvygk4a9mfkk0z6gwfa8gb', entityType: 'seller',
+			entityBody: { id: 'seller_dm7vvxnj9jcvs034hzhgqe856k0', refSellerId: 'm9f1f3f266d214c1abe5', businessType: 'INDIVIDUAL_BUSINESS', status: 'APPROVAL_REQUIRED' } };
+		expect(tossWebhookTarget(seller)).toEqual({ eventType: 'seller.changed', id: 'seller_dm7vvxnj9jcvs034hzhgqe856k0' });
+		expect(parseSellerWebhook(seller)?.data).toMatchObject({ id: 'seller_dm7vvxnj9jcvs034hzhgqe856k0', refSellerId: 'm9f1f3f266d214c1abe5', status: 'APPROVAL_REQUIRED' });
+		const payout = { eventType: 'payout.changed', eventId: 'whevt_x', entityType: 'payout', entityBody: { id: 'tdpo_dm7vvs90ayap322vvfyhm6et7rs', status: 'CANCELED' } };
+		expect(tossWebhookTarget(payout)).toEqual({ eventType: 'payout.changed', id: 'tdpo_dm7vvs90ayap322vvfyhm6et7rs' });
+		// 옛 모양(data)도 받는다 · 모르는 이벤트 · id 없음 · id 형식 밖 · 배열 → null
+		expect(tossWebhookTarget({ eventType: 'seller.changed', data: { id: 'seller_1' } })?.id).toBe('seller_1');
+		expect([tossWebhookTarget({ eventType: 'payment.done', entityBody: { id: 'seller_1' } }), tossWebhookTarget({ eventType: 'seller.changed', entityBody: {} }),
+			tossWebhookTarget({ eventType: 'seller.changed', entityBody: { id: 'a b' } }), tossWebhookTarget([])]).toEqual([null, null, null, null]);
 	});
 	it('웹훅 — 이벤트 종류가 맞을 때만', () => {
 		expect(parseSellerWebhook({ eventType: 'seller.changed', createdAt: '2026-11-19T10:00:00+09:00', data: { id: 's', status: 'PARTIALLY_APPROVED' } })?.data.status).toBe('PARTIALLY_APPROVED');

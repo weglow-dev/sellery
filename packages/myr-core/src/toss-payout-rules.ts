@@ -313,18 +313,35 @@ export function parseTossList<T>(raw: unknown, parseItem: (x: unknown) => T | nu
 
 export type TossWebhook<T> = { eventType: string; createdAt: string | null; data: T };
 
-/** `{ eventType:'seller.changed', createdAt, data:{…seller} }` — 다른 eventType 이나 모양이 다르면 null */
+/**
+ * 웹훅 본문의 대상 — 토스 v2 실측(2026-11-20 · 개발자센터 전송 내역):
+ *   `{ eventType, createdAt, version, eventId, entityType: 'seller' | 'payout', entityBody: { id, refSellerId, status, … } }`
+ * 셀러리에서 복사한 `{ data: {…} }` 가정은 틀렸다(운영 웹훅이 400 으로 거절했다) — entityBody 를 읽고, 옛 모양(data)도 받아 둔다.
+ */
+function webhookEntity(o: Record<string, unknown>): unknown {
+	return o.entityBody ?? o.data;
+}
+
+/** `seller.changed` — 다른 eventType 이나 모양이 다르면 null */
 export function parseSellerWebhook(raw: unknown): TossWebhook<TossSeller> | null {
 	const o = obj(raw);
 	if (!o || o.eventType !== 'seller.changed') return null;
-	const data = parseTossSeller(o.data);
+	const data = parseTossSeller(webhookEntity(o));
 	return data ? { eventType: 'seller.changed', createdAt: str(o.createdAt), data } : null;
 }
 
-/** `{ eventType:'payout.changed', createdAt, data:{…payout} }` */
+/** `payout.changed` */
 export function parsePayoutWebhook(raw: unknown): TossWebhook<TossPayout> | null {
 	const o = obj(raw);
 	if (!o || o.eventType !== 'payout.changed') return null;
-	const data = parseTossPayout(o.data);
+	const data = parseTossPayout(webhookEntity(o));
 	return data ? { eventType: 'payout.changed', createdAt: str(o.createdAt), data } : null;
+}
+
+/** 웹훅 핸들러가 다시 조회할 대상 — 이벤트 종류(seller.changed · payout.changed)와 id(TOSS_ID_RE). 본문의 상태값은 쓰지 않는다(서명이 없다 — id 재조회가 인증) */
+export function tossWebhookTarget(raw: unknown): { eventType: 'seller.changed' | 'payout.changed'; id: string } | null {
+	const o = obj(raw);
+	if (!o || (o.eventType !== 'seller.changed' && o.eventType !== 'payout.changed')) return null;
+	const id = str(obj(webhookEntity(o))?.id);
+	return id && TOSS_ID_RE.test(id) ? { eventType: o.eventType, id } : null;
 }

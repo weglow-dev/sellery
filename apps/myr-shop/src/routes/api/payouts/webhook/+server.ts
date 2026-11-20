@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { Config } from '@sveltejs/adapter-vercel';
 import type { RequestHandler } from './$types';
-import { TOSS_ID_RE } from '@sellery/myr-core/toss-payout-rules';
+import { tossWebhookTarget } from '@sellery/myr-core/toss-payout-rules';
 import { rateLimit } from '@sellery/myr-core/rate-limit';
 import { hasAdmin } from '$lib/server/admin';
 import { handleTossSellerChanged, hasTossPayouts } from '$lib/server/toss-sellers';
@@ -9,7 +9,8 @@ import { handleTossSellerChanged, hasTossPayouts } from '$lib/server/toss-seller
 /**
  * POST /api/payouts/webhook — MYR 토스 지급대행 웹훅(0124 · docs/myr.md 7-7 5번). 셀러리 apps/shop 같은 경로를 복사(셀러리 코드는 복사만).
  *   지급대행 웹훅에는 서명이 없다 — 공개 엔드포인트이며 **id 재조회가 유일한 인증**이다. 본문의 상태값은 쓰지 않는다.
- *   1. 형식 검사(저장 전): 본문 ≤ 64KB · JSON · eventType ∈ {seller.changed, payout.changed} · data.id 형식(TOSS_ID_RE) → 실패 400
+ *   1. 형식 검사(저장 전): 본문 ≤ 64KB · JSON · eventType ∈ {seller.changed, payout.changed} · entityBody.id 형식(tossWebhookTarget · TOSS_ID_RE) → 실패 400
+ *      (토스 v2 본문은 { eventType, eventId, entityType, entityBody } — 2026-11-20 실측. 셀러리에서 복사한 data.id 가정으로 운영이 400 을 돌려줬다)
  *   2. seller.changed — GET /v2/sellers/{id} 재조회 → myr_app_seller_toss_status(MYR 이 등록한 셀러만 · 0124) → 0122 트리거가 지급 건을 다시 정한다
  *      payout.changed — 자동 이체(7-7 8번) 전이라 200 ignored(토스가 다시 보내지 않게)
  *   3. 모르는 셀러(같은 상점을 쓰는 다른 서비스 · 삭제됨) → 200 ignored · 재조회 불명만 502(토스가 다시 보낸다)
@@ -38,22 +39,18 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	}
 	if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return bad();
 
-	let body: { eventType?: unknown; data?: { id?: unknown } | null };
+	let parsed: unknown;
 	try {
-		const parsed: unknown = JSON.parse(text);
-		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return bad();
-		body = parsed as typeof body;
+		parsed = JSON.parse(text);
 	} catch {
 		return bad();
 	}
-	const eventType = typeof body.eventType === 'string' ? body.eventType : '';
-	const id = body.data && typeof body.data === 'object' && typeof body.data.id === 'string' ? body.data.id : '';
-	if (!id || !TOSS_ID_RE.test(id)) return bad();
+	const target = tossWebhookTarget(parsed);
+	if (!target) return bad();
 
-	if (eventType === 'payout.changed') return json({ ok: true, result: 'ignored: payouts not wired yet' });
-	if (eventType !== 'seller.changed') return bad();
+	if (target.eventType === 'payout.changed') return json({ ok: true, result: 'ignored: payouts not wired yet' });
 	if (!hasAdmin() || !hasTossPayouts()) return json({ ok: true, result: 'ignored: not configured' });
-	const r = await handleTossSellerChanged(id);
+	const r = await handleTossSellerChanged(target.id);
 	if (r.status >= 500) console.error('[payouts/webhook] seller.changed', r.result);
 	return json({ ok: r.status < 500, result: r.result }, { status: r.status });
 };
