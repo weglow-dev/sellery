@@ -34,7 +34,14 @@ export const POST: RequestHandler = async (event) => {
 		const l = await linkTossSeller(seller.id, 'register');
 		// 토스가 크리에이터 정보를 거절했으면 l.info 가 그 상태(정보 확인 필요 · [수정하기]) — 카드로 돌려준다. 결과 불명 · 우리 쪽 거절이면 다시 누른다
 		if (l.ok) return json({ ok: true, toss: tossCardOf(l.info.tossState ?? 'none', l.info) });
-		if (l.info) return json({ ok: false, code: l.code, toss: tossCardOf(l.info.tossState ?? 'none', l.info), message: '토스페이먼츠가 정보를 확인하지 못했어요. 수정하기에서 고쳐 주세요' });
+		// 문구는 서버 값으로 — 토스가 크리에이터 정보를 거절했을 때(toss_ask fix)만 "고쳐 주세요". 우리 쪽 거절 · 삭제 실패(abort 가 정보를 돌려준다)는 "잠시 후 다시"
+		if (l.info) {
+			const fix = l.info.tossAsk === 'fix';
+			return json(
+				{ ok: false, code: l.code, toss: tossCardOf(l.info.tossState ?? 'none', l.info), message: fix ? '토스페이먼츠가 정보를 확인하지 못했어요. 수정하기에서 고쳐 주세요' : '지금은 등록하지 못했어요. 잠시 후 다시 눌러 주세요' },
+				{ status: fix ? 200 : 502 }
+			);
+		}
 		console.warn('[my/toss] register failed:', l.code);
 		// 결과 불명 · 우리 쪽 거절 — 지금 값을 다시 읽어 카드로(결과 불명이면 "응답을 기다리고 있어요" · 5분 동안 다시 등록 안 함)
 		const now = user ? await getSettleInfoOfUser(user.id) : null;

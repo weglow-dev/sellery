@@ -81,6 +81,18 @@ export async function linkTossSeller(sellerId: string, action: 'register' | 'upd
 		return { ok: false, code: b?.code ?? 'DB_ERROR', info: null, done: false };
 	}
 
+	// 본문을 먼저 만든다(2026-11-20) — 이전 셀러를 지운 뒤에 본문이 걸리면(은행 코드 표에 없음 · 이메일 없음 등) 인증된 셀러만 사라진다
+	const i = b.input;
+	const built = buildTossSellerBody({ refSellerId: b.ref ?? '', bizKind: i.biz_kind, company: i.company, ceo: i.ceo, bizNo: i.biz_no, email: i.email, phone: i.phone, bank: i.bank });
+	if (!built.ok) {
+		const err = tossBuildErrorOf(built.code, built.field);
+		// 토스에는 아무것도 보내지 않았다 — 셀러는 그대로(수정: 지금 셀러 · 다시 등록: 이전 셀러 · 상태 유지) · 할 일은 남긴다(고친 뒤 같은 동작 — 다시 등록이 수정으로 바뀌지 않게) ·
+		//   등록 진행 중은 바로 끝낸다(abort)
+		const w = await record(sellerId, (b.action === 'update' ? b.toss_id : b.old_toss_id) ?? null, null, err, false);
+		const info = b.action === 'register' ? ((await abort(sellerId, b.ref)) ?? w.info) : w.info;
+		return { ok: false, code: err.code, info, done: false };
+	}
+
 	// 다시 등록 — 이전 셀러 삭제(없으면 404 · 그대로 진행)
 	if (b.action === 'register' && b.old_toss_id) {
 		const del = await api.deleteSeller(b.old_toss_id);
@@ -90,15 +102,6 @@ export async function linkTossSeller(sellerId: string, action: 'register' | 'upd
 			const info = await abort(sellerId, b.ref);
 			return { ok: false, code: isUncertainPayout(del) ? 'UNCERTAIN' : 'TOSS_DELETE', info, done: false };
 		}
-	}
-
-	const i = b.input;
-	const built = buildTossSellerBody({ refSellerId: b.ref ?? '', bizKind: i.biz_kind, company: i.company, ceo: i.ceo, bizNo: i.biz_no, email: i.email, phone: i.phone, bank: i.bank });
-	if (!built.ok) {
-		const err = tossBuildErrorOf(built.code, built.field);
-		// 수정이면 토스의 셀러는 그대로(id 유지 · 상태는 다음 조회까지 비운다) · 등록이면 셀러 없음
-		const w = await record(sellerId, b.action === 'update' ? (b.toss_id ?? null) : null, null, err, true);
-		return { ok: false, code: err.code, info: w.info, done: w.done };
 	}
 
 	const res = b.action === 'update' && b.toss_id ? await api.updateSeller(b.toss_id, built.body) : await api.registerSeller(built.body);
