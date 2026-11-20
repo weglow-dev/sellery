@@ -21,7 +21,8 @@
 | **1** | 상품 검수(§4) | `myr-products.mjs review` · `revisions` · `review-revision` · 재고는 SQL | 크리에이터가 심사 요청을 시작하면 매일 쓴다 · 반려 의견을 터미널로 쓰기 어렵다 |
 | **1** | 크리에이터 초대(§5-1) | `myr-invites.mjs send` · `list` · `revoke` | 가입이 초대로만 된다(결정 14) |
 | 2 | 주문 · 송장 · 배송 완료 예외(§6) | `myr-ops.mjs orders` · `ship` · `ship-csv` · `undelivered` · `deliver` · 샵 `/api/ops/ship` · `/api/ops/deliver` | 이벗 자동 연동 전까지 발송 처리 · 배송 완료가 찍혀야 정산된다 |
-| 2 | 문의(§7) | 없음(크리에이터만 답변) | 크리에이터 미응답 대비 |
+| 2 | 문의(§7-1) | 없음(크리에이터만 답변) | 크리에이터 미응답 대비 |
+| 2 | 파트너팀 톡(§7-2) | `myr-talk.mjs list [--waiting]` · `show` · `reply` | 크리에이터 [문의]가 메일 대신 여기로 온다(0125) · 답장이 터미널에서만 된다 |
 | 2 | 크리에이터 관리 · 사업자 정보(§5-2 · §5-3) | `myr-creators.mjs list` · `account` · `settle-info` · `settle-verify` · `settle-reject` | 계정 연결 · 정지 · 정산에 필요한 사업자 정보 확인 |
 | 2 | 교환 · 환불 운영(§8) | `myr-ops.mjs claims` · `collected` · `reship-claim` · `claim-refund` · 샵 `/api/ops/claims` | 회수 확인이 있어야 환불이 나간다 |
 | 2 | 판매 상태(§4-4) | `myr-products.mjs review <code> pause\|approve\|end` | 판매 상태는 운영만 바꾼다 |
@@ -41,6 +42,7 @@
 | 발송 대기 주문 | `myr_app_admin_ship_pending`(0069) |
 | 배송 완료 기록 없는 출고 줄 | 배송 완료 예외 목록(0088) |
 | 답변 없는 문의(24시간) | 새 RPC |
+| 파트너팀 톡 답할 차례 · 가장 오래 기다린 시간 | `myr_app_admin_partner_threads(true)` 길이 · 응답 `last_message_at`(0125) |
 | 새 초대 요청 | `myr_app_admin_invite_list('requested')`(0070) |
 | 교환 · 환불 단계별 | `myr_app_admin_claims`(0078) |
 | 정산 정보 확인 대기 | `myr_app_admin_settle_infos('pending')`(0085) |
@@ -85,8 +87,31 @@
 
 ## 5. 문의(screens §7)
 
+### 고객 문의(screens §7-1)
+
 - 대행 답변: `sender='seller'` · `actor_role='admin'` — 고객에게는 크리에이터 이름으로.
 - 새로 만들 것: 전체 문의 목록 · 미답변 필터 RPC.
+
+### 파트너팀 톡(screens §7-2 · 0125)
+
+| 화면 동작 | RPC | 거절 코드 · 응답 |
+|---|---|---|
+| 대화방 목록 · 답할 차례 탭 | `myr_app_admin_partner_threads(p_waiting_only)` | `[{seller_id, handle, name, last_sender, last_preview, last_message_at, waiting, unread}]` — 답할 차례 먼저 · 최근 순 · 메시지 없는 방은 안 나옴 |
+| 대화 열기(운영 읽음) | `myr_app_admin_partner_talk(p_seller, p_mark_read)` | `NOT_FOUND` · `{messages[{id, sender, body, created_at}], unread}` — 최근 300개 |
+| 답장 | `myr_app_admin_partner_reply(p_seller, p_body, p_admin)` | `NOT_FOUND` · `BAD_BODY{max}`(`myr_partner_body_max`) · `{message}` |
+
+- 판정은 DB 함수가 한다: 답할 차례 `myr_partner_waiting` · 운영 안 읽음 `myr_partner_admin_unread` · 본문 형식 `myr_partner_body_ok`. 화면은 응답 `waiting` · `unread` 를 그대로 쓴다.
+- `p_admin` 은 서버 세션의 운영자 user id(지금 스크립트는 `null`).
+- 읽음 표시는 방 하나에 운영 공용 `admin_read_at` 하나다(운영자별 읽음 없음).
+- 새로 만들 것:
+
+| 새로 만들 것 | 이유 |
+|---|---|
+| 운영용 메시지 JSON(`admin_user_id` → 운영자 이름) | 운영끼리 누가 답했는지 표시 — 지금 `myr_partner_message_json` 은 크리에이터와 같은 모양이라 운영자가 없다(크리에이터에게는 계속 숨긴다) |
+| 홈 · 메뉴 배지 카운트 RPC(답할 차례 수 · 가장 오래 기다린 시각) | 목록 RPC 를 홈에서 통째로 읽지 않게 |
+| 크리에이터 상세 [파트너팀 톡 열기] | `myr_app_admin_partner_talk(seller)` 로 메시지 없는 크리에이터에게도 먼저 답장할 수 있다(방은 답장 때 생긴다) |
+
+- 없어지는 것: `packages/db/scripts/myr-talk.mjs`.
 
 ## 6. 교환 · 환불(screens §8)
 
