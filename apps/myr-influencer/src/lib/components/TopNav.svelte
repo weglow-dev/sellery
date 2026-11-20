@@ -45,7 +45,7 @@
 			</a>
 			<a href="/messages" aria-label="파트너팀 톡 · 안 읽은 답변 {talkCount}개" aria-current={page.url.pathname.startsWith('/messages') ? 'page' : undefined} class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
 				<Icon id="chat" size={20} />
-				{#if talkCount}<span class="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold tabular-nums text-bg">{talkCount}</span>{/if}
+				{#if talkCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
 			</a>
 			<UserMenu />
 		</div>

@@ -6,7 +6,7 @@
 //
 //   list [--waiting]                 대화방 목록(답할 차례 먼저 · --waiting = 답할 차례만)
 //   show <@handle>                   대화 보기(운영 읽음 표시)
-//   reply <@handle> "<내용>"          답하기(1~2000자) — 크리에이터 콘솔 상단 톡 아이콘에 뱃지가 붙는다
+//   reply <@handle> "<내용>"          답하기(1~2000자 · 서버 myr_partner_body_max) — 크리에이터 콘솔 상단 톡 아이콘에 뱃지가 붙는다
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -82,7 +82,7 @@ async function cmdReply() {
   const body = args[1] ?? fail('usage: reply <@handle> "<내용>"');
   const { data, error } = await db.rpc("myr_app_admin_partner_reply", { p_seller: seller.id, p_body: body, p_admin: null });
   if (error) fail(error.message);
-  if (!data?.ok) fail(data?.code === "BAD_BODY" ? "내용은 1~2000자로 써 주세요" : `거부: ${data?.code}`);
+  if (!data?.ok) fail(data?.code === "BAD_BODY" ? `내용은 1~${data.max}자로 써 주세요` : `거부: ${data?.code}`);
   console.log(`[${where}] ${seller.handle} 에 답했어요 — 크리에이터 콘솔 톡 아이콘에 뱃지가 붙어요`);
 }
 

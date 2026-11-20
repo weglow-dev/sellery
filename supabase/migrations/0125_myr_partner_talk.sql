@@ -7,12 +7,13 @@
 --   운영: 운영 콘솔(화면 단계)이 생기기 전까지 packages/db/scripts/myr-talk.mjs(list · show · reply).
 --   글만(첨부 없음) · 이메일 알림 없음(2026-11-20 결정 — 필요하면 다음 단계).
 --
---   myr_partner_body_ok(body)              메시지 본문 형식 — 앞뒤 공백 뺀 1~2000자(입력 형식 · 화면도 같은 검사)
+--   myr_partner_body_max()                 메시지 본문 최대 글자 수 2000 — 형식 검사 · 거절 응답의 max · 화면 상수(PARTNER_BODY_MAX · check-boundaries (j))가 같은 값
+--   myr_partner_body_ok(body)              메시지 본문 형식 — 앞뒤 공백 뺀 1~myr_partner_body_max()자(입력 형식 · 화면도 같은 검사)
 --   myr_partner_seller_unread(seller)      크리에이터가 안 읽은 파트너팀 답변 수(메신저 뱃지)
 --   myr_partner_admin_unread(seller)       운영이 안 읽은 크리에이터 메시지 수(운영 목록)
 --   myr_partner_waiting(thread)            운영이 답할 차례인가(마지막 메시지가 크리에이터)
 --   myr_partner_thread_touch(seller, sender, body)  메시지 뒤 방 요약(마지막 보낸 쪽 · 미리보기 · 시각 · 보낸 쪽 읽음) — 보내기 · 답하기가 같이 쓴다
---   myr_app_partner_talk_of_user(user, mark_read)    크리에이터 대화(세션 user → sellers.user_id) · 읽음 표시. 거부: NOT_FOUND
+--   myr_app_partner_talk_of_user(user, mark_read)    크리에이터 대화(세션 user → sellers.user_id) · 읽음 표시 · waiting(답 기다리는 중). 거부: NOT_FOUND
 --   myr_app_partner_unread_of_user(user)             크리에이터 뱃지 수
 --   myr_app_partner_send_of_user(user, body)  크리에이터 보내기. 거부: NOT_FOUND · BAD_BODY · TOO_FAST(1분 10개)
 --   myr_app_admin_partner_threads(waiting_only)      운영 목록(답할 차례 먼저)
@@ -22,12 +23,16 @@
 -- ============================================================
 
 -- ---------- 판정 ----------
+create or replace function public.myr_partner_body_max()
+returns integer language sql immutable as $$ select 2000 $$;
+revoke all on function public.myr_partner_body_max() from public, anon, authenticated;
+
 create or replace function public.myr_partner_body_ok(p_body text)
 returns boolean
 language sql
 immutable
 as $$
-  select coalesce(char_length(btrim(p_body)) between 1 and 2000, false)
+  select coalesce(char_length(btrim(p_body)) between 1 and public.myr_partner_body_max(), false)
 $$;
 revoke all on function public.myr_partner_body_ok(text) from public, anon, authenticated;
 
@@ -147,7 +152,8 @@ begin
     insert into public.myr_partner_threads (seller_id, seller_read_at) values (v_seller, now())
     on conflict (seller_id) do update set seller_read_at = now();
   end if;
-  return jsonb_build_object('ok', true, 'messages', public.myr_partner_messages_json(v_seller), 'unread', public.myr_partner_seller_unread(v_seller));
+  return jsonb_build_object('ok', true, 'messages', public.myr_partner_messages_json(v_seller), 'unread', public.myr_partner_seller_unread(v_seller),
+    'waiting', coalesce((select public.myr_partner_waiting(t) from public.myr_partner_threads t where t.seller_id = v_seller), false));
 end;
 $$;
 revoke all on function public.myr_app_partner_talk_of_user(uuid, boolean) from public, anon, authenticated;
@@ -177,7 +183,7 @@ declare
 begin
   select id into v_seller from public.sellers where user_id = p_user;
   if v_seller is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
-  if not public.myr_partner_body_ok(p_body) then return jsonb_build_object('ok', false, 'code', 'BAD_BODY', 'max', 2000); end if;
+  if not public.myr_partner_body_ok(p_body) then return jsonb_build_object('ok', false, 'code', 'BAD_BODY', 'max', public.myr_partner_body_max()); end if;
   -- 너무 빠르게 여러 번(1분에 10개) — 버튼 연타 · 잘못된 반복 막기
   if (select count(*) from public.myr_partner_messages where seller_id = v_seller and sender = 'seller' and created_at > now() - interval '1 minute') >= 10 then
     return jsonb_build_object('ok', false, 'code', 'TOO_FAST');
@@ -239,7 +245,7 @@ declare
   m public.myr_partner_messages%rowtype;
 begin
   if not exists (select 1 from public.sellers where id = p_seller) then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
-  if not public.myr_partner_body_ok(p_body) then return jsonb_build_object('ok', false, 'code', 'BAD_BODY', 'max', 2000); end if;
+  if not public.myr_partner_body_ok(p_body) then return jsonb_build_object('ok', false, 'code', 'BAD_BODY', 'max', public.myr_partner_body_max()); end if;
   insert into public.myr_partner_messages (seller_id, sender, admin_user_id, body) values (p_seller, 'admin', p_admin, btrim(p_body)) returning * into m;
   perform public.myr_partner_thread_touch(p_seller, 'admin', m.body);
   return jsonb_build_object('ok', true, 'message', public.myr_partner_message_json(m));

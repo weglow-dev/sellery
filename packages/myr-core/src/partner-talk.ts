@@ -6,7 +6,7 @@
 export type PartnerSender = 'seller' | 'admin';
 export type PartnerMessage = { id: string; sender: PartnerSender; body: string; createdAt: string };
 
-/** 본문 최대 글자 수 — 입력 형식(서버 myr_partner_body_ok 가 최종 판정 · 화면은 빨리 알려 주기만) */
+/** 본문 최대 글자 수 — 입력 형식(서버 myr_partner_body_ok 가 최종 판정 · 화면은 빨리 알려 주기만) · 서버 myr_partner_body_max() 와 같은 값(check-boundaries (j)) */
 export const PARTNER_BODY_MAX = 2000;
 /** 입력 형식 — 앞뒤 공백 뺀 1~2000자(서버와 같은 형식 검사 · CLAUDE.md 원칙 1 예외 "입력 형식 규칙") */
 export const partnerBodyOk = (v: string): boolean => {

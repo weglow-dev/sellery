@@ -23,7 +23,7 @@ class ConsoleState {
 		return (this.claimWaiting ?? n(layoutClaim)) + (this.inqWaiting ?? n(layoutInq));
 	}
 
-	/** 파트너팀 톡 안 읽은 답변 수(0125) — 첫 값은 콘솔 레이아웃(page.data.talkUnread), 대화 화면을 열면 0 */
+	/** 파트너팀 톡 안 읽은 답변 수(0125) — 첫 값은 콘솔 레이아웃(page.data.talkUnread), 대화 화면을 열면 0, 홈에 올 때마다 서버 값으로 덮는다(inqWaiting 과 같은 방식) */
 	talkUnread = $state<number | null>(null);
 	talkBadge(layoutUnread: unknown): number {
 		return this.talkUnread ?? (typeof layoutUnread === 'number' ? layoutUnread : 0);

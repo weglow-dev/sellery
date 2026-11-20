@@ -12,6 +12,7 @@ import { getSellerSalesOfUser } from '$lib/server/sales';
 import { getSettleInfoOfUser } from '$lib/server/settle-info';
 import { getSellerSettlePreviewOfUser } from '$lib/server/settlement';
 import { myProducts } from '$lib/server/seller-products';
+import { partnerUnreadOfUser } from '$lib/server/partner-talk';
 
 /** 홈 — 서버 값: 판매 중 제품 카드(0071 · 0072) · 이번 달 실적 + 이번 주 월 ~ 일(0117) · 고객 문의 답변 대기 수 · 교환 · 환불 처리 대기 수(0078) · 오늘 처리할 일.
  *  큰 숫자는 다음 정산 예정(0089 · 정산 탭과 같은 예상) · 그 아래 이번 달 순매출 · 주문 · 판매 수량 · CS 비율.
@@ -48,8 +49,10 @@ export const load: PageServerLoad = async (event) => {
 	// 처리 대기 수 — 서버 함수(0116 myr_claim_waiting · myr_cs_waiting · 레이아웃 뱃지와 같은 값) · 목록을 다시 세지 않는다
 	const claimWaitingP = myClaimWaiting(event);
 	const inqWaitingP = myInquiryWaiting(event);
+	// 파트너팀 톡 안 읽은 답변(0125 · 레이아웃 뱃지와 같은 함수) — 레이아웃 load 는 첫 진입에만 돌아서, 홈에 올 때마다 새로 읽는다(실패하면 0)
+	const talkUnreadP = user ? partnerUnreadOfUser(user.id) : Promise.resolve(0);
 	const { rows } = await myProducts(event);
-	const [sales, inquiries, claims, settle, preview, claimWaiting, inqWaiting] = await Promise.all([salesP, inqP, claimP, settleP, previewP, claimWaitingP, inqWaitingP]);
+	const [sales, inquiries, claims, settle, preview, claimWaiting, inqWaiting, talkUnread] = await Promise.all([salesP, inqP, claimP, settleP, previewP, claimWaitingP, inqWaitingP, talkUnreadP]);
 	// 오늘 처리할 일 후보 — 서버 값 waiting(처리 대기 요청 · 답변 대기 문의)
 	const pendingClaims = claims.filter((c) => c.waiting);
 	const waiting = inquiries.filter(isWaiting);
@@ -62,5 +65,5 @@ export const load: PageServerLoad = async (event) => {
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 		.slice(0, Math.max(0, 3 - todayClaims.length))
 		.map((c) => ({ code: c.code, type: c.type, buyerName: c.buyerName, question: c.firstBody ?? '', createdAt: c.createdAt, product: c.product }));
-	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting, claimWaiting, sales, preview, todayInquiries, todayClaims, settleInfo: settle };
+	return { productCounts: homeProductCounts(rows.map((r) => productFromRow(r))), inqWaiting, claimWaiting, talkUnread, sales, preview, todayInquiries, todayClaims, settleInfo: settle };
 };

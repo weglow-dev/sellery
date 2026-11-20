@@ -10,7 +10,7 @@ import { requireSeller } from '$lib/server/seller';
  *  그래서 정지 · 연결 해제는 다음 진입 때 반영된다 — 데이터를 주는 페이지 load · form action 은 각자 requireSeller 를 직접 부른다(요청당 DB 조회는 한 번 · locals 메모).
  *  inqWaiting — 고객 문의 답변 대기 수(내비 · 탭바 뱃지 첫 값 · 0075) · claimWaiting — 교환 · 환불 처리 대기 수(0078). 게이트와 동시에 보낸다.
  *  이후 값은 CS · 홈 화면이 새로 읽어 app.inqWaiting · app.claimWaiting 에 넣는다.
- *  talkUnread — 파트너팀 톡 안 읽은 답변 수(메신저 뱃지 첫 값 · 0125) · 대화 화면을 열면 app.talkUnread = 0. */
+ *  talkUnread — 파트너팀 톡 안 읽은 답변 수(메신저 뱃지 첫 값 · 0125) · 대화 화면을 열면 app.talkUnread = 0, 이후 값은 홈이 새로 읽어 넣는다. */
 export const load: LayoutServerLoad = async (event) => {
 	const waitingP = myInquiryWaiting(event);
 	const claimP = myClaimWaiting(event);
