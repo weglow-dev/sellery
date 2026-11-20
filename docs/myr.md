@@ -217,6 +217,7 @@ RPC(전부 `{ok, code}` 반환 · 서버 전용):
 | 교환·환불 | `/returns` `/returns/[id]`(UI 시안의 "교환 · 환불 관리" — 지금 경로 `/cs`) | 요청 목록(대기 · 진행 중 · 완료/반려) · 승인(처리 방법 선택 + 고객 메시지) · 반려 · 타임라인 · 사진 | 새로(시안 "MYR Influencer Admin") |
 | 실적 | `/sales` | 기간별 매출·환불·순매출 · 상품별 · 예상 정산액 | `apps/influencer/(console)/sales` 축소 |
 | 내 정보 | `/my` | 프로필(핸들 · 아바타 · 소개) · 정산 계좌 · 알림 이메일 | `apps/influencer/(console)/my` |
+| 파트너팀 톡 | `/messages` | **크리에이터 ↔ MYR 운영 대화방**(2026-11-20 · 0125 · 크리에이터마다 방 하나 · 셀러리 대화처럼 말풍선 · 실시간 아님 — 열 때 · 보낼 때 새로 읽음 · 글만 · 이메일 알림 없음). 상단 메신저 아이콘(알림과 내 계정 사이 · 안 읽은 답변 뱃지 `myr_partner_seller_unread`). [문의] 버튼(정산 정보 확인 중 · 토스 문자 도움말 — 오른쪽 정렬)은 메일(mailto) 대신 `/messages`(분류 · 맥락 없음). 운영 답변은 운영 콘솔 전까지 `packages/db/scripts/myr-talk.mjs`(list [--waiting] · show · reply) | 셀러리 대화(DM) 모양 |
 
 게이트: `requireSeller()` 그대로(`sellers.user_id and active`). 도메인이 분리되므로 `foreign` 상태는 "파트너 아닌 세션" 하나로 줄어든다.
 

@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(273);
+select plan(278);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -401,6 +401,12 @@ insert into _rules (label, pat, allowed) values
   ('휴대폰 번호 형식(01x + 7~8자리) — 가입 연락처 · 대표자 휴대폰', $p$01\[016789\]$p$,                                   '{myr_mobile_ok}'),
   ('개인사업자 · 법인(사업자번호 가운데 두 자리 80~89)', $p$between\s+80\s+and\s+89|substr\([^)]*,\s*4,\s*2\)$p$,   '{myr_biz_kind}'),
   -- 2026-11-20: 토스 상태 목록은 myr_toss_status_state 한 곳 — 상태 비교(= · <> · in ( )와 토스 상태 글자 둘 다 막는다
+  -- 0125 파트너팀 톡
+  ('파트너팀 톡 본문 1~최대 글자 수',                 $p$between\s+1\s+and\s+public\.myr_partner_body_max\(\)$p$,          '{myr_partner_body_ok}'),
+  ('거절 응답의 한도 숫자(max · min) 직접 쓰기 — 금지 · 한도 함수(myr_partner_body_max 등)를 부른다', $p$'(max|min)',\s*\d$p$, '{}'),
+  ('파트너팀 톡 운영이 답할 차례',                    $p$last_sender\s*=\s*'seller'$p$,                                       '{myr_partner_waiting}'),
+  ('파트너팀 톡 크리에이터가 안 읽은 답변',           $p$sender\s*=\s*'admin'\s+and\s+m\.created_at\s*>$p$,                 '{myr_partner_seller_unread}'),
+  ('파트너팀 톡 운영이 안 읽은 메시지',               $p$sender\s*=\s*'seller'\s+and\s+m\.created_at\s*>$p$,                '{myr_partner_admin_unread}'),
   ('토스 셀러 상태 비교(= · <> · in)',                $p$toss_seller_status\s*(=\s*'|<>\s*'|(not\s+)?in\s*\()$p$,                '{}'),
   ('토스 셀러 상태 → 상태 이름(본인인증 전 · 추가 인증 · 한도 없음 · 인증 완료)', $p$'(APPROVAL_REQUIRED|KYC_REQUIRED|PARTIALLY_APPROVED|APPROVED)'$p$, '{myr_toss_status_state}'),
   -- myr_toss_creator_ask 의 'register' 는 크리에이터에게 보일 할 일(다시 등록 버튼 · 2026-11-20) — 같은 글자라 주인에 넣는다(판정은 카드 상태 none + 사업자번호)

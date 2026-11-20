@@ -29,12 +29,14 @@
 	/** 로그인한 크리에이터(sellers 행) — 사진은 방금 고른 미리보기(목 · 저장은 9번) → 등록된 프로필 사진 → 이니셜 */
 	const me = $derived(page.data.me as Me);
 	const photo = $derived(me.avatarUrl);
-	// 고객 문의 답변 대기(0075) · 교환 · 환불 처리 대기(0078) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
+	// 고객 문의 답변 대기(0075) · 교환 · 환불 처리 대기(0078) · 파트너팀 톡 안 읽은 답변(0125) — 홈에 올 때마다 서버 값으로 뱃지를 맞춘다
 	$effect(() => {
 		app.inqWaiting = data.inqWaiting;
 		app.claimWaiting = data.claimWaiting;
+		app.talkUnread = data.talkUnread;
 	});
 	const csCount = $derived(data.claimWaiting + data.inqWaiting);
+	const talkCount = $derived(app.talkBadge(data.talkUnread));
 	// 사업자 · 정산 정보 배너 — 보일지는 서버 보류 이유(정산 탭과 같은 myr_seller_next_hold_json · 0116) · 확인 중이면 "확인하고 있어요"(빨간색 없이)
 	const settleBanner = $derived(homeSettleBanner(data.settleInfo));
 	const needsSettle = $derived(settleBanner !== null);
@@ -63,6 +65,10 @@
 			<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
 				<Icon id="bell" size={20} />
 				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<a href="/messages" aria-label="파트너팀 톡 · 안 읽은 답변 {talkCount}개" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
+				<Icon id="chat" size={20} />
+				{#if talkCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
 			</a>
 			<UserMenu />
 		</div>

@@ -2,12 +2,12 @@
 	import { untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { formatPhone } from '@sellery/myr-core/phone';
-	import { COMPANY } from '@sellery/myr-core/company';
+	import { PARTNER_TALK_HREF } from '@sellery/myr-core/partner-talk';
 	import type { TossCard } from '$lib/toss-card';
 
 	/**
 	 * 내 정보 "토스 본인인증" 카드(2026-11-18 · 토스페이먼츠 지급대행 · 시안 "MYR Influencer Admin" · "… PC" 내 정보) — "사업자 · 정산 정보" 상태 카드 바로 아래.
-	 * 시안 구성: 제목 + 칩 · 한 문장(굵은 번호) · 회색 안내 · [인증을 마쳤어요] + "문자를 못 받았어요 ⌄"(한 줄) · 도움말(스팸함 · [수정하기]에서 번호 고치기 · [파트너팀에 문의]).
+	 * 시안 구성: 제목 + 칩 · 한 문장(굵은 번호) · 회색 안내 · [인증을 마쳤어요] + "문자를 못 받았어요 ⌄"(한 줄) · 도움말(스팸함 · [수정하기]에서 번호 고치기 · [파트너팀에 문의] → 파트너팀 톡(0125)).
 	 * 시안과 다른 점: "아직 인증 전이에요" 상태 줄(시안은 누르면 항상 완료) · 토스가 정보를 거절했을 때 [수정하기](시안에 없는 상태).
 	 * 정산금은 ① 사업자 · 정산 정보 확인(운영팀) ② 토스 본인인증(크리에이터) 둘 다 끝나야 받는다 — 두 카드를 나란히 두어 남은 일을 보여 준다.
 	 * 칩 · 문장 · 안내는 서버 값(toss) 그대로. [인증을 마쳤어요] → POST /api/my/toss(지금은 미리보기만 · preview = 미리보기 상태).
@@ -25,7 +25,6 @@
 	// 시안 칩 · 테두리 색 — 인증 전 주황 · 인증 완료 민트 · 추가 인증 · 정보 확인 필요 빨강
 	const TONE: Record<TossCard['chip']['tone'], string> = { muted: 'bg-white/8 text-white/70', accent: 'bg-accent/14 text-[#ff9a66]', ok: 'bg-mint/12 text-mint', danger: 'bg-[#ff6b6b]/14 text-[#ff8a8a]' };
 	const BORDER: Record<TossCard['chip']['tone'], string> = { muted: 'border-white/8', accent: 'border-accent/30', ok: 'border-white/8', danger: 'border-[#ff6b6b]/32' };
-	const csExternal = /^https?:\/\//.test(COMPANY.csUrl);
 
 	$effect(() => {
 		expanded = helpOpen || (toss.canCheck && (checking || toss.notYet || !!error));
@@ -99,7 +98,10 @@
 		<div class="mt-2.5 animate-up-in rounded-[13px] bg-white/4 px-3.5 py-3">
 			<!-- 대표자 휴대폰을 고쳐 저장하면 다시 등록 · 새 번호로 문자(0121 toss_action — 본인인증 전) -->
 			<p class="text-[12.5px] leading-[1.6] text-white/70">스팸 문자함도 살펴봐 주세요. 번호가 다르면 [수정하기]에서 대표자 휴대폰을 고치면 문자를 다시 보내요.</p>
-			<a href={COMPANY.csUrl} target={csExternal ? '_blank' : undefined} rel={csExternal ? 'noopener noreferrer' : undefined} class="mt-2.5 inline-flex h-[34px] items-center rounded-[11px] border border-white/14 px-3 text-[12.5px] font-bold text-fg hover:border-white/35">파트너팀에 문의</a>
+			<!-- 파트너팀 톡(0125) · 오른쪽 정렬 -->
+			<div class="mt-2.5 flex justify-end">
+				<a href={PARTNER_TALK_HREF} class="inline-flex h-[34px] items-center rounded-[11px] border border-white/14 px-3 text-[12.5px] font-bold text-fg hover:border-white/35">문의</a>
+			</div>
 		</div>
 	{/if}
 

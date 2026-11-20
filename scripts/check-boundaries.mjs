@@ -367,6 +367,11 @@ for (const files of [...myrSrcDirs.map((dir) => walk(dir)), myrScriptFiles]) {
       sql: ["myr_holiday_name_ok", (b) => b.match(/between\s+1\s+and\s+(\d+)/)?.[1] ?? null]
     },
     {
+      what: "파트너팀 톡 본문 글자 수",
+      ts: ["packages/myr-core/src/partner-talk.ts", (t) => t.match(/export const PARTNER_BODY_MAX = (\d+);/)?.[1] ?? null],
+      sql: ["myr_partner_body_max", (b) => b.match(/select\s+(\d+)/)?.[1] ?? null]
+    },
+    {
       what: "환불 사진 장수",
       ts: ["packages/myr-core/src/refund-rules.ts", (t) => t.match(/export const REFUND_PHOTO_MAX = (\d+);/)?.[1] ?? null],
       sql: ["myr_refund_photos_too_many", (b) => b.match(/>\s*(\d+)/)?.[1] ?? null]
