@@ -35,6 +35,8 @@
 		app.claimWaiting = data.claimWaiting;
 	});
 	const csCount = $derived(data.claimWaiting + data.inqWaiting);
+	/** 파트너팀 톡 안 읽은 답변(0125) — 첫 값은 레이아웃, 대화 화면을 열면 0 */
+	const talkCount = $derived(app.talkBadge(page.data.talkUnread));
 	// 사업자 · 정산 정보 배너 — 보일지는 서버 보류 이유(정산 탭과 같은 myr_seller_next_hold_json · 0116) · 확인 중이면 "확인하고 있어요"(빨간색 없이)
 	const settleBanner = $derived(homeSettleBanner(data.settleInfo));
 	const needsSettle = $derived(settleBanner !== null);
@@ -63,6 +65,10 @@
 			<a href="/cs" aria-label="처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
 				<Icon id="bell" size={20} />
 				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<a href="/messages" aria-label="파트너팀 톡 · 안 읽은 답변 {talkCount}개" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg">
+				<Icon id="chat" size={20} />
+				{#if talkCount}<span class="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold tabular-nums text-bg">{talkCount}</span>{/if}
 			</a>
 			<UserMenu />
 		</div>

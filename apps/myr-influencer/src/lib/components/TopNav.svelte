@@ -16,6 +16,8 @@
 	const active = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href));
 	/** 처리 대기 CS = 교환·환불 처리 대기(0078) + 고객 문의 답변 대기(0075) */
 	const csCount = $derived(app.csBadge(page.data.inqWaiting, page.data.claimWaiting));
+	/** 파트너팀 톡 안 읽은 답변(0125) */
+	const talkCount = $derived(app.talkBadge(page.data.talkUnread));
 </script>
 
 <header class="z-10 hidden h-[72px] shrink-0 border-b border-white/7 bg-bg/85 backdrop-blur-md lg:block">
@@ -40,6 +42,10 @@
 			<a href="/cs" aria-label="알림 · 처리 대기 CS {csCount}건" class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
 				<Icon id="bell" size={20} />
 				{#if csCount}<span class="absolute top-2 right-[9px] h-2 w-2 rounded-full bg-accent"></span>{/if}
+			</a>
+			<a href="/messages" aria-label="파트너팀 톡 · 안 읽은 답변 {talkCount}개" aria-current={page.url.pathname.startsWith('/messages') ? 'page' : undefined} class="relative flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/5 text-fg transition-colors hover:bg-white/10">
+				<Icon id="chat" size={20} />
+				{#if talkCount}<span class="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-[5px] text-[11px] font-extrabold tabular-nums text-bg">{talkCount}</span>{/if}
 			</a>
 			<UserMenu />
 		</div>

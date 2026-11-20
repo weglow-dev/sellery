@@ -11,7 +11,7 @@
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import SettleInfoForm from '$lib/components/SettleInfoForm.svelte';
-	import { COMPANY } from '@sellery/myr-core/company';
+	import { PARTNER_TALK_HREF } from '@sellery/myr-core/partner-talk';
 	import TossAuthCard from '$lib/components/TossAuthCard.svelte';
 
 	/** 내 정보(9번 · 0085 · 시안 없음 — 콘솔 카드 톤). 프로필(읽기) · 사업자 · 정산 정보 상태(미입력 · 확인 중 · 확인 완료 · 다시 입력 필요).
@@ -90,7 +90,6 @@
 		return () => ro.disconnect();
 	});
 	// 본인인증을 마친 뒤 확인 중(서버 editLocked)에는 고칠 수 없다 — 잘못 넣었으면 파트너팀 문의 → 운영 "다시 입력 요청"(0124)
-	const csExternal = /^https?:\/\//.test(COMPANY.csUrl);
 	/** 토스 카드 [수정하기] · [대표자 휴대폰 고치기] — 입력 폼을 열고 그 칸으로(잠겼으면 잠금 안내로) */
 	async function fixField(field: 'bizNo' | 'account' | 'ceoPhone') {
 		if (info?.editLocked) {
@@ -196,8 +195,9 @@
 					<!-- 본인인증을 마친 뒤 확인 중(서버 editLocked · 0124) — 고칠 수 없다 · 잘못 넣었으면 문의 → 운영 다시 입력 요청 -->
 					<div id="settle-locked" class="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-white/3 px-4 py-3.5">
 						<p class="text-[13px] leading-[1.6] text-white/75">{SETTLE_LOCKED_NOTICE}</p>
-						<div class="flex flex-wrap gap-2">
-							<a href={COMPANY.csUrl} target={csExternal ? '_blank' : undefined} rel={csExternal ? 'noopener noreferrer' : undefined} class="inline-flex h-[38px] items-center rounded-xl border border-white/16 px-3.5 text-[13px] font-bold text-white/80 hover:border-white/30">파트너팀에 문의</a>
+						<!-- 파트너팀 톡(0125) · 오른쪽 정렬 -->
+						<div class="flex justify-end">
+							<a href={PARTNER_TALK_HREF} class="inline-flex h-[38px] items-center rounded-xl border border-white/16 px-3.5 text-[13px] font-bold text-white/80 hover:border-white/30">문의</a>
 						</div>
 					</div>
 				{:else}

@@ -25,6 +25,7 @@ export const UI_ICONS: Record<string, string> = {
 	home: `<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>`,
 	cs: `<path d="M4 7h11l-3-3M20 17H9l3 3"/>`,
 	box: `<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/>`,
+	chat: `<path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4A8 8 0 1 1 20 12z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/>`,
 	bell: `<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>`,
 	back: `<path d="M15 5l-7 7 7 7"/>`,
 	chev: `<path d="M9 5l7 7-7 7"/>`,
