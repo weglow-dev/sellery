@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { formatPhone } from '@sellery/myr-core/phone';
 	import { COMPANY } from '@sellery/myr-core/company';
 	import type { TossCard } from '$lib/toss-card';
@@ -30,6 +31,25 @@
 		expanded = helpOpen || (toss.canCheck && (checking || toss.notYet || !!error));
 	});
 
+	// [토스페이먼츠에 다시 등록하기](2026-11-20) — 서버가 지금도 등록 전인지(toss_ask register) 다시 보고 등록한다. 성공하면 화면 값을 다시 읽는다(상태 카드 · 홈 배너)
+	let registering = $state(false);
+	async function register() {
+		if (registering) return;
+		registering = true;
+		error = null;
+		try {
+			const res = await fetch('/api/my/toss', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'register' }) });
+			const r = (await res.json().catch(() => null)) as { ok?: boolean; toss?: TossCard; message?: string } | null;
+			if (r?.toss) toss = r.toss;
+			if (r?.ok) await invalidateAll();
+			else error = r?.message ?? '지금은 등록하지 못했어요. 잠시 후 다시 눌러 주세요';
+		} catch {
+			error = '서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요';
+		} finally {
+			registering = false;
+		}
+	}
+
 	async function check() {
 		if (checking) return;
 		checking = true;
@@ -55,6 +75,7 @@
 	</div>
 	<p class="mt-3 text-[13.5px] leading-[1.55] text-white/85 tabular-nums">{toss.lead}{#if toss.phone}<b class="font-extrabold text-fg">{formatPhone(toss.phone)}</b>{/if}{toss.tail}</p>
 	{#if toss.note}<p class="mt-1.5 text-[12px] leading-[1.55] text-white/45">{toss.note}</p>{/if}
+	{#if toss.review}<p class="mt-2 text-[12px] leading-[1.55] font-semibold text-[#ff9a66]">{toss.review}</p>{/if}
 
 	{#if toss.canCheck && (checking || toss.notYet || error)}
 		<p class="mt-3 flex items-center gap-2 text-[12.5px] font-semibold {error ? 'text-[#ff8a8a]' : 'text-white/70'}" role="status">
@@ -82,6 +103,13 @@
 		</div>
 	{/if}
 
+	{#if toss.canRegister}
+		{#if error}<p class="mt-3 text-[12.5px] font-semibold text-[#ff8a8a]" role="status">{error}</p>{/if}
+		<button type="button" onclick={register} disabled={registering} aria-busy={registering} class="mt-3.5 h-[42px] w-full rounded-[13px] text-[14px] font-extrabold transition-colors {registering ? 'bg-white/8 text-white/45' : 'bg-accent text-bg hover:bg-[#ff8f5c]'}">{registering ? '등록하는 중…' : '토스페이먼츠에 다시 등록하기'}</button>
+	{/if}
+	{#if toss.needConsent}
+		<button type="button" onclick={() => onfix('ceoPhone')} class="mt-3.5 flex h-[42px] w-full items-center justify-center rounded-[13px] border border-white/16 text-[14px] font-bold hover:border-white/30 hover:bg-white/4">수정하기</button>
+	{/if}
 	{#if toss.fixField}
 		<button type="button" onclick={() => toss.fixField && onfix(toss.fixField)} class="mt-3.5 flex h-[42px] w-full items-center justify-center rounded-[13px] border border-white/16 text-[14px] font-bold hover:border-white/30 hover:bg-white/4">수정하기</button>
 	{/if}

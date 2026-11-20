@@ -101,7 +101,7 @@ update public.sellers set myr_settle_status = 'verified' where id = '00000000-00
 select pg_temp.invoice_ok('@pgtap.tr1');
 select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '세금계산서 확인 뒤에도 토스 본인인증 전이면 보류');
 
--- 토스 셀러 상태가 바뀌면 지급 건을 다시 정한다(트리거 — 0121 myr_app_seller_toss_sync 가 쓰는 칸)
+-- 토스 셀러 상태가 바뀌면 지급 건을 다시 정한다(트리거 — 0124 myr_app_seller_toss_record · myr_app_seller_toss_status 가 쓰는 칸)
 update public.sellers set toss_seller_status = 'APPROVAL_REQUIRED' where id = '00000000-0000-4000-8000-0000000f2201';
 select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '본인인증 전 — 보류');
 update public.sellers set toss_seller_status = 'PARTIALLY_APPROVED' where id = '00000000-0000-4000-8000-0000000f2201';

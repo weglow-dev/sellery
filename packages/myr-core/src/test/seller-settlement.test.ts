@@ -108,6 +108,9 @@ describe('시안 라벨', () => {
 		expect(holdBanner('pending')?.body).toContain('세금계산서까지 확인되면');
 		expect(holdBanner('pending')?.body).not.toContain('정산 확정분부터');
 		expect(holdBanner('pending')?.cta).toBeNull();
+		// 0124 토스 인증 대기 — 운영 확인 문구가 아니라 본인인증 안내
+		expect([holdBanner('toss')?.title, holdBanner('toss')?.cta]).toEqual(['토스 본인인증을 마쳐 주세요', null]);
+		expect(holdBanner('toss')?.body).not.toContain('운영팀');
 	});
 	it('자동 이체 안내(0111) — 종류별 문구 · 버튼 · 운영 쪽 원인은 이유 없이 확인 중', async () => {
 		const { payoutNotice } = await import('../seller-settlement');
@@ -126,6 +129,7 @@ describe('시안 라벨', () => {
 		expect(settleInfoStep('none')).toEqual({ sub: '사업자 · 정산 계좌', action: '등록하기', chip: null });
 		expect(settleInfoStep('pending')).toEqual({ sub: '운영팀이 확인하고 있어요', action: null, chip: '확인 중' });
 		expect(settleInfoStep('rejected').action).toBe('다시 입력');
+		expect(settleInfoStep('toss')).toEqual({ sub: '토스 본인인증을 마치면 확인이 끝나요', action: null, chip: '인증 대기' });
 	});
 	it('보류 해제분은 같은 상품이라도 다른 줄로 묶인다', async () => {
 		const { itemsByProduct, rowKey, settleItemsFromJson } = await import('../seller-settlement');

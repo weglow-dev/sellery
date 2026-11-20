@@ -25,6 +25,16 @@ describe('토스 카드 상태', () => {
 		// 등록 전 — 정보를 넣었으면 "등록 전" · 안 넣었으면 "시작 전" / 거절 — 서버가 준 칸(toss_fix)으로
 		expect([tossCardOf('none', settleInfoFromJson({ has_biz_no: true })).chip.label, tossCardOf('none', null).chip.label]).toEqual(['등록 전', '시작 전']);
 		expect(tossCardOf('rejected', settleInfoFromJson({ toss_fix: 'bizNo' })).fixField).toBe('bizNo');
+		// 2026-11-20 — 토스 셀러가 없음(서버 toss_ask register): 동의했으면 [다시 등록하기] · 동의가 없으면 [수정하기](동의하고 저장) · 다른 상태에는 둘 다 없음
+		const reg = (agreed: boolean) => tossCardOf('none', settleInfoFromJson({ has_biz_no: true, toss_ask: 'register', toss_agreed: agreed }));
+		expect([reg(true).canRegister, reg(true).needConsent, reg(true).lead]).toEqual([true, false, '토스페이먼츠 등록이 끝나지 않았어요.']);
+		expect([reg(false).canRegister, reg(false).needConsent]).toEqual([false, true]);
+		// 토스 응답 대기(서버 toss_ask waiting · 마지막 등록 뒤 5분) — 버튼 없이 안내만
+		const waiting = tossCardOf('none', settleInfoFromJson({ has_biz_no: true, toss_ask: 'waiting', toss_agreed: true }));
+		expect([waiting.canRegister, waiting.needConsent, waiting.chip.label, waiting.lead]).toEqual([false, false, '등록 중', '토스페이먼츠 응답을 기다리고 있어요.']);
+		expect(TOSS_CARD_STATES.filter((s) => c[s].canRegister || c[s].needConsent)).toEqual([]);
+		// 0124 — 승인 때 토스에 반영할 변경이 있으면 한 줄(서버 toss_after_review) · 없으면 없음
+		expect([tossCardOf('partial', settleInfoFromJson({ toss_after_review: true })).review, tossCardOf('partial', settleInfoFromJson({})).review, tossCardOf('partial', null).review]).toEqual(['변경한 정보는 운영팀 확인 뒤 토스페이먼츠에 반영돼요.', null, null]);
 	});
 	it('[인증을 마쳤어요] 미리보기 — 첫 확인은 "아직", 두 번째부터 다음 상태', () => {
 		expect(previewTossCardCheck('wait', 1, info)).toMatchObject({ state: 'wait', notYet: true });

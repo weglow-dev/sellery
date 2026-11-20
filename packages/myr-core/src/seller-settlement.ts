@@ -331,6 +331,8 @@ export function payoutNotice(transfer: PayoutTransfer | null, payDueAt: string |
 /** 정산 보류 배너(사업자 · 정산 정보) — 보일지는 서버 보류 이유(nextHold.code === 'settle_info')가 정한다. 여기서는 입력 상태별 문구 · 버튼만 고른다.
  *  보류는 확인이 끝나면 저절로 풀려 지난 달 정산금도 지급되므로(0102 · 0104 자동 보류) "○일 정산 확정분부터" 같은 날짜는 넣지 않는다 */
 export function holdBanner(settleStatus: string): { title: string; body: string; cta: string | null } {
+	// 0124 토스 인증 대기 — 본인인증을 마치면 확인이 끝난다(운영 확인 없음)
+	if (settleStatus === 'toss') return { title: '토스 본인인증을 마쳐 주세요', body: '인증을 마치면 사업자 · 정산 정보 확인이 끝나요. 세금계산서까지 확인되면 정산금이 지급돼요.', cta: null };
 	if (settleStatus === 'pending') return { title: '정산 정보를 확인하고 있어요', body: '운영팀이 사업자 · 정산 계좌 정보를 확인하고 있어요. 확인이 끝나고 세금계산서까지 확인되면 정산금이 지급돼요.', cta: null };
 	if (settleStatus === 'rejected') return { title: '지급이 보류 중이에요', body: '정산 정보를 다시 입력해 주세요. 확인되기 전에는 정산금이 지급되지 않아요.', cta: '정산 정보 다시 입력하기' };
 	return { title: '지급이 보류 중이에요', body: '사업자 · 정산 계좌 정보를 등록해야 정산금이 지급돼요.', cta: '정산 정보 등록하기' };
@@ -338,6 +340,7 @@ export function holdBanner(settleStatus: string): { title: string; body: string;
 
 /** 정산 상세 "지급까지 할 일" 1단계(정산 정보 등록 · 시안 2026-11-13) — 끝났는지는 서버 보류 이유(settle_info)가 정한다. 여기서는 입력 상태별 버튼 · 칩 문구만 고른다 */
 export function settleInfoStep(settleStatus: string): { sub: string; action: string | null; chip: string | null } {
+	if (settleStatus === 'toss') return { sub: '토스 본인인증을 마치면 확인이 끝나요', action: null, chip: '인증 대기' };
 	if (settleStatus === 'pending') return { sub: '운영팀이 확인하고 있어요', action: null, chip: '확인 중' };
 	if (settleStatus === 'rejected') return { sub: '정산 정보를 다시 입력해 주세요', action: '다시 입력', chip: null };
 	return { sub: '사업자 · 정산 계좌', action: '등록하기', chip: null };

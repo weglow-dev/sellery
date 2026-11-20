@@ -143,6 +143,42 @@ export function buildTossSellerBody(input: TossSellerInput): TossSellerBuild {
 	return { ok: true, body };
 }
 
+/* ---------------- 셀러 등록 · 수정 실패 → 크리에이터에게 보일 오류(0124) ---------------- */
+
+/** sellers.toss_seller_error 에 적는 값 — 있으면 카드가 "정보 확인 필요"(0121 myr_toss_card_state) · field 가 account · bizNo 면 [수정하기]가 그 칸으로(0121 toss_fix) */
+export type TossSellerError = { code: string; message: string; field: string | null };
+
+const BUILD_MESSAGES: Record<TossSellerBuildCode, string> = {
+	BAD_REF: '등록 식별자를 만들지 못했어요',
+	BIZ_KIND_UNKNOWN: '사업자등록번호를 다시 확인해 주세요',
+	BIZ_NO_REQUIRED: '사업자등록번호를 다시 확인해 주세요',
+	BANK_MISSING: '정산 계좌를 넣어 주세요',
+	BANK_CODE_UNKNOWN: '토스페이먼츠가 받지 않는 은행이에요. 다른 은행 계좌를 넣어 주세요',
+	BAD_ACCOUNT: '계좌번호는 숫자 8~14자리예요. 계좌번호를 다시 입력해 주세요',
+	HOLDER_REQUIRED: '예금주를 넣어 주세요',
+	EMAIL_REQUIRED: '계정 이메일을 찾지 못했어요. 파트너팀에 문의해 주세요',
+	PHONE_MISSING: '대표자 휴대폰 번호를 넣어 주세요',
+	COMPANY_REQUIRED: '상호를 넣어 주세요',
+	CEO_REQUIRED: '대표자 이름을 넣어 주세요'
+};
+
+/** 본문을 만들 수 없을 때(저장된 정보가 토스 형식에 안 맞음 — 0122 전에 저장된 15 · 16자리 계좌 등) — 크리에이터가 고칠 오류로 적는다 */
+export function tossBuildErrorOf(code: TossSellerBuildCode, field?: string): TossSellerError {
+	return { code: `PAYLOAD_${code}`, message: BUILD_MESSAGES[code], field: field ?? null };
+}
+
+/**
+ * 토스 셀러 등록 · 수정 거절 → 크리에이터에게 보일 오류. 우리 쪽 문제(키 · 권한 · 접근 정책 · 암호화)와 불명(네트워크 · 5xx)은 null —
+ * 크리에이터가 고칠 일이 아니므로 카드에 적지 않고 서버 로그로 남긴다. 고칠 칸은 토스 오류 코드 이름으로만 고른다(형식 읽기 · 판정 아님).
+ */
+export function tossSellerErrorOf(status: number, body: { code?: string | null; message?: string | null }): TossSellerError | null {
+	const code = String(body.code ?? '');
+	if (status === 0 || status >= 500 || status === 401 || status === 403) return null;
+	if (/KEY|FORBIDDEN|UNAUTHORIZED|ACCESS_DENIED|ENCRYPT|SECURITY|IDEMPOTENT/.test(code)) return null;
+	const field = /ACCOUNT|BANK|HOLDER/.test(code) ? 'account' : /BUSINESS|REGISTRATION|BIZ/.test(code) ? 'bizNo' : /PHONE|MOBILE/.test(code) ? 'ceoPhone' : null;
+	return { code: code || `HTTP_${status}`, message: String(body.message ?? '').slice(0, 300) || '토스페이먼츠가 정보를 받지 않았어요', field };
+}
+
 /* ---------------- 지급 요청 본문 ---------------- */
 
 export const TOSS_PAYOUT_MAX_PER_REQUEST = 100;

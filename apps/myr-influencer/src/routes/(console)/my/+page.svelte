@@ -6,11 +6,12 @@
 	import { shortDate } from '@sellery/myr-core/order-view';
 	import { platformName } from '$lib/signup-rules';
 	import { tick, untrack } from 'svelte';
-	import { SETTLE_STATUS_META, type SettleInfo } from '@sellery/myr-core/settle-info';
+	import { SETTLE_LOCKED_NOTICE, SETTLE_REVIEW_NOTICE, SETTLE_STATUS_META, settleSavedToast, settleStatusDesc, type SettleInfo } from '@sellery/myr-core/settle-info';
 	import { app } from '$lib/state.svelte';
 	import BackHeader from '$lib/components/BackHeader.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import SettleInfoForm from '$lib/components/SettleInfoForm.svelte';
+	import { COMPANY } from '@sellery/myr-core/company';
 	import TossAuthCard from '$lib/components/TossAuthCard.svelte';
 
 	/** 내 정보(9번 · 0085 · 시안 없음 — 콘솔 카드 톤). 프로필(읽기) · 사업자 · 정산 정보 상태(미입력 · 확인 중 · 확인 완료 · 다시 입력 필요).
@@ -19,8 +20,8 @@
 	 *  모바일: 뒤로 헤더 · 한 줄 / PC(lg~): 1240px · 왼쪽 프로필 · 상태 / 오른쪽 입력
 	 *  PC 는 펼치기 전(문자를 못 받았어요 · 수정하기) 세로 스크롤이 없게 여백을 줄이고, 오른쪽 읽기 카드는 왼쪽 세 카드의 **펼치기 전** 높이에 맞춘다
 	 *  (왼쪽 토스 카드가 늘어나도(문자를 못 받았어요 · 확인 상태 줄) 오른쪽은 늘어나지 않는다 — 늘어난 동안은 왼쪽 높이를 재지 않는다)
-	 *  토스 본인인증 카드(2026-11-18) — 상태 카드 바로 아래 · 값은 서버 data.toss. 토스 연동 전에는 개발 서버 · Vercel Preview 에서만 보인다:
-	 *  이 계정의 실제 상태(가짜 토스 — 정보를 저장하면 등록 · [인증을 마쳤어요] 두 번째에 인증 · lib/server/toss-sim.ts) · 주소 ?toss=<상태> 면 그 상태 미리보기(목) */
+	 *  토스 본인인증 카드(2026-11-18) — 상태 카드 바로 아래 · 값은 서버 data.toss. 지급대행 키가 있을 때 보인다(0124 · 시범운영은 테스트 키):
+	 *  이 계정의 실제 상태(정보를 저장하면 토스 셀러 등록 · [인증을 마쳤어요]는 토스 다시 조회 · 웹훅 seller.changed) · 주소 ?toss=<상태> 면 그 상태 미리보기(목 · 개발 서버 · Preview) */
 	let { data } = $props();
 	// 저장 응답으로 바로 바꾼다(처음 값만 서버에서)
 	let info = $state<SettleInfo | null>(untrack(() => data.info));
@@ -88,8 +89,14 @@
 		ro.observe(el);
 		return () => ro.disconnect();
 	});
-	/** 토스 카드 [수정하기] · [대표자 휴대폰 고치기] — 입력 폼을 열고 그 칸으로 */
+	// 본인인증을 마친 뒤 확인 중(서버 editLocked)에는 고칠 수 없다 — 잘못 넣었으면 파트너팀 문의 → 운영 "다시 입력 요청"(0124)
+	const csExternal = /^https?:\/\//.test(COMPANY.csUrl);
+	/** 토스 카드 [수정하기] · [대표자 휴대폰 고치기] — 입력 폼을 열고 그 칸으로(잠겼으면 잠금 안내로) */
 	async function fixField(field: 'bizNo' | 'account' | 'ceoPhone') {
+		if (info?.editLocked) {
+			document.getElementById('settle-locked')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			return;
+		}
 		editing = true;
 		await tick();
 		const el = document.getElementById(`s-${field}`);
@@ -100,7 +107,7 @@
 	async function saved(next: SettleInfo, recheck: boolean) {
 		info = next;
 		editing = false;
-		app.showToast(recheck ? '저장했어요 · 운영팀이 확인해야 정산금이 지급돼요' : '저장했어요');
+		app.showToast(settleSavedToast(next, recheck));
 		await invalidateAll();
 	}
 </script>
@@ -141,16 +148,18 @@
 				</dl>
 			</section>
 
-			<section aria-label="정산 정보 상태" class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5">
+			<!-- 토스 인증 대기(0124 · status toss)면 비활성 카드 — 본인인증을 마치면 확인이 끝난다(운영 확인 없음) -->
+			<section aria-label="정산 정보 상태" class="rounded-[20px] border border-white/8 bg-white/3 p-4 lg:p-5 {info?.status === 'toss' ? 'opacity-60' : ''}">
 				<div class="flex items-center justify-between gap-2">
 					<p class="text-[15px] font-extrabold">사업자 · 정산 정보</p>
 					<span class="rounded-lg px-2.5 py-[5px] text-[12px] font-bold {TONE[st.tone]}">{st.label}</span>
 				</div>
-				<p class="mt-2 text-[13px] leading-[1.6] text-white/70">{st.desc}</p>
+				<p class="mt-2 text-[13px] leading-[1.6] text-white/70">{settleStatusDesc(info)}</p>
 				{#if info?.status === 'rejected' && info.note}
 					<p class="mt-2.5 border-l-2 border-[#ff6b6b]/60 pl-2.5 text-[13px] leading-[1.55] text-white/85"><span class="font-bold text-[#ff8a8a]">운영팀</span> {info.note}</p>
 				{/if}
-				<p class="mt-3 text-[12px] leading-[1.55] text-white/45">계좌 · 사업자등록번호 · 대표자를 바꾸면 운영팀이 다시 확인해요. 확인이 끝나기 전에는 정산금 지급이 잠시 미뤄져요.</p>
+				<!-- 0124 — 토스에 등록된 크리에이터(서버 reviewOnChange)는 모든 변경이 운영 승인 때 토스에 반영 -->
+				<p class="mt-3 text-[12px] leading-[1.55] text-white/45">{info?.reviewOnChange ? SETTLE_REVIEW_NOTICE : '토스 본인인증 전에는 정보를 고치면 운영 확인 없이 바로 토스페이먼츠에 등록돼요.'}</p>
 			</section>
 
 			{#if data.toss}
@@ -183,7 +192,17 @@
 				{/snippet}
 				{@render rows('사업자 정보', [['상호', info.company], ['사업자등록번호', info.bizNoMasked ?? ''], ['대표자', info.ceo], ['대표자 휴대폰', info.ceoPhone ? formatPhone(info.ceoPhone) : ''], ['세금계산서 이메일', info.taxEmail]])}
 				{@render rows('정산 계좌', [['은행', info.bank], ['계좌번호', info.accountMasked ?? ''], ['예금주', info.holder]])}
-				<button type="button" onclick={() => (editing = true)} class="flex h-14 w-full items-center justify-center rounded-2xl border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:h-[60px] lg:text-[16px]">수정하기</button>
+				{#if info.editLocked}
+					<!-- 본인인증을 마친 뒤 확인 중(서버 editLocked · 0124) — 고칠 수 없다 · 잘못 넣었으면 문의 → 운영 다시 입력 요청 -->
+					<div id="settle-locked" class="flex flex-col gap-2.5 rounded-2xl border border-white/10 bg-white/3 px-4 py-3.5">
+						<p class="text-[13px] leading-[1.6] text-white/75">{SETTLE_LOCKED_NOTICE}</p>
+						<div class="flex flex-wrap gap-2">
+							<a href={COMPANY.csUrl} target={csExternal ? '_blank' : undefined} rel={csExternal ? 'noopener noreferrer' : undefined} class="inline-flex h-[38px] items-center rounded-xl border border-white/16 px-3.5 text-[13px] font-bold text-white/80 hover:border-white/30">파트너팀에 문의</a>
+						</div>
+					</div>
+				{:else}
+					<button type="button" onclick={() => (editing = true)} class="flex h-14 w-full items-center justify-center rounded-2xl border border-white/16 text-[15px] font-bold text-fg transition-colors hover:border-white/30 hover:bg-white/4 lg:h-[60px] lg:text-[16px]">수정하기</button>
+				{/if}
 			</section>
 		{/if}
 	</div>
