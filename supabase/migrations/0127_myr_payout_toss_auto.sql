@@ -15,7 +15,8 @@
 --     웹훅 payout.changed 는 COMPLETED · FAILED(REJECTED 도 FAILED 로) 때만 온다.
 --
 --   설정: platform_settings.myr_payout.mode 는 'toss' 만(제약) — 운영 값이 manual 이면 toss 로 바꾸고, 트리거(0122 platform_settings_myr_payout_refresh)가
---         지급 건 상태를 전부 다시 정한다(토스 본인인증 전이면 지급 보류 · 토스 본인인증 전).
+--         지급 건 상태를 전부 다시 정한다(토스 본인인증 전이면 지급 보류 · 토스 본인인증 전). 그 트리거는 이 파일의 새 판정보다 먼저 돌므로
+--         파일 맨 끝에서 myr_payout_refresh_all() 로 한 번 더 다시 정한다(새 myr_toss_ready · 계좌 실패 재시도).
 --   칸(myr_payouts): transfer_ref(이번 시도 참조 번호 · 유일) · toss_payout_id(토스 지급 id) · transfer_error(토스 오류 원문 — 운영용)
 --   지급 기록(myr_payout_logs.action): + toss_request(토스에 요청) · toss_failed(실패 · 종류) · toss_retry(운영이 다시 보내기) · toss_confirmed(운영 예외 기록 뒤 토스가 완료를 알려 옴)
 --   판정:
@@ -454,3 +455,8 @@ grant execute on function public.myr_payout_check_list(timestamptz) to service_r
 
 -- ---------- 지움: 수동 이체 목록(계좌 원문) ----------
 drop function if exists public.myr_payout_to_pay(date);
+
+-- ---------- 마지막: 자동 상태 지급 건 다시 정하기 ----------
+-- 함수 · 트리거를 바꾼 뒤 자동 상태 지급 건을 새 판정(myr_toss_ready — 셀러 id · 계좌 실패 재시도)으로 다시 정한다 —
+-- 맨 위 지급 방식 update 의 트리거는 옛 정의로 돌았다(리뷰 2026-11-24: 상태만 있고 셀러 id 가 없는 크리에이터가 적용 직후 "지급 대기"로 남았다)
+select public.myr_payout_refresh_all();
