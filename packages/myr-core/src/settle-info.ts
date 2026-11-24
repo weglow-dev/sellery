@@ -111,6 +111,8 @@ export type SettleInfo = {
 	reauthAfterReview: boolean;
 	/** 0124 — 크리에이터가 토스에서 할 일(myr_toss_creator_ask): auth 본인인증 · kyc 추가 인증 · fix 정보 고치기 · register 다시 등록(토스 셀러 없음) · waiting 토스 응답 대기(마지막 등록 뒤 5분) · 없으면 null */
 	tossAsk: TossAsk | null;
+	/** 0126 — 지급 방식이 토스인가(서버 myr_payout_toss_on · 0122). 수동 지급이면 토스 인증이 없어도 지급된다 — 정산 상세 "지급까지 할 일" ③ 을 보일지 */
+	payoutToss: boolean;
 };
 /** 토스 카드 상태 — none 시작 전 · rejected 토스가 정보 거절 · wait 본인인증 전 · partial 인증 완료 · kyc 추가 인증 · approved 한도 없음 · corporate 법인 */
 export type TossState = 'none' | 'rejected' | 'wait' | 'partial' | 'kyc' | 'approved' | 'corporate';
@@ -154,7 +156,8 @@ export function settleInfoFromJson(v: unknown): SettleInfo | null {
 		tossAfterReview: o.toss_after_review === true,
 		editLocked: o.edit_locked === true,
 		reauthAfterReview: o.reauth_after_review === true,
-		tossAsk: o.toss_ask === 'auth' || o.toss_ask === 'kyc' || o.toss_ask === 'fix' || o.toss_ask === 'register' || o.toss_ask === 'waiting' ? o.toss_ask : null
+		tossAsk: o.toss_ask === 'auth' || o.toss_ask === 'kyc' || o.toss_ask === 'fix' || o.toss_ask === 'register' || o.toss_ask === 'waiting' ? o.toss_ask : null,
+		payoutToss: o.payout_toss === true
 	};
 }
 function holdFrom(v: unknown): SettleInfo['hold'] {

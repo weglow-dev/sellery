@@ -47,7 +47,7 @@ select is(pg_temp.save('010-1234-5678', false) ->> 'code', 'TOSS_CONSENT_REQUIRE
 select is((select myr_toss_agreed_at from public.sellers where id = '00000000-0000-4000-8000-000000000e12'), null, '거부되면 동의 시각을 남기지 않는다');
 
 -- ---------- 저장 ----------
-select is((pg_temp.save('010-1234-5678', true) #> '{info}') - array['hold', 'submitted_at', 'company', 'ceo', 'bank', 'holder', 'account_masked', 'has_account', 'tax_email', 'note', 'checked_at', 'biz_no_masked', 'has_biz_no', 'status'],
+select is((pg_temp.save('010-1234-5678', true) #> '{info}') - array['hold', 'submitted_at', 'company', 'ceo', 'bank', 'holder', 'account_masked', 'has_account', 'tax_email', 'note', 'checked_at', 'biz_no_masked', 'has_biz_no', 'status', 'payout_toss'],
           '{"ceo_phone": "01012345678", "toss_agreed": true, "biz_kind": "individual", "toss_state": "none", "toss_fix": null, "toss_ready": false, "review_on_change": false, "toss_after_review": false, "edit_locked": false, "reauth_after_review": false, "toss_ask": "register"}'::jsonb,
           '저장 — 대표자 휴대폰(숫자만) · 동의 · 개인사업자 · 토스 등록 전(none) · 토스로 지급 가능 아님 · 변경은 지금 바로(0124 안내 값)');
 select is((select settle_phone from public.sellers where id = '00000000-0000-4000-8000-000000000e12'), '01012345678', '대표자 휴대폰은 settle_phone(셀러리 0042 토스 본인인증 번호 칸)');

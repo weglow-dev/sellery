@@ -2,15 +2,17 @@
 	import { holdBanner } from '@sellery/myr-core/seller-settlement';
 
 	/** 정산 보류 배너(시안 "MYR Influencer Admin" 정산) — 사업자 · 정산 정보(0085) 확인 전이면. 등록 · 다시 입력은 내 정보로. 확인 완료면 그리지 않는다.
+	 *  toss(0126) — 사업자 정보 말고 토스에서 할 일이 남았으면(홈 배너와 같은 homeSettleBanner 결과) 그 문구를 같은 모양으로 · hold 면 [내 정보로 가기] · wait 면 회색 테두리 · 버튼 없음.
 	 *  모바일: 아이콘 · 글 + 아래 꽉 찬 버튼 / PC(lg~): 한 줄(아이콘 · 글 · 오른쪽 버튼) */
-	let { settleStatus }: { settleStatus: string } = $props();
-	const b = $derived(holdBanner(settleStatus));
+	let { settleStatus = 'none', toss = null }: { settleStatus?: string; toss?: { title: string; body: string; tone: 'hold' | 'wait' } | null } = $props();
+	const b = $derived(toss ? { title: toss.title, body: toss.body, cta: toss.tone === 'hold' ? '내 정보로 가기' : null } : holdBanner(settleStatus));
+	const wait = $derived(toss?.tone === 'wait');
 </script>
 
 {#if b}
-	<div class="rounded-[18px] border border-[#ff6b6b]/26 bg-[#ff6b6b]/7 px-4 py-3.5 lg:flex lg:items-center lg:gap-3.5 lg:rounded-[20px] lg:py-4 lg:pr-4 lg:pl-5">
+	<div class="rounded-[18px] border px-4 py-3.5 lg:flex lg:items-center lg:gap-3.5 lg:rounded-[20px] lg:py-4 lg:pr-4 lg:pl-5 {wait ? 'border-white/12 bg-white/4' : 'border-[#ff6b6b]/26 bg-[#ff6b6b]/7'}">
 		<div class="flex items-start gap-2.5 lg:flex-1 lg:items-center lg:gap-3.5">
-			<span class="mt-px shrink-0 text-[#ff8a8a] lg:mt-0 lg:flex lg:h-10 lg:w-10 lg:items-center lg:justify-center lg:rounded-xl lg:bg-[#ff6b6b]/16">
+			<span class="mt-px shrink-0 lg:mt-0 lg:flex lg:h-10 lg:w-10 lg:items-center lg:justify-center lg:rounded-xl {wait ? 'text-white/60 lg:bg-white/8' : 'text-[#ff8a8a] lg:bg-[#ff6b6b]/16'}">
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5M12 16h.01" /></svg>
 			</span>
 			<span class="min-w-0">

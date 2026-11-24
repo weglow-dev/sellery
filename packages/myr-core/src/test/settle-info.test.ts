@@ -115,6 +115,8 @@ describe('정보 변경 안내(0124 — 등록된 크리에이터의 변경은 �
 		expect(settleInfoFromJson({ review_on_change: true, toss_after_review: true, edit_locked: true, reauth_after_review: true })).toMatchObject({ reviewOnChange: true, tossAfterReview: true, editLocked: true, reauthAfterReview: true });
 		expect([settleInfoFromJson({ toss_ask: 'auth' })!.tossAsk, settleInfoFromJson({ toss_ask: 'kyc' })!.tossAsk, settleInfoFromJson({ toss_ask: 'fix' })!.tossAsk, settleInfoFromJson({ toss_ask: 'register' })!.tossAsk, settleInfoFromJson({ toss_ask: 'waiting' })!.tossAsk, settleInfoFromJson({ toss_ask: 'wait' })!.tossAsk, settleInfoFromJson({})!.tossAsk]).toEqual(['auth', 'kyc', 'fix', 'register', 'waiting', null, null]);
 		expect(settleInfoFromJson({ review_on_change: 'true', reauth_after_review: 'true' })).toMatchObject({ reviewOnChange: false, tossAfterReview: false, editLocked: false, reauthAfterReview: false });
+		// 0126 — 지급 방식이 토스인가(서버 payout_toss · true 일 때만)
+		expect([settleInfoFromJson({ payout_toss: true })!.payoutToss, settleInfoFromJson({ payout_toss: 'true' })!.payoutToss, settleInfoFromJson({})!.payoutToss]).toEqual([true, false, false]);
 		expect(settleSaveMessage('REVIEW_PENDING')).toEqual({ message: '운영팀이 확인하는 동안에는 정보를 바꿀 수 없어요. 확인이 끝난 뒤 다시 시도해 주세요' });
 	});
 	it('바뀐 칸 — 입력 값 ↔ 저장된 값 · 사업자번호 · 계좌는 새로 입력했으면 · 하이픈 무관 · 공백 무관', () => {
