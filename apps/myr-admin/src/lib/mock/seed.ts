@@ -354,6 +354,8 @@ export const OTHER_COUNTS = {
 	orders: { toShip: 4, toShipOldest: '2일째', noDelivered: 2, noDeliveredOldest: '9일째' },
 	cs: { inqLate: 1, inqLateOldest: '26시간', refundRetry: 1, refundOldest: '4일째', creatorLate: 1, creatorLateOldest: '1일 넘김', pickup: 2, resend: 1, inqOpen: 3 },
 	creators: { inviteAsk: 1, inviteOldest: '하루째' },
+	/** 파트너팀 톡(0125) — 크리에이터가 마지막으로 말한 방 = 답할 차례 */
+	talk: { waiting: 2 },
 	settle: { nextAt: '12월 1일(화) 오후 1시', dday: 14, noLedger: 1, heldLines: 2 }
 };
 

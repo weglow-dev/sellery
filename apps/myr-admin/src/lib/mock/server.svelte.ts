@@ -8,10 +8,10 @@ import type {
 	CreatorTab,
 	CreatorView,
 	FailKind,
-	FlowStep,
 	HoldKind,
-	HomeGroup,
-	HomeTask,
+	HomeChip,
+	HomeRow,
+	HomeStep,
 	NavBadge,
 	PayoutAction,
 	PayoutRaw,
@@ -49,7 +49,7 @@ const SETTLE_CHIP: Record<CreatorRaw['settle'], Chip> = {
 	redo: { label: '다시 입력 요청', tone: 'red' }
 };
 /** 사업자 정보는 확인됐지만 토스 본인인증 전 — 크리에이터 목록 칩(확인 완료 대신) */
-const TOSS_CHIP: Chip = { label: '토스 인증 전', tone: 'red' };
+const TOSS_CHIP: Chip = { label: '토스 인증 대기', tone: 'red' };
 const TAX_CHIP: Record<TaxRaw['status'], Chip> = {
 	none: { label: '제출 전', tone: 'grey' },
 	chk: { label: '확인 중', tone: 'orange' },
@@ -398,7 +398,7 @@ class MockServer {
 			{ id: 'wait', name: '확인 대기', count: n('wait') },
 			{ id: 'redo', name: '다시 입력 요청', count: n('redo') },
 			{ id: 'none', name: '미입력', count: n('none') },
-			{ id: 'toss', name: '토스 인증 전', count: n('toss') },
+			{ id: 'toss', name: '토스 인증 대기', count: n('toss') },
 			{ id: 'ok', name: '확인 완료', count: n('ok') },
 			{ id: 'all', name: '전체', count: this.creatorsRaw.length }
 		];
@@ -434,150 +434,119 @@ class MockServer {
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
 			orders: { n: o.orders.toShip, hot: false },
 			cs: { n: o.cs.inqOpen + o.cs.refundRetry + o.cs.pickup + o.cs.resend, hot: o.cs.inqLate + o.cs.refundRetry + o.cs.creatorLate > 0 },
+			talk: { n: o.talk.waiting, hot: false },
 			settle: { n: o.settle.noLedger + o.settle.heldLines, hot: false },
 			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
 			tax: { n: c.taxChk.length + c.taxOverdue, hot: c.taxOverdue > 0 }
 		};
 	}
 
-	/** 홈 맨 위 카드 안의 "운영 확인 필요" — 자동으로 다시 보내지 않아 운영이 풀어야 하는 실패만(결과 확인 · 운영 조치).
-	 *  재시도 대기는 다음 자동 이체에 자동으로 · 계좌 확인 필요는 정산 정보 확인 카드 · 응답 없음은 웹훅을 기다리는 송금 중이라 넣지 않는다 */
-	get blocked() {
+	/** 홈(시안 "MYR Admin" · "MYR Admin PC" 홈 · 2026-11-24) — 화면은 이 값만 그린다.
+	 *  ① 히어로: 10월분 아직 지급하지 않은 금액 · 지급 합계 · 지급 완료 · 운영 확인 필요 · 토스 지급 가능 잔액(다음 실행에 보낼 금액보다 적으면 "₩○ 모자라요") · 들어올 예정
+	 *  ② 세금계산서 확인 대기(확인하면 다음 자동 이체에 지급) · 심사 대기 상품
+	 *  ③ 오늘 처리할 일 — 메뉴 8줄 고정 순서 · 빨강 칩 수 = 급한 일
+	 *  ④ 정산 일정 — 10월분 지급 흐름 4단계 */
+	get home() {
 		const c = this.counts;
-		return [...c.check, ...c.ops].map((p) => ({
-			id: p.id,
-			label: FAIL_META[p.failKind!].label,
-			who: `${p.name} ${won(p.amount)}`,
-			why: p.failKind === 'check' ? `${p.fail!.why} · 지급대행에 확인하고 지급 완료 기록으로 남겨요` : `${p.fail!.why} · 조치한 뒤 다시 보내요`,
-			action: p.actions[0] as 'record' | 'resend'
-		}));
-	}
+		const o = OTHER_COUNTS;
+		const v = this.payouts.filter((x) => x.amount);
+		const paid = v.filter((x) => x.tabs.includes('paid'));
+		const total = v.reduce((a, x) => a + x.amount, 0);
+		const done = paid.reduce((a, x) => a + x.amount, 0);
+		const opsN = c.check.length + c.ops.length;
+		const plan = this.runPlan;
+		// 다음 실행에 보내야 할 금액(지급 가능 안에 든 것 + 모자라 넘어가는 것) — 잔액과 비교
+		const due = this.payoutsRaw.filter((p) => plan.send.includes(p.id) || plan.defer.includes(p.id)).reduce((a, p) => a + p.amount, 0);
+		const { available, pending } = this.provider;
+		const short = Math.max(0, due - available);
+		const payDay = NOW.beforeRun ? '오늘' : '다음 영업일';
+		const tx = this.taxesRaw;
+		const late = tx.filter((t) => t.status === 'none' || t.status === 'redo').length;
+		const chk = c.taxChk.length;
 
-	get taxCard() {
-		const chk = this.counts.taxChk;
+		const chip = (label: string, n: number, tone: HomeChip['tone'], href: string): HomeChip | null => (n ? { label, n, tone, href } : null);
+		const row = (key: string, name: string, icon: string, href: string, chips: (HomeChip | null)[]): HomeRow => {
+			const cs = chips.filter((x): x is HomeChip => !!x);
+			return { key, name, icon, href, chips: cs, tone: cs.some((x) => x.tone === 'red') ? 'red' : cs.some((x) => x.tone === 'orange') ? 'orange' : 'grey' };
+		};
+		const rows: HomeRow[] = [
+			row('products', '상품', 'm_products', '/products', [
+				chip('신규 심사', o.products.newReview, 'orange', '/products'),
+				chip('수정 심사', o.products.revReview, 'orange', '/products'),
+				chip('재고 0 · 판매 중', o.products.soldOutLive, 'orange', '/products')
+			]),
+			row('orders', '주문 · 배송', 'm_orders', '/orders', [
+				chip('발송 대기', o.orders.toShip, 'orange', '/orders'),
+				chip('배송 완료 기록 없음', o.orders.noDelivered, 'orange', '/orders')
+			]),
+			row('cs', 'CS', 'm_claims', '/cs', [
+				chip('환불 다시 필요', o.cs.refundRetry, 'red', '/cs'),
+				chip('회수 대기', o.cs.pickup, 'orange', '/cs'),
+				chip('재발송 대기', o.cs.resend, 'orange', '/cs')
+			]),
+			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', o.talk.waiting, 'orange', '/talk')]),
+			row('creators', '크리에이터', 'm_creators', '/creators', [
+				chip('사업자 · 정산 정보 확인 대기', c.settleWait, 'orange', '/creators?tab=wait'),
+				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=toss')
+			]),
+			row('settle', '정산', 'm_settle', '/settle', [
+				chip('제조금액 미입력', o.settle.noLedger, 'orange', '/settle'),
+				chip('보류된 정산', o.settle.heldLines, 'orange', '/settle')
+			]),
+			row('payouts', '지급', 'm_payouts', '/payouts', [
+				chip('운영 확인 필요', opsN, 'red', '/payouts?tab=fail'),
+				chip('계좌 확인 필요', c.account.length, 'orange', '/payouts?tab=fail&sub=account'),
+				chip('재시도 대기', c.retry, 'grey', '/payouts?tab=fail&sub=retry'),
+				chip('지급 보류', c.hold.length, 'grey', '/payouts?tab=hold')
+			]),
+			row('tax', '세금계산서', 'm_tax', '/tax', [
+				chip('기한 지남', late, 'red', tx.some((t) => t.status === 'none') ? '/tax?tab=none' : '/tax?tab=redo'),
+				chip('확인 대기', chk, 'orange', '/tax?tab=chk')
+			])
+		];
+		const hot = rows.reduce((a, r) => a + r.chips.filter((x) => x.tone === 'red').length, 0);
+
+		// 정산 일정 — 10월분 지급 흐름(지급 건이 있는 크리에이터 기준)
+		const conf = v.length;
+		const txs = tx.filter((t) => v.some((p) => p.creatorId === t.creatorId));
+		const sub = txs.filter((t) => t.status !== 'none').length;
+		const okN = txs.filter((t) => t.status === 'ok').length;
+		const heldN = o.settle.heldLines;
+		const exc = opsN + c.account.length + c.retry;
+		const pct = (a: number, b: number) => Math.round((a / (b || a || 1)) * 100);
+		const steps: HomeStep[] = [
+			{ no: '1', title: '정산 확정', when: '11월 1일 오후 1시 · 자동', val: String(conf), of: '건', pct: 100, desc: heldN ? `제조금액 미입력 ${heldN}개 상품은 다음 회차로` : '보류 없이 확정됐어요', tone: heldN ? 'orange' : 'plain', href: '/settle' },
+			{ no: '2', title: '세금계산서 제출', when: '11월 10일까지 · 크리에이터', val: String(sub), of: `/ ${conf}`, pct: pct(sub, conf), desc: late ? `기한 지남 ${late}명` : '모두 냈어요', tone: late ? 'red' : 'plain', href: tx.some((t) => t.status === 'none') ? '/tax?tab=none' : '/tax?tab=redo' },
+			{ no: '3', title: '수취 확인', when: '제출되는 대로 · 운영', val: String(okN), of: `/ ${conf}`, pct: pct(okN, conf), desc: chk ? `확인 대기 ${chk}건` : '확인할 게 없어요', tone: chk ? 'orange' : 'plain', href: '/tax?tab=chk' },
+			{ no: '4', title: '자동 이체', when: '영업일 오후 1시 · 자동', val: String(paid.length), of: `/ ${conf}`, pct: pct(paid.length, conf), desc: `${payDay} ${plan.send.length}건 예정 · 송금 중 ${c.sending} · 예외 ${exc}`, tone: exc ? 'red' : 'plain', href: exc ? '/payouts?tab=fail' : '/payouts?tab=ready' }
+		];
+
 		return {
-			n: chk.length,
-			oldest: chk.length ? `가장 오래 ${chk[0].waited} · ${chk[0].name}` : '확인할 세금계산서가 없어요',
-			when: chk.length ? `지금 확인하면 ${runDay()} 오후 1시 지급` : null
+			heroLabel: '10월분 · 아직 지급하지 않은 금액',
+			heroValue: won(total - done),
+			payHref: c.check.length + c.ops.length + c.account.length + c.retry ? '/payouts?tab=fail' : '/payouts?tab=hold',
+			heroStats: [
+				{ k: '지급 합계', v: won(total), warn: false },
+				{ k: '지급 완료', v: `${paid.length}/${conf}건`, warn: false },
+				{ k: '운영 확인 필요', v: `${opsN}건`, warn: opsN > 0 }
+			],
+			bal: won(available),
+			balNote: short ? `${won(short)} 모자라요` : '충분해요',
+			balShort: short > 0,
+			pend: pending ? won(pending) : null,
+			tax: { n: chk, when: chk ? `지금 확인하면 ${payDay} 오후 1시 지급` : null },
+			review: { n: o.products.newReview + o.products.revReview, sub: `신규 ${o.products.newReview} · 수정 ${o.products.revReview}` },
+			rows,
+			hot,
+			hotText: hot ? `급한 일 ${hot}가지` : '급한 일이 없어요',
+			steps,
+			stepsNote: '지급은 매월 1일 한 번이 아니라 세금계산서가 확인된 다음 자동 이체(영업일 오후 1시)에 건마다 나가요.'
 		};
 	}
 
-	get homeGroups(): HomeGroup[] {
-		const c = this.counts;
-		const o = OTHER_COUNTS;
-		const t = (label: string, n: number, tone: HomeTask['tone'], href: string, oldest: string | null = null, x: Partial<HomeTask> = {}): HomeTask | null =>
-			n ? { label, n, tone, href, oldest, ...x } : null;
-		const holdReasons = HOLD_ORDER
-			.map((k) => [k, c.hold.filter((p) => p.holdKinds.includes(k)).length] as const)
-			.filter(([, n]) => n)
-			.map(([k, n]) => `${HOLD_LABEL[k].replace(' 확인 전', '').replace('운영팀 확인 중', '운영 보류').replace('사업자 · 정산 정보', '사업자 정보')} ${n}`)
-			.join(' · ');
-		const groups: Omit<HomeGroup, 'hot'>[] = [
-			{
-				key: 'cs',
-				name: '문의 · 교환/환불',
-				icon: 'cs',
-				href: '/cs',
-				tasks: [
-					t('답변 없는 문의 24시간 넘음', o.cs.inqLate, 'red', '/cs', o.cs.inqLateOldest),
-					t('환불 다시 필요', o.cs.refundRetry, 'red', '/cs', o.cs.refundOldest, { hint: '카드사 환불 실패' }),
-					t('크리에이터 답변 기한 넘김', o.cs.creatorLate, 'red', '/cs', o.cs.creatorLateOldest),
-					t('회수 대기', o.cs.pickup, 'plain', '/cs'),
-					t('재발송 대기', o.cs.resend, 'plain', '/cs')
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'tax',
-				name: '세금계산서',
-				icon: 'doc',
-				href: '/tax',
-				tasks: [
-					t('발행 기한 지남', c.taxOverdue, 'red', '/tax?tab=none', '11월 10일까지'),
-					t('다시 제출 요청 뒤 아직 안 냄', c.taxRedo, 'orange', '/tax?tab=redo')
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'payouts',
-				name: '지급',
-				icon: 'wallet',
-				href: '/payouts',
-				tasks: [
-					t('계좌 확인 필요', c.account.length, 'red', '/payouts?tab=fail&sub=account', null, { hint: '크리에이터가 계좌를 다시 입력해야 보내요' }),
-					t('재시도 대기', c.retry, 'grey', '/payouts?tab=fail&sub=retry', null, { hint: '다음 자동 이체(영업일 오후 1시)에 다시 보내요' }),
-					t('지급 보류', c.hold.length, 'grey', '/payouts?tab=hold', null, { hint: holdReasons }),
-					t('송금 중', c.sending, 'grey', '/payouts?tab=sending', null, { hint: '은행 처리 중' })
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'creators',
-				name: '크리에이터',
-				icon: 'user',
-				href: '/creators',
-				tasks: [
-					t('사업자 · 정산 정보 확인 대기', c.settleWait, 'orange', '/creators?tab=wait', '3일째', {
-						hint: this.creatorsRaw.some((x) => x.settle === 'wait' && x.resubmitNote) ? '계좌 다시 입력 1명 · 확인하면 다음 자동 이체(영업일 오후 1시)에 다시 보내요' : undefined
-					}),
-					t('새 초대 요청', o.creators.inviteAsk, 'plain', '/creators', o.creators.inviteOldest)
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'orders',
-				name: '주문 · 배송',
-				icon: 'order',
-				href: '/orders',
-				tasks: [
-					t('발송 대기', o.orders.toShip, 'plain', '/orders', o.orders.toShipOldest),
-					t('배송 완료 기록 없는 출고', o.orders.noDelivered, 'orange', '/orders', o.orders.noDeliveredOldest, { hint: '정산 확정 3일 전부터 빨강' })
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'products',
-				name: '상품',
-				icon: 'box',
-				href: '/products',
-				tasks: [
-					t('신규 심사 대기', o.products.newReview, 'plain', '/products', o.products.newOldest, { pcOnly: true }),
-					t('수정 심사 대기', o.products.revReview, 'plain', '/products', o.products.revOldest, { pcOnly: true }),
-					t('재고 0 · 판매 중', o.products.soldOutLive, 'orange', '/products')
-				].filter((x): x is HomeTask => !!x)
-			},
-			{
-				key: 'settle',
-				name: '정산',
-				icon: 'chart',
-				href: '/settle',
-				tasks: [
-					t(`다음 정산 확정 D-${o.settle.dday}`, 1, 'plain', '/settle', null, { value: o.settle.nextAt.replace(' 오후 1시', '') }),
-					t('제조금액 미입력 판매 상품', o.settle.noLedger, 'orange', '/settle', null, { hint: '이대로면 다음 정산에서 보류돼요', pcOnly: true }),
-					t('보류된 정산', o.settle.heldLines, 'plain', '/settle')
-				].filter((x): x is HomeTask => !!x)
-			}
-		];
-		return groups
-			.map((g) => ({ ...g, hot: g.tasks.some((x) => x.tone === 'red') }))
-			.sort((a, b) => Number(b.hot) - Number(a.hot));
-	}
-
+	/** 급한 일 수 — 홈 "오늘 처리할 일"의 빨강 칩 수(모바일 머리와 같은 값) */
 	get hotCount() {
-		return this.homeGroups.reduce((a, g) => a + g.tasks.filter((x) => x.tone === 'red').length, 0) + this.blocked.length;
-	}
-
-	get flow(): FlowStep[] {
-		const v = this.payouts.filter((x) => x.amount);
-		const tx = this.taxesRaw;
-		const submitted = tx.filter((t) => t.status === 'chk' || t.status === 'ok').length;
-		const okN = tx.filter((t) => t.status === 'ok').length;
-		const chkN = tx.filter((t) => t.status === 'chk').length;
-		const m = this.monthSummary;
-		const o = OTHER_COUNTS.settle;
-		const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
-		return [
-			{ title: '정산 확정', when: '11월 1일 오후 1시 · 자동', value: String(this.payoutsRaw.length), of: '건', pct: null, desc: `지급 건 ${this.payoutsRaw.length} · 지급 없음 1 · 보류 상품 ${o.heldLines}`, tone: 'plain', href: '/settle' },
-			{ title: '세금계산서 제출', when: '11월 10일까지 · 크리에이터', value: String(submitted), of: ` / ${tx.length}`, pct: pct(submitted, tx.length), desc: `기한 지남 ${tx.filter((t) => t.overdue).length}명`, tone: 'red', href: '/tax?tab=none' },
-			{ title: '수취 확인', when: '제출되는 대로 · 운영', value: String(okN), of: ` / ${tx.length}`, pct: pct(okN, tx.length), desc: chkN ? `확인 대기 ${chkN}건 · 가장 오래 ${this.counts.taxChk[0]?.waited}` : '확인할 게 없어요', tone: chkN ? 'orange' : 'plain', href: '/tax' },
-			{ title: '자동 이체', when: '영업일 오후 1시 · 자동', value: String(m.paidN), of: ` / ${v.length}`, pct: pct(m.paidN, v.length), desc: `실패 ${m.failN} · 보류 ${m.holdN} · 송금 중 ${m.sendingN} · 대기 ${m.readyN}`, tone: m.failN ? 'red' : 'plain', href: '/payouts' },
-			{ title: '다음 정산 확정', when: o.nextAt, value: `D-${o.dday}`, of: '', pct: null, desc: '11월분 · 자동으로 확정돼요', tone: 'plain', href: '/settle' }
-		];
+		return this.home.hot;
 	}
 
 	// ───────── 동작(RPC 자리) — 결과 문구를 돌려준다 ─────────

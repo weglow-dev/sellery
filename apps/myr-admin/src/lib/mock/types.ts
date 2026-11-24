@@ -191,41 +191,33 @@ export interface NavBadge {
 	hot: boolean;
 }
 
-export interface HomeTask {
+/** 홈 "오늘 처리할 일" 칩 — 빨강(급함 · 급한 일 수에 들어감) · 주황 숫자(처리할 일) · 회색(기다리기만 하면 됨) */
+export interface HomeChip {
 	label: string;
 	n: number;
-	/** 가장 오래 기다린 시간 — "3일째" · "26시간" */
-	oldest: string | null;
-	tone: 'red' | 'orange' | 'grey' | 'plain';
+	tone: 'red' | 'orange' | 'grey';
 	href: string;
-	/** PC 에서만 되는 일 — 모바일은 건수만 + "PC에서 처리" */
-	pcOnly?: boolean;
-	hint?: string;
-	/** 건수 대신 보여 줄 값 — "12월 1일(화)" */
-	value?: string;
 }
 
-export interface HomeGroup {
+/** 홈 "오늘 처리할 일" 한 줄 = 메뉴 하나(시안 순서 고정 · 정렬하지 않는다) — 타일 색은 칩 중 가장 급한 색 */
+export interface HomeRow {
 	key: string;
 	name: string;
 	icon: string;
 	href: string;
-	tasks: HomeTask[];
-	/** 빨강 할 일이 있는 묶음을 위로 */
-	hot: boolean;
+	tone: 'red' | 'orange' | 'grey';
+	chips: HomeChip[];
 }
 
-export interface FlowStep {
+/** 홈 "정산 일정" 한 단계 — 큰 숫자 · 분모 · 진행 막대(%) · 아래 한 줄(색은 tone) */
+export interface HomeStep {
+	no: string;
 	title: string;
 	when: string;
-	/** 큰 숫자 — "14" · "D-14" */
-	value: string;
-	/** 분모 — "/ 16" (없으면 단위) */
+	val: string;
 	of: string;
-	/** 진행 막대 % — 막대가 없는 단계는 null */
-	pct: number | null;
-	/** 막대 아래 한 줄 — 색은 tone */
+	pct: number;
 	desc: string;
-	tone: Tone;
+	tone: 'red' | 'orange' | 'plain';
 	href: string;
 }
