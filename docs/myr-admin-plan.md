@@ -27,7 +27,7 @@
 | 2 | 교환 · 환불 운영(§8) | `myr-ops.mjs claims` · `collected` · `reship-claim` · `claim-refund` · 샵 `/api/ops/claims` | 회수 확인이 있어야 환불이 나간다 |
 | 2 | 판매 상태(§4-4) | `myr-products.mjs review <code> pause\|approve\|end` | 판매 상태는 운영만 바꾼다 |
 | 2 | 제조 원장(§10-1) | `myr-settle.mjs pending` · `mfg` · `mfg-add` · `mfg-deposit` · `mfg-fix` · `mfg-void` · `confirm-held` | 원장 없는 상품은 정산이 보류된다 — 매월 1일 전에 채워야 한다 |
-| 2 | 지급(§11) | `myr-settle.mjs to-pay` · `paid` · `unpaid` · `hold` · `release` | 운영이 이체하고 기록해야 크리에이터 화면에 "지급 완료"가 뜬다 · 터미널에 계좌 원문이 보인다 |
+| 2 | 지급(§11) | 자동 이체(0127 · 샵 크론) · `myr-settle.mjs retry` · `paid`(예외) · `unpaid` · `hold` · `release` | 평소 지급은 자동 이체라 운영 할 일이 없다 — 운영 조치 필요 · 결과 확인 필요 같은 예외만 토스 대시보드에서 확인하고 `retry`(다시 보내기) · `paid`(예외 기록)로 마무리 · 보류 · 해제 · 계좌 원문은 다루지 않는다(0127) |
 | 2 | 세금계산서 수취 확인(§12) | `myr-settle.mjs invoices` · `invoice-ok` · `invoice-return` | 확인해야 지급 가능이 된다(0104) · 터미널에 사업자등록번호 원문이 보인다 |
 | 3 | 월 정산(§10-2 · §10-3) | `myr-settle.mjs report` · `run`(크론 실패 때) | 매월 1일 13:00 크론이 계산 · 확정 |
 | 3 | 공구 링크(§9) | 없음 | 운영 확인 |
@@ -47,7 +47,7 @@
 | 교환 · 환불 단계별 | `myr_app_admin_claims`(0078) |
 | 정산 정보 확인 대기 | `myr_app_admin_settle_infos('pending')`(0085) |
 | 제조금액 미입력 판매 중 상품 · 보류된 정산 | `myr_mfg_pending` |
-| 지급 가능 N · 금액 합 | `myr_payout_to_pay`(0103 — 계좌 원문이 실리니 홈은 카운트 전용 RPC 를 새로) |
+| 지급 가능 N · 금액 합 | 보낼 지급 건 `myr_payout_send_list`(0127 · 요청 시간에만) — 홈은 카운트 전용 RPC 를 새로(`myr_payout_to_pay` 는 0127 에서 지웠다) |
 | 지급 보류 N(이유별) · 지급일 지난 지급 대기 | 지급 목록 읽기 RPC(새 · §11) |
 | 세금계산서 확인 대기 · 기한 지남 | `myr_tax_invoice_list(null, 'submitted')`(0104) · 기한 지남은 응답 `overdue` — 홈은 카운트 전용 RPC 를 새로(사업자등록번호 원문이 실린다) |
 
@@ -140,7 +140,8 @@
 
 | 화면 동작 | RPC |
 |---|---|
-| 지급 대기(자동 이체 대상) · 금액 | `myr_payout_payable` · `myr_payout_amount` · (스크립트) `myr_payout_to_pay` |
+| 지급 대기(자동 이체 대상) · 금액 | `myr_payout_payable` · `myr_payout_sendable` · `myr_payout_amount` · 크론 `myr_payout_send_list`(0127) |
+| 자동 이체(0127) | 시작 `myr_payout_send_begin`(가드 · 참조 번호 · 멱등 키) · 결과 `myr_payout_send_result` · 매시간 `myr_payout_check_list` · 다시 보내기 `myr_payout_send_retry`(`NOTE_REQUIRED` · `NOT_FAILED` · `ALREADY_PAID`) · 판정 `myr_payout_toss_outcome` · `myr_payout_toss_fail_kind` · `myr_payout_send_window` · `myr_payout_unknown` · `myr_payout_account_fixed` |
 | 상태 문구 · 보류 이유 | `myr_payout_status_label` · `myr_payout_hold_label` · `myr_payout_auto_state` |
 | 보류 이유 전부(운영 보류 맨 앞) | `myr_payout_hold_reasons`(자동 이유 목록 · 첫 번째가 `myr_payout_hold_reason`) · `myr_payout_holds_json`(`[{code, label}]` — `myr_settlement_report` · 크리에이터 정산 탭 응답 `holds`) (0104) |
 | 지급 완료 기록 | `myr_payout_mark_paid(month, handle, amount, paid_on, note, actor)` — 거절 `NOT_FOUND` · `ALREADY_PAID`(paid_on) · `NOT_PAYABLE`(status · hold_label) · `AMOUNT_MISMATCH`(amount) · `BAD_DATE` · `FUTURE_DATE` · `BEFORE_RUN`(run_on) |
@@ -150,14 +151,14 @@
 
 | 새로 만들 것 | 이유 |
 |---|---|
-| 화면용 지급 목록 읽기 RPC(가린 계좌 · 탭 카운트 · 크리에이터 필터 · 줄마다 `holds` = `myr_payout_holds_json`) | `myr_payout_to_pay` 는 계좌 원문을 돌려준다(스크립트용) · 보류 이유가 여러 개일 수 있다 |
-| 계좌 원문 열람 RPC(열람 기록) · 이체용 내려받기(열람 기록) | 원문은 `sellers.bank_info` 에만 |
+| 화면용 지급 목록 읽기 RPC(가린 계좌 · 탭 카운트 · 크리에이터 필터 · 줄마다 `holds` = `myr_payout_holds_json`) | `myr_payout_to_pay`(0127 에서 지움)는 계좌 원문을 돌려줬다(스크립트용) · 보류 이유가 여러 개일 수 있다 |
+| 계좌 원문 열람 RPC(열람 기록) | 원문은 `sellers.bank_info` 에만 · 이체용 내려받기는 없다(0127 — 수동 이체 없음) |
 | 일괄 지급 완료 RPC(같은 이체일 · 줄별 결과 · 일부 실패해도 나머지 기록) | 여러 줄 선택 기록 |
 | 지급 건 상세 읽기 RPC(담긴 줄 · 이력) | 지급 건 상세 |
 | 홈 카운트 RPC(지급 가능 · 보류 이유별 · 지급일 지난 지급 대기) | 홈 카드 |
 | 월/핸들 대신 id 로 부르는 래퍼(지금 RPC 는 정산월 · 핸들) | 화면은 지급 건 id 를 가진다 |
 
-- 없어지는 것: `myr-settle.mjs` 의 `to-pay` · `paid` · `unpaid` · `hold` · `release`(`report` 는 회차 상세로) — 세금계산서 명령은 §10.
+- 없어지는 것: `myr-settle.mjs` 의 `retry` · `paid` · `unpaid` · `hold` · `release`(`to-pay` 는 0127 에서 이미 지웠다)(`report` 는 회차 상세로) — 세금계산서 명령은 §10.
 
 ## 10. 세금계산서(screens §12) — 작업 순서 7-4 · 0104
 

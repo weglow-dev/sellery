@@ -208,7 +208,7 @@ update public.sellers set toss_seller_id = 'seller_k6', toss_seller_status = 'AP
 update public.sellers set toss_seller_status = 'PARTIALLY_APPROVED' where id = '00000000-0000-4000-8000-0000000f2406';
 select is((pg_temp.k6()).myr_settle_status, 'toss', '인증을 마쳐도 토스가 거절한 정보가 남았으면 토스 인증 대기 그대로');
 
--- ---------- 2026-11-20: 0124 전에 확인 완료된 크리에이터(토스 미등록 · 수동 지급) — 재확인 칸이 그대로면 확인 완료 그대로 · 토스 등록은 한다 ----------
+-- ---------- 2026-11-20: 0124 전에 확인 완료된 크리에이터(토스 미등록) — 재확인 칸이 그대로면 확인 완료 그대로 · 토스 등록은 한다 · 0127 부터 지급은 토스만이라 토스 본인인증 전 보류 ----------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-0000000f24c7', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-tl7@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
 insert into public.sellers (id, name, handle, platform, active, user_id, biz_no, tax_info, bank_info, settle_type, settle_phone, myr_toss_agreed_at, myr_settle_status, myr_settle_submitted_at, myr_settle_checked_at)
@@ -220,13 +220,13 @@ create function pg_temp.save7(company text, acct text, phone text) returns jsonb
 create function pg_temp.st7() returns jsonb language sql as
   $$ select jsonb_build_object('status', (pg_temp.k7()).myr_settle_status, 'hold', to_jsonb(public.myr_seller_hold_reasons('00000000-0000-4000-8000-0000000f2407'))) $$;
 select is(pg_temp.save7('칠랩', null, '01077770000'), '{"recheck": false, "toss_action": "register", "toss_todo": null}'::jsonb, 'K7 그대로 저장 — 토스 등록은 한다');
-select is(pg_temp.st7(), '{"status": "verified", "hold": []}'::jsonb, '그대로 저장 — 확인 완료 그대로 · 지급 보류 없음');
+select is(pg_temp.st7(), '{"status": "verified", "hold": ["toss_auth"]}'::jsonb, '그대로 저장 — 확인 완료 그대로 · 토스 본인인증 전 보류만(0127 토스 지급만)');
 select is(pg_temp.save7('칠랩 스튜디오', null, '01077770000') ->> 'toss_action', 'register', '상호만 변경 — 토스 등록');
-select is(pg_temp.st7(), '{"status": "verified", "hold": []}'::jsonb, '상호만 변경 — 확인 완료 그대로(0122 와 같다)');
+select is(pg_temp.st7(), '{"status": "verified", "hold": ["toss_auth"]}'::jsonb, '상호만 변경 — 확인 완료 그대로(0122 와 같다) · 토스 본인인증 전 보류');
 select is(pg_temp.save7('칠랩 스튜디오', null, '01077771111') ->> 'toss_action', 'register', '휴대폰만 변경 — 토스 등록(새 번호)');
-select is(pg_temp.st7(), '{"status": "verified", "hold": []}'::jsonb, '휴대폰만 변경 — 확인 완료 그대로');
+select is(pg_temp.st7(), '{"status": "verified", "hold": ["toss_auth"]}'::jsonb, '휴대폰만 변경 — 확인 완료 그대로 · 토스 본인인증 전 보류');
 select is(pg_temp.save7('칠랩 스튜디오', '110777000002', '01077771111') ->> 'recheck', 'false', '계좌 변경 — 본인인증 전이라 운영 확인은 없다');
-select is(pg_temp.st7(), '{"status": "toss", "hold": ["settle_info"]}'::jsonb, '계좌 변경(0085 재확인 칸) — 토스 인증 대기 · 지급 보류');
+select is(pg_temp.st7(), '{"status": "toss", "hold": ["settle_info", "toss_auth"]}'::jsonb, '계좌 변경(0085 재확인 칸) — 토스 인증 대기 · 지급 보류(사업자 정보 · 토스 본인인증)');
 
 -- ---------- 2026-11-20: 결과 불명 등록 뒤 5분 동안은 다시 등록을 막는다(주인 없는 셀러 방지) ----------
 update public.sellers set myr_settle_status = 'toss', toss_seller_id = null, toss_seller_status = null, toss_seller_error = null, myr_toss_ref = null, myr_toss_ref_at = null, myr_toss_todo = null where id = '00000000-0000-4000-8000-0000000f2407';

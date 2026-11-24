@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(278);
+select plan(285);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -364,7 +364,7 @@ insert into _rules (label, pat, allowed) values
   ('결제된 줄(paid_at · 결제 상태 · 취소 아님) — 실적 · 정산 · 미리보기', $p$\mpaid_at\s+is\s+not\s+null$p$, '{myr_line_paid}'),
   ('배송 작업 대상 줄(열린 주문 + 살아 있는 줄) — 발주 · 송장 · 배송 완료 · 동기화 · 발송 대기', $p$myr_order_status_open\([^)]*\)\s+(and|or)\s+(not\s+)?public\.myr_line_live|myr_line_live\(\w+\)\s+(and|or)\s+(not\s+)?public\.myr_order_status_open$p$, '{myr_line_ship_work}'),
   ('크리에이터에게 보이는 이체 실패 종류(운영 쪽은 ops 로)', $p$'ops'\s*,\s*'check'$p$,                   '{myr_payout_fail_kind}'),
-  ('송금 중인지(이체 상태 sending)',            $p$transfer_state\s*=\s*'sending'$p$,                           '{myr_payout_sending}'),
+  ('송금 중인지(이체 상태 sending)',            $p$transfer_state\s*=\s*'sending'$p$,                           '{myr_payout_sending,myr_payout_send_begin,myr_payout_send_result}'),
   ('마지막 정산 회차 다음 달',                  $p$max\(\w+\.month\)\s*\+\s*interval$p$,                      '{myr_settlement_after_last}'),
   ('정산할 달 — KST 지난달(이번 달 − 1달)',    $p$-\s*interval\s*'1 month'$p$,                                  '{myr_settlement_due}'),
   ('결제 금액(상품 합계 + 배송비 · 배송비 + 상품 합계 모양도) — 결제 · 주문 표 amount 생성 칸과 같은 식', $p$items_amount\s*\+\s*[\w.]*shipping_fee|v_items\w*\s*\+\s*v_fee|shipping_fee\s*\+\s*[\w.]*items_amount|v_fee\s*\+\s*v_items$p$, '{myr_pay_amount}'),
@@ -447,7 +447,15 @@ insert into _rules (label, pat, allowed) values
   ('첫 영업일 찾기',                             $p$myr_is_business_day\(\w+::date\)$p$,                               '{myr_business_day_from}'),
   ('다음 지급 시각(영업일 오후 1시)',            $p$myr_business_day_from\(public\.myr_kst_date$p$,                   '{myr_payout_next_run}'),
   ('지금 보낼 지급 건(지급 가능 · 송금 중 아님 · 계좌 · 운영 실패 아님)', $p$'account'\s*,\s*'ops'$p$,                   '{myr_payout_sendable}'),
-  ('그날 요청한 지급 건(시도한 날 · 실패 확정 아님)', $p$myr_kst_date\(\w+\.transfer_at\)|transfer_fail\s*=\s*'check'$p$, '{myr_payout_requested_on}'),
+  ('그날 요청한 지급 건(시도한 날 · 실패 확정 아님)', $p$myr_kst_date\(\w+\.transfer_at\)$p$,                    '{myr_payout_requested_on}'),
+  -- 0127 토스 지급대행 자동 이체
+  ('지급 결과 모름(실패 종류 check)',           $p$transfer_fail\s*=\s*'check'$p$,                                    '{myr_payout_unknown}'),
+  ('토스 지급 상태 → 결과(완료 · 송금 중 · 실패)', $p$'IN_PROGRESS'$p$,                                                 '{myr_payout_toss_outcome}'),
+  ('토스 오류 코드 → 실패 종류',               $p$'(EXCEEDED_PAYOUT_BALANCE_AMOUNT|INVALID_ACCOUNT_INFO|FORBIDDEN_SELLER_PAYOUT|COMMON_ERROR)'$p$, '{myr_payout_toss_fail_kind}'),
+  ('토스 바로지급 요청 시간(영업일 08~15시)',   $p$time\s+'(08|15):00'$p$,                                           '{myr_payout_send_window}'),
+  ('토스로 지급 가능에 셀러 있음 포함(셀러 id 가 없으면 보류 · 크론도 같은 판정)', $p$'corporate'\)\s+and\s+public\.myr_toss_registered\($p$, '{myr_toss_ready}'),
+  ('토스 지급 멱등 키',                         $p$'myr-po-'$p$,                                                     '{myr_payout_idem_key}'),
+  ('지급 완료 적기(지급 건 상태 paid)',          $p$set\s+status\s*=\s*'paid'$p$,                                  '{myr_payout_record_paid}'),
   ('계좌번호 형식(숫자 8~14자리 · 토스 최대 14)', $p$\\d\{8,1[46]\}$p$,                                              '{myr_account_ok}'),
   -- 상태 비교는 정규형으로만(status = 'X' · <> · in (…) · 값이 빌 수 있으면 coalesce(status = 'X', false)) — 판정별 규칙이 정규형으로 적혀 있으므로
   --   다른 모양(순서 바꾸기 · != · any(array) · is distinct from · 형 변환 · 값 하나짜리 in)은 금지해 빠져나가지 못하게 한다. 변수(v_status · p_ship_status)도 같다.

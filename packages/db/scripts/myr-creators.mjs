@@ -199,7 +199,7 @@ async function cmdSettleInfo() {
     if (r.toss_todo) console.log(`  토스 반영: 확인 완료 때 ${TODO_LABEL[r.toss_todo] ?? r.toss_todo}`);
     // 0124 myr_toss_reauth_pending — 사업자번호 · 대표자 변경(법인 제외): 확인하면 토스 인증 대기가 되고 크리에이터가 새로 본인인증해야 확인 완료
     if (r.reauth) console.log("  ⚠ 재인증 필요 — 확인하면 토스에 다시 등록되고, 크리에이터가 대표자 휴대폰으로 본인인증을 마쳐야 확인 완료(그때까지 토스 인증 대기 · 지급 보류)");
-    if (r.status === "toss") console.log("  토스 인증 대기 — 본인인증을 마치면 자동으로 확인 완료(0124). 시범운영(테스트 키 · 개인사업자 문자 없음)에서 수동 지급하려면 아래 확인 완료로 직접 확인");
+    if (r.status === "toss") console.log("  토스 인증 대기 — 본인인증을 마치면 자동으로 확인 완료(0124). 시범운영(테스트 키 · 개인사업자 문자 없음)에서는 아래 확인 완료로 직접 확인할 수 있지만, 지급은 토스 본인인증이 끝나야 나간다(0127 · 보류 이유 토스 본인인증 전)");
     if ((r.status === "pending" || r.status === "toss") && r.submitted_at) {
       console.log(`  확인 완료:   node packages/db/scripts/myr-creators.mjs settle-verify ${r.handle} --at ${r.submitted_at}`);
       console.log(`  다시 입력:   node packages/db/scripts/myr-creators.mjs settle-reject ${r.handle} "사유" --at ${r.submitted_at}`);
@@ -230,7 +230,7 @@ async function settleCheck(decision) {
   if (error) fail(error.message);
   // 0124 — 토스에 반영할 할 일이 남았으면 콘솔 운영 API 가 토스에 반영한 뒤 확인한다(토스 키는 콘솔에만 있다)
   const data = decision === "verify" && first?.code === "TOSS_PENDING" ? await verifyViaConsole(seller.handle, at) : first;
-  // 0124(2026-11-20) — 토스가 크리에이터 정보를 거절한 상태면 확인 완료가 아니다(수동 지급이면 틀린 계좌로 이체하게 된다)
+  // 0124(2026-11-20) — 토스가 크리에이터 정보를 거절한 상태면 확인 완료가 아니다(틀린 계좌 · 사업자 정보로 지급하게 된다)
   if (data?.code === "TOSS_REJECTED") fail(`토스페이먼츠가 크리에이터 정보를 거절한 상태예요(${data.toss_error ?? "?"}) — 확인 완료할 수 없어요. settle-reject 로 다시 입력을 요청하세요`);
   if (data?.code === "STALE") fail(`그사이 크리에이터가 정보를 다시 저장했어요(지금 제출 ${data.submitted_at ?? "—"}) — settle-info 로 새 값을 보고 다시 확인하세요`);
   if (!data?.ok) fail(`거부: ${data?.code}${data?.status ? ` (지금 ${data.status})` : ""}`);

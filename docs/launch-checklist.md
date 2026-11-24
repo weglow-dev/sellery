@@ -88,6 +88,10 @@
 - [ ] **2단계 인증(대표 계정)**: Supabase · Vercel(`weglow-team`) · GitHub(`weglow-dev` 조직 2FA 강제) · 토스 개발자센터 · 카카오 개발자 · Resend · 호스팅케이알(DNS). 저장소로 확인 불가 — **확인 필요(대표)**.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` 를 가진 PC 목록 정리(운영 스크립트 실행자 = 실 DB 쓰기 권한). 퇴사·기기 교체 시 회전.
 - [ ] **MYR 크리에이터 콘솔 테스트 계정 정리(MYR 실판매 전)** — 운영 DB 에 시드 크리에이터 4명(`@minji.routine` · `@haru.well` · `@jun.fit` · `@soy.clean`)의 로그인 계정 `*@myr.test` 를 2026-11-04 에 만들었고, **비밀번호가 로컬 테스트용과 같아 저장소 문서로 알 수 있다**. 콘솔은 공개 주소라 이 계정으로 상품 · 주문 · 교환/환불(승인 · 환불 실행)을 건드릴 수 있으니, 시드 상품을 내리거나 실제 크리에이터로 바꿀 때 `myr-creators.mjs unlink` + Supabase → Authentication → Users 에서 `*@myr.test` 삭제(또는 `account … --password <새 값>` 으로 교체). 알림 메일은 `@myr.test` 가 예약 도메인이라 나가지 않는다(`@sellery/myr-core/mail/resend` isReservedAddress).
+- [ ] **MYR 지급대행 자동 이체(0127 · MYR 실판매 전)** — 시범운영은 의사 CRM 상점 `peerkeamf5` 의 **테스트 키**로 자동 이체가 돈 없이 돈다. 실판매 전에:
+    ① MYR 자기 지급대행 상점 계약 · 라이브 키(`TOSS_PAYOUT_SECRET_KEY` · `TOSS_PAYOUT_SECURITY_KEY` — `myr-shop` · `myr-influencer` · 운영 콘솔) — `peerkeamf5` 는 라이브로 쓰지 않는다(대표 허락은 테스트용만) ·
+    ② 라이브 상점 웹훅 등록(`https://myr-shop.vercel.app/api/payouts/webhook` · `seller.changed` · `payout.changed`) · ③ 크리에이터 토스 셀러 다시 등록(테스트 상점 셀러 id 는 라이브에 없다) ·
+    ④ 시범운영 중 테스트 키로 "지급 완료"가 된 지급 건 · 기록(`myr_payouts.paid_by = 'toss'` · `myr_payout_logs`) 정리 — 실제 입금은 없었다 · ⑤ 운영자 본인 소액 지급 리허설(docs/myr.md 7-7 9번 · 실패 코드 실측).
 
 ---
 
