@@ -43,6 +43,8 @@
 --                                                실제로 나갔으면 다시 보내지 말고 myr_payout_mark_paid(예외 기록)로 마무리한다(두 번 나간다)
 --   계좌 실패 자동 재시도: myr_payout_account_fixed(p, s) — 계좌 문제로 실패한 뒤 사업자 · 정산 정보가 다시 확인됐다(확인 시각 > 마지막 시도) →
 --     myr_payout_refresh(0102 정의 · 트리거 sellers_myr_payout_refresh 가 부른다)가 실패 종류를 retry 로 — 다음 자동 이체에 다시 보낸다
+--   지급 완료 취소(0103 myr_payout_unmark_paid) — 토스가 완료로 알려 준 건(myr_payout_paid_by_toss · paid_by 'toss')은 거절 PAID_BY_TOSS(리뷰 2026-11-24):
+--     취소하면 자동 상태(지급 대기)로 돌아가 이체 상태도 비어 있어 다음 13:05 에 새 참조 번호로 다시 나간다 — 두 번 지급. 운영 예외 기록(paid)으로 적은 건은 그대로 취소할 수 있다
 --   지움: myr_payout_to_pay(month)(수동 이체 목록 · 계좌 원문) — myr-settle.mjs to-pay 도 지운다
 --   테스트: supabase/tests/myr_payout_toss_auto.test.sql
 -- ============================================================
@@ -220,6 +222,47 @@ end;
 $$;
 revoke all on function public.myr_payout_mark_paid(date, text, integer, date, text, text, timestamptz) from public, anon, authenticated;
 grant execute on function public.myr_payout_mark_paid(date, text, integer, date, text, text, timestamptz) to service_role;
+
+-- ---------- 지급 완료 취소 — 토스가 완료한 건은 막는다 ----------
+create or replace function public.myr_payout_paid_by_toss(p public.myr_payouts)
+returns boolean
+language sql
+immutable
+as $$
+  select coalesce(public.myr_payout_is_paid(p) and p.paid_by = 'toss', false)
+$$;
+revoke all on function public.myr_payout_paid_by_toss(public.myr_payouts) from public, anon, authenticated;
+
+-- 0103 정의 + PAID_BY_TOSS
+create or replace function public.myr_payout_unmark_paid(p_month date, p_handle text, p_reason text, p_actor text)
+returns jsonb
+language plpgsql
+volatile
+security definer set search_path = public
+as $$
+declare
+  v        public.myr_payouts%rowtype;
+  v_reason text := btrim(coalesce(p_reason, ''));
+begin
+  v := public.myr_payout_find(p_month, p_handle);
+  if v.id is null then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
+  if v_reason = '' then return jsonb_build_object('ok', false, 'code', 'REASON_REQUIRED'); end if;
+  select * into v from public.myr_payouts where id = v.id for update;
+  if not public.myr_payout_is_paid(v) then return jsonb_build_object('ok', false, 'code', 'NOT_PAID'); end if;
+  -- 토스가 완료로 알려 준 건은 실제로 돈이 나갔다 — 취소하면 다음 자동 이체에 다시 나간다(두 번 지급)
+  if public.myr_payout_paid_by_toss(v) then return jsonb_build_object('ok', false, 'code', 'PAID_BY_TOSS', 'paid_on', v.paid_on); end if;
+  insert into public.myr_payout_logs (payout_id, action, amount, paid_on, bank, note, actor)
+  values (v.id, 'unpaid', v.paid_amount, v.paid_on, v.paid_bank, v_reason, coalesce(p_actor, 'script'));
+  -- 지급 완료를 지우고 자동 상태로(사업자 정보 확인 전이면 지급 보류)
+  update public.myr_payouts p
+     set (status, hold_reason) = (select a.status, a.hold_reason from public.myr_payout_auto_state(v) a),
+         paid_at = null, paid_on = null, paid_amount = null, paid_bank = null, paid_note = null, paid_by = null, updated_at = now()
+   where p.id = v.id returning * into v;
+  return jsonb_build_object('ok', true, 'status', v.status, 'hold_reason', v.hold_reason);
+end;
+$$;
+revoke all on function public.myr_payout_unmark_paid(date, text, text, text) from public, anon, authenticated;
+grant execute on function public.myr_payout_unmark_paid(date, text, text, text) to service_role;
 
 -- ---------- 실패 다시 보내기 ----------
 create or replace function public.myr_payout_account_fixed(p public.myr_payouts, s public.sellers)

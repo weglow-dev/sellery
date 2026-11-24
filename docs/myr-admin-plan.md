@@ -145,7 +145,7 @@
 | 상태 문구 · 보류 이유 | `myr_payout_status_label` · `myr_payout_hold_label` · `myr_payout_auto_state` |
 | 보류 이유 전부(운영 보류 맨 앞) | `myr_payout_hold_reasons`(자동 이유 목록 · 첫 번째가 `myr_payout_hold_reason`) · `myr_payout_holds_json`(`[{code, label}]` — `myr_settlement_report` · 크리에이터 정산 탭 응답 `holds`) (0104) |
 | 지급 완료 기록 | `myr_payout_mark_paid(month, handle, amount, paid_on, note, actor)` — 거절 `NOT_FOUND` · `ALREADY_PAID`(paid_on) · `NOT_PAYABLE`(status · hold_label) · `AMOUNT_MISMATCH`(amount) · `BAD_DATE` · `FUTURE_DATE` · `BEFORE_RUN`(run_on) |
-| 지급 완료 취소 | `myr_payout_unmark_paid` — `REASON_REQUIRED` · `NOT_PAID` |
+| 지급 완료 취소 | `myr_payout_unmark_paid` — `REASON_REQUIRED` · `NOT_PAID` · `PAID_BY_TOSS`(토스가 완료한 건 — 취소하면 다음 자동 이체에 다시 나가 두 번 지급 · 0127 · 운영 예외 기록만 취소할 수 있다) |
 | 운영 보류 · 해제 | `myr_payout_hold` · `myr_payout_release` — `NOTE_REQUIRED` · `ALREADY_PAID` · `ALREADY_HELD` · `NOTHING_TO_PAY` · `NOT_MANUAL` |
 | 지급 때 계좌 · 이력 | `paid_bank`(가린 값 · `myr_payout_bank_snapshot`) · `myr_payout_logs` |
 

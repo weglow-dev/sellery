@@ -3,7 +3,7 @@
 --   계좌 실패 자동 재시도 · 운영 다시 보내기 · 운영 예외 기록이 이체 상태를 비운다 · 수동 이체 목록 지움.
 -- 2039년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(63);
+select plan(68);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_payout_send_list', '{"timestamp with time zone"}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 send_list 불가');
@@ -108,6 +108,9 @@ select is((select jsonb_build_array(status, paid_on, paid_by, transfer_state, to
           '지급 완료 · 이체한 날 · 처리 = toss · 이체 상태 비움');
 select is((select jsonb_agg(action order by created_at, action desc) from public.myr_payout_logs where payout_id = (pg_temp.po('@pgtap.au1')).id), '["toss_request", "paid"]'::jsonb, '기록 — 토스 요청 · 지급 완료');
 select is(public.myr_payout_send_result((select b ->> 'ref' from _b1), 'COMPLETED', 'tp_au1', null, null) - array['paid_on'], '{"ok": true, "result": "paid", "already": true}'::jsonb, '웹훅이 다시 와도 한 번만(이미 지급 완료)');
+-- 리뷰(2026-11-24): 토스가 완료한 건을 취소하면 다음 13:05 에 다시 나간다(두 번 지급) — 거절
+select is(public.myr_payout_unmark_paid('2039-01-01', '@pgtap.au1', '잘못 기록', null) - 'paid_on', '{"ok": false, "code": "PAID_BY_TOSS"}'::jsonb, '토스가 완료한 지급 건은 취소할 수 없다(PAID_BY_TOSS)');
+select is(array[(pg_temp.po('@pgtap.au1')).status, public.myr_payout_paid_by_toss(pg_temp.po('@pgtap.au1'))::text], array['paid', 'true'], '그대로 지급 완료 · 토스 완료');
 
 -- ---------- A3: 계좌 오류 → 사업자 정보 다시 확인 → 재시도 ----------
 create temp table _b3 as select public.myr_payout_send_begin((pg_temp.po('@pgtap.au3')).id, 10000000, '2039-02-03 13:05+09') as b;
@@ -139,6 +142,10 @@ select is(public.myr_payout_send_retry('2039-01-01', '@pgtap.au1', '확인', nul
 select is(public.myr_payout_mark_paid('2039-01-01', '@pgtap.au3', public.myr_payout_amount(pg_temp.po('@pgtap.au3')), '2039-02-08', '토스 대시보드 확인', 'admin:test', '2039-02-09 10:00+09') ->> 'ok', 'true',
           '결과 확인 필요 → 운영 예외 기록');
 select is(pg_temp.st('@pgtap.au3'), '{"status": "paid", "state": null, "fail": null, "tries": 3}'::jsonb, '예외 기록 — 지급 완료 · 이체 상태 비움');
+-- 운영 예외 기록(paid)으로 적은 건은 취소할 수 있다 — 잘못 적었으면 다시 보내는 게 맞다
+select is(public.myr_payout_paid_by_toss(pg_temp.po('@pgtap.au3')), false, '운영 예외 기록은 토스 완료가 아니다');
+select is(public.myr_payout_unmark_paid('2039-01-01', '@pgtap.au3', '토스 대시보드 재확인 — 안 나갔다', null) ->> 'ok', 'true', '운영 예외 기록은 취소할 수 있다');
+select is(pg_temp.list('2039-02-10 13:05+09'), '["@pgtap.au3"]'::jsonb, '취소한 예외 기록 건은 다음 자동 이체에 다시(새 시도)');
 
 -- ---------- 거절 코드 · 갈래(리뷰 2026-11-24 — 백엔드 원칙 7) ----------
 select is(public.myr_payout_send_begin('00000000-0000-4000-8000-0000000000ff', 10000000, '2039-02-03 13:05+09') ->> 'code', 'NOT_FOUND', '송금 시작 — 없는 지급 건 NOT_FOUND');

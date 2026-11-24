@@ -1,7 +1,7 @@
 -- pgTAP — 0099 판정 하나에 함수 하나(백엔드 원칙 1 · 2):
 --   1) 새 판정 함수의 권한 · 값   2) 화면이 다시 계산하지 않게 응답에 더한 값   3) "식이 지정한 함수 밖에 없다" 검사(맨 아래 — 새 함수가 같은 식을 다시 쓰면 여기서 실패한다)
 begin;
-select plan(285);
+select plan(286);
 
 -- ---------- 1. 권한 ----------
 select function_privs_are('public', 'myr_product_visible', '{myr_products,sellers}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 product_visible 불가');
@@ -455,6 +455,7 @@ insert into _rules (label, pat, allowed) values
   ('토스 바로지급 요청 시간(영업일 08~15시)',   $p$time\s+'(08|15):00'$p$,                                           '{myr_payout_send_window}'),
   ('토스로 지급 가능에 셀러 있음 포함(셀러 id 가 없으면 보류 · 크론도 같은 판정)', $p$'corporate'\)\s+and\s+public\.myr_toss_registered\($p$, '{myr_toss_ready}'),
   ('토스 지급 멱등 키',                         $p$'myr-po-'$p$,                                                     '{myr_payout_idem_key}'),
+  ('토스가 완료한 지급 건(paid_by toss — 취소하면 두 번 지급)', $p$paid_by\s*=\s*'toss'$p$,                              '{myr_payout_paid_by_toss}'),
   ('지급 완료 적기(지급 건 상태 paid)',          $p$set\s+status\s*=\s*'paid'$p$,                                  '{myr_payout_record_paid}'),
   ('계좌번호 형식(숫자 8~14자리 · 토스 최대 14)', $p$\\d\{8,1[46]\}$p$,                                              '{myr_account_ok}'),
   -- 상태 비교는 정규형으로만(status = 'X' · <> · in (…) · 값이 빌 수 있으면 coalesce(status = 'X', false)) — 판정별 규칙이 정규형으로 적혀 있으므로
