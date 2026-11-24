@@ -17,6 +17,8 @@ values ('00000000-0000-4000-8000-0000000e70c1', '00000000-0000-0000-0000-0000000
 insert into public.sellers (id, name, handle, platform, active, user_id, myr_settle_status, bank_info)
 values ('00000000-0000-4000-8000-0000000e7001', '지급 1', '@pgtap.pt1', 'instagram', true, '00000000-0000-4000-8000-0000000e70c1', 'verified', '{"bank": "국민", "account": "12345678", "holder": "지급 1"}'),
        ('00000000-0000-4000-8000-0000000e7002', '지급 2', '@pgtap.pt2', 'instagram', true, null, 'pending', '{"bank": "신한", "account": "99990000", "holder": "지급 2"}');
+-- 0127: 지급은 토스 지급대행만 — 이 파일은 사업자 정보 · 세금계산서 보류를 보므로 크리에이터를 토스 인증 완료(지급 가능)로 둔다(토스 보류는 myr_payout_toss_rules.test.sql)
+update public.sellers set biz_no = coalesce(biz_no, '1248100998'), toss_seller_id = 'pgtap' || right(replace(id::text, '-', ''), 12), toss_seller_status = 'PARTIALLY_APPROVED' where handle like '@pgtap.pt%';
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
 values ('00000000-0000-4000-8000-0000000e7a01', 'pgtap-pt-1', '00000000-0000-4000-8000-0000000e7001', 'diet', 'Q1', 10000, 1000, 'listed', 'grape'),
        ('00000000-0000-4000-8000-0000000e7a02', 'pgtap-pt-2', '00000000-0000-4000-8000-0000000e7002', 'diet', 'Q2', 10000, 1000, 'listed', 'lemon');

@@ -5,9 +5,9 @@ begin;
 select plan(45);
 
 -- ---------- 권한 ----------
-select function_privs_are('public', 'myr_payout_to_pay', '{date}'::text[], 'anon', '{}'::text[], 'anon 은 payout_to_pay 불가');
-select function_privs_are('public', 'myr_payout_to_pay', '{date}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 payout_to_pay 불가');
-select function_privs_are('public', 'myr_payout_to_pay', '{date}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 payout_to_pay 가능');
+select function_privs_are('public', 'myr_payout_send_list', '{"timestamp with time zone"}'::text[], 'anon', '{}'::text[], 'anon 은 payout_send_list 불가');
+select function_privs_are('public', 'myr_payout_send_list', '{"timestamp with time zone"}'::text[], 'authenticated', '{}'::text[], 'authenticated 도 payout_send_list 불가');
+select function_privs_are('public', 'myr_payout_send_list', '{"timestamp with time zone"}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 payout_send_list 가능');
 select function_privs_are('public', 'myr_payout_mark_paid', '{date,text,integer,date,text,text,"timestamp with time zone"}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 mark_paid 불가');
 select function_privs_are('public', 'myr_payout_mark_paid', '{date,text,integer,date,text,text,"timestamp with time zone"}'::text[], 'service_role', '{EXECUTE}'::text[], 'service_role 은 mark_paid 가능');
 select function_privs_are('public', 'myr_payout_unmark_paid', '{date,text,text,text}'::text[], 'anon', '{}'::text[], 'anon 은 unmark_paid 불가');
@@ -23,6 +23,8 @@ values ('00000000-0000-4000-8000-0000000d70c1', '00000000-0000-0000-0000-0000000
 insert into public.sellers (id, name, handle, platform, active, user_id, myr_settle_status, bank_info)
 values ('00000000-0000-4000-8000-0000000d7001', '지급 1', '@pgtap.pp1', 'instagram', true, '00000000-0000-4000-8000-0000000d70c1', 'verified', '{"bank": "국민", "account": "12345678", "holder": "지급 1"}'),
        ('00000000-0000-4000-8000-0000000d7002', '지급 2', '@pgtap.pp2', 'instagram', true, null, 'pending', '{"bank": "신한", "account": "99990000", "holder": "지급 2"}');
+-- 0127: 지급은 토스 지급대행만 — 이 파일은 사업자 정보 · 세금계산서 보류를 보므로 크리에이터를 토스 인증 완료(지급 가능)로 둔다(토스 보류는 myr_payout_toss_rules.test.sql)
+update public.sellers set biz_no = coalesce(biz_no, '1248100998'), toss_seller_id = 'pgtap' || right(replace(id::text, '-', ''), 12), toss_seller_status = 'PARTIALLY_APPROVED' where handle like '@pgtap.pp%';
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
 values ('00000000-0000-4000-8000-0000000d7a01', 'pgtap-pp-1', '00000000-0000-4000-8000-0000000d7001', 'diet', 'Q1', 10000, 1000, 'listed', 'grape'),
        ('00000000-0000-4000-8000-0000000d7a02', 'pgtap-pp-2', '00000000-0000-4000-8000-0000000d7002', 'diet', 'Q2', 10000, 1000, 'listed', 'lemon');
@@ -75,9 +77,9 @@ select is(jsonb_build_array(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0
 select is(public.myr_mfg_repaid_pct('00000000-0000-4000-8000-0000000d7a01'), 100, '제조금액 0원 원장 → 100');
 delete from public.myr_settlement_rows where id = '00000000-0000-4000-8000-0000000d7e03';
 
--- ---------- 지급 목록 ----------
-select is((select jsonb_agg(jsonb_build_array(e #>> '{seller,handle}', (e ->> 'amount')::int, e #>> '{bank,account}')) from jsonb_array_elements(public.myr_payout_to_pay('2033-01-01')) e where e #>> '{seller,handle}' like '@pgtap.pp%'),
-          '[["@pgtap.pp1", 30000, "12345678"]]'::jsonb, '지급 목록 — 지급 가능한 Q1 만(Q2 는 사업자 정보 확인 전) · 이체용 계좌 원문');
+-- ---------- 보낼 지급 건(0127 자동 이체 — 수동 이체 목록 myr_payout_to_pay 는 지웠다) ----------
+select is((select jsonb_agg(jsonb_build_array(s.handle, (e ->> 'amount')::int)) from jsonb_array_elements(public.myr_payout_send_list('2033-02-03 10:00+09')) e join public.myr_payouts p on p.id = (e ->> 'id')::uuid join public.sellers s on s.id = p.seller_id where s.handle like '@pgtap.pp%'),
+          '[["@pgtap.pp1", 30000]]'::jsonb, '보낼 지급 건 — 지급 가능한 Q1 만(Q2 는 사업자 정보 확인 전) · 계좌 원문은 싣지 않는다');
 
 -- ---------- 지급 완료 — 거절 ----------
 select is(public.myr_payout_mark_paid('2033-01-01', '@pgtap.nobody', 1, '2033-02-03', null, 'test') ->> 'code', 'NOT_FOUND', '없는 지급 건');
@@ -95,7 +97,7 @@ select is((select jsonb_build_array(p.status, p.paid_on, p.paid_amount, p.paid_n
 select is((select paid_bank ? 'account' from public.myr_payouts where id = (pg_temp.po('@pgtap.pp1')).id), false, '계좌 원문은 남기지 않는다');
 select is(pg_temp.pay('@pgtap.pp1', 30000, '2033-02-03') - 'ok', '{"code": "ALREADY_PAID", "paid_on": "2033-02-03"}'::jsonb, '다시 기록하면 ALREADY_PAID');
 select is(public.myr_payout_payable(pg_temp.po('@pgtap.pp1')), false, '지급 완료는 지급 가능 아님');
-select is((select count(*)::int from jsonb_array_elements(public.myr_payout_to_pay('2033-01-01')) e where e #>> '{seller,handle}' like '@pgtap.pp%'), 0, '지급 목록에서 빠진다');
+select is((select count(*)::int from jsonb_array_elements(public.myr_payout_send_list('2033-02-03 10:00+09')) e join public.myr_payouts p on p.id = (e ->> 'id')::uuid join public.sellers s on s.id = p.seller_id where s.handle like '@pgtap.pp%'), 0, '보낼 지급 건에서 빠진다');
 select is((select jsonb_agg(jsonb_build_array(action, amount, paid_on, note) order by created_at) from public.myr_payout_logs where payout_id = (pg_temp.po('@pgtap.pp1')).id),
           '[["paid", 30000, "2033-02-03", "1월분 이체"]]'::jsonb, '이력 — 지급 완료 1건');
 -- 지급 완료 뒤 사업자 정보가 바뀌어도 그대로(0102 자동 대상 아님)

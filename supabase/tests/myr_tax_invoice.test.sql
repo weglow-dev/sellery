@@ -50,6 +50,8 @@ values ('00000000-0000-4000-8000-0000000e7001', '계산서 1', '@pgtap.ti1', 'in
        ('00000000-0000-4000-8000-0000000e7002', '계산서 2', '@pgtap.ti2', 'instagram', true, '00000000-0000-4000-8000-0000000e70c2', 'verified', null, null),
        ('00000000-0000-4000-8000-0000000e7003', '계산서 3', '@pgtap.ti3', 'instagram', true, '00000000-0000-4000-8000-0000000e70c3', 'verified', null, null),
        ('00000000-0000-4000-8000-0000000e7004', '계산서 4', '@pgtap.ti4', 'instagram', true, '00000000-0000-4000-8000-0000000e70c4', 'none', null, null);
+-- 0127: 지급은 토스 지급대행만 — 이 파일은 사업자 정보 · 세금계산서 보류를 보므로 크리에이터를 토스 인증 완료(지급 가능)로 둔다(토스 보류는 myr_payout_toss_rules.test.sql)
+update public.sellers set biz_no = coalesce(biz_no, '1248100998'), toss_seller_id = 'pgtap' || right(replace(id::text, '-', ''), 12), toss_seller_status = 'PARTIALLY_APPROVED' where handle like '@pgtap.ti%';
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
 select ('00000000-0000-4000-8000-0000000e7a0' || n)::uuid, 'pgtap-ti-' || n, ('00000000-0000-4000-8000-0000000e700' || n)::uuid, 'diet', 'T' || n, 10000, 1000, 'listed', 'grape'
   from generate_series(1, 4) n;
@@ -132,8 +134,8 @@ select is(public.myr_tax_invoice_accept('2034-01-01', '@pgtap.ti1', 'test') - 'o
 select is(public.myr_tax_invoice_accept('2034-01-01', '@pgtap.ti1', 'test') ->> 'code', 'ALREADY_ACCEPTED', '다시 확인하면 ALREADY_ACCEPTED');
 select is(pg_temp.submit(1, '20340203-41000000-11111112') ->> 'code', 'ALREADY_ACCEPTED', '확인 완료 뒤에는 크리에이터가 바꿀 수 없다');
 select is(jsonb_build_array(pg_temp.inv('@pgtap.ti1') ->> 'status_label', pg_temp.inv('@pgtap.ti1') -> 'can_submit'), '["확인 완료", false]'::jsonb, '확인 완료 · 제출 불가');
-select is((select jsonb_agg(e #>> '{seller,handle}' order by e #>> '{seller,handle}') from jsonb_array_elements(public.myr_payout_to_pay('2034-01-01')) e where e #>> '{seller,handle}' like '@pgtap.ti%'),
-          '["@pgtap.ti1", "@pgtap.ti3"]'::jsonb, '지급 목록 — 확인된 T1 · 세금계산서가 필요 없는 T3');
+select is((select jsonb_agg(s.handle order by s.handle) from jsonb_array_elements(public.myr_payout_send_list('2034-02-02 10:00+09')) e join public.myr_payouts p on p.id = (e ->> 'id')::uuid join public.sellers s on s.id = p.seller_id where s.handle like '@pgtap.ti%'),
+          '["@pgtap.ti1", "@pgtap.ti3"]'::jsonb, '보낼 지급 건(0127) — 확인된 T1 · 세금계산서가 필요 없는 T3');
 
 -- ---------- 다시 제출 요청 ----------
 select is(public.myr_tax_invoice_return('2034-01-01', '@pgtap.ti1', '  ', 'test') ->> 'code', 'REASON_REQUIRED', '다시 제출 요청은 사유 필수');

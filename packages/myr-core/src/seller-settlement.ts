@@ -346,7 +346,7 @@ export function settleInfoStep(settleStatus: string): { sub: string; action: str
 	return { sub: '사업자 · 정산 계좌', action: '등록하기', chip: null };
 }
 
-/** 정산 상세 "지급까지 할 일" 3단계(토스 본인인증 · 0126) — 보일지는 서버 payout_toss(지급 방식이 토스), 끝났는지는 서버 보류 이유(toss_auth)가 정한다.
+/** 정산 상세 "지급까지 할 일" 3단계(토스 본인인증 · 0126) — 보일지는 서버 payout_toss(0127 부터 지급은 토스만이라 늘 true), 끝났는지는 서버 보류 이유(toss_auth)가 정한다.
  *  여기서는 토스에서 할 일(서버 toss_ask · 0124 myr_toss_creator_ask)별 문구 · 버튼 · 칩만 고른다 — 버튼은 내 정보의 토스 본인인증 카드로 */
 export function tossStep(ask: string | null): { sub: string; action: string | null; chip: string | null } {
 	if (ask === 'auth') return { sub: '대표자 휴대폰으로 온 알림톡에서 인증해 주세요', action: '인증하기', chip: null };

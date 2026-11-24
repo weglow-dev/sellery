@@ -20,6 +20,8 @@ insert into public.sellers (id, name, handle, platform, active, myr_settle_statu
 values ('00000000-0000-4000-8000-0000000c7001', '보류 1', '@pgtap.ph1', 'instagram', true, 'none'),
        ('00000000-0000-4000-8000-0000000c7002', '보류 2', '@pgtap.ph2', 'instagram', true, 'verified'),
        ('00000000-0000-4000-8000-0000000c7003', '보류 3', '@pgtap.ph3', 'instagram', true, 'verified');
+-- 0127: 지급은 토스 지급대행만 — 이 파일은 사업자 정보 · 세금계산서 보류를 보므로 크리에이터를 토스 인증 완료(지급 가능)로 둔다(토스 보류는 myr_payout_toss_rules.test.sql)
+update public.sellers set biz_no = coalesce(biz_no, '1248100998'), toss_seller_id = 'pgtap' || right(replace(id::text, '-', ''), 12), toss_seller_status = 'PARTIALLY_APPROVED' where handle like '@pgtap.ph%';
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
 values ('00000000-0000-4000-8000-0000000c7a01', 'pgtap-ph-1', '00000000-0000-4000-8000-0000000c7001', 'diet', 'P1', 10000, 1000, 'listed', 'grape'),
        ('00000000-0000-4000-8000-0000000c7a02', 'pgtap-ph-2', '00000000-0000-4000-8000-0000000c7002', 'diet', 'P2', 10000, 1000, 'listed', 'lemon'),

@@ -20,11 +20,13 @@
 //                                             + 지급 건(상태 · 보류 이유 · 운영 메모 · 지급 가능 — 0102 서버 값 그대로)
 //   hold <YYYY-MM> <@핸들> "<메모>"             지급 건 운영 보류(메모 필수 · 지급 완료 · 0원은 거절) — 사람이 건 보류는 자동으로 풀리지 않는다
 //   release <YYYY-MM> <@핸들>                  운영 보류 해제 — 자동 상태로(사업자 정보 확인 전이면 다시 지급 보류)
-//   to-pay <YYYY-MM>                          지급 목록 — 지급 가능한 지급 건 · 금액 · 이체할 계좌(원문 · 터미널에만)
+//   (지급은 토스 지급대행 자동 이체 — 샵 크론 /api/cron/payouts 영업일 13:05 · /api/cron/payouts-check 매시간 · 0127. 수동 이체 목록 to-pay 는 지웠다)
 //   paid <YYYY-MM> <@핸들> <금액> --date YYYY-MM-DD ["메모"]
-//                                             지급 완료 기록(0103) — 직접 이체한 뒤. 금액은 to-pay 의 금액과 같아야 · 이체한 날은 오늘 이후 · 회차 계산일 전이면 거절
-//                                             세금계산서 확인 전이면 지급 가능이 아니라 to-pay 에 나오지 않는다(0104)
-//   unpaid <YYYY-MM> <@핸들> "<사유>"            지급 완료 취소(잘못 기록했을 때 · 사유 필수 · 이력은 남는다)
+//                                             예외용 지급 완료 기록(0103 · 0127) — "결과 확인 필요"(토스가 결과를 끝내 알려 주지 않음)를 토스 대시보드에서
+//                                             "실제로 나갔다"고 확인했을 때만. 금액은 report 의 지급 건 금액 · 이체한 날 · 회차 계산일 전이면 거절
+//   retry <YYYY-MM> <@핸들> "<메모>"             실패한 지급 건을 다음 자동 이체(영업일 13:05)에 다시 보낸다(0127 · 운영 조치 필요 · 결과 확인 필요).
+//                                             결과 확인 필요는 토스 대시보드에서 "실패"를 확인했을 때만 — 실제로 나갔으면 paid(다시 보내면 두 번 나간다)
+//   unpaid <YYYY-MM> <@핸들> "<사유>"            지급 완료 취소(paid 로 잘못 기록했을 때 · 사유 필수 · 이력은 남는다) — 토스가 완료한 건은 거절(PAID_BY_TOSS · 0127 · 취소하면 다시 나간다)
 //   invoices [<YYYY-MM>] [--status submitted|returned|accepted|none]
 //                                             세금계산서(0104) — 필요한 지급 건 · 상태 · 합계 · 공급가액 · 세액 · 작성일자 · 발행 기한 · 승인번호 · 상호 · 사업자등록번호(홈택스 대조용 원문)
 //                                             달을 빼면 모든 달 · --status 기본 submitted(확인 대기) · --status all 이면 전부
@@ -88,7 +90,7 @@ const MESSAGES = {
 // 지급 건 보류 · 해제(0102) — ALREADY_PAID 처럼 차수 명령과 코드가 겹쳐 따로 둔다
 const PAYOUT_MESSAGES = {
   NOT_FOUND: "그 달 · 핸들의 지급 건이 없습니다(report 로 확인 · 핸들은 @ 포함)",
-  NOTE_REQUIRED: "보류 메모를 적어 주세요",
+  NOTE_REQUIRED: "메모를 적어 주세요(보류 · 다시 보내기)",
   ALREADY_PAID: "이미 지급 완료된 지급 건입니다",
   ALREADY_HELD: "이미 운영 보류 중입니다",
   NOTHING_TO_PAY: "0원 지급 건(지급 없음)이라 보류할 것이 없습니다",
@@ -100,6 +102,9 @@ const PAYOUT_MESSAGES = {
   BEFORE_RUN: "이체한 날이 회차 계산일 전입니다",
   REASON_REQUIRED: "취소 사유를 적어 주세요",
   NOT_PAID: "지급 완료가 아닙니다",
+  PAID_BY_TOSS: "토스가 지급 완료라고 알려 준 건이라 취소할 수 없습니다 — 실제로 돈이 나갔고, 취소하면 다음 자동 이체에 다시 나갑니다(두 번 지급). 토스 대시보드에서 확인하세요",
+  // 자동 이체 다시 보내기(0127)
+  NOT_FAILED: "실패한 지급 건이 아닙니다(송금 중이면 매시간 확인을 기다리세요)",
   // 세금계산서(0104)
   NOT_SUBMITTED: "크리에이터가 아직 승인번호를 내지 않았습니다(또는 이미 다시 제출 요청 중)",
   ALREADY_ACCEPTED: "이미 확인한 세금계산서입니다",
@@ -253,18 +258,16 @@ async function cmdRelease() {
   const r = checkPayout(await rpc("myr_payout_release", { p_month: m, p_handle: args[1] ?? "", p_actor: "script" }));
   console.log(`[${where}] ${args[0]} ${args[1]} 운영 보류 해제 — 지금 상태 ${r.status}${r.hold_reason ? `(${r.hold_reason})` : ""} · report ${args[0]} 로 확인`);
 }
-async function cmdToPay() {
+async function cmdRetry() {
   const m = month(args[0]);
-  const list = (await rpc("myr_payout_to_pay", { p_month: m })) ?? [];
-  console.log(`[${where}] ${args[0]} 지급 목록 — ${list.length}건 (계좌 원문이 보입니다 · 화면 공유 주의)`);
-  for (const p of list) console.log(`  ${p.seller.handle} | ${p.seller.name} | ${won(p.amount)} | ${p.bank.bank ?? "-"} ${p.bank.account ?? "-"} (${p.bank.holder ?? "-"})`);
-  if (list.length) console.log(`  이체한 뒤: paid ${args[0]} <@핸들> <금액> --date YYYY-MM-DD "메모"`);
+  const r = checkPayout(await rpc("myr_payout_send_retry", { p_month: m, p_handle: args[1] ?? "", p_note: args[2] ?? "", p_actor: "script" }));
+  console.log(`[${where}] ${args[0]} ${args[1]} 다음 자동 이체(영업일 13:05)에 다시 보냅니다 — 이전 실패 종류 ${r.was}`);
 }
 async function cmdPaid() {
   const m = month(args[0]);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(flags.date ?? ""))) fail(PAYOUT_MESSAGES.BAD_DATE);
   const amount = Number(args[2]);
-  if (!Number.isInteger(amount)) fail("금액은 원 단위 정수(to-pay 의 금액)");
+  if (!Number.isInteger(amount)) fail("금액은 원 단위 정수(report 의 지급 건 금액)");
   const r = checkPayout(await rpc("myr_payout_mark_paid", { p_month: m, p_handle: args[1] ?? "", p_amount: amount, p_paid_on: flags.date, p_note: args[3] ?? "", p_actor: "script" }));
   console.log(`[${where}] ${args[0]} ${args[1]} 지급 완료 — ${won(r.amount)} · 이체한 날 ${r.paid_on} · ${r.bank.bank ?? "-"} ${r.bank.account_masked ?? "-"}`);
 }
@@ -293,7 +296,7 @@ async function cmdInvoices() {
 async function cmdInvoiceOk() {
   const m = month(args[0]);
   const r = checkPayout(await rpc("myr_tax_invoice_accept", { p_month: m, p_handle: args[1] ?? "", p_actor: "script" }));
-  console.log(`[${where}] ${args[0]} ${args[1]} 세금계산서 확인 — 지급 건 ${r.status}${r.hold_label ? `(${r.hold_label})` : ""} · ${r.payable ? "지급 가능 → to-pay" : "아직 지급 불가"}`);
+  console.log(`[${where}] ${args[0]} ${args[1]} 세금계산서 확인 — 지급 건 ${r.status}${r.hold_label ? `(${r.hold_label})` : ""} · ${r.payable ? "지급 가능 → 다음 자동 이체(영업일 13:05)" : "아직 지급 불가"}`);
 }
 async function cmdInvoiceReturn() {
   const m = month(args[0]);
@@ -313,7 +316,7 @@ const COMMANDS = {
   report: cmdReport,
   hold: cmdHold,
   release: cmdRelease,
-  "to-pay": cmdToPay,
+  retry: cmdRetry,
   paid: cmdPaid,
   unpaid: cmdUnpaid,
   invoices: cmdInvoices,
@@ -322,7 +325,7 @@ const COMMANDS = {
 };
 const fn = COMMANDS[cmd];
 if (!fn) {
-  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release|to-pay|paid|unpaid|invoices|invoice-ok|invoice-return> … (파일 머리말 참고)");
+  console.error("사용법: node packages/db/scripts/myr-settle.mjs <pending|mfg|mfg-add|mfg-deposit|mfg-fix|mfg-void|confirm-held|run|report|hold|release|retry|paid|unpaid|invoices|invoice-ok|invoice-return> … (파일 머리말 참고)");
   process.exit(2);
 }
 await fn();

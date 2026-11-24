@@ -88,7 +88,7 @@ describe('API 본문 · 응답', () => {
 		expect(homeSettleBanner({ status: 'rejected', hold, tossAsk: 'auth' })?.title).toBe('사업자 · 정산 정보를 다시 입력해 주세요');
 		expect(homeSettleBanner({ status: 'verified', hold: null, tossAsk: 'kyc' })?.title).toBe('토스페이먼츠 추가 인증을 해 주세요');
 		expect(homeSettleBanner({ status: 'verified', hold: null, tossAsk: null })).toBeNull();
-		// 첫 등록이 끝나지 않은 토스 인증 대기 — 알림톡이 오지 않으니 다시 등록 안내 · 확인 완료(0124 전 · 수동 지급)는 배너 없음
+		// 첫 등록이 끝나지 않은 토스 인증 대기 — 알림톡이 오지 않으니 다시 등록 안내 · 확인 완료(0124 전에 확인된 크리에이터 · 토스에서 할 일 없음)는 배너 없음
 		expect(homeSettleBanner({ status: 'toss', hold, tossAsk: 'register' })).toEqual({ title: '토스페이먼츠 등록을 마쳐 주세요', body: '내 정보의 토스 본인인증 카드에서 다시 등록해 주세요', tone: 'hold' });
 		expect(homeSettleBanner({ status: 'verified', hold: null, tossAsk: 'register' })).toBeNull();
 		// 0124 전에 확인된 크리에이터(확인 완료 · 토스 미등록) — 토스 방식에서 "토스 본인인증 전"으로 지급이 막히면(서버 보류 이유 toss_auth) 홈에도 안내

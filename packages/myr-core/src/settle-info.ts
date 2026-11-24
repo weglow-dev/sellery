@@ -111,7 +111,7 @@ export type SettleInfo = {
 	reauthAfterReview: boolean;
 	/** 0124 — 크리에이터가 토스에서 할 일(myr_toss_creator_ask): auth 본인인증 · kyc 추가 인증 · fix 정보 고치기 · register 다시 등록(토스 셀러 없음) · waiting 토스 응답 대기(마지막 등록 뒤 5분) · 없으면 null */
 	tossAsk: TossAsk | null;
-	/** 0126 — 지급 방식이 토스인가(서버 myr_payout_toss_on · 0122). 수동 지급이면 토스 인증이 없어도 지급된다 — 정산 상세 "지급까지 할 일" ③ 을 보일지 */
+	/** 0126 — 지급 방식이 토스인가(서버 myr_payout_toss_on · 0122) — 정산 상세 "지급까지 할 일" ③ 을 보일지. 0127 부터 지급은 토스만이라 늘 true(분기는 나중에 걷어낸다) */
 	payoutToss: boolean;
 };
 /** 토스 카드 상태 — none 시작 전 · rejected 토스가 정보 거절 · wait 본인인증 전 · partial 인증 완료 · kyc 추가 인증 · approved 한도 없음 · corporate 법인 */
@@ -177,7 +177,7 @@ export function homeSettleBanner(i: Pick<SettleInfo, 'status' | 'hold' | 'tossAs
 	if (i.tossAsk === 'auth') return { title: '토스 본인인증을 해 주세요', body: '대표자 휴대폰으로 온 토스페이먼츠 알림톡에서 대표자 본인 명의로 인증해 주세요', tone: 'hold' };
 	if (i.tossAsk === 'kyc') return { title: '토스페이먼츠 추가 인증을 해 주세요', body: '토스페이먼츠가 보낸 이메일에서 인증을 마치면 정산금 지급이 다시 시작돼요', tone: 'hold' };
 	// 2026-11-20: 첫 등록이 끝나지 않았으면(우리 쪽 거절 · 결과 불명이었는데 실패 · 0124 전에 확인된 크리에이터) 알림톡이 오지 않는다 — 다시 등록 · 응답 대기 · 고치기 안내.
-	//   토스 인증 대기이거나, 토스 방식에서 "토스 본인인증 전"으로 지급이 막혔을 때(서버 보류 이유 toss_auth — 0122)만. 키가 없는 개발 환경 · 수동 지급의 확인 완료에는 띄우지 않는다
+	//   토스 인증 대기이거나, "토스 본인인증 전"으로 지급이 막혔을 때(서버 보류 이유 toss_auth — 0122 · 0127 부터 지급은 토스만)만. 토스에서 할 일이 없는 확인 완료에는 띄우지 않는다
 	if (i.status === 'toss' || i.hold?.code === 'toss_auth') {
 		if (i.tossAsk === 'waiting') return { title: '토스페이먼츠 등록을 확인하고 있어요', body: '잠시 뒤 다시 확인해 주세요', tone: 'wait' };
 		if (i.tossAsk === 'register') return { title: '토스페이먼츠 등록을 마쳐 주세요', body: '내 정보의 토스 본인인증 카드에서 다시 등록해 주세요', tone: 'hold' };

@@ -4,7 +4,7 @@
 --   공유 잔액 가드 + 하루 한도(myr_payout_guard) · 계좌 8~14자리(myr_account_ok · 저장 RPC).
 -- 2037년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(72);
+select plan(73);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', f, a::text[], 'authenticated', '{}'::text[], 'authenticated 는 ' || f || ' 불가')
@@ -18,30 +18,32 @@ select table_privs_are('public', 'myr_holidays', 'anon', '{}'::text[], 'anon 은
 select table_privs_are('public', 'myr_holidays', 'authenticated', '{}'::text[], 'authenticated 도 공휴일 표 불가');
 
 -- ---------- 지급 방식 설정 ----------
-select is(array[public.myr_payout_toss_on()::text, public.myr_payout_daily_cap()::text], array['false', '5000000'], '기본 — 수동 지급 · 하루 한도 500만 원');
+select is(array[public.myr_payout_toss_on()::text, public.myr_payout_daily_cap()::text], array['true', '5000000'], '기본(0127) — 토스 지급대행만 · 하루 한도 500만 원');
 select throws_ok($$update public.platform_settings set value = '{"mode": "auto", "daily_cap": 1}' where key = 'myr_payout'$$, '23514', null, '모르는 지급 방식 거절');
 select throws_ok($$update public.platform_settings set value = '{"mode": "toss", "daily_cap": "많이"}' where key = 'myr_payout'$$, '23514', null, '한도가 숫자가 아니면 거절');
 
 -- ---------- 토스로 지급 가능 ----------
 create function pg_temp.ready(j jsonb) returns boolean language sql as $$ select public.myr_toss_ready(jsonb_populate_record(null::public.sellers, j)) $$;
 select is(array[pg_temp.ready('{"biz_no": "1230145670"}'),
-                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_status": "APPROVAL_REQUIRED"}'),
-                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_status": "PARTIALLY_APPROVED"}'),
-                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_status": "KYC_REQUIRED"}'),
-                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_status": "APPROVED"}'),
-                pg_temp.ready('{"biz_no": "1248100998", "toss_seller_status": "PARTIALLY_APPROVED"}'),
-                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_status": "APPROVED", "toss_seller_error": {"field": "account"}}'),
-                pg_temp.ready('{"toss_seller_status": "APPROVED"}')],
-          array[false, false, true, false, true, true, false, false],
-          '토스로 지급 가능 — 인증 완료 · 한도 없음 · 법인만(등록 전 · 본인인증 전 · 추가 인증 · 토스 거절 · 사업자번호 없음은 아니다)');
+                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_id": "sid", "toss_seller_status": "APPROVAL_REQUIRED"}'),
+                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_id": "sid", "toss_seller_status": "PARTIALLY_APPROVED"}'),
+                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_id": "sid", "toss_seller_status": "KYC_REQUIRED"}'),
+                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_id": "sid", "toss_seller_status": "APPROVED"}'),
+                pg_temp.ready('{"biz_no": "1248100998", "toss_seller_id": "sid", "toss_seller_status": "PARTIALLY_APPROVED"}'),
+                pg_temp.ready('{"biz_no": "1230145670", "toss_seller_id": "sid", "toss_seller_status": "APPROVED", "toss_seller_error": {"field": "account"}}'),
+                pg_temp.ready('{"toss_seller_id": "sid", "toss_seller_status": "APPROVED"}'),
+                pg_temp.ready('{"biz_no": "1248100998", "toss_seller_status": "PARTIALLY_APPROVED"}')],
+          array[false, false, true, false, true, true, false, false, false],
+          '토스로 지급 가능 — 인증 완료 · 한도 없음 · 법인만(등록 전 · 본인인증 전 · 추가 인증 · 토스 거절 · 사업자번호 없음 · 0127 셀러 id 없음은 아니다)');
 
 -- ---------- 픽스처 ----------
 -- T1: 개인사업자 · 사업자 정보 확인 완료 · 토스 등록 전 / T2: 법인 · 토스 인증 완료(PARTIALLY_APPROVED) / T3: 정산 정보 저장용 계정
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 values ('00000000-0000-4000-8000-0000000f22c3', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pgtap-tr3@myr.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
-insert into public.sellers (id, name, handle, platform, active, user_id, myr_settle_status, biz_no, toss_seller_status, bank_info)
-values ('00000000-0000-4000-8000-0000000f2201', '토스 1', '@pgtap.tr1', 'instagram', true, null, 'verified', '1230145670', null, '{"bank": "국민", "account": "12345678", "holder": "토스 1"}'),
-       ('00000000-0000-4000-8000-0000000f2202', '토스 2', '@pgtap.tr2', 'instagram', true, null, 'verified', '1248100998', 'PARTIALLY_APPROVED', '{"bank": "신한", "account": "99990000", "holder": "토스 2"}');
+-- 0127: 지급 가능은 토스 셀러 id 도 본다 — T1 은 id 만 있고 상태가 없어 "등록 전"(뒤에서 상태를 바꿔 본다)
+insert into public.sellers (id, name, handle, platform, active, user_id, myr_settle_status, biz_no, toss_seller_id, toss_seller_status, bank_info)
+values ('00000000-0000-4000-8000-0000000f2201', '토스 1', '@pgtap.tr1', 'instagram', true, null, 'verified', '1230145670', 'pgtaptr1seller', null, '{"bank": "국민", "account": "12345678", "holder": "토스 1"}'),
+       ('00000000-0000-4000-8000-0000000f2202', '토스 2', '@pgtap.tr2', 'instagram', true, null, 'verified', '1248100998', 'pgtaptr2seller', 'PARTIALLY_APPROVED', '{"bank": "신한", "account": "99990000", "holder": "토스 2"}');
 insert into public.sellers (id, name, handle, platform, active, user_id)
 values ('00000000-0000-4000-8000-0000000f2203', '토스 3', '@pgtap.tr3', 'instagram', true, '00000000-0000-4000-8000-0000000f22c3');
 insert into public.myr_products (id, code, seller_id, category, name, price, stock, status, icon)
@@ -73,11 +75,11 @@ create function pg_temp.hold(p_handle text) returns text[] language sql as $$
 $$;
 select pg_temp.invoice_ok('@pgtap.tr2');
 
--- ---------- 보류 이유 — 수동 지급이면 토스를 보지 않는다 ----------
-select is(pg_temp.hold('@pgtap.tr1'), array['held', 'tax_invoice'], '수동 지급 — 토스 등록 전이어도 토스 보류 없음(세금계산서만)');
-select is(pg_temp.hold('@pgtap.tr2'), array['pending', null], '수동 지급 — T2 지급 대기');
+-- ---------- 보류 이유 — 지급은 토스만(0127 · 수동 지급은 없다) ----------
+select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '토스 지급 — 토스 등록 전이면 토스 본인인증 전 보류(세금계산서보다 먼저)');
+select is(pg_temp.hold('@pgtap.tr2'), array['pending', null], '토스 지급 — 법인 인증 완료 T2 지급 대기');
 
--- 토스 지급으로 바꾸면 지급 건 전부 다시 정한다(트리거)
+-- 설정을 다시 적어도(트리거) 지급 건 전부 다시 정한다
 select pg_temp.mode('toss');
 select is(public.myr_payout_toss_on(), true, '지급 방식 토스');
 select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '토스 지급 — 토스 등록 전이면 보류 이유 토스 본인인증 전(세금계산서보다 먼저)');
@@ -112,12 +114,11 @@ update public.sellers set toss_seller_status = 'APPROVED', toss_seller_error = '
 select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '토스가 계좌를 거절 — 보류');
 update public.sellers set toss_seller_error = null where id = '00000000-0000-4000-8000-0000000f2201';
 select is(pg_temp.hold('@pgtap.tr1'), array['pending', null], '오류가 풀리면 지급 대기');
--- 운영 보류 · 지급 완료는 자동으로 바꾸지 않는다 — 다시 수동으로 돌리면 토스 상태와 무관
+-- 0127: 수동 지급으로 되돌릴 수 없다(토스 지급대행만) — 추가 인증이 필요하면 그대로 보류
 update public.sellers set toss_seller_status = 'KYC_REQUIRED' where id = '00000000-0000-4000-8000-0000000f2201';
-select pg_temp.mode('manual');
-select is(pg_temp.hold('@pgtap.tr1'), array['pending', null], '수동 지급으로 돌리면 토스 보류가 풀린다');
+select throws_ok($$select pg_temp.mode('manual')$$, '23514', null, '수동 지급으로 되돌릴 수 없다(0127 — 토스 지급대행만)');
+select is(pg_temp.hold('@pgtap.tr1'), array['held', 'toss_auth'], '추가 인증 필요 — 그대로 보류');
 select ok(public.myr_payout_refresh_all() >= 2, '자동 상태 지급 건 다시 정하기 — 개수를 돌려준다');
-select pg_temp.mode('toss');
 update public.sellers set toss_seller_status = 'APPROVED' where id = '00000000-0000-4000-8000-0000000f2201';
 
 -- ---------- 영업일 ----------

@@ -6,7 +6,7 @@
 
 	/** 정산 상세 "지급까지 할 일"(시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL · 2026-11-13) — ① 정산 정보 등록 ② 세금계산서 발행 ③ 토스 본인인증(0126).
 	 *  ① 끝남 = 서버 보류 이유에 사업자 · 정산 정보(settle_info)가 없다 · ② 끝남 = 서버 accepted(myr_tax_invoice_accepted).
-	 *  ③ 은 지급 방식이 토스일 때만(서버 payout_toss — 수동 지급이면 토스 인증 없이 지급된다) · 끝남 = 서버 보류 이유에 토스 본인인증(toss_auth)이 없다 ·
+	 *  ③ 은 서버 payout_toss 가 true 일 때(0127 부터 지급은 토스만이라 늘 true · 분기는 나중에 걷어낸다) · 끝남 = 서버 보류 이유에 토스 본인인증(toss_auth)이 없다 ·
 	 *    문구는 토스에서 할 일(서버 toss_ask) — 버튼은 내 정보의 토스 본인인증 카드로.
 	 *  세금계산서는 정산이 확정된 뒤에 생긴다(작성일자 = 정산월 말일) — 다음 정산(예상)에서는 ② 를 안내만 한다.
 	 *  모바일: 제목 아래 안내 · ② 본문은 왼쪽 정렬 / PC(lg~): 제목 줄 오른쪽 안내 · ② 본문은 번호 옆으로 들여 쓴다 */
@@ -111,7 +111,7 @@
 	{#if toss}
 		<div class="my-4 h-px bg-white/7 lg:my-[18px]"></div>
 
-		<!-- ③ 토스 본인인증(0126 · 지급 방식이 토스일 때만) -->
+		<!-- ③ 토스 본인인증(0126 · 서버 payout_toss — 0127 부터 늘 보인다) -->
 		<div class="flex items-center gap-3 lg:gap-3.5">
 			{@render dot(3, toss.done)}
 			<span class="min-w-0 flex-1">

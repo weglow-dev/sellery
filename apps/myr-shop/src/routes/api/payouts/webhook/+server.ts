@@ -5,6 +5,7 @@ import { tossWebhookTarget } from '@sellery/myr-core/toss-payout-rules';
 import { rateLimit } from '@sellery/myr-core/rate-limit';
 import { hasAdmin } from '$lib/server/admin';
 import { handleTossSellerChanged, hasTossPayouts } from '$lib/server/toss-sellers';
+import { handleTossPayoutChanged } from '$lib/server/payout-run';
 
 /**
  * POST /api/payouts/webhook — MYR 토스 지급대행 웹훅(0124 · docs/myr.md 7-7 5번). 셀러리 apps/shop 같은 경로를 복사(셀러리 코드는 복사만).
@@ -12,12 +13,13 @@ import { handleTossSellerChanged, hasTossPayouts } from '$lib/server/toss-seller
  *   1. 형식 검사(저장 전): 본문 ≤ 64KB · JSON · eventType ∈ {seller.changed, payout.changed} · entityBody.id 형식(tossWebhookTarget · TOSS_ID_RE) → 실패 400
  *      (토스 v2 본문은 { eventType, eventId, entityType, entityBody } — 2026-11-20 실측. 셀러리에서 복사한 data.id 가정으로 운영이 400 을 돌려줬다)
  *   2. seller.changed — GET /v2/sellers/{id} 재조회 → myr_app_seller_toss_status(MYR 이 등록한 셀러만 · 0124) → 0122 트리거가 지급 건을 다시 정한다
- *      payout.changed — 자동 이체(7-7 8번) 전이라 200 ignored(토스가 다시 보내지 않게)
+ *      payout.changed — GET /v2/payouts/{id} 재조회 → 참조 번호(refPayoutId)로 myr_payout_send_result(0127 자동 이체 — 완료면 지급 완료 · 실패면 실패 종류) ·
+ *        MYR 이 보낸 지급이 아니면(같은 상점의 다른 서비스) 200 ignored
  *   3. 모르는 셀러(같은 상점을 쓰는 다른 서비스 · 삭제됨) → 200 ignored · 재조회 불명만 502(토스가 다시 보낸다)
  * 같은 상점(시범운영 peerkeamf5)에 다른 서비스의 웹훅도 등록돼 있다 — 각자 모르는 셀러를 200 으로 넘긴다.
  * 레이트리밋: IP 당 1분 120번 → 429. 공개 주소라 아무 id 로 두드려 토스 조회(같은 상점을 쓰는 서비스와 나눠 쓰는 호출량)를 쓰지 못하게 —
  *   실제 토스 웹훅은 이보다 훨씬 적고, 막혀도 토스는 2xx 가 아니면 다시 보낸다. 함수 인스턴스 메모리 기준이라 느슨한 상한(rate-limit.ts).
- * 등록: 토스 개발자센터 → 지급대행 상점 웹훅 → https://myr-shop.vercel.app/api/payouts/webhook · seller.changed(자동 이체 때 payout.changed).
+ * 등록: 토스 개발자센터 → 지급대행 상점 웹훅 → https://myr-shop.vercel.app/api/payouts/webhook · seller.changed · payout.changed.
  */
 export const config: Config = { maxDuration: 30 };
 
@@ -48,8 +50,12 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	const target = tossWebhookTarget(parsed);
 	if (!target) return bad();
 
-	if (target.eventType === 'payout.changed') return json({ ok: true, result: 'ignored: payouts not wired yet' });
 	if (!hasAdmin() || !hasTossPayouts()) return json({ ok: true, result: 'ignored: not configured' });
+	if (target.eventType === 'payout.changed') {
+		const p = await handleTossPayoutChanged(target.id);
+		if (p.status >= 500) console.error('[payouts/webhook] payout.changed', p.result);
+		return json({ ok: p.status < 500, result: p.result }, { status: p.status });
+	}
 	const r = await handleTossSellerChanged(target.id);
 	if (r.status >= 500) console.error('[payouts/webhook] seller.changed', r.result);
 	return json({ ok: r.status < 500, result: r.result }, { status: r.status });
