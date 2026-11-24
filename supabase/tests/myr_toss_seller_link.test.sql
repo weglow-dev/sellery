@@ -119,7 +119,7 @@ select is(public.myr_settle_info_json(pg_temp.k5()) -> 'edit_locked', 'false'::j
 select is(pg_temp.save5('110555000001', null, '01055557777') - 'recheck', '{"toss_action": "register", "toss_todo": null}'::jsonb, '본인인증 전 휴대폰 변경 — 지금 바로 다시 등록(새 번호로 문자)');
 update public.sellers set toss_seller_status = 'PARTIALLY_APPROVED', myr_settle_status = 'verified' where id = '00000000-0000-4000-8000-0000000f2405';
 select is(pg_temp.save5('110555000002', null, '01055557777'), '{"recheck": true, "toss_action": null, "toss_todo": "update"}'::jsonb, '인증 뒤 계좌 변경 — 지금은 안 부름 · 승인 때 수정 · 운영 재확인');
-select is(public.myr_settle_info_json(pg_temp.k5()) - array['company','ceo','biz_no_masked','has_biz_no','bank','holder','account_masked','has_account','tax_email','note','submitted_at','checked_at','hold','ceo_phone','status','biz_kind','toss_fix','toss_ready','toss_state','toss_agreed'],
+select is(public.myr_settle_info_json(pg_temp.k5()) - array['company','ceo','biz_no_masked','has_biz_no','bank','holder','account_masked','has_account','tax_email','note','submitted_at','checked_at','hold','ceo_phone','status','biz_kind','toss_fix','toss_ready','toss_state','toss_agreed','payout_toss'],
           '{"review_on_change": true, "toss_after_review": true, "edit_locked": true, "reauth_after_review": false, "toss_ask": null}'::jsonb, '본인인증 뒤 — 변경은 승인 때 · 승인 때 토스에 반영할 할 일 있음 · 확인 중이라 잠김 · 계좌 변경은 재인증 없음');
 select is(pg_temp.save5('110555000002', null, '01055558888'), '{"code": "REVIEW_PENDING"}'::jsonb, '확인 중(토스 등록됨)에는 고칠 수 없다 — 인증 뒤 휴대폰도');
 select is(pg_temp.check5('verify') - 'toss_todo', '{"ok": false, "code": "TOSS_PENDING"}'::jsonb, '토스 반영 전에는 확인 완료가 안 된다(TOSS_PENDING)');

@@ -11,7 +11,7 @@
 	 *  상품별 내역(지급액 · 판매 · 정산금 · 상계 · 보증금 · 판매 내역 = 주문 줄 · 고객 이름 가림) · 정산 계산 · 지급 정보 · (다음 정산) 아직 포함되지 않은 판매.
 	 *  보류 상품(제조금액 확인 중)은 지급액 대신 "—" + 한 줄 안내. 정산 뒤 환불이 있으면 정산 계산에 줄을 더한다.
 	 *  보류 해제(0089): 지난 달 보류분이 이 정산에서 지급되면 같은 상품이라도 "○월분 · 보류 해제" 줄이 따로 생긴다. 원래 달 상세에는 "○월 정산에서 지급"으로 남고 합계에서 빠진다.
-	 *  지급까지 할 일(시안 2026-11-13 · SettleTodo): 지급 전이면 ① 정산 정보 등록 ② 세금계산서 발행(0104 · 서버 myr_payout_invoice_json) — 지급은 세금계산서 확인 뒤라 날짜는 "정산일"(지급 완료면 이체한 날).
+	 *  지급까지 할 일(시안 2026-11-13 · SettleTodo): 지급 전이면 ① 정산 정보 등록 ② 세금계산서 발행(0104 · 서버 myr_payout_invoice_json) ③ 토스 본인인증(0126 · 지급 방식이 토스일 때만) — 지급은 세금계산서 확인 뒤라 날짜는 "정산일"(지급 완료면 이체한 날).
 	 *  모바일: 60px 머리 · 상태 · 지급까지 할 일 → 정산 계산 → 상품별 내역 / PC(lg~): 32px 제목 · 왼쪽 지급까지 할 일 · 상품별 내역 + 오른쪽 420px sticky 정산 계산 · 지급 정보(보류 사유 · 세금계산서 상태) */
 	let { data } = $props();
 	const st = $derived(data.settle);
@@ -32,8 +32,11 @@
 	const holdText = $derived(holds.map((h) => h.label).join(', '));
 	// 지급까지 할 일 ① — 사업자 · 정산 정보 이유가 있으면 아직(서버 코드로 고른다)
 	const settleInfoHold = $derived(holds.some((h) => h.code === 'settle_info'));
-	// 지급 완료(이체한 날이 있다)면 할 일 카드를 그리지 않는다 · 다음 정산 · 세금계산서가 있는 달 · 정산 정보가 걸린 달만
-	const showTodo = $derived(!paidOn && (upcoming || !!inv || settleInfoHold));
+	// ③ 토스 본인인증(0126) — 지급 방식이 토스일 때만(서버 payout_toss) · 토스 본인인증 이유(toss_auth)가 있으면 아직 · 문구는 서버 toss_ask
+	const tossHold = $derived(holds.some((h) => h.code === 'toss_auth'));
+	const toss = $derived(data.settleInfo?.payoutToss ? { done: !tossHold, ask: data.settleInfo.tossAsk } : null);
+	// 지급 완료(이체한 날이 있다)면 할 일 카드를 그리지 않는다 · 다음 정산 · 세금계산서가 있는 달 · 정산 정보 · 토스 본인인증이 걸린 달만
+	const showTodo = $derived(!paidOn && (upcoming || !!inv || settleInfoHold || tossHold));
 	const status = $derived(upcoming ? monthStatus({ upcoming: true, nextHold: st.nextHold }) : monthStatus({ upcoming: false, payoutStatus: mon?.payoutStatus ?? null, payoutLabel: mon?.payoutLabel ?? '', transfer }));
 	const target = $derived(`${monthShort(month)} 배송 완료분`);
 	// 이체 전이면 지급 예정 금액 · 지급 완료(이체한 날이 있다)면 지급액
@@ -111,7 +114,7 @@
 			{#if holds.length}<p class="mt-2 text-[12px] leading-[1.5] text-white/55 lg:hidden">보류 사유 : {holdText}</p>{/if}
 			<PayoutNotice {transfer} {payDueAt} />
 			{#if showTodo}
-				<SettleTodo month={data.key} settleStatus={st.settleStatus} settleInfoDone={!settleInfoHold} {inv} depositRefund={src.total.depositRefund} {payAt} {payDueAt} />
+				<SettleTodo month={data.key} settleStatus={st.settleStatus} settleInfoDone={!settleInfoHold} {inv} depositRefund={src.total.depositRefund} {payAt} {payDueAt} {toss} />
 			{/if}
 
 			<!-- 모바일 정산 계산 -->

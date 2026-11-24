@@ -346,6 +346,17 @@ export function settleInfoStep(settleStatus: string): { sub: string; action: str
 	return { sub: '사업자 · 정산 계좌', action: '등록하기', chip: null };
 }
 
+/** 정산 상세 "지급까지 할 일" 3단계(토스 본인인증 · 0126) — 보일지는 서버 payout_toss(지급 방식이 토스), 끝났는지는 서버 보류 이유(toss_auth)가 정한다.
+ *  여기서는 토스에서 할 일(서버 toss_ask · 0124 myr_toss_creator_ask)별 문구 · 버튼 · 칩만 고른다 — 버튼은 내 정보의 토스 본인인증 카드로 */
+export function tossStep(ask: string | null): { sub: string; action: string | null; chip: string | null } {
+	if (ask === 'auth') return { sub: '대표자 휴대폰으로 온 알림톡에서 인증해 주세요', action: '인증하기', chip: null };
+	if (ask === 'kyc') return { sub: '토스페이먼츠 추가 인증이 필요해요', action: '인증하기', chip: null };
+	if (ask === 'register') return { sub: '토스페이먼츠 등록을 마쳐 주세요', action: '다시 등록', chip: null };
+	if (ask === 'fix') return { sub: '토스페이먼츠가 정보를 확인하지 못했어요', action: '고치기', chip: null };
+	if (ask === 'waiting') return { sub: '토스페이먼츠 등록을 확인하고 있어요', action: null, chip: '확인 중' };
+	return { sub: '정산 정보를 등록하면 대표자 휴대폰으로 인증 알림톡이 와요', action: null, chip: '정보 등록 뒤' };
+}
+
 /** 상품 줄 열쇠 — 같은 상품이라도 보류 해제분(origin)은 다른 줄 */
 export const rowKey = (productCode: string, origin: string | null): string => `${productCode}|${origin ?? ''}`;
 

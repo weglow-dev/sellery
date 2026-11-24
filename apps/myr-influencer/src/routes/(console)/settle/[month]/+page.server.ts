@@ -11,7 +11,7 @@ export const load: PageServerLoad = async (event) => {
 	const { user } = await event.locals.safeGetSession();
 	const itemsP: Promise<SettleItem[]> = !user ? Promise.resolve([]) : key === 'next' ? listSellerSettlePreviewItemsOfUser(user.id) : listSellerSettlementItemsOfUser(user.id, `${key}-01`);
 	itemsP.catch(() => {}); // 게이트가 redirect 를 던지면 기다리지 않는다
-	const { data } = await mySettlements(event);
+	const { data, info } = await mySettlements(event);
 	if (key !== 'next' && !data.months.some((m) => m.month === key)) redirect(303, '/settle');
-	return { settle: data, key, items: await itemsP };
+	return { settle: data, key, items: await itemsP, settleInfo: info };
 };

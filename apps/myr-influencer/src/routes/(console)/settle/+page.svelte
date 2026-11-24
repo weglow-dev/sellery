@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { dDay, ledgerCard, monthShort, monthStatus, settleAtLabel, settlePctLabel, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { homeSettleBanner } from '@sellery/myr-core/settle-info';
 	import { won } from '$lib/rules';
 	import { readParam, syncParam } from '$lib/url-state';
 	import Icon from '$lib/components/Icon.svelte';
@@ -8,12 +9,14 @@
 
 	/** 정산(0089 · 시안 "MYR Influencer Admin" · "… PC" 정산 탭 · 2026-11-10). 계산은 DB(0087 · 0089) — 여기는 보여 주기만.
 	 *  [정산 내역 | 제조금액 · 보증금] 전환(주소 ?view=mfg — 상세에 갔다 와도 그대로).
-	 *  정산 내역: 보류 배너(사업자 정보 확인 전) · 다음 정산 카드(D-day · 예상 지급액 · 상태 · 판매 · 정산금 · 상계 · 보증금 → 상세) · 월별 정산(다음 정산 + 지난 회차 → /settle/<월>).
+	 *  정산 내역: 보류 배너(사업자 정보 확인 전 · 그 밖에 토스에서 할 일이 남았으면 홈 배너와 같은 문구 — 0126) · 다음 정산 카드(D-day · 예상 지급액 · 상태 · 판매 · 정산금 · 상계 · 보증금 → 상세) · 월별 정산(다음 정산 + 지난 회차 → /settle/<월>).
 	 *  제조금액 · 보증금: 안내 · 제품별 카드(상환 중/완료 · 남은 금액 · 막대(갚은 % + 다음 정산 상환 예정) · 보증금).
 	 *  지난 회차 상태 · 보류 사유는 지급 건 서버 값(지급 대기 · 지급 보류 · 지급 완료 · 지급 없음 — 0102). 모바일: 한 줄 · PC(lg~): 1240px · 카드 2단 */
 	let { data } = $props();
 	const st = $derived(data.settle);
 	const pv = $derived(st.preview);
+	// 토스에서 할 일(0126) — 사업자 정보 보류 배너가 없을 때 홈 배너와 같은 함수(서버 status · hold · toss_ask)로 고른다
+	const tossBanner = $derived(st.nextHold?.code === 'settle_info' ? null : homeSettleBanner(data.settleInfo));
 
 	let view = $state<'pay' | 'mfg'>(readParam('view', ['pay', 'mfg'] as const, 'pay'));
 	$effect(() => syncParam('view', view, 'pay'));
@@ -91,7 +94,8 @@
 
 	<div class="no-bar min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-8 lg:overflow-visible lg:p-0">
 		{#if view === 'pay'}
-			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} /></div>{/if}
+			{#if st.nextHold?.code === 'settle_info'}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold settleStatus={st.settleStatus} /></div>
+			{:else if tossBanner}<div class="mb-3 lg:mt-5 lg:mb-0"><SettleHold toss={tossBanner} /></div>{/if}
 
 			<!-- 다음 정산 -->
 			<a href={next.href} class="relative block overflow-hidden rounded-3xl bg-panel p-5 text-fg lg:mt-5 lg:flex lg:items-center lg:gap-10 lg:px-7 lg:py-[26px]">

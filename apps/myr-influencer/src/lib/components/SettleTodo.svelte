@@ -1,11 +1,13 @@
 <script lang="ts">
-	import { settleAtLabel, settleInfoStep, shortDate, type SettleTone } from '@sellery/myr-core/seller-settlement';
+	import { settleAtLabel, settleInfoStep, shortDate, tossStep, type SettleTone } from '@sellery/myr-core/seller-settlement';
 	import { PAYOUT_BLOCK_TEXT, PAYOUT_RULE_TEXT, SETTLE_CONFIRM_TEXT } from '@sellery/myr-core/settlement-rules';
 	import { TAX_INVOICE_TONE, type TaxInvoice as Invoice } from '@sellery/myr-core/tax-invoice';
 	import TaxInvoice from './TaxInvoice.svelte';
 
-	/** 정산 상세 "지급까지 할 일"(시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL · 2026-11-13) — ① 정산 정보 등록 ② 세금계산서 발행.
+	/** 정산 상세 "지급까지 할 일"(시안 "MYR Influencer Admin" · "… PC" SETTLEMENT DETAIL · 2026-11-13) — ① 정산 정보 등록 ② 세금계산서 발행 ③ 토스 본인인증(0126).
 	 *  ① 끝남 = 서버 보류 이유에 사업자 · 정산 정보(settle_info)가 없다 · ② 끝남 = 서버 accepted(myr_tax_invoice_accepted).
+	 *  ③ 은 지급 방식이 토스일 때만(서버 payout_toss — 수동 지급이면 토스 인증 없이 지급된다) · 끝남 = 서버 보류 이유에 토스 본인인증(toss_auth)이 없다 ·
+	 *    문구는 토스에서 할 일(서버 toss_ask) — 버튼은 내 정보의 토스 본인인증 카드로.
 	 *  세금계산서는 정산이 확정된 뒤에 생긴다(작성일자 = 정산월 말일) — 다음 정산(예상)에서는 ② 를 안내만 한다.
 	 *  모바일: 제목 아래 안내 · ② 본문은 왼쪽 정렬 / PC(lg~): 제목 줄 오른쪽 안내 · ② 본문은 번호 옆으로 들여 쓴다 */
 	let {
@@ -15,8 +17,18 @@
 		inv,
 		depositRefund,
 		payAt,
-		payDueAt = null
-	}: { month: string; settleStatus: string; settleInfoDone: boolean; inv: Invoice | null; depositRefund: number; payAt: string | null; payDueAt?: string | null } = $props();
+		payDueAt = null,
+		toss = null
+	}: {
+		month: string;
+		settleStatus: string;
+		settleInfoDone: boolean;
+		inv: Invoice | null;
+		depositRefund: number;
+		payAt: string | null;
+		payDueAt?: string | null;
+		toss?: { done: boolean; ask: string | null } | null;
+	} = $props();
 
 	const CHIP: Record<SettleTone, string> = {
 		plan: 'bg-[#a8dcc8]/16 text-[#a8dcc8]',
@@ -26,9 +38,10 @@
 	};
 	const step1 = $derived(settleInfoStep(settleStatus));
 	const invDone = $derived(!!inv?.accepted);
-	const left = $derived((settleInfoDone ? 0 : 1) + (invDone ? 0 : 1));
+	const step3 = $derived(tossStep(toss?.ask ?? null));
+	const left = $derived((settleInfoDone ? 0 : 1) + (invDone ? 0 : 1) + (toss && !toss.done ? 1 : 0));
 	// 할 일이 남았으면 개수만 · 다 끝났으면 지급 예정 시각(서버 pay_due_at · 0111 — 자동 이체 다음 오후 1시) · 예정이 없으면(이체 실패 · 운영 보류 등은 따로 안내) 날짜 없이
-	const todoText = $derived(left ? `${left === 2 ? '두' : '한'} 가지를 마치면 지급돼요` : payDueAt ? `모두 끝났어요. ${settleAtLabel(payDueAt)}에 입금돼요` : '모두 끝났어요');
+	const todoText = $derived(left ? `${['', '한', '두', '세'][left]} 가지를 마치면 지급돼요` : payDueAt ? `모두 끝났어요. ${settleAtLabel(payDueAt)}에 입금돼요` : '모두 끝났어요');
 </script>
 
 {#snippet dot(n: number, done: boolean)}
@@ -93,6 +106,26 @@
 	</div>
 	{#if inv}
 		<div class="mt-3.5 lg:mt-4 lg:ml-[42px]"><TaxInvoice {month} {inv} {depositRefund} /></div>
+	{/if}
+
+	{#if toss}
+		<div class="my-4 h-px bg-white/7 lg:my-[18px]"></div>
+
+		<!-- ③ 토스 본인인증(0126 · 지급 방식이 토스일 때만) -->
+		<div class="flex items-center gap-3 lg:gap-3.5">
+			{@render dot(3, toss.done)}
+			<span class="min-w-0 flex-1">
+				<span class="block text-[14px] font-bold lg:text-[15px]">토스 본인인증</span>
+				<span class="mt-0.5 block text-[12px] text-white/55 lg:text-[13px]">{toss.done ? '토스페이먼츠 지급 등록' : step3.sub}</span>
+			</span>
+			{#if toss.done}
+				{@render chip('완료', CHIP.done)}
+			{:else if step3.action}
+				<a href="/my" class="flex h-[38px] shrink-0 items-center rounded-xl bg-accent px-3.5 text-[13px] font-extrabold text-bg lg:h-10 lg:px-4 lg:hover:bg-[#ff8f5c]">{step3.action}</a>
+			{:else if step3.chip}
+				{@render chip(step3.chip, 'bg-white/8 text-white/85')}
+			{/if}
+		</div>
 	{/if}
 
 	<!-- 정산 확정 · 지급 규칙(2026-11-13 · 자동 이체) — "정산일"을 돈이 들어오는 날로 읽지 않게 둘을 나눠 적고, 세금계산서가 없으면 지급되지 않는다는 것을 같이 -->

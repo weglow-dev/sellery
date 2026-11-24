@@ -131,6 +131,14 @@ describe('시안 라벨', () => {
 		expect(settleInfoStep('rejected').action).toBe('다시 입력');
 		expect(settleInfoStep('toss')).toEqual({ sub: '토스 본인인증을 마치면 확인이 끝나요', action: null, chip: '인증 대기' });
 	});
+	it('지급까지 할 일 3단계(토스 본인인증 · 0126) — 토스에서 할 일(서버 toss_ask)별 버튼 · 칩(보일지 · 끝났는지는 서버 payout_toss · toss_auth)', async () => {
+		const { tossStep } = await import('../seller-settlement');
+		expect(tossStep('auth')).toEqual({ sub: '대표자 휴대폰으로 온 알림톡에서 인증해 주세요', action: '인증하기', chip: null });
+		expect([tossStep('kyc').action, tossStep('register').action, tossStep('fix').action]).toEqual(['인증하기', '다시 등록', '고치기']);
+		expect(tossStep('waiting')).toEqual({ sub: '토스페이먼츠 등록을 확인하고 있어요', action: null, chip: '확인 중' });
+		// 할 일이 없는데 아직이면(정보 미입력) — 버튼 없이 안내(① 의 [등록하기]가 먼저)
+		expect(tossStep(null)).toEqual({ sub: '정산 정보를 등록하면 대표자 휴대폰으로 인증 알림톡이 와요', action: null, chip: '정보 등록 뒤' });
+	});
 	it('보류 해제분은 같은 상품이라도 다른 줄로 묶인다', async () => {
 		const { itemsByProduct, rowKey, settleItemsFromJson } = await import('../seller-settlement');
 		const its = settleItemsFromJson([{ order_code: 'a', product_code: 'x' }, { order_code: 'b', product_code: 'x', origin: '2026-10' }, { order_code: 'c', product_code: 'x' }]);
