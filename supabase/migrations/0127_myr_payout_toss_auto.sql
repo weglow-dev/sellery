@@ -17,7 +17,7 @@
 --   설정: platform_settings.myr_payout.mode 는 'toss' 만(제약) — 운영 값이 manual 이면 toss 로 바꾸고, 트리거(0122 platform_settings_myr_payout_refresh)가
 --         지급 건 상태를 전부 다시 정한다(토스 본인인증 전이면 지급 보류 · 토스 본인인증 전).
 --   칸(myr_payouts): transfer_ref(이번 시도 참조 번호 · 유일) · toss_payout_id(토스 지급 id) · transfer_error(토스 오류 원문 — 운영용)
---   지급 기록(myr_payout_logs.action): + toss_request(토스에 요청) · toss_failed(실패 · 종류) · toss_retry(운영이 다시 보내기)
+--   지급 기록(myr_payout_logs.action): + toss_request(토스에 요청) · toss_failed(실패 · 종류) · toss_retry(운영이 다시 보내기) · toss_confirmed(운영 예외 기록 뒤 토스가 완료를 알려 옴)
 --   판정:
 --     myr_payout_toss_outcome(status)        토스 지급 상태 → paid · sending · failed · check(모름)
 --     myr_payout_toss_fail_kind(code, tries) 토스 오류 코드 → retry · account · ops · check(실패 종류 0111)
@@ -44,7 +44,8 @@
 --   계좌 실패 자동 재시도: myr_payout_account_fixed(p, s) — 계좌 문제로 실패한 뒤 사업자 · 정산 정보가 다시 확인됐다(확인 시각 > 마지막 시도) →
 --     myr_payout_refresh(0102 정의 · 트리거 sellers_myr_payout_refresh 가 부른다)가 실패 종류를 retry 로 — 다음 자동 이체에 다시 보낸다
 --   지급 완료 취소(0103 myr_payout_unmark_paid) — 토스가 완료로 알려 준 건(myr_payout_paid_by_toss · paid_by 'toss')은 거절 PAID_BY_TOSS(리뷰 2026-11-24):
---     취소하면 자동 상태(지급 대기)로 돌아가 이체 상태도 비어 있어 다음 13:05 에 새 참조 번호로 다시 나간다 — 두 번 지급. 운영 예외 기록(paid)으로 적은 건은 그대로 취소할 수 있다
+--     취소하면 자동 상태(지급 대기)로 돌아가 이체 상태도 비어 있어 다음 13:05 에 새 참조 번호로 다시 나간다 — 두 번 지급. 운영 예외 기록(paid)으로 적은 건은 그대로 취소할 수 있다.
+--     운영이 "결과 확인 필요"를 예외 기록으로 마무리한 뒤 토스가 같은 시도를 COMPLETED 로 알려 오면 결과 기록이 paid_by 를 'toss' 로 바꾼다(toss_confirmed) — 그 뒤 취소도 PAID_BY_TOSS
 --   지움: myr_payout_to_pay(month)(수동 이체 목록 · 계좌 원문) — myr-settle.mjs to-pay 도 지운다
 --   테스트: supabase/tests/myr_payout_toss_auto.test.sql
 -- ============================================================
@@ -66,7 +67,7 @@ comment on column public.myr_payouts.toss_payout_id is '토스 지급 id(0127) �
 comment on column public.myr_payouts.transfer_error is '토스 오류 원문 { code, message }(0127) — 운영 확인용 · 크리에이터에게 보이지 않는다';
 
 alter table public.myr_payout_logs drop constraint if exists myr_payout_logs_action_check;
-alter table public.myr_payout_logs add constraint myr_payout_logs_action_check check (action in ('paid', 'unpaid', 'toss_request', 'toss_failed', 'toss_retry'));
+alter table public.myr_payout_logs add constraint myr_payout_logs_action_check check (action in ('paid', 'unpaid', 'toss_request', 'toss_failed', 'toss_retry', 'toss_confirmed'));
 
 -- ---------- 판정 ----------
 create or replace function public.myr_payout_toss_outcome(p_status text)
@@ -391,7 +392,16 @@ declare
 begin
   select * into v from public.myr_payouts where transfer_ref = p_ref for update;
   if not found then return jsonb_build_object('ok', false, 'code', 'NOT_FOUND'); end if;
-  if public.myr_payout_is_paid(v) then return jsonb_build_object('ok', true, 'result', 'paid', 'already', true); end if;
+  if public.myr_payout_is_paid(v) then
+    -- 운영 예외 기록 뒤 토스가 같은 시도를 완료로 알려 옴 → 토스 완료로(그 뒤 지급 완료 취소는 PAID_BY_TOSS — 취소하면 두 번 지급)
+    if public.myr_payout_toss_outcome(p_status) = 'paid' and not public.myr_payout_paid_by_toss(v) then
+      update public.myr_payouts set paid_by = 'toss', toss_payout_id = coalesce(p_toss_id, toss_payout_id), updated_at = now() where id = v.id;
+      insert into public.myr_payout_logs (payout_id, action, amount, paid_on, note, actor)
+      values (v.id, 'toss_confirmed', v.paid_amount, v.paid_on, '운영 예외 기록(' || coalesce(v.paid_by, '—') || ') 뒤 토스 완료 · ' || coalesce(p_toss_id, '—') || ' · ' || p_ref, 'toss');
+      return jsonb_build_object('ok', true, 'result', 'paid', 'already', true, 'confirmed', true);
+    end if;
+    return jsonb_build_object('ok', true, 'result', 'paid', 'already', true);
+  end if;
   v_out := case when p_status is not null then public.myr_payout_toss_outcome(p_status)
                 when public.myr_payout_toss_fail_kind(p_code, v.transfer_tries) = 'check' then 'check'
                 else 'failed' end;

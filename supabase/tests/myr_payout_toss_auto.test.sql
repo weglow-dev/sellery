@@ -3,7 +3,7 @@
 --   계좌 실패 자동 재시도 · 운영 다시 보내기 · 운영 예외 기록이 이체 상태를 비운다 · 수동 이체 목록 지움.
 -- 2039년 회차를 쓴다(다른 정산 테스트와 겹치지 않게). 트랜잭션 안에서 돌고 롤백된다.
 begin;
-select plan(68);
+select plan(74);
 
 -- ---------- 권한 ----------
 select function_privs_are('public', 'myr_payout_send_list', '{"timestamp with time zone"}'::text[], 'authenticated', '{}'::text[], 'authenticated 는 send_list 불가');
@@ -146,6 +146,16 @@ select is(pg_temp.st('@pgtap.au3'), '{"status": "paid", "state": null, "fail": n
 select is(public.myr_payout_paid_by_toss(pg_temp.po('@pgtap.au3')), false, '운영 예외 기록은 토스 완료가 아니다');
 select is(public.myr_payout_unmark_paid('2039-01-01', '@pgtap.au3', '토스 대시보드 재확인 — 안 나갔다', null) ->> 'ok', 'true', '운영 예외 기록은 취소할 수 있다');
 select is(pg_temp.list('2039-02-10 13:05+09'), '["@pgtap.au3"]'::jsonb, '취소한 예외 기록 건은 다음 자동 이체에 다시(새 시도)');
+-- 리뷰(2026-11-24): 예외 기록 뒤 토스가 같은 시도를 COMPLETED 로 알려 오면 토스 완료로 — 그 뒤 취소는 PAID_BY_TOSS(두 번 지급 막기)
+create temp table _b3d as select public.myr_payout_send_begin((pg_temp.po('@pgtap.au3')).id, 10000000, '2039-02-10 13:05+09') as b;
+select is(public.myr_payout_send_result((select b ->> 'ref' from _b3d), null, null, 'UNCERTAIN', null, '2039-02-10 13:06+09') ->> 'result', 'check', '네 번째 시도 — 결과 모름');
+select is(public.myr_payout_mark_paid('2039-01-01', '@pgtap.au3', public.myr_payout_amount(pg_temp.po('@pgtap.au3')), '2039-02-10', '토스 대시보드 확인', 'admin:test', '2039-02-11 10:00+09') ->> 'ok', 'true',
+          '운영이 예외 기록으로 마무리');
+select is(public.myr_payout_send_result((select b ->> 'ref' from _b3d), 'COMPLETED', 'tp_au3d', null, null, '2039-02-11 11:00+09') - 'paid_on', '{"ok": true, "result": "paid", "already": true, "confirmed": true}'::jsonb,
+          '뒤늦게 토스 COMPLETED — 토스 완료로 바꾼다(confirmed)');
+select is((select jsonb_build_array(paid_by, toss_payout_id, public.myr_payout_paid_by_toss(p)) from pg_temp.po('@pgtap.au3') p), '["toss", "tp_au3d", true]'::jsonb, '처리 = toss · 토스 지급 id');
+select is(public.myr_payout_unmark_paid('2039-01-01', '@pgtap.au3', '잘못 기록', null) ->> 'code', 'PAID_BY_TOSS', '그 뒤 취소는 PAID_BY_TOSS(다시 나가지 않는다)');
+select is((select count(*)::int from public.myr_payout_logs where payout_id = (pg_temp.po('@pgtap.au3')).id and action = 'toss_confirmed'), 1, '기록 — 토스 완료 확인 한 줄');
 
 -- ---------- 거절 코드 · 갈래(리뷰 2026-11-24 — 백엔드 원칙 7) ----------
 select is(public.myr_payout_send_begin('00000000-0000-4000-8000-0000000000ff', 10000000, '2039-02-03 13:05+09') ->> 'code', 'NOT_FOUND', '송금 시작 — 없는 지급 건 NOT_FOUND');
