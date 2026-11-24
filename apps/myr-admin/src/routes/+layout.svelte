@@ -4,8 +4,8 @@
 	import MenuSheet from '$lib/components/MenuSheet.svelte';
 	import PayoutModals from '$lib/components/PayoutModals.svelte';
 	import MobileTop from '$lib/components/MobileTop.svelte';
-	import SideNav from '$lib/components/SideNav.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
+	import TopNav from '$lib/components/TopNav.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 
 	let { children } = $props();
@@ -24,10 +24,10 @@
 
 <!--
 	모바일(~lg): 앱 셸 — 높이 100dvh · 최대 폭 430px(크리에이터 콘솔과 같은 셸). 상단(제목 · 알림 · 전체 메뉴) → <main> 스크롤 → 하단 플로팅 탭.
-	PC(lg~): 왼쪽 메뉴 240px + <main> 한 곳이 스크롤 · 화면은 1200px 컨테이너. 상세는 오른쪽 서랍(Drawer · fixed).
+	PC(lg~): 상단 메뉴 72px(시안 "MYR Admin PC" · 파트너팀 톡 · 내 계정은 오른쪽 아이콘) + 그 아래 <main> 한 곳이 스크롤 · 화면은 1200~1240px 컨테이너. 상세는 오른쪽 서랍(Drawer · fixed).
 -->
-<div class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-bg sm:border-x sm:border-white/8 lg:max-w-none lg:flex-row lg:border-x-0">
-	<SideNav />
+<div class="relative mx-auto flex h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-bg sm:border-x sm:border-white/8 lg:max-w-none lg:border-x-0">
+	<TopNav />
 	<MobileTop />
 	<main bind:this={main} class="no-bar min-h-0 flex-1 overflow-y-auto">
 		{@render children()}

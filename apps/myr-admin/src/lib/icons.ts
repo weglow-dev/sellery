@@ -27,5 +27,15 @@ export const UI_ICONS: Record<string, string> = {
 	eye: `<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>`,
 	send: `<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>`,
 	pause: `<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>`,
-	bolt: `<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>`
+	bolt: `<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>`,
+	info: `<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/>`,
+	// 홈 "오늘 처리할 일" 메뉴 타일(시안 MYR Admin · m_*) — stroke 1.8 로 그린다
+	m_products: `<path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>`,
+	m_creators: `<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/>`,
+	m_orders: `<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9.5 8h5M9.5 12h5"/>`,
+	m_claims: `<path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4"/>`,
+	m_settle: `<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 7.5h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>`,
+	m_payouts: `<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10.5h19M6.5 15h4"/>`,
+	m_talk: `<path d="M4.5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8.5z"/><path d="M8.6 10.6h.01M12 10.6h.01M15.4 10.6h.01"/>`,
+	m_tax: `<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>`
 };

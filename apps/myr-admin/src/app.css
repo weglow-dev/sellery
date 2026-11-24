@@ -23,6 +23,19 @@
 	/* 상세 서랍 — PC 는 오른쪽에서, 모바일은 아래에서 */
 	--animate-drawer: drawer-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	--animate-sheet: sheet-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	/* 상단 내 계정 메뉴(시안 menuIn) */
+	--animate-menu: menu-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes menu-in {
+	0% {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.98);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
 }
 
 @keyframes fade-in {

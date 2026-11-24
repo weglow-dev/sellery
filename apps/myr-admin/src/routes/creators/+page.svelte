@@ -60,7 +60,7 @@
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1200px] lg:px-10 lg:pt-8 lg:pb-16">
 	<PageHead title="크리에이터">
 		{#snippet sum()}
-			사업자 · 정산 정보 확인 대기 <b class="font-bold text-accent">{n('wait')}명</b> · 다시 입력 요청 {n('redo')} · 미입력 {n('none')} · 토스 인증 전 {n('toss')} · 전체 {n('all')}명
+			사업자 · 정산 정보 확인 대기 <b class="font-bold text-accent">{n('wait')}명</b> · 다시 입력 요청 {n('redo')} · 미입력 {n('none')} · 토스 인증 대기 {n('toss')} · 전체 {n('all')}명
 		{/snippet}
 		{#snippet actions()}
 			<Btn onclick={() => app.showToast('초대는 다음 단계에서 만들어요')}><Icon id="send" size={16} />초대 보내기</Btn>

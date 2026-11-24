@@ -204,7 +204,7 @@
 
 <!-- 여러 줄 선택 바 -->
 {#if sel.n}
-	<div class="fixed inset-x-0 bottom-[96px] z-30 mx-auto w-[calc(100%-40px)] max-w-[390px] animate-toast lg:bottom-8 lg:left-[240px] lg:max-w-[720px]">
+	<div class="fixed inset-x-0 bottom-[96px] z-30 mx-auto w-[calc(100%-40px)] max-w-[390px] animate-toast lg:bottom-8 lg:max-w-[720px]">
 		<div class="flex items-center gap-2 rounded-2xl border border-white/12 bg-panel-2 py-2.5 pr-2.5 pl-4 shadow-[0_14px_40px_rgba(0,0,0,.55)]">
 			<p class="min-w-0 flex-1 text-[14px] font-bold"><span class="text-accent tabular-nums">{sel.n}건</span> 선택 · <span class="tabular-nums">{sel.sumText}</span></p>
 			<button type="button" onclick={() => (picked = [])} class="hidden h-10 px-2 text-[13px] font-semibold text-white/60 hover:text-fg sm:block">선택 해제</button>
