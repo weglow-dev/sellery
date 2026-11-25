@@ -30,6 +30,8 @@ export interface CreatorRaw {
 	joinedAt: string;
 	products: { live: number; total: number };
 	active: boolean;
+	/** 정지 기록(active=false 일 때) — 사유는 운영만 본다 · 크리에이터 콘솔은 정지 화면만 */
+	stop?: { why: string; at: string; by: string } | null;
 	phoneMasked: string;
 	settle: SettleStatus;
 	/** 사업자 · 정산 정보 — 가린 값과 [보기] 때 보여 줄 원문(목 · 원문 열람은 기록이 남는다) */
@@ -62,9 +64,12 @@ export interface CreatorView extends CreatorRaw {
 	/** [확인 완료] 모달 안내 — 확인하면 무엇이 풀리는지 */
 	verifyNote: string;
 	tabs: CreatorTab[];
+	/** 정지면 빨간 "정지" 칩 · 서랍 정지 안내 */
+	stopChip: Chip | null;
+	stopNote: string | null;
 	payouts: { id: string; month: string; amount: number; chips: Chip[]; holdText: string | null; paidAt: string | null }[];
 }
-export type CreatorTab = 'wait' | 'redo' | 'none' | 'toss' | 'ok';
+export type CreatorTab = 'wait' | 'redo' | 'none' | 'toss' | 'ok' | 'stopped';
 
 // ───────── 지급 ─────────
 

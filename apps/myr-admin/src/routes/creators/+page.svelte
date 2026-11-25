@@ -22,7 +22,7 @@
 
 	/** 크리에이터 — docs/myr-admin-screens.md §5-2 · §5-3 중 자동 이체에 필요한 부분(사업자 · 정산 정보 확인 · 지급 이력)만.
 	 *  "계좌 확인 필요"로 이체가 실패하면 크리에이터가 계좌를 다시 입력 → 여기서 확인 → 다음 자동 이체(영업일 오후 1시)에 다시 보낸다.
-	 *  [초대 보내기] = 보내기 폼만(§5-1 · 초대 목록은 필요해지면). 정지 · 상품 · 활동 탭은 다음 단계. 상태 칩 · 지급 안내 · 결과 문구는 서버(목) 값 */
+	 *  [초대 보내기] = 보내기 폼만(§5-1 · 초대 목록은 필요해지면). 정지 = 정지 탭 · 이름 옆 칩 · 서랍 [계정 정지]/[정지 해제](§5-3 · UI 만 — 확인하면 "다음 단계" 안내). 상품 · 활동 탭은 다음 단계. 상태 칩 · 지급 안내 · 결과 문구는 서버(목) 값 */
 	const tabs = $derived(server.creatorTabs());
 	const all = $derived(server.creators);
 	const tab = $derived(page.url.searchParams.get('tab') ?? (tabs[0].count ? 'wait' : 'all'));
@@ -37,6 +37,7 @@
 		none: '정산 정보를 안 낸 크리에이터가 없어요',
 		toss: '토스 본인인증을 기다리는 크리에이터가 없어요',
 		ok: '확인 완료된 크리에이터가 없어요',
+		stopped: '정지한 크리에이터가 없어요',
 		all: '크리에이터가 없어요'
 	};
 
@@ -53,10 +54,15 @@
 		app.showToast('사업자 · 정산 정보 원문을 열었어요 · 열람 기록이 남아요');
 	}
 
-	let modal = $state<'verify' | 'redo' | null>(null);
+	let modal = $state<'verify' | 'redo' | 'stop' | 'resume' | null>(null);
 	let inviting = $state(false);
 	let why = $state('');
 	const openRow = (id: string) => setParams(page.url, { id }, true);
+	/** UI 단계 — 계정 정지 · 해제는 화면만(동작은 기능 단계에서 sellers.active RPC) */
+	const soon = (what: string) => {
+		app.showToast(`${what}는 다음 단계에서 붙어요`);
+		modal = null;
+	};
 </script>
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1200px] lg:px-10 lg:pt-8 lg:pb-16">
@@ -89,7 +95,7 @@
 						<td class="pl-5">
 							<span class="flex items-center gap-2.5">
 								<Avatar initial={c.initial} bg={c.avatarBg} size={32} />
-								<span class="min-w-0"><span class="block truncate font-bold">{c.name}{c.biz ? ` · ${c.biz.firm}` : ''}</span><span class="block truncate text-[12px] text-white/55">{c.handle}</span></span>
+								<span class="min-w-0"><span class="flex items-center gap-1.5"><span class="truncate font-bold">{c.name}{c.biz ? ` · ${c.biz.firm}` : ''}</span>{#if c.stopChip}<Chip label={c.stopChip.label} tone={c.stopChip.tone} />{/if}</span><span class="block truncate text-[12px] text-white/55">{c.handle}</span></span>
 							</span>
 						</td>
 						<td><Chip label={c.settleChip.label} tone={c.settleChip.tone} /></td>
@@ -114,7 +120,7 @@
 				<button type="button" onclick={() => openRow(c.id)} class="flex w-full items-start gap-3 rounded-[20px] border border-white/8 bg-white/3 p-4 text-left">
 					<Avatar initial={c.initial} bg={c.avatarBg} size={40} />
 					<span class="min-w-0 flex-1">
-						<span class="flex items-center justify-between gap-2"><span class="truncate text-[15px] font-bold">{c.name}{c.biz ? ` · ${c.biz.firm}` : ''}</span><Chip label={c.settleChip.label} tone={c.settleChip.tone} /></span>
+						<span class="flex items-center justify-between gap-2"><span class="flex min-w-0 items-center gap-1.5"><span class="truncate text-[15px] font-bold">{c.name}{c.biz ? ` · ${c.biz.firm}` : ''}</span>{#if c.stopChip}<Chip label={c.stopChip.label} tone={c.stopChip.tone} />{/if}</span><Chip label={c.settleChip.label} tone={c.settleChip.tone} /></span>
 						<span class="mt-0.5 block text-[12px] text-white/55">{c.handle} · 판매 중 {c.products.live}/{c.products.total}</span>
 						{#if c.payNote}<span class="mt-1.5 block text-[12px] leading-[1.5] font-semibold {NOTE_CLS[c.payNoteTone]}">{c.payNote}</span>{/if}
 					</span>
@@ -137,6 +143,12 @@
 				</div>
 				<Chip label={open.settleChip.label} tone={open.settleChip.tone} lg />
 			</div>
+			{#if open.stopNote}
+				<div class="mt-4 rounded-2xl border border-danger/28 bg-danger/8 px-4 py-3 text-[13px] leading-[1.55]">
+					<p class="font-bold text-danger-fg">정지 중이에요 · 샵에 상품이 보이지 않고 크리에이터 콘솔은 정지 화면만 보여요</p>
+					<p class="mt-1 text-white/70">{open.stopNote}</p>
+				</div>
+			{/if}
 			{#if result}
 				<p class="mt-4 flex items-start gap-2 rounded-2xl border border-mint/25 bg-mint/8 px-4 py-3 text-[13px] leading-[1.55] font-semibold text-mint"><Icon id="check" size={16} sw={2.4} class="mt-0.5 shrink-0" />{result}</p>
 			{/if}
@@ -168,7 +180,14 @@
 			<div class="rounded-2xl border border-white/8 px-4 py-1">
 				<KV k="연락처"><span class="tabular-nums">{open.phoneMasked}</span></KV>
 				<KV k="상품">판매 중 {open.products.live} / 전체 {open.products.total}</KV>
-				<KV k="활동 상태">{open.active ? '활동 중' : '정지'}</KV>
+				<KV k="활동 상태">{#if open.stopChip}<Chip label={open.stopChip.label} tone={open.stopChip.tone} />{:else}활동 중{/if}</KV>
+			</div>
+			<div class="mt-2.5 flex justify-end">
+				{#if open.active}
+					<Btn sm onclick={() => { why = ''; modal = 'stop'; }}>계정 정지</Btn>
+				{:else}
+					<Btn sm onclick={() => (modal = 'resume')}>정지 해제</Btn>
+				{/if}
 			</div>
 		</Section>
 
@@ -234,6 +253,36 @@
 		<Field label="사유(필수)" count="{why.length}/100">
 			<textarea bind:value={why} maxlength="100" rows="3" class={TEXTAREA} placeholder="예: 통장 사본의 예금주가 사업자 대표자와 달라요"></textarea>
 		</Field>
+	</Modal>
+{/if}
+
+{#if modal === 'stop' && open}
+	<Modal
+		title="계정 정지"
+		desc="{open.name} {open.handle}"
+		ok="정지"
+		sure="정말 정지하기"
+		danger
+		info="정지하면 샵에서 이 크리에이터의 상품이 모두 내려가고, 크리에이터 콘솔은 정지 화면만 보여요 · 크리에이터가 콘솔에 못 들어오니 진행 중인 배송 · CS 답변은 운영이 챙겨야 해요"
+		infoTone="red"
+		disabled={!why.trim()}
+		onclose={() => (modal = null)}
+		onok={() => soon('계정 정지')}
+	>
+		<Field label="정지 사유(필수 · 운영만 봐요)" count="{why.length}/200">
+			<textarea bind:value={why} maxlength="200" rows="3" class={TEXTAREA} placeholder="예: 상품 상세에 의약품 오인 표현을 반복해서 올림"></textarea>
+		</Field>
+	</Modal>
+{:else if modal === 'resume' && open}
+	<Modal
+		title="정지 해제"
+		desc="{open.name} {open.handle}"
+		ok="정지 해제"
+		info="판매 중이던 상품이 바로 다시 샵에 보이고, 크리에이터 콘솔을 다시 쓸 수 있어요"
+		onclose={() => (modal = null)}
+		onok={() => soon('정지 해제')}
+	>
+		{#if open.stopNote}<p class="rounded-2xl bg-white/4 px-4 py-3 text-[13px] leading-[1.55] text-white/70">{open.stopNote}</p>{/if}
 	</Modal>
 {/if}
 

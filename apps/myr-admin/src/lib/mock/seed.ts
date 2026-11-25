@@ -76,7 +76,7 @@ export const seedCreators = (): CreatorRaw[] =>
 		},
 		{ id: 'c14', name: '소민', handle: '@somin.run', joinedAt: '2026년 10월 8일', products: { live: 1, total: 1 }, settle: 'ok', biz: biz('소민런', '장소민', 'somin@sominrun.kr', '208-14-90376', '케이뱅크', '100-188-402271', '10월 9일 오전 11:12') },
 		{ id: 'c15', name: '서윤', handle: '@seoyun.walk', joinedAt: '2026년 10월 10일', products: { live: 2, total: 2 }, settle: 'ok', biz: biz('서윤워크', '임서윤', 'seoyun@seoyunwalk.kr', '415-27-88304', '농협', '351-0981-2210-43', '10월 11일 오후 6:20') },
-		{ id: 'c16', name: '채원', handle: '@chaewon.pilates', joinedAt: '2026년 10월 12일', products: { live: 1, total: 1 }, settle: 'ok', biz: biz('채원필라테스', '권채원', 'chaewon@cwpilates.kr', '135-55-20419', '신한', '110-612-338845', '10월 13일 오전 9:30') },
+		{ id: 'c16', name: '채원', handle: '@chaewon.pilates', joinedAt: '2026년 10월 12일', products: { live: 1, total: 1 }, settle: 'ok', active: false, stop: { why: '상품 상세에 의약품 오인 표현을 반복해서 올림 · 계약 위반 검토 중', at: '11월 14일 오후 3:20', by: '운영 박서연' }, log: [{ at: '11월 14일 오후 3:20', text: '정지 · 상품 상세에 의약품 오인 표현을 반복해서 올림', who: '운영 박서연' }], biz: biz('채원필라테스', '권채원', 'chaewon@cwpilates.kr', '135-55-20419', '신한', '110-612-338845', '10월 13일 오전 9:30') },
 		{ id: 'c17', name: '가은', handle: '@gaeun.daily', joinedAt: '2026년 10월 14일', products: { live: 1, total: 1 }, settle: 'ok', biz: biz('가은데일리', '신가은', 'gaeun@gaeundaily.kr', '622-38-10945', '국민', '061901-04-228813', '10월 15일 오후 12:40') },
 		{
 			id: 'c18',

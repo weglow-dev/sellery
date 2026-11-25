@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 
 	/** 심사 미리보기의 섹션 칸 — 왼쪽 위 태그(01 기본 정보 · 구매 패널 · 02 레시피 노트 …) · 오른쪽 위 [의견 달기]/[의견 고치기].
-	 *  의견이 있는 칸은 주황 테두리 · 주황 태그(시안 상품 심사). [의견 달기]는 PC 에서만 */
+	 *  의견이 있는 칸은 주황 테두리 · 주황 태그(시안 상품 심사). 모바일도 [의견 달기]가 있다(조금 더 큰 34px) */
 	let { box, onop, children }: { box: { tag: string; on: boolean; opLabel: string }; onop: () => void; children: Snippet } = $props();
 </script>
 
@@ -11,7 +11,7 @@
 	<button
 		type="button"
 		onclick={onop}
-		class="absolute -top-4 right-3.5 hidden h-8 rounded-full border bg-[#15161a] px-3 text-[12.5px] font-bold whitespace-nowrap transition-colors hover:border-accent hover:text-[#ff9a66] lg:block {box.on ? 'border-accent/65 text-[#ff9a66]' : 'border-white/16 text-white/75'}"
+		class="absolute -top-[17px] right-3.5 h-[34px] rounded-full border bg-[#15161a] px-[13px] text-[12.5px] font-bold whitespace-nowrap transition-colors hover:border-accent hover:text-[#ff9a66] lg:-top-4 lg:h-8 lg:px-3 {box.on ? 'border-accent/65 text-[#ff9a66]' : 'border-white/16 text-white/75'}"
 	>
 		{box.opLabel}
 	</button>

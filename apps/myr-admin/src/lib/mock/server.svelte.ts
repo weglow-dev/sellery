@@ -362,7 +362,7 @@ class MockServer {
 		const ps = this.payoutsRaw.filter((p) => p.creatorId === c.id).map(this.payoutView);
 		const acctFail = ps.find((p) => p.failKind === 'account');
 		const toss = this.tossPending(c);
-		const tabs: CreatorTab[] = [toss ? 'toss' : c.settle];
+		const tabs: CreatorTab[] = [toss ? 'toss' : c.settle, ...(c.active ? [] : ['stopped' as const])];
 		let payNote: string | null = null;
 		let payNoteTone: Tone = 'orange';
 		if (acctFail && c.settle === 'wait') payNote = '계좌 확인 필요로 이체 실패 · 확인하면 다음 자동 이체(영업일 오후 1시)에 다시 보내요';
@@ -378,6 +378,8 @@ class MockServer {
 		return {
 			...c,
 			settleChip: toss ? TOSS_CHIP : SETTLE_CHIP[c.settle],
+			stopChip: c.active ? null : { label: '정지', tone: 'red' },
+			stopNote: c.active || !c.stop ? null : `${c.stop.at} 정지 · ${c.stop.by} · ${c.stop.why}`,
 			payNote,
 			payNoteTone,
 			verifyNote: acctFail
@@ -389,7 +391,7 @@ class MockServer {
 	};
 
 	get creators(): CreatorView[] {
-		const rank: Record<CreatorTab, number> = { wait: 0, redo: 1, none: 2, toss: 3, ok: 4 };
+		const rank: Record<CreatorTab, number> = { wait: 0, redo: 1, none: 2, toss: 3, ok: 4, stopped: 5 };
 		return this.creatorsRaw.map(this.creatorView).sort((a, b) => rank[a.tabs[0]] - rank[b.tabs[0]]);
 	}
 
@@ -402,6 +404,7 @@ class MockServer {
 			{ id: 'none', name: '미입력', count: n('none') },
 			{ id: 'toss', name: '토스 인증 대기', count: n('toss') },
 			{ id: 'ok', name: '확인 완료', count: n('ok') },
+			{ id: 'stopped', name: '정지', count: n('stopped') },
 			{ id: 'all', name: '전체', count: this.creatorsRaw.length }
 		];
 	}
