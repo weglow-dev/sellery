@@ -13,11 +13,11 @@ export const MENUS: Menu[] = [
 	{ key: 'tax', href: '/tax', name: '세금계산서', icon: 'doc', ready: true },
 	{ key: 'creators', href: '/creators', name: '크리에이터', icon: 'user', ready: true },
 	{ key: 'products', href: '/products', name: '상품', icon: 'box', ready: true },
-	{ key: 'orders', href: '/orders', name: '주문 · 배송', icon: 'order', ready: false },
-	{ key: 'cs', href: '/cs', name: '문의 · 교환/환불', icon: 'cs', ready: false },
-	{ key: 'talk', href: '/talk', name: '파트너팀 톡', icon: 'm_talk', ready: false },
-	{ key: 'settle', href: '/settle', name: '정산', icon: 'chart', ready: false },
-	{ key: 'groupbuys', href: '/groupbuys', name: '공구 링크', icon: 'link', ready: false }
+	{ key: 'orders', href: '/orders', name: '주문 · 배송', icon: 'order', ready: true },
+	{ key: 'cs', href: '/cs', name: '문의 · 교환/환불', icon: 'cs', ready: true },
+	{ key: 'talk', href: '/talk', name: '파트너팀 톡', icon: 'm_talk', ready: true },
+	{ key: 'settle', href: '/settle', name: '정산', icon: 'chart', ready: true },
+	{ key: 'groupbuys', href: '/groupbuys', name: '공구 링크', icon: 'link', ready: true }
 ];
 
 /** PC 상단 메뉴 · 모바일 전체 메뉴(시안 "MYR Admin PC" · "MYR Admin" · 2026-11-24) — 시안 순서 · 짧은 이름 · 시안 아이콘(m_* · 굵기 1.8).
