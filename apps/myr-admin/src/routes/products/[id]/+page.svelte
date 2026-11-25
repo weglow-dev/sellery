@@ -16,6 +16,7 @@
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 	import ReviewHead from '$lib/components/ReviewHead.svelte';
 	import ReviewInfo from '$lib/components/ReviewInfo.svelte';
+	import ReviewMobile from '$lib/components/ReviewMobile.svelte';
 	import ReviewPanel from '$lib/components/ReviewPanel.svelte';
 	import Timeline from '$lib/components/Timeline.svelte';
 	import type { SecNo } from '$lib/mock/types';
@@ -23,7 +24,7 @@
 	/** 상품 상세 — docs/myr-admin-screens.md §4-2 신규 심사 · §4-4 상품 관리(시안 "MYR Admin PC" 상품 · 2026-11-25).
 	 *  신규 심사: 검수 정보 줄 · 샵 상세 미리보기(01 기본 정보 · 구매 패널 → 02 레시피 노트 → 03~07 · 칸마다 [의견 달기]) · 오른쪽 의견 패널([반려] · [승인 → 처음 재고 · 제조금액]).
 	 *  상품 관리: 상품 정보 · 수정 심사 안내 · 제조금액 원장 · 보낸 의견 · 처리 이력 / 오른쪽 상태 · [재고 수정] · [일시중지]/[다시 판매] · [판매 종료].
-	 *  상품 심사는 PC 에서만(§3 모바일) — 모바일(시안 "MYR Admin")은 안내 · 검수 정보 표 · 미리보기만. 상품 관리 모바일은 상태 · 버튼이 위. 문구 · 버튼 · 거절은 서버(목) 값 */
+	 *  상품 심사는 PC 에서만(§3 모바일) — 모바일(시안 "MYR Admin")은 안내 · 검수 정보 표 · 미리보기만. 상품 관리 모바일은 상태 카드 대신 머리 한 줄(크리에이터 · 채널) · 버튼은 맨 아래 "관리" 칸. 문구 · 버튼 · 거절은 서버(목) 값 */
 	const id = $derived(page.params.id ?? '');
 	const rv = $derived(products.review(id));
 	const v = $derived(rv ? null : products.view(id));
@@ -31,6 +32,7 @@
 	const backHref = $derived(`/products?tab=${(v && BACK_TAB[v.status]) || 'review'}`);
 
 	let panel = $state<ReturnType<typeof ReviewPanel>>();
+	let mobile = $state<ReturnType<typeof ReviewMobile>>();
 	let ph = $state(0);
 	/** 한 번 더 확인 중인 버튼 — 일시중지 · 판매 종료(첫 클릭에 [취소] [정말 ○○하기] + 아래 안내) */
 	let armed = $state<'pause' | 'end' | null>(null);
@@ -50,6 +52,7 @@
 	const addOp = (k: SecNo) => {
 		products.addOp(id, k);
 		panel?.focusSel();
+		mobile?.openSheet();
 	};
 	const open = (m: 'approve' | 'stock' | 'ledger') => {
 		stockIn = m === 'stock' && v?.stock != null ? String(v.stock) : '';
@@ -71,6 +74,18 @@
 		app.showToast(products.pause(id));
 		armed = null;
 	}
+	/** 심사 버튼 · 의견 — PC 패널과 모바일(의견 목록 · 아래 막대 · 시트)이 같은 값을 쓴다 */
+	const reviewProps = $derived({
+		id,
+		approveLabel: '승인',
+		rejectNote: `의견 ${products.opsOf(id).valid}개가 크리에이터에게 전달돼요`,
+		onreject: () => {
+			const r = products.reject(id);
+			if (r.ok) done(r, '/products?tab=review');
+			return r;
+		},
+		onapprove: () => open('approve')
+	});
 	const approveHints = $derived(products.approveHints(stockIn, amountIn));
 	const stockHint = $derived(products.stockHint(stockIn));
 </script>
@@ -124,20 +139,10 @@
 						</PreviewBox>
 					{/each}
 				</PreviewCard>
+				<ReviewMobile bind:this={mobile} {...reviewProps} />
 			</div>
 			<div class="hidden lg:sticky lg:top-7 lg:block">
-				<ReviewPanel
-					bind:this={panel}
-					{id}
-					approveLabel="승인"
-					rejectNote="의견 {products.opsOf(id).valid}개가 크리에이터에게 전달돼요"
-					onreject={() => {
-						const r = products.reject(id);
-						if (r.ok) done(r, '/products?tab=review');
-						return r;
-					}}
-					onapprove={() => open('approve')}
-				/>
+				<ReviewPanel bind:this={panel} {...reviewProps} />
 			</div>
 		</div>
 	</div>
@@ -164,19 +169,48 @@
 	{/if}
 {:else if v}
 	<!-- ───────── 상품 관리 ───────── -->
+	{#snippet manage(sm: boolean)}
+		<div class="flex flex-col gap-2">
+			<div class="flex gap-2">
+				{#if armed === 'pause'}
+					<PanelBtn {sm} onclick={() => (armed = null)}>취소</PanelBtn>
+					<PanelBtn {sm} tone="primary" onclick={pause}>정말 일시중지하기</PanelBtn>
+				{:else}
+					{#if v.can.stock}<PanelBtn {sm} onclick={() => open('stock')}>재고 수정</PanelBtn>{/if}
+					{#if v.can.pause}<PanelBtn {sm} onclick={() => (armed = 'pause')}>일시중지</PanelBtn>{/if}
+					{#if v.can.resume}<PanelBtn {sm} tone="primary" onclick={() => app.showToast(products.resume(id))}>다시 판매</PanelBtn>{/if}
+				{/if}
+			</div>
+			{#if armed === 'pause'}<p class="text-[12.5px] leading-[1.45] font-semibold text-[#ff9a66]">{v.pauseNote}</p>{/if}
+			{#if v.can.end}
+				<div class="flex gap-2">
+					{#if armed === 'end'}
+						<PanelBtn {sm} onclick={() => (armed = null)}>취소</PanelBtn>
+						<PanelBtn {sm} tone="solidRed" onclick={end}>정말 판매 종료하기</PanelBtn>
+					{:else}
+						<PanelBtn {sm} tone="danger" onclick={() => (armed = 'end')}>판매 종료</PanelBtn>
+					{/if}
+				</div>
+				{#if armed === 'end'}<p class="text-[12.5px] leading-[1.45] font-semibold text-danger-fg">{v.endNote}</p>{/if}
+			{/if}
+		</div>
+	{/snippet}
 	<div class="animate-up-in px-5 pb-12 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-14">
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-3 lg:min-h-[52px] lg:flex-nowrap lg:gap-x-3.5">
 			<a href={backHref} aria-label="상품 목록으로" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 hover:bg-white/6"><Icon id="back" size={18} sw={2.2} /></a>
+			<span class="lg:hidden"><ProductThumb tile={v.tile} icon={v.icon} size={36} radius={11} art={20} /></span>
 			<span class="hidden lg:block"><ProductThumb tile={v.tile} icon={v.icon} size={48} radius={14} art={26} /></span>
 			<h1 class="min-w-0 flex-1 truncate text-[22px] font-extrabold tracking-[-0.03em] lg:text-[28px]">{v.name}</h1>
 			<div class="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:shrink-0 lg:gap-2">
 				{#each v.headChips as c (c.label)}<Chip label={c.label} tone={c.tone} md />{/each}
-				<span class="text-[13px] text-white/50 tabular-nums lg:ml-1 lg:text-[14px]">{v.sub}</span>
+				<span class="text-[13px] text-white/50 lg:hidden">{v.subMobile}</span>
+				<span class="ml-1 hidden text-[14px] text-white/50 tabular-nums lg:inline">{v.sub}</span>
 			</div>
 		</div>
 
 		<div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
-			<div class="flex min-w-0 flex-col gap-3.5">
+			<div class="flex min-w-0 flex-col gap-3 lg:gap-3.5">
+				{#if v.sideNote}<p class="rounded-[14px] border border-white/8 bg-white/4 px-4 py-[13px] text-[13.5px] leading-[1.5] font-semibold text-white/60 lg:hidden">{v.sideNote}</p>{/if}
 				<section class="rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:p-6">
 					<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">상품 정보</h2>
 					{#each v.info as r (r.k)}
@@ -200,8 +234,8 @@
 							<div class="mb-3.5 flex flex-wrap items-center gap-2">
 								<h2 class="text-[17px] font-extrabold tracking-[-0.01em]">제조금액 원장</h2>
 								{#each v.ledger.chips as c (c.label)}<Chip label={c.label} tone={c.tone} md />{/each}
-								<span class="flex-1"></span>
-								<a href={v.ledger.href} class="flex h-9 items-center rounded-xl border border-white/10 bg-white/6 px-3 text-[13px] font-bold hover:brightness-110">원장 열기</a>
+								<span class="hidden flex-1 lg:block"></span>
+								<a href={v.ledger.href} class="hidden h-9 items-center rounded-xl border border-white/10 bg-white/6 px-3 text-[13px] font-bold hover:brightness-110 lg:flex">원장 열기</a>
 							</div>
 							{#each v.ledger.rows as [k, val] (k)}
 								<div class="flex min-h-9 items-center justify-between gap-4 text-[14.5px] lg:min-h-[38px] lg:text-[15px]"><span class="text-white/60">{k}</span><span class="font-semibold tabular-nums">{val}</span></div>
@@ -209,6 +243,10 @@
 							<div class="mt-3 flex items-center gap-2.5">
 								<span class="h-1.5 flex-1 overflow-hidden rounded-full bg-white/9"><span class="block h-full rounded-full bg-accent" style:width="{v.ledger.pct}%"></span></span>
 								<span class="shrink-0 text-[12.5px] font-semibold text-white/60 tabular-nums">{v.ledger.barText}</span>
+							</div>
+							<!-- 모바일은 [원장 열기]를 막대 아래 오른쪽에 -->
+							<div class="mt-3 flex justify-end lg:hidden">
+								<a href={v.ledger.href} class="flex h-9 items-center rounded-xl border border-white/10 bg-white/6 px-3 text-[13px] font-bold active:brightness-110">원장 열기</a>
 							</div>
 						</section>
 					{:else}
@@ -236,10 +274,18 @@
 						<Timeline items={v.log} oldFirst who={false} />
 					</section>
 				{/if}
+
+				<!-- 모바일 "관리" 칸 — 버튼은 맨 아래(시안 "MYR Admin") -->
+				{#if v.can.stock || v.can.end}
+					<div class="mt-2 flex flex-col gap-2 border-t border-white/8 pt-[18px] lg:hidden">
+						<p class="text-[12.5px] font-bold text-white/45">관리</p>
+						{@render manage(true)}
+					</div>
+				{/if}
 			</div>
 
 			<!-- 오른쪽 고정 패널 -->
-			<aside class="order-first flex flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:sticky lg:top-7 lg:order-none lg:p-6">
+			<aside class="sticky top-7 hidden flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-6 lg:flex">
 				<div>
 					<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">상태</h2>
 					{#each [['크리에이터', `${v.creator.name} ${v.creator.handle}`], ['채널', v.creator.channel]] as [k, val] (k)}
@@ -247,32 +293,7 @@
 					{/each}
 				</div>
 				{#if v.sideNote}<p class="rounded-[14px] border border-white/8 bg-white/4 px-4 py-[13px] text-[13.5px] leading-[1.5] font-semibold text-white/60">{v.sideNote}</p>{/if}
-				{#if v.can.stock || v.can.end}
-					<div class="flex flex-col gap-2">
-						<div class="flex gap-2">
-							{#if armed === 'pause'}
-								<PanelBtn onclick={() => (armed = null)}>취소</PanelBtn>
-								<PanelBtn tone="primary" onclick={pause}>정말 일시중지하기</PanelBtn>
-							{:else}
-								{#if v.can.stock}<PanelBtn onclick={() => open('stock')}>재고 수정</PanelBtn>{/if}
-								{#if v.can.pause}<PanelBtn onclick={() => (armed = 'pause')}>일시중지</PanelBtn>{/if}
-								{#if v.can.resume}<PanelBtn tone="primary" onclick={() => app.showToast(products.resume(id))}>다시 판매</PanelBtn>{/if}
-							{/if}
-						</div>
-						{#if armed === 'pause'}<p class="text-[12.5px] leading-[1.45] font-semibold text-[#ff9a66]">{v.pauseNote}</p>{/if}
-						{#if v.can.end}
-							<div class="flex gap-2">
-								{#if armed === 'end'}
-									<PanelBtn onclick={() => (armed = null)}>취소</PanelBtn>
-									<PanelBtn tone="solidRed" onclick={end}>정말 판매 종료하기</PanelBtn>
-								{:else}
-									<PanelBtn tone="danger" onclick={() => (armed = 'end')}>판매 종료</PanelBtn>
-								{/if}
-							</div>
-							{#if armed === 'end'}<p class="text-[12.5px] leading-[1.45] font-semibold text-danger-fg">{v.endNote}</p>{/if}
-						{/if}
-					</div>
-				{/if}
+				{#if v.can.stock || v.can.end}{@render manage(false)}{/if}
 			</aside>
 		</div>
 	</div>

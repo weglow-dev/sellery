@@ -1,6 +1,6 @@
 <script lang="ts">
 	/** 심사 검수 정보(시안 상품 심사) — PC: 가로 줄(상품코드 · 크리에이터 · 연락처(가림 · [보기] 6초 뒤 다시 가림) · 제출 시각).
-	 *  모바일(시안 "MYR Admin"): "의견 달기 · 승인 · 반려는 PC에서 할 수 있어요" 안내 + 세로 표(크리에이터 · 가격 · 구성 · 상품코드 · 제출 시각) */
+	 *  모바일(시안 "MYR Admin"): 세로 표(크리에이터 · 가격 · 구성 · 상품코드 · 제출 시각) */
 	let { r }: { r: { code: string; creator: string; at: string; priceText: string; cat: string; unit: string; phone: { masked: string; raw: string } } } = $props();
 
 	let shown = $state(false);
@@ -33,7 +33,6 @@
 	</div>
 </div>
 
-<p class="rounded-[18px] border border-accent/25 bg-accent/8 px-4 py-3.5 text-[13.5px] leading-[1.5] font-bold text-[#ff9a66] lg:hidden">의견 달기 · 승인 · 반려는 PC에서 할 수 있어요</p>
 <div class="rounded-[20px] border border-white/8 bg-white/3 p-[18px] lg:hidden">
 	{#each [['크리에이터', r.creator], ['가격', r.priceText], ['구성', `${r.cat} · ${r.unit}`], ['상품코드', r.code], ['제출 시각', r.at]] as [k, v] (k)}
 		<div class="flex min-h-[34px] items-center justify-between gap-3 text-[14.5px]">

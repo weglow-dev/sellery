@@ -9,6 +9,7 @@
 	import PreviewSec from '$lib/components/PreviewSec.svelte';
 	import ReviewHead from '$lib/components/ReviewHead.svelte';
 	import ReviewInfo from '$lib/components/ReviewInfo.svelte';
+	import ReviewMobile from '$lib/components/ReviewMobile.svelte';
 	import ReviewPanel from '$lib/components/ReviewPanel.svelte';
 	import type { SecNo } from '$lib/mock/types';
 
@@ -18,10 +19,23 @@
 	const id = $derived(page.params.id ?? '');
 	const r = $derived(products.revision(id));
 	let panel = $state<ReturnType<typeof ReviewPanel>>();
+	let mobile = $state<ReturnType<typeof ReviewMobile>>();
 
+	/** 심사 버튼 · 의견 — PC 패널과 모바일(의견 목록 · 아래 막대 · 시트)이 같은 값을 쓴다 */
+	const reviewProps = $derived({
+		id,
+		approveLabel: '반영 승인',
+		approveSure: '정말 반영하기',
+		approveNote: '샵 상세에 바로 반영돼요',
+		freeFoot: '반영해도 판매 상태 · 재고 · 옵션은 그대로예요',
+		rejectNote: `의견 ${products.opsOf(id).valid}개가 크리에이터에게 전달돼요`,
+		onreject: () => finish(products.rejectRevision(id)),
+		onapprove: () => finish(products.applyRevision(id))
+	});
 	const addOp = (k: SecNo) => {
 		products.addOp(id, k);
 		panel?.focusSel();
+		mobile?.openSheet();
 	};
 	function finish(res: { ok: boolean; msg: string }) {
 		if (res.ok) {
@@ -87,19 +101,10 @@
 						{/if}
 					{/each}
 				</PreviewCard>
+				<ReviewMobile bind:this={mobile} {...reviewProps} />
 			</div>
 			<div class="hidden lg:sticky lg:top-7 lg:block">
-				<ReviewPanel
-					bind:this={panel}
-					{id}
-					approveLabel="반영 승인"
-					approveSure="정말 반영하기"
-					approveNote="샵 상세에 바로 반영돼요"
-					freeFoot="반영해도 판매 상태 · 재고 · 옵션은 그대로예요"
-					rejectNote="의견 {products.opsOf(id).valid}개가 크리에이터에게 전달돼요"
-					onreject={() => finish(products.rejectRevision(id))}
-					onapprove={() => finish(products.applyRevision(id))}
-				/>
+				<ReviewPanel bind:this={panel} {...reviewProps} />
 			</div>
 		</div>
 	</div>

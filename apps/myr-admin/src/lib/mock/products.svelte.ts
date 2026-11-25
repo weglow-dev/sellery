@@ -364,6 +364,8 @@ class ProductsServer {
 			icon: p.icon,
 			headChips,
 			sub: `${p.category} · ${won(p.price)}`,
+			/** 모바일 머리 한 줄 — 크리에이터 · 채널(시안 "MYR Admin" · 상태 카드 대신) */
+			subMobile: `${c.name} ${c.handle} · ${c.channel}`,
 			info: [
 				{ k: '상품코드', v: p.code, red: false },
 				{ k: '카테고리', v: p.category, red: false },
