@@ -14,6 +14,8 @@
 		infoTone = 'plain',
 		ok,
 		sure,
+		sureInfo,
+		sureKind = 'danger',
 		danger = false,
 		disabled = false,
 		onok,
@@ -26,6 +28,10 @@
 		infoTone?: Tone;
 		ok: string;
 		sure?: string;
+		/** 두 번째 확인 때 안내 자리에 보여 줄 문구(예: 정말 승인할까요? 샵에 바로 공개돼요) */
+		sureInfo?: string;
+		/** 두 번째 확인 버튼 색 — 기본 빨강 · 승인처럼 되돌릴 수 없지만 위험하지 않은 동작은 주황 */
+		sureKind?: 'primary' | 'danger';
 		danger?: boolean;
 		disabled?: boolean;
 		onok: () => string | void;
@@ -57,11 +63,12 @@
 		<h2 class="text-[18px] font-extrabold tracking-[-0.02em]">{title}</h2>
 		{#if desc}<p class="mt-1 text-[14px] text-white/60">{desc}</p>{/if}
 		{#if children}<div class="mt-4 flex flex-col gap-3">{@render children()}</div>{/if}
-		{#if info}<p class="mt-4 rounded-xl bg-white/4 px-3.5 py-3 text-[13px] leading-[1.55] {NOTE_CLS[infoTone]}">{info}</p>{/if}
+		{#if armed && sureInfo}<p class="mt-4 rounded-xl bg-accent/8 px-3.5 py-3 text-[13px] leading-[1.55] font-semibold text-[#ff9a66]">{sureInfo}</p>
+		{:else if info}<p class="mt-4 rounded-xl bg-white/4 px-3.5 py-3 text-[13px] leading-[1.55] {NOTE_CLS[infoTone]}">{info}</p>{/if}
 		{#if err}<p class="mt-3 text-[13px] leading-[1.5] font-semibold text-danger-fg" role="alert">{err}</p>{/if}
 		<div class="mt-5 flex gap-2">
 			<div class="flex-1"><Btn kind="ghost" full onclick={() => (armed ? (armed = false) : onclose())}>{armed ? '취소' : '닫기'}</Btn></div>
-			<div class="flex-[1.4]"><Btn kind={armed || danger ? 'danger' : 'primary'} full {disabled} onclick={go}>{armed ? sure : ok}</Btn></div>
+			<div class="flex-[1.4]"><Btn kind={armed ? sureKind : danger ? 'danger' : 'primary'} full {disabled} onclick={go}>{armed ? sure : ok}</Btn></div>
 		</div>
 	</div>
 </div>

@@ -10,8 +10,8 @@
 </script>
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1200px] lg:px-10 lg:pt-8">
-	<h1 class="sr-only text-[26px] font-extrabold tracking-[-0.02em] lg:not-sr-only lg:block">{m.name}</h1>
-	<div class="mt-2 lg:mt-6 flex flex-col items-center rounded-3xl border border-dashed border-white/15 px-6 py-14 text-center">
+	<h1 class="mt-1.5 text-[26px] font-extrabold tracking-[-0.03em] lg:mt-0 lg:tracking-[-0.02em]">{m.name}</h1>
+	<div class="mt-4 lg:mt-6 flex flex-col items-center rounded-3xl border border-dashed border-white/15 px-6 py-14 text-center">
 		<span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/6 text-white/70"><Icon id={m.icon} size={26} /></span>
 		<p class="mt-4 text-[17px] font-bold">다음 단계에서 만들어요</p>
 		<p class="mt-1.5 max-w-[420px] text-[14px] leading-[1.6] text-white/60">{desc}</p>

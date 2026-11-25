@@ -350,13 +350,12 @@ export const seedTaxes = (): TaxRaw[] => [
 
 /** 아직 화면을 만들지 않은 메뉴의 홈 숫자 — 기능 단계에서 각 RPC(심사 대기 · 발송 대기 · 문의 · 정산)가 보낸다 */
 export const OTHER_COUNTS = {
-	products: { newReview: 2, newOldest: '3일째', revReview: 1, revOldest: '하루째', soldOutLive: 1 },
 	orders: { toShip: 4, toShipOldest: '2일째', noDelivered: 2, noDeliveredOldest: '9일째' },
 	cs: { inqLate: 1, inqLateOldest: '26시간', refundRetry: 1, refundOldest: '4일째', creatorLate: 1, creatorLateOldest: '1일 넘김', pickup: 2, resend: 1, inqOpen: 3 },
 	creators: { inviteAsk: 1, inviteOldest: '하루째' },
 	/** 파트너팀 톡(0125) — 크리에이터가 마지막으로 말한 방 = 답할 차례 */
 	talk: { waiting: 2 },
-	settle: { nextAt: '12월 1일(화) 오후 1시', dday: 14, noLedger: 1, heldLines: 2 }
+	settle: { nextAt: '12월 1일(화) 오후 1시', dday: 14, heldLines: 2 }
 };
 
 /** 지급대행 · 크론 — 잔액 · 마지막 실행 (서비스가 정해지면 지급대행 API · docs/myr-admin-screens.md §13) */
