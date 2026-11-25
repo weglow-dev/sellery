@@ -12,6 +12,7 @@
 	import Drawer from '$lib/components/Drawer.svelte';
 	import Field from '$lib/components/Field.svelte';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
+	import InviteSend from '$lib/components/InviteSend.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import KV from '$lib/components/KV.svelte';
 	import Modal from '$lib/components/Modal.svelte';
@@ -21,7 +22,7 @@
 
 	/** 크리에이터 — docs/myr-admin-screens.md §5-2 · §5-3 중 자동 이체에 필요한 부분(사업자 · 정산 정보 확인 · 지급 이력)만.
 	 *  "계좌 확인 필요"로 이체가 실패하면 크리에이터가 계좌를 다시 입력 → 여기서 확인 → 다음 자동 이체(영업일 오후 1시)에 다시 보낸다.
-	 *  초대 · 정지 · 상품 · 활동 탭은 다음 단계. 상태 칩 · 지급 안내 · 결과 문구는 서버(목) 값 */
+	 *  [초대 보내기] = 보내기 폼만(§5-1 · 초대 목록은 필요해지면). 정지 · 상품 · 활동 탭은 다음 단계. 상태 칩 · 지급 안내 · 결과 문구는 서버(목) 값 */
 	const tabs = $derived(server.creatorTabs());
 	const all = $derived(server.creators);
 	const tab = $derived(page.url.searchParams.get('tab') ?? (tabs[0].count ? 'wait' : 'all'));
@@ -53,6 +54,7 @@
 	}
 
 	let modal = $state<'verify' | 'redo' | null>(null);
+	let inviting = $state(false);
 	let why = $state('');
 	const openRow = (id: string) => setParams(page.url, { id }, true);
 </script>
@@ -63,7 +65,7 @@
 			사업자 · 정산 정보 확인 대기 <b class="font-bold text-accent">{n('wait')}명</b> · 다시 입력 요청 {n('redo')} · 미입력 {n('none')} · 토스 인증 대기 {n('toss')} · 전체 {n('all')}명
 		{/snippet}
 		{#snippet actions()}
-			<Btn onclick={() => app.showToast('초대는 다음 단계에서 만들어요')}><Icon id="send" size={16} />초대 보내기</Btn>
+			<Btn onclick={() => (inviting = true)}><Icon id="send" size={16} />초대 보내기</Btn>
 		{/snippet}
 	</PageHead>
 
@@ -234,3 +236,5 @@
 		</Field>
 	</Modal>
 {/if}
+
+{#if inviting}<InviteSend onclose={() => (inviting = false)} />{/if}
