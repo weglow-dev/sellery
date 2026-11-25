@@ -2,6 +2,10 @@
  *  기능 단계에서 이 파일은 RPC 호출로 바뀌고 판정은 DB 함수가 한다(0102 보류 이유 · 0104 세금계산서 · 0111 이체 상태 — docs/myr-admin-plan.md).
  *  화면(routes · components)은 여기서 받은 이름 · 칩 · 안내 · 버튼 목록 · 건수만 그린다 — 화면에서 상태를 다시 판정하지 않는다. */
 import { products } from './products.svelte';
+import { cs } from './cs.svelte';
+import { orders } from './orders.svelte';
+import { settle } from './settle.svelte';
+import { talk } from './talk.svelte';
 import { NOW, ME, OTHER_COUNTS, seedCreators, seedPayouts, seedProvider, seedTaxes } from './seed';
 import type {
 	Chip,
@@ -437,10 +441,10 @@ class MockServer {
 		return {
 			products: { n: products.counts.newReview + products.counts.revReview, hot: false },
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
-			orders: { n: o.orders.toShip, hot: false },
-			cs: { n: o.cs.inqOpen + o.cs.refundRetry + o.cs.pickup + o.cs.resend, hot: o.cs.inqLate + o.cs.refundRetry + o.cs.creatorLate > 0 },
-			talk: { n: o.talk.waiting, hot: false },
-			settle: { n: products.counts.noLedger + o.settle.heldLines, hot: false },
+			orders: { n: orders.counts.toShip, hot: false },
+			cs: { n: cs.counts.inqOpen + cs.counts.refundRetry + cs.counts.pickup + cs.counts.resend, hot: cs.counts.inqLate + cs.counts.refundRetry + cs.counts.creatorLate > 0 },
+			talk: { n: talk.counts.waiting, hot: false },
+			settle: { n: products.counts.noLedger + settle.counts.heldLines, hot: false },
 			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
 			tax: { n: c.taxChk.length + c.taxOverdue, hot: c.taxOverdue > 0 }
 		};
@@ -482,22 +486,22 @@ class MockServer {
 				chip('재고 0 · 판매 중', pc.soldOutLive, 'orange', '/products?tab=live')
 			]),
 			row('orders', '주문 · 배송', 'm_orders', '/orders', [
-				chip('발송 대기', o.orders.toShip, 'orange', '/orders'),
-				chip('배송 완료 기록 없음', o.orders.noDelivered, 'orange', '/orders')
+				chip('발송 대기', orders.counts.toShip, 'orange', '/orders?tab=paid'),
+				chip('배송 완료 기록 없음', orders.counts.noDelivered, 'orange', '/orders/overdue')
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
-				chip('환불 다시 필요', o.cs.refundRetry, 'red', '/cs'),
-				chip('회수 대기', o.cs.pickup, 'orange', '/cs'),
-				chip('재발송 대기', o.cs.resend, 'orange', '/cs')
+				chip('환불 다시 필요', cs.counts.refundRetry, 'red', '/cs?tab=refund'),
+				chip('회수 대기', cs.counts.pickup, 'orange', '/cs?tab=pickup'),
+				chip('재발송 대기', cs.counts.resend, 'orange', '/cs?tab=resend')
 			]),
-			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', o.talk.waiting, 'orange', '/talk')]),
+			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', talk.counts.waiting, 'orange', '/talk?tab=wait')]),
 			row('creators', '크리에이터', 'm_creators', '/creators', [
 				chip('사업자 · 정산 정보 확인 대기', c.settleWait, 'orange', '/creators?tab=wait'),
 				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=toss')
 			]),
 			row('settle', '정산', 'm_settle', '/settle', [
-				chip('제조금액 미입력', pc.noLedger, 'orange', '/settle'),
-				chip('보류된 정산', o.settle.heldLines, 'orange', '/settle')
+				chip('제조금액 미입력', pc.noLedger, 'orange', '/settle?tab=none'),
+				chip('보류된 정산', settle.counts.heldLines, 'orange', '/settle')
 			]),
 			row('payouts', '지급', 'm_payouts', '/payouts', [
 				chip('운영 확인 필요', opsN, 'red', '/payouts?tab=fail'),
@@ -517,11 +521,11 @@ class MockServer {
 		const txs = tx.filter((t) => v.some((p) => p.creatorId === t.creatorId));
 		const sub = txs.filter((t) => t.status !== 'none').length;
 		const okN = txs.filter((t) => t.status === 'ok').length;
-		const heldN = o.settle.heldLines;
+		const heldN = settle.counts.heldLines;
 		const exc = opsN + c.account.length + c.retry;
 		const pct = (a: number, b: number) => Math.round((a / (b || a || 1)) * 100);
 		const curSteps: Omit<HomeStep, 'state' | 'pill'>[] = [
-			{ no: '1', title: '정산 확정', when: '11월 1일 오후 1시 · 자동', val: String(conf), of: '건', pct: 100, desc: heldN ? `제조금액 미입력 ${heldN}개 상품은 다음 회차로` : '보류 없이 확정됐어요', tone: heldN ? 'orange' : 'plain', href: '/settle' },
+			{ no: '1', title: '정산 확정', when: '11월 1일 오후 1시 · 자동', val: String(conf), of: '건', pct: 100, desc: heldN ? `제조금액 미입력 ${heldN}개 상품은 다음 회차로` : '보류 없이 확정됐어요', tone: heldN ? 'orange' : 'plain', href: '/settle/rounds' },
 			{ no: '2', title: '세금계산서 제출', when: '11월 10일까지 · 크리에이터', val: String(sub), of: `/ ${conf}`, pct: pct(sub, conf), desc: late ? `기한 지남 ${late}명` : '모두 냈어요', tone: late ? 'red' : 'plain', href: tx.some((t) => t.status === 'none') ? '/tax?tab=none' : '/tax?tab=redo' },
 			{ no: '3', title: '수취 확인', when: '제출되는 대로 · 운영', val: String(okN), of: `/ ${conf}`, pct: pct(okN, conf), desc: chk ? `확인 대기 ${chk}건` : '확인할 게 없어요', tone: chk ? 'orange' : 'plain', href: '/tax?tab=chk' },
 			{ no: '4', title: '자동 이체', when: '영업일 오후 1시 · 자동', val: String(paid.length), of: `/ ${conf}`, pct: pct(paid.length, conf), desc: `${payDay} ${plan.send.length}건 예정 · 송금 중 ${c.sending} · 예외 ${exc}`, tone: exc ? 'red' : 'plain', href: exc ? '/payouts?tab=fail' : '/payouts?tab=ready' }

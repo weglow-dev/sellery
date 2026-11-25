@@ -165,8 +165,8 @@ const MYR_MIRROR_RULES = [
   {
     re: /===\s*['"](listed|live)['"]\s*\|\|[^\n]*===\s*['"]paused['"]|===\s*['"]draft['"]\s*\|\|[^\n]*===\s*['"]rejected['"]/,
     why: "상품 상태 묶음을 다시 씀 — 서버 값 approved · editable(myr_product_status_*)을 쓴다",
-    // 운영 콘솔 UI 단계의 서버 흉내(목) — 판정 함수 approved 한 줄. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
-    allow: ["apps/myr-admin/src/lib/mock/products.svelte.ts"],
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 상품 판정 approved 한 줄 · 원장 화면이 다루는 상품(판매 중 · 일시중지 · 종료) 한 줄. 기능 단계에서 RPC 로 바뀌면 이 파일들과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/products.svelte.ts", "apps/myr-admin/src/lib/mock/settle.svelte.ts"],
   },
   {
     re: /(===|!==)\s*['"](단순 변심|파손 · 누액|오배송)['"]/,
@@ -194,7 +194,12 @@ const MYR_MIRROR_RULES = [
   { re: /\bdeposit(Held|Unpaid|Refunded)\s*(===?|!==|>|<=)\s*0\b/, why: "보증금 상태를 다시 판정 — 서버 값 depositState(myr_mfg_deposits)를 쓴다" },
   { re: /\breleasedIn\s*\|\||\|\|\s*[\w.]*nextPayout\b/, why: "이 달 합계에서 빠진 줄을 다시 판정 — 서버 값 counted(myr_settlement_card_rows)를 쓴다" },
   { re: /\.some\([^\n]*\.hasLedger\b/, why: "보류 해제 예정을 다시 판정 — 서버 값 releasable(myr_settlement_row_releasable)을 쓴다" },
-  { re: /\boffset\s*\/\s*[\w.]*total\b/, why: "제조금액 갚은 비율을 화면에서 계산 — 서버 값 repaidPct(myr_mfg_repaid_pct · 0103)를 쓴다" },
+  {
+    re: /\boffset\s*\/\s*[\w.]*total\b/,
+    why: "제조금액 갚은 비율을 화면에서 계산 — 서버 값 repaidPct(myr_mfg_repaid_pct · 0103)를 쓴다",
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 원장 요약을 서버 자리에서 계산한다. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/settle.svelte.ts"],
+  },
   { re: /\bkind\s*===\s*['"]refund_adj['"]\s*\?\s*0\b/, why: "정산 뒤 환불 줄의 환불액을 화면에서 다시 정함 — 서버 값 refund_snapshot 을 그대로 쓰고 문구만 kind 로 고른다" },
   { re: /['"]\*\*\*\*['"]\s*\+/, why: "계좌번호를 화면에서 가림 — 서버 값 account_masked(myr_mask_account)를 쓴다" },
   { re: /\bpayout_?[sS]tatus\s*(===|!==)\s*['"]paid['"]/, why: "지급 완료를 다시 판정 — 서버 값 payoutLabel · paidOn(myr_payout_is_paid · 0103)을 쓴다" },
@@ -257,7 +262,12 @@ const MYR_MIRROR_RULES = [
   { re: /\bcheckPayoutGuard\b|\bavailableAmount\s*(<|>|<=|>=)|(<|>|<=|>=)\s*[\w.]*\bavailableAmount\b|\b5_?000_?000\b/, why: "공유 잔액 가드 · 하루 한도를 TS 에서 판정 — 서버 myr_payout_guard(잔액만 넘긴다 · 한도는 platform_settings myr_payout · 0122)를 쓴다" },
   // 샵 화면 숫자(0115) — 결제 금액 · 줄 금액 · 재고 초과 · 무료배송 기준은 서버 견적(myr_app_cart_quote)
   { re: /\bitemsAmount\s*\+\s*[\w.]*shippingFee\b|\bshippingFee\s*\+\s*[\w.]*itemsAmount\b|\bsubtotal\s*\+\s*[\w.]*shipping\b/, why: "결제 금액(상품 합계 + 배송비)을 다시 계산 — 서버 값 amount(견적 · myr_pay_amount · 0115)를 쓴다" },
-  { re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/, why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다" },
+  {
+    re: /\w*(?:[uU]nit|[pP]rice)\w*\s*\*\s*[\w.]*[qQ]ty\b|[\w.]*[qQ]ty\s*\*\s*[\w.]*(?:[uU]nit|[pP]rice)/,
+    why: "단가 × 수량을 다시 계산 — 서버 견적 줄 lineAmount(myr_line_amount · 0115)를 쓴다",
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 주문 줄 · 요청 금액을 서버 자리에서 계산한다. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/orders.svelte.ts", "apps/myr-admin/src/lib/mock/cs.svelte.ts"],
+  },
   { re: /\bqty\s*>\s*[\w.]*stockLeft\b|\bstockLeft\s*<\s*[\w.]*qty\b/, why: "재고 초과를 화면에서 판정 — 서버 견적 줄 overStock(myr_stock_short · 0115)을 쓴다" },
   { re: /\d+\s*만\s*원\s*이상\s*무료배송/, why: "무료배송 기준을 화면에 고정 — 서버 견적 freeOver(platform_settings myr_shipping · 0092)를 쓴다" },
   {
