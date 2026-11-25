@@ -346,6 +346,23 @@ class ProductsServer {
 		return { rows, empty: { review: '심사를 기다리는 상품이 없어요', live: '판매 중인 상품이 없어요', ended: '판매 종료한 상품이 없어요' }[tab] };
 	}
 
+	/** 크리에이터 상세(§5-3) 상품 표 — 상품명 · 상태 칩 · 가격 · 재고 · 상품 상세 링크(삭제 · 임시저장 제외 없이 전부) */
+	byCreator(creatorId: string) {
+		const v = this.raw.filter((p) => p.creatorId === creatorId);
+		return {
+			live: v.filter((p) => p.status === 'live').length,
+			total: v.length,
+			rows: v.map((p) => ({
+				id: p.id,
+				name: p.name,
+				chip: STATUS_CHIP[p.status],
+				priceText: won(p.price),
+				stockText: p.stock === null ? '—' : `${p.stock.toLocaleString('ko-KR')}개`,
+				href: `/products/${p.id}`
+			}))
+		};
+	}
+
 	// ───────── 상품 관리(§4-4) ─────────
 
 	/** 상품 관리 — 왼쪽 상품 정보 · 수정 심사 안내 · 제조금액 원장 · 보낸 의견 · 처리 이력 / 오른쪽 상태 · 버튼 */
