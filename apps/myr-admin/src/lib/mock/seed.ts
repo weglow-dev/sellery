@@ -39,7 +39,7 @@ const mk = (c: C, i: number): CreatorRaw => ({
 export const seedCreators = (): CreatorRaw[] =>
 	[
 		{ id: 'c1', name: '민지', handle: '@minji.routine', joinedAt: '2026년 9월 2일', products: { live: 3, total: 4 }, settle: 'ok', biz: biz('민지루틴', '김민지', 'tax@minjiroutine.kr', '214-87-30215', '국민', '123456-04-305678', '9월 3일 오후 2:10') },
-		{ id: 'c2', name: '하루', handle: '@haru.well', joinedAt: '2026년 9월 5일', products: { live: 2, total: 2 }, settle: 'ok', toss: 'APPROVAL_REQUIRED', biz: biz('하루웰', '이하루', 'haru@haruwell.kr', '105-22-48190', '신한', '110-482-901122', '9월 6일 오전 11:40') },
+		{ id: 'c2', name: '하루', handle: '@haru.well', channel: '유튜브', joinedAt: '2026년 9월 5일', products: { live: 2, total: 2 }, settle: 'ok', toss: 'APPROVAL_REQUIRED', biz: biz('하루웰', '이하루', 'haru@haruwell.kr', '105-22-48190', '신한', '110-482-901122', '9월 6일 오전 11:40') },
 		{ id: 'c3', name: '준', handle: '@jun.fit', joinedAt: '2026년 9월 8일', products: { live: 1, total: 2 }, settle: 'ok', biz: biz('준피트', '박준', 'jun@junfit.co', '317-81-55021', '카카오뱅크', '3333-08-7712045', '9월 9일 오후 4:22') },
 		{ id: 'c4', name: '소이', handle: '@soy.clean', joinedAt: '2026년 9월 11일', products: { live: 2, total: 3 }, settle: 'ok', biz: biz('소이클린', '정소이', 'soy@soyclean.kr', '220-19-77104', '우리', '1002-552-440198', '9월 12일 오전 9:05') },
 		{ id: 'c5', name: '온유', handle: '@onyu.table', joinedAt: '2026년 9월 12일', products: { live: 2, total: 2 }, settle: 'ok', biz: biz('온유테이블', '최온유', 'onyu@onyutable.kr', '409-08-22917', '농협', '302-1145-8821-21', '9월 13일 오후 1:48') },
@@ -60,7 +60,7 @@ export const seedCreators = (): CreatorRaw[] =>
 			]
 		},
 		{ id: 'c8', name: '다온', handle: '@daon.cook', joinedAt: '2026년 9월 20일', products: { live: 3, total: 3 }, settle: 'ok', biz: biz('다온쿡', '오다온', 'daon@daoncook.kr', '211-45-60713', '기업', '011-220918-04-012', '9월 21일 오후 5:12') },
-		{ id: 'c9', name: '하늘', handle: '@haneul.yoga', joinedAt: '2026년 9월 22일', products: { live: 2, total: 3 }, settle: 'ok', biz: biz('하늘요가', '강하늘', 'haneul@haneulyoga.kr', '133-90-12478', '신한', '110-330-772910', '9월 23일 오전 8:55') },
+		{ id: 'c9', name: '하늘', handle: '@haneul.yoga', channel: '틱톡', joinedAt: '2026년 9월 22일', products: { live: 2, total: 3 }, settle: 'ok', biz: biz('하늘요가', '강하늘', 'haneul@haneulyoga.kr', '133-90-12478', '신한', '110-330-772910', '9월 23일 오전 8:55') },
 		{ id: 'c10', name: '유나', handle: '@yuna.bake', joinedAt: '2026년 9월 25일', products: { live: 1, total: 1 }, settle: 'ok', biz: biz('유나베이크', '서유나', 'yuna@yunabake.kr', '601-11-38025', '토스뱅크', '1000-4471-2093', '9월 26일 오후 2:40') },
 		{ id: 'c11', name: '로라', handle: '@lola.green', joinedAt: '2026년 9월 27일', products: { live: 2, total: 2 }, settle: 'ok', biz: biz('로라그린', '문로라', 'lola@lolagreen.kr', '304-25-61190', '국민', '470301-01-552019', '9월 28일 오전 10:18') },
 		{ id: 'c12', name: '지유', handle: '@jiyu.tea', joinedAt: '2026년 10월 1일', products: { live: 1, total: 1 }, settle: 'ok', biz: biz('지유티', '배지유', 'jiyu@jiyutea.kr', '119-63-40871', '우리', '1002-901-334120', '10월 2일 오후 3:30') },

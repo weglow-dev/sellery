@@ -30,6 +30,8 @@ export interface CreatorRaw {
 	joinedAt: string;
 	products: { live: number; total: number };
 	active: boolean;
+	/** 대표 채널(인스타그램 · 유튜브 · 틱톡) — 없으면 인스타그램 */
+	channel?: string;
 	/** 정지 기록(active=false 일 때) — 사유는 운영만 본다 · 크리에이터 콘솔은 정지 화면만 */
 	stop?: { why: string; at: string; by: string } | null;
 	phoneMasked: string;

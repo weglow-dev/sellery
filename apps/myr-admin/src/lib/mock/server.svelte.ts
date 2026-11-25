@@ -413,6 +413,96 @@ class MockServer {
 		];
 	}
 
+	// ───────── 크리에이터(§5 · 시안 "MYR Admin PC" · "MYR Admin" 크리에이터 · 2026-11-25) ─────────
+
+	/** 대기 = 정지 아니고 사업자 · 정산 정보가 확인 전이거나 토스 인증이 남은 크리에이터(목록 대기 탭) */
+	private crPending = (c: CreatorRaw) => c.active && (c.settle !== 'ok' || c.toss === 'APPROVAL_REQUIRED' || c.toss === 'KYC_REQUIRED');
+	private crTs(c: CreatorRaw): 'ok' | 'limited' | 'ci' | 'kyc' | 'none' {
+		return c.toss === 'APPROVED' ? 'ok' : c.toss === 'PARTIALLY_APPROVED' ? 'limited' : c.toss === 'APPROVAL_REQUIRED' ? 'ci' : c.toss === 'KYC_REQUIRED' ? 'kyc' : 'none';
+	}
+	private crBizChip(c: CreatorRaw): Chip {
+		return ({ ok: { label: '확인 완료', tone: 'grey' }, wait: { label: '확인 대기', tone: 'orange' }, redo: { label: '다시 입력 요청', tone: 'red' }, none: { label: '미입력', tone: 'red' } } as Record<CreatorRaw['settle'], Chip>)[c.settle];
+	}
+	private crTsChip(c: CreatorRaw): Chip {
+		return ({ ok: { label: '토스 지급 가능', tone: 'grey' }, limited: { label: '토스 지급 가능', tone: 'grey' }, ci: { label: '토스 본인인증 대기', tone: 'orange' }, kyc: { label: '토스 추가 인증 필요', tone: 'red' }, none: { label: '토스 셀러 등록 전', tone: 'grey' } } as Record<string, Chip>)[this.crTs(c)];
+	}
+	private crJoined = (c: CreatorRaw) => c.joinedAt.replace(/^\d{4}년\s*/, '');
+
+	/** 목록 탭 3개 — 전체 · 대기 · 정지 */
+	crTabs() {
+		const v = this.creatorsRaw;
+		return [
+			{ id: 'all' as const, name: '전체', count: v.length },
+			{ id: 'wait' as const, name: '대기', count: v.filter(this.crPending).length },
+			{ id: 'stopped' as const, name: '정지', count: v.filter((c) => !c.active).length }
+		];
+	}
+
+	/** 목록 표 — 크리에이터(아바타 · 이름 · 핸들) · 상태 칩(없으면 "정상") · 채널 · 상품 · 가입일 */
+	crList(tab: 'all' | 'wait' | 'stopped') {
+		const inTab = { all: () => true, wait: this.crPending, stopped: (c: CreatorRaw) => !c.active }[tab];
+		const rows = this.creatorsRaw.filter(inTab).map((c) => {
+			const ts = this.crTs(c);
+			const biz = this.crBizChip(c);
+			const chips: Chip[] = [...(c.settle === 'ok' ? [] : [{ ...biz, label: `사업자 정보 ${biz.label}` }]), ...(ts === 'ci' || ts === 'kyc' ? [this.crTsChip(c)] : []), ...(c.active ? [] : [{ label: '정지', tone: 'red' } as Chip])];
+			const ps = products.byCreator(c.id);
+			return { id: c.id, initial: c.initial, avatarBg: c.avatarBg, name: c.name, handle: c.handle, channel: c.channel ?? '인스타그램', chips, prod: `판매 중 ${ps.live}개 · 전체 ${ps.total}개`, joined: this.crJoined(c), href: `/creators/${c.id}` };
+		});
+		return { rows, empty: { all: '크리에이터가 없어요', wait: '확인이나 인증을 기다리는 크리에이터가 없어요', stopped: '정지한 크리에이터가 없어요' }[tab] };
+	}
+
+	/** 상세 — 머리 칩 · 기본 정보 · 사업자 · 정산 정보 · 토스 지급대행 · 상품 · 지급 이력 · 활동 · 오른쪽(판매 중 상품 · 안내 · 버튼) */
+	crDetail(id: string) {
+		const c = this.creatorsRaw.find((x) => x.id === id);
+		if (!c) return null;
+		const ts = this.crTs(c);
+		const ps = products.byCreator(c.id);
+		const TS = { ok: ['지급 가능', '한도 없음', 'plain'], limited: ['지급 가능', '7일에 1,000만 원까지', 'plain'], ci: ['본인인증 대기', '인증 전에는 지급할 수 없어요', 'orange'], kyc: ['추가 인증 필요', '인증 전에는 지급할 수 없어요', 'red'], none: ['셀러 등록 전', '—', 'grey'] }[ts] as [string, string, Tone | 'plain'];
+		const pays = this.payoutsRaw.filter((p) => p.creatorId === c.id).map(this.payoutView);
+		return {
+			id: c.id,
+			name: c.name,
+			handle: c.handle,
+			initial: c.initial,
+			avatarBg: c.avatarBg,
+			headChips: [c.active ? ({ label: '활성', tone: 'mint' } as Chip) : ({ label: '정지', tone: 'red' } as Chip), this.crBizChip(c), ...(ts === 'ci' || ts === 'kyc' ? [this.crTsChip(c)] : [])],
+			liveText: `판매 중 상품 ${ps.live}개`,
+			basic: { name: `${c.name} ${c.handle}`, channel: c.channel ?? '인스타그램', phone: { masked: c.phoneMasked, raw: c.phoneMasked.replace('****', '2048') }, joined: this.crJoined(c) },
+			biz: {
+				chip: this.crBizChip(c),
+				info: c.biz ? { firm: c.biz.firm, bizNo: { masked: c.biz.bizNoMasked, raw: c.biz.bizNo }, owner: c.biz.owner, email: c.biz.email, account: { masked: c.biz.accountMasked, raw: `${c.biz.bank} ${c.biz.account}` }, submittedAt: c.biz.submittedAt } : null,
+				note:
+					c.settle === 'wait'
+						? (c.resubmitNote ?? '새로 제출한 정보예요 · 확인해 주세요')
+						: c.settle === 'redo'
+							? `다시 입력 요청 사유 | ${c.redoWhy ?? ''}`
+							: !c.biz
+								? '아직 사업자, 정산 정보를 입력하지 않았어요 · 크리에이터 콘솔 내 정보에서 입력해요 · 입력 전까지 지급 보류예요'
+								: null,
+				noteGrey: !c.biz
+			},
+			toss: c.biz
+				? {
+						chip: this.crTsChip(c),
+						state: { text: TS[0], tone: TS[2] },
+						limit: ts === 'ok' || ts === 'limited' ? null : TS[1],
+						note: { ci: '토스 본인인증 전이라 지급 보류, 크리에이터가 인증하면 자동으로 지급 대기가 돼요', kyc: '최근 7일 지급액이 1,000만 원을 넘었어요 · 추가 인증(KYC)을 마치기 전까지 지급이 모두 막혀요', none: '크리에이터가 정산 정보를 넣으면 토스에 셀러로 등록되고 본인인증 문자가 나가요', ok: null, limited: null }[ts]
+					}
+				: null,
+			products: ps.rows,
+			payouts: pays.map((p) => ({ id: p.id, month: p.month, reason: p.holdText ?? '—', reasonRed: !!p.holdText, chip: p.chips[0], amountText: won(p.amount), href: `/payouts?tab=all&id=${p.id}` })),
+			activity: [
+				{ at: this.crJoined(c), text: '초대 링크로 가입했어요', who: '' },
+				...(c.biz ? [{ at: c.biz.submittedAt, text: '사업자 · 정산 정보를 제출했어요', who: '' }] : []),
+				...c.log
+			],
+			sideNote: c.settle === 'wait' ? '사업자 정보가 확인돼야 지급 보류가 풀려요' : null,
+			can: { verify: c.settle === 'wait', kyc: ts === 'kyc', stop: c.active, restore: !c.active },
+			stopNote: '정지하면 크리에이터의 판매 중인 상품이 모두 내려가고, 로그인할 수 없어요',
+			talkHref: `/talk?cr=${c.id}`
+		};
+	}
+
 	// ───────── 홈 · 메뉴 숫자(배지 = 홈 숫자 · §1-1) ─────────
 
 	get counts() {
@@ -497,7 +587,7 @@ class MockServer {
 			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', talk.counts.waiting, 'orange', '/talk?tab=wait')]),
 			row('creators', '크리에이터', 'm_creators', '/creators', [
 				chip('사업자 · 정산 정보 확인 대기', c.settleWait, 'orange', '/creators?tab=wait'),
-				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=toss')
+				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=wait')
 			]),
 			row('settle', '정산', 'm_settle', '/settle', [
 				chip('제조금액 미입력', pc.noLedger, 'orange', '/settle?tab=none'),
