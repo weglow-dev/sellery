@@ -48,7 +48,7 @@
 		<div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
 			<div class="flex min-w-0 flex-col gap-3.5">
 				<ReviewInfo {r} />
-				<PreviewCard right={r.revSum} cat={r.cat} name={r.name} gap="gap-3">
+				<PreviewCard right={r.revSum} rightMobile cat={r.cat} name={r.name} gap="gap-2.5 lg:gap-3">
 					{#each r.secs as s (s.k)}
 						{#if s.same}
 							<div class="flex h-[46px] items-center justify-between gap-3 rounded-[14px] border border-dashed border-white/10 px-4">
@@ -59,7 +59,7 @@
 							<div class="mt-3.5 mb-2">
 								<PreviewBox box={s} onop={() => addOp(s.k)}>
 									{#if s.k === 1}
-										<div class="relative mb-[18px] flex h-[240px] items-center justify-center rounded-[18px] text-fg" style:background={PRODUCT_TILES[r.tile]}>
+										<div class="relative mb-[18px] flex h-[200px] items-center justify-center rounded-[18px] text-fg lg:h-[240px]" style:background={PRODUCT_TILES[r.tile]}>
 											<svg width="76" height="76" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html PRODUCT_ART[r.icon] ?? ''}</svg>
 											<div class="absolute bottom-3 left-3 flex flex-wrap gap-1.5">{#each r.tags as t (t)}<span class="rounded-full bg-bg/55 px-2.5 py-[5px] text-[12px] font-bold">{t}</span>{/each}</div>
 										</div>
@@ -101,7 +101,6 @@
 					onapprove={() => finish(products.applyRevision(id))}
 				/>
 			</div>
-			<p class="rounded-2xl bg-white/4 px-4 py-3 text-[13px] text-white/60 lg:hidden">수정 심사(의견 · 반려 · 반영 승인)는 PC 에서 해요</p>
 		</div>
 	</div>
 {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
-	/** 심사 검수 정보 줄(시안 상품 심사) — 상품코드 · 크리에이터 · 연락처(가림 · [보기] 6초 뒤 다시 가림) · 제출 시각 */
-	let { r }: { r: { code: string; creator: string; at: string; phone: { masked: string; raw: string } } } = $props();
+	/** 심사 검수 정보(시안 상품 심사) — PC: 가로 줄(상품코드 · 크리에이터 · 연락처(가림 · [보기] 6초 뒤 다시 가림) · 제출 시각).
+	 *  모바일(시안 "MYR Admin"): "의견 달기 · 승인 · 반려는 PC에서 할 수 있어요" 안내 + 세로 표(크리에이터 · 가격 · 구성 · 상품코드 · 제출 시각) */
+	let { r }: { r: { code: string; creator: string; at: string; priceText: string; cat: string; unit: string; phone: { masked: string; raw: string } } } = $props();
 
 	let shown = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -12,7 +13,7 @@
 	$effect(() => () => clearTimeout(timer));
 </script>
 
-<div class="flex flex-wrap items-start gap-x-11 gap-y-3 rounded-3xl border border-white/8 bg-white/3 px-6 py-4">
+<div class="hidden flex-wrap items-start gap-x-11 gap-y-3 rounded-3xl border border-white/8 bg-white/3 px-6 py-4 lg:flex">
 	{#each [['상품코드', r.code], ['크리에이터', r.creator]] as [k, v] (k)}
 		<div class="shrink-0">
 			<p class="text-[12px] text-white/50">{k}</p>
@@ -30,4 +31,14 @@
 		<p class="text-[12px] text-white/50">제출 시각</p>
 		<p class="mt-[5px] flex min-h-6 items-center text-[14.5px] font-semibold whitespace-nowrap tabular-nums">{r.at}</p>
 	</div>
+</div>
+
+<p class="rounded-[18px] border border-accent/25 bg-accent/8 px-4 py-3.5 text-[13.5px] leading-[1.5] font-bold text-[#ff9a66] lg:hidden">의견 달기 · 승인 · 반려는 PC에서 할 수 있어요</p>
+<div class="rounded-[20px] border border-white/8 bg-white/3 p-[18px] lg:hidden">
+	{#each [['크리에이터', r.creator], ['가격', r.priceText], ['구성', `${r.cat} · ${r.unit}`], ['상품코드', r.code], ['제출 시각', r.at]] as [k, v] (k)}
+		<div class="flex min-h-[34px] items-center justify-between gap-3 text-[14.5px]">
+			<span class="shrink-0 text-white/60">{k}</span>
+			<span class="min-w-0 truncate font-semibold tabular-nums">{v}</span>
+		</div>
+	{/each}
 </div>

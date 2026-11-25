@@ -23,7 +23,7 @@
 	/** 상품 상세 — docs/myr-admin-screens.md §4-2 신규 심사 · §4-4 상품 관리(시안 "MYR Admin PC" 상품 · 2026-11-25).
 	 *  신규 심사: 검수 정보 줄 · 샵 상세 미리보기(01 기본 정보 · 구매 패널 → 02 레시피 노트 → 03~07 · 칸마다 [의견 달기]) · 오른쪽 의견 패널([반려] · [승인 → 처음 재고 · 제조금액]).
 	 *  상품 관리: 상품 정보 · 수정 심사 안내 · 제조금액 원장 · 보낸 의견 · 처리 이력 / 오른쪽 상태 · [재고 수정] · [일시중지]/[다시 판매] · [판매 종료].
-	 *  상품 심사는 PC 에서만(§3 모바일) — 모바일은 미리보기만 보고 버튼 대신 안내. 문구 · 버튼 · 거절은 서버(목) 값 */
+	 *  상품 심사는 PC 에서만(§3 모바일) — 모바일(시안 "MYR Admin")은 안내 · 검수 정보 표 · 미리보기만. 상품 관리 모바일은 상태 · 버튼이 위. 문구 · 버튼 · 거절은 서버(목) 값 */
 	const id = $derived(page.params.id ?? '');
 	const rv = $derived(products.review(id));
 	const v = $derived(rv ? null : products.view(id));
@@ -76,7 +76,7 @@
 </script>
 
 {#snippet hero(bg: string, icon: string, slides: boolean)}
-	<div class="relative flex h-[240px] items-center justify-center rounded-[18px] text-fg" style:background={bg}>
+	<div class="relative flex h-[200px] items-center justify-center rounded-[18px] text-fg lg:h-[240px]" style:background={bg}>
 		<svg width="76" height="76" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html PRODUCT_ART[icon] ?? ''}</svg>
 		{#if slides && rv}
 			<button type="button" onclick={() => turn(-1)} aria-label="이전 사진" class="absolute top-1/2 left-2.5 flex h-[34px] w-[34px] -translate-y-1/2 items-center justify-center rounded-full bg-bg/50 hover:bg-bg/75"><Icon id="back" size={16} sw={2.4} /></button>
@@ -139,7 +139,6 @@
 					onapprove={() => open('approve')}
 				/>
 			</div>
-			<p class="rounded-2xl bg-white/4 px-4 py-3 text-[13px] text-white/60 lg:hidden">상품 심사(의견 · 반려 · 승인)는 PC 에서 해요</p>
 		</div>
 	</div>
 
@@ -166,22 +165,22 @@
 {:else if v}
 	<!-- ───────── 상품 관리 ───────── -->
 	<div class="animate-up-in px-5 pb-12 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-14">
-		<div class="flex flex-wrap items-center gap-x-3.5 gap-y-2 lg:min-h-[52px] lg:flex-nowrap">
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-3 lg:min-h-[52px] lg:flex-nowrap lg:gap-x-3.5">
 			<a href={backHref} aria-label="상품 목록으로" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 hover:bg-white/6"><Icon id="back" size={18} sw={2.2} /></a>
-			<ProductThumb tile={v.tile} icon={v.icon} size={48} radius={14} art={26} />
+			<span class="hidden lg:block"><ProductThumb tile={v.tile} icon={v.icon} size={48} radius={14} art={26} /></span>
 			<h1 class="min-w-0 flex-1 truncate text-[22px] font-extrabold tracking-[-0.03em] lg:text-[28px]">{v.name}</h1>
-			<div class="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:shrink-0">
-				{#each v.headChips as c (c.label)}<Chip label={c.label} tone={c.tone} />{/each}
-				<span class="ml-1 text-[14px] text-white/50 tabular-nums">{v.sub}</span>
+			<div class="flex w-full flex-wrap items-center gap-1.5 lg:w-auto lg:shrink-0 lg:gap-2">
+				{#each v.headChips as c (c.label)}<Chip label={c.label} tone={c.tone} md />{/each}
+				<span class="text-[13px] text-white/50 tabular-nums lg:ml-1 lg:text-[14px]">{v.sub}</span>
 			</div>
 		</div>
 
 		<div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
 			<div class="flex min-w-0 flex-col gap-3.5">
-				<section class="rounded-3xl border border-white/8 bg-white/3 p-5 lg:p-6">
+				<section class="rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:p-6">
 					<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">상품 정보</h2>
 					{#each v.info as r (r.k)}
-						<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]">
+						<div class="flex min-h-9 items-center justify-between gap-4 text-[14.5px] lg:min-h-[38px] lg:text-[15px]">
 							<span class="text-white/60">{r.k}</span>
 							<span class="text-right font-semibold tabular-nums {r.red ? 'text-danger-fg' : ''}">{r.v}</span>
 						</div>
@@ -197,15 +196,15 @@
 
 				{#if v.showLedger}
 					{#if v.ledger}
-						<section class="rounded-3xl border border-white/8 bg-white/3 p-5 lg:p-6">
+						<section class="rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:p-6">
 							<div class="mb-3.5 flex flex-wrap items-center gap-2">
 								<h2 class="text-[17px] font-extrabold tracking-[-0.01em]">제조금액 원장</h2>
-								{#each v.ledger.chips as c (c.label)}<Chip label={c.label} tone={c.tone} />{/each}
+								{#each v.ledger.chips as c (c.label)}<Chip label={c.label} tone={c.tone} md />{/each}
 								<span class="flex-1"></span>
 								<a href={v.ledger.href} class="flex h-9 items-center rounded-xl border border-white/10 bg-white/6 px-3 text-[13px] font-bold hover:brightness-110">원장 열기</a>
 							</div>
 							{#each v.ledger.rows as [k, val] (k)}
-								<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><span class="text-white/60">{k}</span><span class="font-semibold tabular-nums">{val}</span></div>
+								<div class="flex min-h-9 items-center justify-between gap-4 text-[14.5px] lg:min-h-[38px] lg:text-[15px]"><span class="text-white/60">{k}</span><span class="font-semibold tabular-nums">{val}</span></div>
 							{/each}
 							<div class="mt-3 flex items-center gap-2.5">
 								<span class="h-1.5 flex-1 overflow-hidden rounded-full bg-white/9"><span class="block h-full rounded-full bg-accent" style:width="{v.ledger.pct}%"></span></span>
@@ -221,7 +220,7 @@
 				{/if}
 
 				{#if v.sent.length}
-					<section class="rounded-3xl border border-white/8 bg-white/3 p-5 lg:p-6">
+					<section class="rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:p-6">
 						<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">보낸 의견 {v.sent.length}개</h2>
 						<ul class="flex flex-col gap-2.5">
 							{#each v.sent as s, n (n)}
@@ -232,7 +231,7 @@
 				{/if}
 
 				{#if v.log.length}
-					<section class="rounded-3xl border border-white/8 bg-white/3 p-5 lg:p-6">
+					<section class="rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:p-6">
 						<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">처리 이력</h2>
 						<Timeline items={v.log} oldFirst who={false} />
 					</section>
@@ -240,11 +239,11 @@
 			</div>
 
 			<!-- 오른쪽 고정 패널 -->
-			<aside class="flex flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-5 lg:sticky lg:top-7 lg:p-6">
+			<aside class="order-first flex flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-[18px] lg:sticky lg:top-7 lg:order-none lg:p-6">
 				<div>
 					<h2 class="mb-3.5 text-[17px] font-extrabold tracking-[-0.01em]">상태</h2>
 					{#each [['크리에이터', `${v.creator.name} ${v.creator.handle}`], ['채널', v.creator.channel]] as [k, val] (k)}
-						<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><span class="text-white/60">{k}</span><span class="font-semibold">{val}</span></div>
+						<div class="flex min-h-9 items-center justify-between gap-4 text-[14.5px] lg:min-h-[38px] lg:text-[15px]"><span class="text-white/60">{k}</span><span class="font-semibold">{val}</span></div>
 					{/each}
 				</div>
 				{#if v.sideNote}<p class="rounded-[14px] border border-white/8 bg-white/4 px-4 py-[13px] text-[13.5px] leading-[1.5] font-semibold text-white/60">{v.sideNote}</p>{/if}
