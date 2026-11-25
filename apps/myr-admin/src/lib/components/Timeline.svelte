@@ -13,7 +13,7 @@
 	{#each rows as l, i (i)}
 		<li class="relative">
 			<span class="absolute top-[5px] -left-5 h-[11px] w-[11px] rounded-full border-2 border-bg {i === last ? 'bg-accent' : 'bg-white/30'}" aria-hidden="true"></span>
-			<p class="text-[14px] leading-[1.45] font-semibold text-white/90">{l.text}</p>
+			<p class="text-[14.5px] leading-[1.4] font-semibold text-white/90">{l.text}</p>
 			<p class="mt-0.5 text-[12px] text-white/55 tabular-nums">{who ? `${l.who} · ${l.at}` : l.at}</p>
 		</li>
 	{/each}
