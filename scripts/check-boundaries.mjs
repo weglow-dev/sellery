@@ -165,6 +165,8 @@ const MYR_MIRROR_RULES = [
   {
     re: /===\s*['"](listed|live)['"]\s*\|\|[^\n]*===\s*['"]paused['"]|===\s*['"]draft['"]\s*\|\|[^\n]*===\s*['"]rejected['"]/,
     why: "상품 상태 묶음을 다시 씀 — 서버 값 approved · editable(myr_product_status_*)을 쓴다",
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 판정 함수 approved 한 줄. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/products.svelte.ts"],
   },
   {
     re: /(===|!==)\s*['"](단순 변심|파손 · 누액|오배송)['"]/,
@@ -174,7 +176,12 @@ const MYR_MIRROR_RULES = [
     re: /\brefunded_?[qQ]ty\s*>\s*0\b/,
     why: "줄에 환불이 있었는지 다시 판정 — 서버 값 hasRefund(myr_line_has_refund · lineHasRefund)를 쓴다",
   },
-  { re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/, why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다" },
+  {
+    re: /\bstock(Left)?\s*(<=|<|===)\s*[01]\b/,
+    why: "품절을 다시 판정 — 서버 값 soldOut(myr_product_sold_out)을 쓴다",
+    // 운영 콘솔 UI 단계의 서버 흉내(목) — 판정 함수 soldOut 한 줄. 기능 단계에서 RPC 로 바뀌면 이 파일과 예외를 지운다
+    allow: ["apps/myr-admin/src/lib/mock/products.svelte.ts"],
+  },
   { re: /\bGB_PCT_(MIN|MAX)\b|\b10_?000_?000\b/, why: "공구 할인율 범위 · 판매가 상한 숫자를 화면에 둠 — 서버 값(pctRange · 거절 응답 max)을 쓴다" },
   { re: /\bsales\s*-\s*[\w.]*refund_?[aA]dj\b/, why: "순매출(판매 − 정산 뒤 환불)을 다시 계산 — 서버 값 netSales(myr_settlement_net_sales)를 쓴다" },
   { re: /\bsettle\s*-\s*[\w.]*offset\b/, why: "줄 지급액(정산금 − 상계 + 보증금 환급)을 다시 계산 — 서버 값 payout(myr_settlement_row_payout)을 쓴다" },

@@ -1,6 +1,7 @@
 /** 서버 흉내 — UI 단계라 지급 · 세금계산서 · 크리에이터 판정과 동작을 여기서 대신한다(메모리 · 새로고침하면 시드로).
  *  기능 단계에서 이 파일은 RPC 호출로 바뀌고 판정은 DB 함수가 한다(0102 보류 이유 · 0104 세금계산서 · 0111 이체 상태 — docs/myr-admin-plan.md).
  *  화면(routes · components)은 여기서 받은 이름 · 칩 · 안내 · 버튼 목록 · 건수만 그린다 — 화면에서 상태를 다시 판정하지 않는다. */
+import { products } from './products.svelte';
 import { NOW, ME, OTHER_COUNTS, seedCreators, seedPayouts, seedProvider, seedTaxes } from './seed';
 import type {
 	Chip,
@@ -11,6 +12,7 @@ import type {
 	HoldKind,
 	HomeChip,
 	HomeRow,
+	HomeCycle,
 	HomeStep,
 	NavBadge,
 	PayoutAction,
@@ -430,12 +432,12 @@ class MockServer {
 		const c = this.counts;
 		const o = OTHER_COUNTS;
 		return {
-			products: { n: o.products.newReview + o.products.revReview, hot: false },
+			products: { n: products.counts.newReview + products.counts.revReview, hot: false },
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
 			orders: { n: o.orders.toShip, hot: false },
 			cs: { n: o.cs.inqOpen + o.cs.refundRetry + o.cs.pickup + o.cs.resend, hot: o.cs.inqLate + o.cs.refundRetry + o.cs.creatorLate > 0 },
 			talk: { n: o.talk.waiting, hot: false },
-			settle: { n: o.settle.noLedger + o.settle.heldLines, hot: false },
+			settle: { n: products.counts.noLedger + o.settle.heldLines, hot: false },
 			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
 			tax: { n: c.taxChk.length + c.taxOverdue, hot: c.taxOverdue > 0 }
 		};
@@ -445,10 +447,11 @@ class MockServer {
 	 *  ① 히어로: 10월분 아직 지급하지 않은 금액 · 지급 합계 · 지급 완료 · 운영 확인 필요 · 토스 지급 가능 잔액(다음 실행에 보낼 금액보다 적으면 "₩○ 모자라요") · 들어올 예정
 	 *  ② 세금계산서 확인 대기(확인하면 다음 자동 이체에 지급) · 심사 대기 상품
 	 *  ③ 오늘 처리할 일 — 메뉴 8줄 고정 순서 · 빨강 칩 수 = 급한 일
-	 *  ④ 정산 일정 — 10월분 지급 흐름 4단계 */
+	 *  ④ 정산 일정 — 회차 둘(10월분 지급 흐름 · 11월분 확정 전) × 4단계 · 단계 상태 끝남 · 진행 중 · 아직 */
 	get home() {
 		const c = this.counts;
 		const o = OTHER_COUNTS;
+		const pc = products.counts;
 		const v = this.payouts.filter((x) => x.amount);
 		const paid = v.filter((x) => x.tabs.includes('paid'));
 		const total = v.reduce((a, x) => a + x.amount, 0);
@@ -471,9 +474,9 @@ class MockServer {
 		};
 		const rows: HomeRow[] = [
 			row('products', '상품', 'm_products', '/products', [
-				chip('신규 심사', o.products.newReview, 'orange', '/products'),
-				chip('수정 심사', o.products.revReview, 'orange', '/products'),
-				chip('재고 0 · 판매 중', o.products.soldOutLive, 'orange', '/products')
+				chip('신규 심사', pc.newReview, 'orange', '/products?tab=review'),
+				chip('수정 심사', pc.revReview, 'orange', '/products?tab=review'),
+				chip('재고 0 · 판매 중', pc.soldOutLive, 'orange', '/products?tab=live')
 			]),
 			row('orders', '주문 · 배송', 'm_orders', '/orders', [
 				chip('발송 대기', o.orders.toShip, 'orange', '/orders'),
@@ -490,7 +493,7 @@ class MockServer {
 				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=toss')
 			]),
 			row('settle', '정산', 'm_settle', '/settle', [
-				chip('제조금액 미입력', o.settle.noLedger, 'orange', '/settle'),
+				chip('제조금액 미입력', pc.noLedger, 'orange', '/settle'),
 				chip('보류된 정산', o.settle.heldLines, 'orange', '/settle')
 			]),
 			row('payouts', '지급', 'm_payouts', '/payouts', [
@@ -514,11 +517,31 @@ class MockServer {
 		const heldN = o.settle.heldLines;
 		const exc = opsN + c.account.length + c.retry;
 		const pct = (a: number, b: number) => Math.round((a / (b || a || 1)) * 100);
-		const steps: HomeStep[] = [
+		const curSteps: Omit<HomeStep, 'state' | 'pill'>[] = [
 			{ no: '1', title: '정산 확정', when: '11월 1일 오후 1시 · 자동', val: String(conf), of: '건', pct: 100, desc: heldN ? `제조금액 미입력 ${heldN}개 상품은 다음 회차로` : '보류 없이 확정됐어요', tone: heldN ? 'orange' : 'plain', href: '/settle' },
 			{ no: '2', title: '세금계산서 제출', when: '11월 10일까지 · 크리에이터', val: String(sub), of: `/ ${conf}`, pct: pct(sub, conf), desc: late ? `기한 지남 ${late}명` : '모두 냈어요', tone: late ? 'red' : 'plain', href: tx.some((t) => t.status === 'none') ? '/tax?tab=none' : '/tax?tab=redo' },
 			{ no: '3', title: '수취 확인', when: '제출되는 대로 · 운영', val: String(okN), of: `/ ${conf}`, pct: pct(okN, conf), desc: chk ? `확인 대기 ${chk}건` : '확인할 게 없어요', tone: chk ? 'orange' : 'plain', href: '/tax?tab=chk' },
 			{ no: '4', title: '자동 이체', when: '영업일 오후 1시 · 자동', val: String(paid.length), of: `/ ${conf}`, pct: pct(paid.length, conf), desc: `${payDay} ${plan.send.length}건 예정 · 송금 중 ${c.sending} · 예외 ${exc}`, tone: exc ? 'red' : 'plain', href: exc ? '/payouts?tab=fail' : '/payouts?tab=ready' }
+		];
+		// 단계 상태(시안 2026-11-24) — 끝남(✓) · 진행 중(강조 · "진행 중") · 아직(흐리게)
+		const curSt: HomeStep['state'][] = [
+			'done',
+			sub === conf ? 'done' : 'now',
+			okN === conf ? 'done' : sub ? 'now' : 'wait',
+			paid.length === conf ? 'done' : okN || paid.length ? 'now' : 'wait'
+		];
+		// 다음 회차(11월분) — 매월 1일 오후 1시에 확정되기 전까지는 일정만(값 없음 · "확정 전")
+		const nextSteps: Omit<HomeStep, 'state' | 'pill'>[] = [
+			{ no: '1', title: '정산 확정', when: `${o.settle.nextAt} · 자동`, val: `D-${o.settle.dday}`, of: '', pct: 0, desc: '11월 판매분을 자동으로 계산하고 확정해요', tone: 'plain', href: '/settle' },
+			{ no: '2', title: '세금계산서 제출', when: '12월 10일까지 · 크리에이터', val: '—', of: '', pct: 0, desc: '정산이 확정되면 크리에이터에게 안내가 가요', tone: 'plain', href: '/tax' },
+			{ no: '3', title: '수취 확인', when: '제출되는 대로 · 운영', val: '—', of: '', pct: 0, desc: '제출된 건부터 확인해요', tone: 'plain', href: '/tax' },
+			{ no: '4', title: '자동 이체', when: '영업일 오후 1시 · 자동', val: '—', of: '', pct: 0, desc: '수취 확인된 건부터 건마다 나가요', tone: 'plain', href: '/payouts' }
+		];
+		const withSt = (list: Omit<HomeStep, 'state' | 'pill'>[], st: HomeStep['state'][], nowPill: string): HomeStep[] =>
+			list.map((x, i) => ({ ...x, state: st[i], pill: st[i] === 'now' ? nowPill : null }));
+		const cycles: HomeCycle[] = [
+			{ key: 'cur', label: '10월분', steps: withSt(curSteps, curSt, '진행 중') },
+			{ key: 'next', label: '11월분', steps: withSt(nextSteps, ['now', 'wait', 'wait', 'wait'], '확정 전') }
 		];
 
 		return {
@@ -533,20 +556,18 @@ class MockServer {
 			bal: won(available),
 			balNote: short ? `${won(short)} 모자라요` : '충분해요',
 			balShort: short > 0,
+			// 모자란 건은 실패가 아니다 — 지급 대기 그대로 다음 영업일 자동 이체로(§11 "잔액")
+			balMore: short ? `모자란 ${plan.defer.length}건은 다음 영업일에 자동으로 보내요` : null,
 			pend: pending ? won(pending) : null,
-			tax: { n: chk, when: chk ? `지금 확인하면 ${payDay} 오후 1시 지급` : null },
-			review: { n: o.products.newReview + o.products.revReview, sub: `신규 ${o.products.newReview} · 수정 ${o.products.revReview}` },
+			// 확인할 게 없으면 회색 카드(급해 보이지 않게)
+			tax: { n: chk, tone: chk ? 'orange' : 'grey', when: chk ? `지금 확인하면 ${payDay} 오후 1시 지급` : null },
+			review: { n: pc.newReview + pc.revReview, sub: `신규 ${pc.newReview} · 수정 ${pc.revReview}`, href: '/products?tab=review' },
 			rows,
 			hot,
 			hotText: hot ? `급한 일 ${hot}가지` : '급한 일이 없어요',
-			steps,
+			cycles,
 			stepsNote: '지급은 매월 1일 한 번이 아니라 세금계산서가 확인된 다음 자동 이체(영업일 오후 1시)에 건마다 나가요.'
 		};
-	}
-
-	/** 급한 일 수 — 홈 "오늘 처리할 일"의 빨강 칩 수(모바일 머리와 같은 값) */
-	get hotCount() {
-		return this.home.hot;
 	}
 
 	// ───────── 동작(RPC 자리) — 결과 문구를 돌려준다 ─────────

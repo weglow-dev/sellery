@@ -220,4 +220,77 @@ export interface HomeStep {
 	desc: string;
 	tone: 'red' | 'orange' | 'plain';
 	href: string;
+	/** 단계 상태 — done 끝남(✓ 민트) · now 진행 중(주황 동그라미 + pill) · wait 아직(흐리게) */
+	state: 'done' | 'now' | 'wait';
+	pill: string | null;
+}
+
+/** 정산 일정 회차 — cur 지금 회차(10월분) · next 다음 회차(11월분 · 확정 전) */
+export interface HomeCycle {
+	key: 'cur' | 'next';
+	label: string;
+	steps: HomeStep[];
+}
+
+// ───────── 상품(§4) ─────────
+
+/** 상품 상태 — draft 임시저장 · review 신규 심사 · live 판매 중 · paused 일시중지 · rejected 반려 · ended 판매 종료(0071) */
+export type ProductStatus = 'draft' | 'review' | 'live' | 'paused' | 'rejected' | 'ended';
+/** 샵 상세 섹션 번호 — 1 기본 정보(구매 패널) · 2 레시피 노트 · 3 왜 만들었나요 · 4 성분 · 5 섭취법 · 6 제품 정보 · 7 FAQ · 0 전체(의견 대상) */
+export type SecNo = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** 섹션 안 한 줄 — h 소제목(성분 이름 · 질문 등 · 없으면 '') · t 내용 */
+export interface SecItem {
+	h: string;
+	t: string;
+}
+export interface ProductRaw {
+	id: string;
+	code: string;
+	creatorId: string;
+	name: string;
+	category: string;
+	price: number;
+	unit: string;
+	/** 사진 자리 — 타일 그라데이션 키 · 그림 키(UI 단계) */
+	tile: string;
+	icon: string;
+	/** 사진이 여러 장일 때 [타일, 그림] — 첫 장이 대표 사진(없으면 tile · icon 한 장) */
+	photos?: [string, string][];
+	status: ProductStatus;
+	stock: number | null;
+	/** 상태 바뀐 뒤 지난 날 — 심사 탭은 기다린 날(오래 기다린 순) · 나머지는 최근 수정순 */
+	days: number;
+	/** 심사 요청 시각(신규 심사) */
+	submittedAt: string | null;
+	/** 샵 상세 미리보기(신규 심사) — 섹션 2~7 · 비면 샵에서 숨김 */
+	content: [SecNo, SecItem[]][] | null;
+	/** 이전 반려 이력 한 줄씩 */
+	rejects: string[];
+	/** 반려 때 보낸 의견 [섹션, 문장] */
+	sent: [SecNo, string][] | null;
+	/** 열린 수정본(판매 중 상품의 수정 심사) — 바뀐 섹션만 [섹션, 지금 샵, 수정본] */
+	rev: { at: string; days: number; diff: [SecNo, SecItem[], SecItem[]][]; history: string[] } | null;
+	/** 제조 원장 요약(§10-1) — 없으면 null(정산 보류) */
+	ledger: LedgerRaw | null;
+	log: LogEntry[];
+}
+/** 반려 의견 한 줄 — 섹션 · 문장(300자) */
+/** 제조 원장(§10-1 · 0103) — 차수마다 제조금액 · 보증금(25%) 입금 확인일 · 환급 · 메모 · 입력자 · 무효, 상계 이력(정산월마다 정산금에서 상계한 금액) */
+export interface LedgerRound {
+	n: number;
+	amount: number;
+	depositAt: string | null;
+	refunded: boolean;
+	memo: string;
+	by: string;
+	void: boolean;
+}
+export interface LedgerRaw {
+	rounds: LedgerRound[];
+	offsets: { month: string; amount: number }[];
+}
+
+export interface ProductOpinion {
+	sec: SecNo;
+	text: string;
 }

@@ -108,6 +108,11 @@
 	.no-bar::-webkit-scrollbar {
 		display: none;
 	}
+	/* 가는 스크롤바 — 심사 의견 목록(시안) */
+	.thin-bar {
+		scrollbar-width: thin;
+		scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
