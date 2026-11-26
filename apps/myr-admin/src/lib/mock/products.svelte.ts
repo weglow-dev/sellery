@@ -120,6 +120,7 @@ function ledSum(l: LedgerRaw) {
 /** 39개 — 크리에이터 시드의 상품 수(판매 중 / 전체)와 지급 건 상품 이름에 맞춘다 */
 export const seedProducts = (): ProductRaw[] => [
 	P(1, 'c1', '포도 글루타치온 젤리', '이너뷰티', 32000, '14포 / 2주분', 'grape', 'jelly', 'live', 184, 45, {
+		ebutCode: 'EB2048101',
 		ledger: led(600000, 1),
 		rev: {
 			at: '11월 16일 오후 2:40',
@@ -137,6 +138,7 @@ export const seedProducts = (): ProductRaw[] => [
 		]
 	}),
 	P(2, 'c1', '레몬 콜라겐 스틱', '이너뷰티', 36000, '14포 / 2주분', 'lemon', 'stick', 'live', 96, 15, {
+		ebutCode: 'EB2048102',
 		ledger: {
 			rounds: [rd(1, 800000, '9월 12일', false, '초도 4,000포', '운영 박서연'), rd(2, 400000, null, false, '재생산 2,000포', '운영 김지수')],
 			offsets: [
@@ -391,6 +393,19 @@ class ProductsServer {
 				{ k: '재고', v: p.stock === null ? '—' : soldOut(p) ? '품절 · 0개' : `${p.stock.toLocaleString('ko-KR')}개`, red: soldOut(p) },
 				{ k: '최근 처리', v: this.dayText(p), red: false }
 			],
+			/** 이벗 상품코드 줄(판매 중 · 일시중지 · 종료) — 재고 조회용 · 주문은 상품코드로 나간다 */
+			ebut:
+				approved(p.status) || p.status === 'ended'
+					? {
+							code: p.ebutCode ?? null,
+							canEdit: approved(p.status),
+							orderCode: p.code,
+							/** 입력 · 수정 창 안내 — 재고가 바뀐다는 것 */
+							info: p.ebutCode
+								? `이벗 상품코드를 바꾸면 재고도 새 코드의 이벗 재고로 바뀌어요 · 주문은 상품코드(${p.code})로 보내요`
+								: `등록하면 지금 넣어 둔 재고 대신 이벗 연동 재고로 바뀌어요 · 주문은 상품코드(${p.code})로 보내요`
+						}
+					: null,
 			revNote: this.openRev(p) ? `수정 심사 중이에요 · ${p.rev!.at} 요청 · 승인 전까지 샵은 지금 내용으로 판매돼요` : null,
 			/** 판매 종료 상품은 원장이 있을 때만 보여 주고, 없어도 제조금액 입력을 받지 않는다 */
 			showLedger: approved(p.status) || (p.status === 'ended' && !!l),
@@ -404,6 +419,8 @@ class ProductsServer {
 			sideNote: p.status === 'ended' ? '판매 종료한 상품은 읽기 전용이에요' : rejected(p.status) ? '크리에이터가 고쳐서 다시 요청하면 신규 심사에 올라와요' : p.status === 'draft' ? '크리에이터가 아직 심사를 요청하지 않은 임시저장이에요' : null,
 			/** 오른쪽 패널 버튼(§4-4) — 서버가 정한다 */
 			can: { pause: p.status === 'live', resume: p.status === 'paused', stock: approved(p.status), end: approved(p.status) },
+			/** [재고 수정] 비활성 이유 — 이벗 상품코드가 있으면 재고는 이벗에서 가져온다 */
+			stockLock: p.ebutCode ? '이벗 상품코드가 등록돼 있어서 재고는 이벗에서 가져와요' : null,
 			pauseNote: '일시중지하면 샵에서 바로 내려가요 · [다시 판매]로 언제든 다시 올릴 수 있어요',
 			endNote: '되돌릴 수 없어요, 다시 팔려면 새 상품으로 등록해야 해요',
 			stock: p.stock
@@ -628,24 +645,45 @@ class ProductsServer {
 	}
 
 	/** 승인 모달 안내 — 처음 재고 · 제조금액(§4-2 · 승인하면 원장이 함께 만들어진다) */
-	approveHints(stockIn: string, amountIn: string) {
+	/** 이벗 상품코드 입력 형식 — 영문 · 숫자 · - · _ · 40자(화면도 보지만 최종 판정은 서버) */
+	private ebutOf(input: string): { ok: boolean; code: string; msg: string | null } {
+		const code = input.trim();
+		if (!code) return { ok: false, code, msg: null };
+		if (!/^[A-Za-z0-9_-]{1,40}$/.test(code)) return { ok: false, code, msg: '이벗 상품코드는 영문 · 숫자 · - · _ 로 40자까지 적어 주세요' };
+		return { ok: true, code, msg: null };
+	}
+
+	/** 승인 모달 안내 — 이벗 상품코드(있으면 재고는 이벗에서) · 없으면 처음 재고 직접 · 제조금액(§4-2 · 승인하면 원장이 함께 만들어진다).
+	 *  needStock = 이벗 상품코드를 비웠을 때만 처음 재고 칸을 보여 준다 */
+	approveHints(stockIn: string, amountIn: string, ebutIn: string) {
+		const e = this.ebutOf(ebutIn);
 		const s = this.stockOf(stockIn);
 		const zero = s.ok && s.n === 0;
-		return { stock: zero ? '재고 0으로 승인하면 샵에서 품절로 보여요' : '승인하면 이 재고로 샵에 올라가요', stockRed: zero, amount: this.amountHint(amountIn) };
+		return {
+			ebut: e.code ? '승인하면 재고를 이벗에서 가져와요(5분마다) · 처음 재고는 넣지 않아요' : '비워 둘 시 아래에 임의로 재고를 직접 넣어요',
+			needStock: !e.code,
+			stock: zero ? '재고 0으로 승인하면 샵에서 품절로 보여요' : '상품 관리 상세페이지에서 이벗 상품코드를 등록하면 이벗 연동 재고로 바뀌어요',
+			stockRed: zero,
+			amount: this.amountHint(amountIn)
+		};
 	}
-	approve(id: string, stockIn: string, amountIn: string): { ok: boolean; msg: string } {
+	approve(id: string, stockIn: string, amountIn: string, ebutIn = ''): { ok: boolean; msg: string } {
 		const p = this.find(id);
 		if (!p || p.status !== 'review') return { ok: false, msg: '상품 상태가 바뀌었어요 · 목록에서 다시 열어 주세요' };
+		const e = this.ebutOf(ebutIn);
+		if (e.code && !e.ok) return { ok: false, msg: e.msg! };
 		const s = this.stockOf(stockIn);
-		if (!s.ok) return { ok: false, msg: s.msg ?? '처음 재고를 적어 주세요' };
+		if (!e.code && !s.ok) return { ok: false, msg: s.msg ?? '처음 재고를 적거나 이벗 상품코드를 넣어 주세요' };
 		const a = this.amountOf(amountIn);
 		if (!a.ok) return { ok: false, msg: a.msg! };
 		this.clearOps(id);
-		this.patch(
-			id,
-			() => ({ status: 'live', stock: s.n, days: 0, submittedAt: null, ledger: { rounds: [rd(1, a.n, null, false, '', me())], offsets: [] } }),
-			`승인 · 재고 ${s.n}개 · 제조금액 ${won(a.n)}`
-		);
+		const ledger = { rounds: [rd(1, a.n, null, false, '', me())], offsets: [] };
+		if (e.code) {
+			// 재고는 이벗에서 가져온다(목은 이벗 재고가 없어 비워 둔다 · 기능 단계에서 판매 가능 재고 함수)
+			this.patch(id, () => ({ status: 'live', ebutCode: e.code, stock: null, days: 0, submittedAt: null, ledger }), `승인 · 이벗 상품코드 ${e.code} · 제조금액 ${won(a.n)}`);
+			return { ok: true, msg: '승인했어요 · 재고는 이벗에서 가져오고 제조금액 원장을 만들었어요' };
+		}
+		this.patch(id, () => ({ status: 'live', stock: s.n, days: 0, submittedAt: null, ledger }), `승인 · 재고 ${s.n}개 · 제조금액 ${won(a.n)}`);
 		return { ok: true, msg: '승인했어요 · 샵에 올라갔고 제조금액 원장을 만들었어요' };
 	}
 
@@ -698,6 +736,19 @@ class ProductsServer {
 		this.patch(id, () => ({ status: 'live', days: 0 }), '다시 판매');
 		return '다시 판매를 시작했어요';
 	}
+	/** 이벗 상품코드 저장 — 입력 형식(영문 · 숫자 · - · _ · 40자)은 화면도 보지만 최종 판정은 서버. 재고 조회에만 쓴다 */
+	setEbutCode(id: string, input: string): { ok: boolean; msg: string } {
+		const p = this.find(id);
+		if (!p || !approved(p.status)) return { ok: false, msg: '상품 상태가 바뀌었어요 · 목록에서 다시 열어 주세요' };
+		const e = this.ebutOf(input);
+		if (!e.code) return { ok: false, msg: '이벗 상품코드를 적어 주세요' };
+		if (!e.ok) return { ok: false, msg: e.msg! };
+		const code = e.code;
+		if (code === p.ebutCode) return { ok: false, msg: '바뀐 내용이 없어요' };
+		this.patch(id, () => ({ ebutCode: code }), p.ebutCode ? `이벗 상품코드 ${p.ebutCode} → ${code}` : `이벗 상품코드 입력 · ${code}`);
+		return { ok: true, msg: '이벗 상품코드를 저장했어요' };
+	}
+
 	/** 재고 수정 모달 안내 */
 	stockHint(input: string) {
 		const s = this.stockOf(input);
@@ -707,6 +758,7 @@ class ProductsServer {
 	setStock(id: string, input: string): { ok: boolean; msg: string } {
 		const p = this.find(id);
 		if (!p || !approved(p.status)) return { ok: false, msg: '상품 상태가 바뀌었어요 · 목록에서 다시 열어 주세요' };
+		if (p.ebutCode) return { ok: false, msg: '이벗 상품코드가 등록된 상품은 재고를 이벗에서 가져와요' };
 		const s = this.stockOf(input);
 		if (!s.ok) return { ok: false, msg: s.msg ?? '재고를 적어 주세요' };
 		this.patch(id, () => ({ stock: s.n }), `재고 ${p.stock ?? 0}개 → ${s.n}개`);
