@@ -2,13 +2,14 @@ import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createServerClient } from '@supabase/ssr';
-import { dev } from '$app/environment';
+import { building, dev } from '$app/environment';
 import { base } from '$app/paths';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import { env as publicEnv } from '$env/dynamic/public';
 import type { Database } from '@sellery/db/database.types';
 import { demoEnabled, isDemoPath } from '$lib/demo';
-import { isAdminPublicPath } from '$lib/server/admin';
+import { LANG_COOKIE, LANG_MAX_AGE, parseLang, pickLang } from '$lib/lang';
+import { adminPath, isAdminPublicPath } from '$lib/server/admin';
 import '$lib/server/env'; // configureDb() 1회 — $env/dynamic/private 는 여기(서버 배럴)에서만 읽는다 (결정 11)
 
 /* Supabase SSR 세션 — 4 앱 공통 골격 (docs/monorepo-migration.md §2.1 · apps/brand/src/hooks.server.ts 와 동일).
@@ -74,4 +75,20 @@ const gate: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(supabase, gate);
+/* 표시 언어 — `?lang=en|ko` 를 쿠키에 적고 `locals.lang` 에 싣는다(`$lib/lang` · 메타 앱 검수자가 읽는 화면용 · 표시만 바꾼다).
+   쿠키는 리다이렉트 응답에도 실린다 — 비로그인으로 `/admin/outreach?lang=en` 을 열어 로그인으로 넘어가도 언어가 남는다.
+   `<html lang>` 은 app.html 의 `%lang%` 자리에 넣는다. */
+const lang: Handle = async ({ event, resolve }) => {
+	// 빌드 때 미리 그리는 경로(robots.txt)에서는 주소의 쿼리를 읽을 수 없다(읽으면 SvelteKit 이 던진다) — 한국어로 그대로 통과
+	if (building) {
+		event.locals.lang = 'ko';
+		return resolve(event, { transformPageChunk: ({ html }) => html.replace('%lang%', 'ko') });
+	}
+	const asked = parseLang(event.url.searchParams.get('lang'));
+	if (asked) event.cookies.set(LANG_COOKIE, asked, { path: adminPath('/'), httpOnly: true, sameSite: 'lax', secure: !dev, maxAge: LANG_MAX_AGE });
+	const picked = pickLang(asked, event.cookies.get(LANG_COOKIE));
+	event.locals.lang = picked;
+	return resolve(event, { transformPageChunk: ({ html }) => html.replace('%lang%', picked) });
+};
+
+export const handle = sequence(lang, supabase, gate);

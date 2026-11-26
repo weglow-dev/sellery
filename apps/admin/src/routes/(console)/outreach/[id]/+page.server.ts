@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { OUTREACH_STATUSES, OUTREACH_STATUS_LABEL, OUTREACH_TRENDS, dmDraft, isOutreachStatus, outreachFit } from '@sellery/db/admin/outreach-rules';
+import { outreachText } from '$lib/outreach-text';
 import { adminPath, requireAdmin } from '$lib/server/admin';
 import { addOutreachNote, deleteOutreach, getOutreach, listOutreachEvents, setOutreachStatus, updateOutreachFields } from '$lib/server/outreach';
 
@@ -19,18 +20,21 @@ export const load: PageServerLoad = async (event) => {
   const gate = await requireAdmin(event);
   if (!gate.ok) redirect(303, gate.location);
   const id = event.params.id;
-  if (!UUID_RE.test(id)) error(404, { message: '후보를 찾을 수 없습니다' });
+  const lang = event.locals.lang;
+  const t = outreachText(lang);
+  if (!UUID_RE.test(id)) error(404, { message: t.result.notFound });
   const [row, events] = await Promise.all([getOutreach(id), listOutreachEvents(id)]);
-  if (!row) error(404, { message: '후보를 찾을 수 없습니다' });
+  if (!row) error(404, { message: t.result.notFound });
   const key = event.url.searchParams.get('msg') ?? '';
-  const msg = { saved: '저장했어요', status: '상태를 바꿨어요', note: '메모를 남겼어요', draft: 'DM 초안을 다시 만들었어요', err: '처리하지 못했어요' }[key] ?? null;
+  const msg = t.detail.msg[key] ?? null;
   return {
     row,
     fit: outreachFit(row),
     events,
     msg,
+    lang,
     listPath: adminPath('/outreach'),
-    statuses: OUTREACH_STATUSES.map((k) => ({ value: k, ...OUTREACH_STATUS_LABEL[k] })),
+    statuses: OUTREACH_STATUSES.map((k) => ({ value: k, tone: OUTREACH_STATUS_LABEL[k].tone, label: t.statusLabel[k], hint: t.statusHint[k] })),
     trends: OUTREACH_TRENDS
   };
 };
@@ -64,7 +68,7 @@ export const actions: Actions = {
     if (!gate.ok) redirect(303, gate.location);
     const form = await event.request.formData();
     const st = String(form.get('status') ?? '');
-    if (!isOutreachStatus(st)) return fail(400, { error: '상태 값이 올바르지 않아요' });
+    if (!isOutreachStatus(st)) return fail(400, { error: outreachText(event.locals.lang).result.badStatus });
     const ok = await setOutreachStatus(event.params.id, st, gate.ctx.user.email ?? null);
     redirect(303, `${adminPath(`/outreach/${event.params.id}`)}?msg=${ok ? 'status' : 'err'}`);
   },
@@ -79,7 +83,7 @@ export const actions: Actions = {
     const gate = await requireAdmin(event);
     if (!gate.ok) redirect(303, gate.location);
     const row = await getOutreach(event.params.id);
-    if (!row) return fail(404, { error: '후보를 찾을 수 없습니다' });
+    if (!row) return fail(404, { error: outreachText(event.locals.lang).result.notFound });
     const ok = await updateOutreachFields(event.params.id, { dm_draft: dmDraft(row) }, gate.ctx.user.email ?? null);
     redirect(303, `${adminPath(`/outreach/${event.params.id}`)}?msg=${ok ? 'draft' : 'err'}`);
   },

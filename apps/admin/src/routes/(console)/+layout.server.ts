@@ -19,5 +19,5 @@ export const load: LayoutServerLoad = async (event) => {
 	} catch (e) {
 		console.error('[admin/layout] admin context failed:', e instanceof Error ? e.message : e);
 	}
-	return { me };
+	return { me, lang: event.locals.lang };
 };

@@ -9,6 +9,8 @@ declare global {
 			safeGetSession(): Promise<{ session: import('@supabase/supabase-js').Session | null; user: import('@supabase/supabase-js').User | null }>;
 			/** 요청당 메모 — getAdminContext 가 쓴다 (React cache() 대체, §3.4): 로그인 화면 + page 가 같이 불러도 app_role() RPC 는 한 번 */
 			memo: Map<string, unknown>;
+			/** 표시 언어 — hooks 가 `?lang=` · 쿠키에서 정한다(`$lib/lang`). 기본 한국어 */
+			lang: import('$lib/lang').Lang;
 		}
 		// interface Error {}
 		// interface PageData {}
