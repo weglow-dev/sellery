@@ -11,7 +11,9 @@ export type OrderStatus = 'paid' | 'wait' | 'shipping' | 'delivered' | 'refunded
 export type OrderTab = OrderStatus | 'ebutFail' | 'all';
 /** 서랍 아래 버튼 — 송장 입력(운영이 직접 · 평소엔 이벗 송장 자동 수집) · 송장 정정 · 배송 완료 · 예외 환불 */
 export type OrderAction = 'ship' | 'fixShip' | 'delivered' | 'refund';
-export type OrderSub = 'list' | 'bulk' | 'overdue';
+export type OrderSub = 'list' | 'bulk';
+/** 배송 중 탭 안 필터 — 전체 · 배송 완료 예외(?ex=1) */
+export type ShipFilter = 'all' | 'overdue';
 
 export interface OrderLine {
 	productId: string;
@@ -29,7 +31,8 @@ export interface OrderRaw {
 	lines: OrderLine[];
 	creatorId: string;
 	amount: number;
-	ship: { carrier: string; tracking: string; shippedOn: string } | null;
+	/** by — ebut = 이벗 발주 · 18시 송장 수집으로 들어온 송장(자동 배송 완료 대상) · ops = 운영이 직접 입력(자동 배송 완료 없음) */
+	ship: { carrier: string; tracking: string; shippedOn: string; by: 'ebut' | 'ops' } | null;
 	/** 이벗 발주 실패(결제 완료 주문 · 결정 13 — 3번 다시 시도 뒤) — 화면은 실패일 때만 안내한다 */
 	ebut?: { state: 'failed'; at?: string };
 	deliveredOn: string | null;
@@ -48,13 +51,6 @@ export interface OrderRow {
 	title: string;
 	sub: string;
 	right: string;
-}
-
-export interface OverdueRow extends Omit<OrderRow, 'right'> {
-	carrier: string;
-	tracking: string;
-	/** [택배 조회] 토스트 — UI 단계라 새 창은 열지 않는다 */
-	trackToast: string;
 }
 
 export interface BulkRow {
@@ -100,6 +96,8 @@ export interface OrderView {
 	noShip: { text: string; tone: Tone };
 	/** 이벗 발주 실패 안내(송장 칸 위 · 빨강) + 이벗 관리자에서 찾을 상품코드 — 실패가 아니면 null */
 	ebutFail: { text: string; codes: { name: string; code: string }[] } | null;
+	/** 배송 완료 예외면 송장 칸 위 주황 안내(왜 자동으로 안 끝났는지 · 운영이 직접 기록) — 아니면 null */
+	deliverNote: string | null;
 	log: LogEntry[];
 	actions: OrderAction[];
 }
@@ -108,8 +106,10 @@ export interface OrderView {
 export const TODAY = '2026-11-17';
 /** 다음 정산 — 12월 1일(화) 오후 1시(seed OTHER_COUNTS.settle.nextAt) */
 const NEXT_SETTLE = '12월 1일';
-/** 배송 중으로 이 날 수를 넘기면 배송 완료 예외(§6-4 기본 5일) */
+/** 배송 완료 예외(§6-4) — 운영이 직접 입력한 송장은 자동 배송 완료가 없어 발송 5일째부터 */
 const OVERDUE_DAYS = 5;
+/** 이벗 송장은 택배사 완료('91') 또는 발송 10일 뒤 자동 배송 완료(0118 · 바인허브와 같음) — 10일이 지나도 배송 중이면 예외 */
+const AUTO_DELIVER_DAYS = 10;
 export const CARRIERS = ['CJ대한통운', '한진택배', '롯데택배', '우체국택배'];
 const TRACKING_RE = /^[\d-]{8,}$/;
 
@@ -162,10 +162,11 @@ const O = (id: string, paidOn: string, status: OrderStatus, creatorId: string, r
 	log: [],
 	...x
 });
-const shipped = (carrier: string, tracking: string, shippedOn: string) => ({
+const shipped = (carrier: string, tracking: string, shippedOn: string, by: 'ebut' | 'ops' = 'ops') => ({
 	carrier,
 	tracking,
-	shippedOn
+	shippedOn,
+	by
 });
 const L = (at: string, text: string, who = '크리에이터'): LogEntry => ({
 	at,
@@ -206,8 +207,8 @@ export const seedOrders = (): OrderRaw[] => [
 		}
 	),
 	O('MYR1529', '2026-11-14', 'shipping', 'c1', ['오지수', '010-2290-4417', '서울 송파구 올림픽로 300, 2104호'], [['p1', 1, 32000]], {
-		ship: shipped('CJ대한통운', '5612-3344-9087', '2026-11-15'),
-		log: [L('11월 14일 오전 11:02', '카드 결제 완료 · ₩32,000', '자동'), L('11월 15일 오후 2:10', '송장 직접 입력 · CJ대한통운 5612-3344-9087')]
+		ship: shipped('CJ대한통운', '5612-3344-9087', '2026-11-15', 'ebut'),
+		log: [L('11월 14일 오전 11:02', '카드 결제 완료 · ₩32,000', '자동'), L('11월 14일 오전 11:00', '이벗 발주 · 배송준비중', '자동'), L('11월 15일 오후 6:00', '이벗 송장 수집 · CJ대한통운 5612-3344-9087', '자동')]
 	}),
 	O('MYR1527', '2026-11-14', 'paid', 'c1', ['윤서원', '010-6634-2208', '대전 유성구 대학로 99, 301호'], [['p1', 1, 32000]], { log: [L('11월 14일 오전 9:35', '카드 결제 완료 · ₩32,000', '자동')] }),
 	O('MYR1524', '2026-11-11', 'delivered', 'c1', ['이하늘', '010-8102-5563', '인천 연수구 송도과학로 32, 1502호'], [['p2', 3, 36000]], {
@@ -225,9 +226,9 @@ export const seedOrders = (): OrderRaw[] => [
 		deliveredOn: '2026-11-13',
 		log: [L('11월 11일 오전 10:15', '송장 직접 입력 · CJ대한통운 5612-3290-1180'), L('11월 13일 오후 2:48', '배송 완료 · 택배사 연동', '자동')]
 	}),
-	O('MYR1519', '2026-11-08', 'shipping', 'c3', ['배현준', '010-3345-8126', '대구 수성구 달구벌대로 2450, 702호'], [['p7', 2, 39000]], {
-		ship: shipped('롯데택배', '2380-7714-5502', '2026-11-08'),
-		log: [L('11월 8일 오후 6:02', '송장 직접 입력 · 롯데택배 2380-7714-5502')]
+	O('MYR1519', '2026-11-06', 'shipping', 'c3', ['배현준', '010-3345-8126', '대구 수성구 달구벌대로 2450, 702호'], [['p7', 2, 39000]], {
+		ship: shipped('롯데택배', '2380-7714-5502', '2026-11-07', 'ebut'),
+		log: [L('11월 6일 오후 7:40', '카드 결제 완료 · ₩78,000', '자동'), L('11월 7일 오전 11:00', '이벗 발주 · 배송준비중', '자동'), L('11월 7일 오후 6:00', '이벗 송장 수집 · 롯데택배 2380-7714-5502', '자동')]
 	}),
 	O('MYR1512', '2026-11-07', 'delivered', 'c1', ['박지훈', '010-2217-9045', '서울 성동구 왕십리로 83, 1401호'], [['p2', 2, 36000]], {
 		ship: shipped('CJ대한통운', '5612-3255-7741', '2026-11-08'),
@@ -265,9 +266,14 @@ class OrdersServer {
 	private shipDays(o: OrderRaw) {
 		return o.ship ? daysSince(o.ship.shippedOn) : 0;
 	}
-	/** 배송 완료 예외 — 배송 중인데 발송 뒤 5일을 넘김(§6-4) */
+	/** 배송 완료 예외(§6-4 · 2026-11-26) — 배송 중인데 자동으로 끝나지 않는 주문: 직접 입력 송장은 발송 5일째부터 · 이벗 송장은 10일이 지나도 배송 중일 때 */
 	private isOverdue(o: OrderRaw) {
-		return o.status === 'shipping' && !!o.ship && this.shipDays(o) >= OVERDUE_DAYS;
+		if (o.status !== 'shipping' || !o.ship) return false;
+		return this.shipDays(o) >= (o.ship.by === 'ebut' ? AUTO_DELIVER_DAYS : OVERDUE_DAYS);
+	}
+	/** 왜 자동으로 안 끝났는지 — 목록 둘째 줄 · 서랍 안내 */
+	private overdueWhy(o: OrderRaw) {
+		return o.ship?.by === 'ebut' ? '이벗에서 취소됐거나 18시 송장 수집이 실패했어요' : '운영이 직접 입력한 송장이에요';
 	}
 	private first(o: OrderRaw) {
 		return productOf(o.lines[0].productId);
@@ -289,7 +295,7 @@ class OrdersServer {
 	/** 이벗 발주 실패 — 결제 완료인데 11시 발주가 3번 다시 시도해도 실패(서버 판정 자리 · 기능 단계에서 실패 판정 · 기록 — myr-admin-plan §4) */
 	private ebutFailed = (o: OrderRaw) => o.status === 'paid' && o.ebut?.state === 'failed';
 
-	/** 홈 · 메뉴 배지용(server.svelte.ts 에 연결) — 이벗 발주 실패 · 발송 대기 = 결제 완료 · 배송 완료 기록 없음 = 배송 중 5일 넘음 */
+	/** 홈 · 메뉴 배지용(server.svelte.ts 에 연결) — 이벗 발주 실패 · 발송 대기 = 결제 완료 · 배송 완료 예외(noDelivered) = 자동으로 끝나지 않는 배송 중 */
 	get counts() {
 		const toShip = this.raw.filter((o) => o.status === 'paid');
 		const over = this.raw.filter((o) => this.isOverdue(o));
@@ -303,17 +309,19 @@ class OrdersServer {
 		};
 	}
 
-	/** 메뉴 안 화면(시안 subs) — SubNav 항목 · 배송 완료 예외는 건수 배지 */
+	/** 메뉴 안 화면(시안 subs) — SubNav 항목. 배송 완료 예외는 하위 화면 대신 배송 중 탭 안 필터(2026-11-26) */
 	get subs(): { key: OrderSub; label: string; href: string; n?: number }[] {
 		return [
 			{ key: 'list', label: '주문 목록', href: '/orders' },
-			{ key: 'bulk', label: '송장 일괄 입력', href: '/orders/bulk' },
-			{
-				key: 'overdue',
-				label: '배송 완료 예외',
-				href: '/orders/overdue',
-				n: this.counts.noDelivered
-			}
+			{ key: 'bulk', label: '송장 일괄 입력', href: '/orders/bulk' }
+		];
+	}
+
+	/** 배송 중 탭 안 필터 — 배송 완료 예외는 주황 숫자(hot) */
+	shipFilters(): { id: ShipFilter; name: string; count: number; hot?: boolean }[] {
+		return [
+			{ id: 'all', name: '전체', count: this.counts.shipping },
+			{ id: 'overdue', name: '배송 완료 예외', count: this.counts.noDelivered, hot: true }
 		];
 	}
 
@@ -330,59 +338,38 @@ class OrdersServer {
 	readonly listEmpty = '해당하는 주문이 없어요';
 	readonly bulkEmpty = 'CSV를 붙여 넣으면 여기에서 미리 볼 수 있어요';
 	readonly bulkSum = 'CSV 한 줄 = 주문번호,택배사,운송장';
-	readonly overdueEmpty = '배송 완료 기록이 빠진 출고가 없어요';
-	readonly overdueBand = `배송 완료 기록이 없으면 정산에 들어가지 않아요 · 다음 정산(${NEXT_SETTLE} 오후 1시) 전에 확인해 주세요`;
+	readonly overdueEmpty = '자동으로 끝나지 않은 배송이 없어요';
+	readonly overdueBand = `자동으로 배송 완료되지 않는 주문이에요 — 운영이 직접 입력한 송장(발송 ${OVERDUE_DAYS}일째부터) · 이벗에서 취소됐거나 18시 송장 수집이 실패한 송장(발송 ${AUTO_DELIVER_DAYS}일이 지나도 배송 중) · 택배 조회로 도착을 확인하고 [배송 완료]로 기록해 주세요 · 기록이 없으면 정산에 들어가지 않아요(다음 정산 ${NEXT_SETTLE} 오후 1시)`;
 
 	get listSum() {
 		const c = this.counts;
 		return `${c.ebutFail ? `이벗 발주 실패 ${c.ebutFail}건 · ` : ''}발송 대기 ${c.toShip}건 · 배송 중 ${c.shipping}건`;
-	}
-	get overdueSum() {
-		return `배송 중으로 ${OVERDUE_DAYS}일 넘은 출고 ${this.counts.noDelivered}건`;
 	}
 
 	// ───────── 목록 ─────────
 
 	private row(r: OrderRaw): OrderRow {
 		const c = creatorOf(r.creatorId);
+		const over = this.isOverdue(r);
 		return {
 			id: r.id,
 			thumb: this.thumb(r),
-			chips: this.ebutFailed(r) ? [STATUS_CHIP[r.status], { label: '이벗 발주 실패', tone: 'red' }] : [STATUS_CHIP[r.status]],
+			chips: this.ebutFailed(r) ? [STATUS_CHIP[r.status], { label: '이벗 발주 실패', tone: 'red' }] : over ? [STATUS_CHIP[r.status], { label: `배송 완료 예외 · 발송 ${this.shipDays(r)}일째`, tone: 'orange' }] : [STATUS_CHIP[r.status]],
 			meta: `${r.id} · ${fd(r.paidOn)} 결제 · ${this.who(r)}`,
 			title: this.title(r),
-			sub: `${c.name} · ${r.ship ? `${r.ship.carrier} ${r.ship.tracking}` : r.status === 'paid' ? (r.ebut?.state === 'failed' ? '이벗 발주 실패 · 확인 필요' : '송장 입력 전') : (r.due ?? '송장 없음')}`,
+			sub: `${c.name} · ${r.ship ? `${r.ship.carrier} ${r.ship.tracking}${over ? ` · ${this.overdueWhy(r)}` : ''}` : r.status === 'paid' ? (r.ebut?.state === 'failed' ? '이벗 발주 실패 · 확인 필요' : '송장 입력 전') : (r.due ?? '송장 없음')}`,
 			right: won(r.amount)
 		};
 	}
 
-	/** 주문 목록 — 탭(상태) · 검색(주문번호 · 주문자 · 상품 · 크리에이터) */
-	list({ tab, q }: { tab: OrderTab; q: string }): OrderRow[] {
+	/** 주문 목록 — 탭(상태) · 배송 중 탭 안 필터(배송 완료 예외) · 검색(주문번호 · 주문자 · 상품 · 크리에이터) */
+	list({ tab, q, ship = 'all' }: { tab: OrderTab; q: string; ship?: ShipFilter }): OrderRow[] {
 		const needle = q.trim().toLowerCase();
 		return this.raw
 			.filter((o) => (tab === 'all' ? true : tab === 'ebutFail' ? this.ebutFailed(o) : o.status === tab))
+			.filter((o) => tab !== 'shipping' || ship === 'all' || this.isOverdue(o))
 			.filter((o) => !needle || `${o.id} ${this.who(o)} ${o.raw.name} ${o.lines.map((l) => productOf(l.productId).name).join(' ')} ${creatorOf(o.creatorId).name}`.toLowerCase().includes(needle))
 			.map((o) => this.row(o));
-	}
-
-	/** 배송 완료 예외 — 발송 N일째(빨강) · 발송일 · 택배사 송장 */
-	overdue(): OverdueRow[] {
-		return this.raw
-			.filter((o) => this.isOverdue(o))
-			.map((o) => {
-				const s = o.ship!;
-				return {
-					id: o.id,
-					thumb: this.thumb(o),
-					chips: [{ label: `발송 ${this.shipDays(o)}일째`, tone: 'red' }],
-					meta: `${o.id} · ${fd(s.shippedOn)} 발송`,
-					title: this.title(o),
-					sub: `${creatorOf(o.creatorId).name} · ${s.carrier} ${s.tracking}`,
-					carrier: s.carrier,
-					tracking: s.tracking,
-					trackToast: `${s.carrier} 조회 페이지를 새 창으로 열었어요`
-				};
-			});
 	}
 
 	// ───────── 이벗 발주 실패(결정 13 · myr-shop 크론 ebut-prepare 평일 11시 · 주문마다 3번 다시 시도) ─────────
@@ -448,6 +435,7 @@ class OrdersServer {
 				: null,
 			noShip: o.status === 'paid' ? { text: '아직 입력하지 않았어요', tone: 'orange' } : { text: '—', tone: 'plain' },
 			ebutFail: this.ebutFailNote(o),
+			deliverNote: over ? `자동으로 배송 완료되지 않는 주문이에요(운영이 직접 입력한 송장 · 이벗에서 취소된 주문 · 18시 송장 수집이 실패한 경우) · 이 주문은 ${this.overdueWhy(o)} · 택배 조회로 도착을 확인한 뒤 [배송 완료]로 기록해 주세요` : null,
 			log: o.log,
 			actions
 		};
@@ -476,7 +464,7 @@ class OrdersServer {
 			id,
 			(x) => ({
 				status: 'shipping',
-				ship: { carrier, tracking: tr, shippedOn: x.ship?.shippedOn ?? TODAY }
+				ship: { carrier, tracking: tr, shippedOn: x.ship?.shippedOn ?? TODAY, by: x.ship?.by ?? 'ops' }
 			}),
 			`${fix ? '송장 정정' : '송장 직접 입력'} · ${carrier} ${tr}`
 		);
@@ -594,7 +582,7 @@ class OrdersServer {
 				x.no,
 				() => ({
 					status: 'shipping',
-					ship: { carrier: x.co, tracking: x.tr, shippedOn: TODAY }
+					ship: { carrier: x.co, tracking: x.tr, shippedOn: TODAY, by: 'ops' }
 				}),
 				`송장 일괄 입력 · ${x.co} ${x.tr}`
 			);

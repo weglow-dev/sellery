@@ -79,6 +79,9 @@
 					</ul>
 				</div>
 			{/if}
+			{#if v.deliverNote}
+				<p class="mb-2.5 rounded-2xl bg-accent/10 px-4 py-3 text-[13px] leading-[1.55] font-semibold text-[#ff9a66]">{v.deliverNote}</p>
+			{/if}
 			<div class="rounded-2xl border border-white/8 px-4 py-1">
 				{#if v.ship}
 					<KV k="택배사">{v.ship.carrier}</KV>
