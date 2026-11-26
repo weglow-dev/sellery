@@ -2,22 +2,21 @@
  * 아웃리치 "조건으로 수집" — 제공사 검색(Modash) 1페이지(≤15건)를 받아 후보 큐에 upsert 한다 (대표 요청 2026-10-22).
  *   collectOutreachCandidates({ provider:'modash', page, actor }) → { ok, inserted, updated, total, page, error }
  *   제공사 둘: **meta**(공식 Instagram Creator Marketplace API · 무료 · Advanced Access 전엔 모의 데이터) 우선, 없으면 **modash**(유료).
- *   설정: configureOutreachCollect({ metaPageToken, metaIgUserId, modashApiKey, modashKrLocationId? }) — 관리자 앱이 env 에서 넣는다. 아무것도 없으면 NOT_CONFIGURED.
+ *   설정: Modash 는 configureOutreachCollect({ modashApiKey, modashKrLocationId? }) — 관리자 앱이 env 에서 넣는다. 메타 자격 증명은 여기 두지 않고
+ *   `meta-connect.server.ts` 의 `resolveMetaCredentials()` 하나에서만 읽는다(콘솔 [Instagram 연결] → 없으면 환경변수 토큰). 아무것도 없으면 NOT_CONFIGURED.
  *   한국 location id 는 한 번 조회(`/v1/instagram/locations?query=Korea`)해 캐시. 조회 실패 시 env 값.
  *   비용: 검색 0.01 크레딧/건(페이지당 ~0.15) — 버튼 1회 = 1페이지. 보고서(상세 인구통계) 호출은 2단계(선택).
  */
 import { META_GRAPH_VERSION, META_MOCK_CATEGORY, isMetaBreakdownError, isMetaMockHandle, metaCreatorSearchParams, modashSearchBody, parseMetaCreators, parseModashSearch, pickKoreaLocationId, type OutreachProvider } from "../../admin/outreach-providers";
 import { outreachFit } from "../../admin/outreach-rules";
 import { createAdminClient, type Admin } from "../admin.server";
+import { metaConnectStatus, resolveMetaCredentials, type MetaConnectStatus } from "./meta-connect.server";
 import { upsertOutreachCreators } from "./outreach.server";
 
 const MODASH = "https://api.modash.io/v1";
 type CollectConfig = {
   modashApiKey?: string | null;
   modashKrLocationId?: string | null;
-  /** Meta Instagram Creator Marketplace API — 브랜드 IG 비즈니스 계정에 연결된 페이지의 Page access token · 그 IG 사용자 id */
-  metaPageToken?: string | null;
-  metaIgUserId?: string | null;
 };
 let cfg: CollectConfig = {};
 let krLocationCache: number | string | null = null;
@@ -26,10 +25,16 @@ export function configureOutreachCollect(c: CollectConfig): void {
   cfg = { ...cfg, ...c };
 }
 
-/** 메타(공식·무료)가 설정돼 있으면 우선, 아니면 Modash */
-export function outreachCollectStatus(): { provider: OutreachProvider | null; configured: boolean } {
-  if (cfg.metaPageToken && cfg.metaIgUserId) return { provider: "meta", configured: true };
-  return cfg.modashApiKey ? { provider: "modash", configured: true } : { provider: null, configured: false };
+/** 메타 자격 증명이 있으면 메타(공식·무료), 아니면 Modash — 화면 상태와 실제 수집이 같은 규칙을 쓴다 */
+function providerOf(hasMeta: boolean): OutreachProvider | null {
+  return hasMeta ? "meta" : cfg.modashApiKey ? "modash" : null;
+}
+
+/** 화면용 — 어느 제공사로 수집하는지 + 메타 연결 상태(토큰 없음) */
+export async function outreachCollectStatus(admin: Admin = createAdminClient()): Promise<{ provider: OutreachProvider | null; configured: boolean; meta: MetaConnectStatus }> {
+  const meta = await metaConnectStatus(admin);
+  const provider = providerOf(Boolean(meta.source));
+  return { provider, configured: provider !== null, meta };
 }
 
 async function modashFetch(path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; json: unknown }> {
@@ -81,14 +86,14 @@ export async function collectOutreachCandidates(
 ): Promise<CollectResult> {
   const page = Math.max(0, opts.page ?? 0);
   const base = { inserted: 0, updated: 0, failed: 0, found: 0, kept: 0, total: 0, page };
-  const status = outreachCollectStatus();
-  const provider = opts.provider ?? status.provider;
+  const creds = await resolveMetaCredentials(admin);
+  const provider = opts.provider ?? providerOf(Boolean(creds));
   if (!provider) return { ok: false, code: "NOT_CONFIGURED", ...base };
 
   if (provider === "meta") {
-    if (!cfg.metaPageToken || !cfg.metaIgUserId) return { ok: false, code: "NOT_CONFIGURED", provider, ...base };
-    const token = cfg.metaPageToken;
-    const igId = cfg.metaIgUserId;
+    if (!creds) return { ok: false, code: "NOT_CONFIGURED", provider, ...base };
+    const token = creds.pageToken;
+    const igId = creds.igUserId;
     const call = async (breakdown: boolean) => {
       const q = metaCreatorSearchParams({ after: opts.after ?? null, breakdown });
       q.set("access_token", token);
