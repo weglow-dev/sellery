@@ -26,8 +26,10 @@ export interface ClaimOpt {
 	quote: number | null;
 }
 const op = (id: Resolution, title: string, desc: string, collects: boolean, refunds: boolean, quote: number | null = null): ClaimOpt => ({ id, title, desc, collects, refunds, quote });
-/** 목록 탭 — pickup = 회수 후 환불(회수 확인 필요한 환불) · resend = 재발송(교환 전부 — 회수 확인 필요 + 자동 발송) · collect = 회수 확인 필요 전부(홈 칩 · 탭 줄에는 없음) */
-export type ClaimTab = ClaimStage | 'collect' | 'all';
+/** 목록 탭(2026-11-26) — 운영 할 일: collect = 회수 확인 필요(환불 + 교환 · 기본) · refund = 환불할 차례(실패)
+ *  / 상황 보기: pending = 처리 대기 · refunds = 환불(진행 중 — 회수 확인 필요 · 환불할 차례) · exchanges = 교환(진행 중 — 회수 확인 필요 · 자동 발송) · done · rejected · all.
+ *  한 요청이 운영 할 일 탭과 환불/교환 탭에 같이 보인다(탭 숫자 합 ≠ 전체) */
+export type ClaimTab = 'collect' | 'refund' | 'pending' | 'refunds' | 'exchanges' | 'done' | 'rejected' | 'all';
 
 export interface ClaimRaw {
 	id: string;
@@ -59,13 +61,14 @@ export interface ClaimRaw {
 	msg: string | null;
 	/** 환불 다시 필요 — 실패 원문 */
 	fail: string | null;
-	/** 교환 발송 송장(이벗 교환 주문이면 18시 수집 · 이벗이 아닌 곳에서 보낸 예외면 운영이 직접 입력) */
+	/** 재발송 운송장(이벗 교환 주문이면 18시 수집 · 이벗이 아닌 곳에서 보낸 예외면 운영이 직접 입력) — 완료 뒤 주문 · 배송 칸에 보인다 */
 	resent: string | null;
 	/** 이벗 회수(승인 때 자동 신청 — E4 · 바인허브 exprtakeback): 신청됨(운송장 대기) · 운송장 나옴 · 신청 실패 */
-	pickup: { state: 'requested' | 'assigned' | 'failed'; at: string; code?: string; carrier?: string; tracking?: string; fail?: string } | null;
+	/* 이벗 처리 단계(2026-11-26 — 바인허브처럼 도착은 운영이 확인): requested 회수 접수(운송장 대기) → assigned 회수 운송장 나옴(매일 10시 자동) → 운영이 택배 조회로 회수가 끝난 걸 확인하고 [회수 완료(운영 확인)] · failed 신청 실패 */
+	pickup: { state: 'requested' | 'assigned' | 'failed'; at: string; code?: string; carrier?: string; tracking?: string; assignedAt?: string; fail?: string } | null;
 	/** 교환 발송(회수 확인 때 자동 — 결제 없는 교환 주문 줄 → 다음 영업일 11시 이벗 교환 주문 ordGbn=2 · 18시 송장 수집 · 바인허브와 같음)
-	 *  queued = 발주 예약 · ordered = 이벗에 등록(배송준비중 · 송장 대기) — 송장이 붙으면 교환 완료(stage done · resent) */
-	reship: { state: 'queued' | 'ordered'; at: string; line: string } | null;
+	 *  queued = 발주 예약 · ordered = 이벗에 등록(배송준비중 · 재발송 운송장 대기) · shipped = 재발송 운송장 붙음(배송 중) — 택배사 배송 완료('91') 또는 발송 10일이면 교환 완료(stage done · 2026-11-26) */
+	reship: { state: 'queued' | 'ordered' | 'shipped'; at: string; line: string; carrier?: string; tracking?: string; shippedAt?: string } | null;
 	tl: LogEntry[];
 }
 
@@ -105,8 +108,9 @@ export interface ClaimView {
 	stageChip: Chip;
 	side: { k: string; v: string; tone: Tone | 'plain'; href?: string }[];
 	/** 회수 칸(회수 확인 필요) — 상태 칩 · 회수 접수 · 회수 운송장 · 안내 / 교환 발송 칸(재발송 예약) — 발송 예정 · 안내 */
-	pickupBox: { chip: Chip; rows: { k: string; v: string; tone: Tone | 'plain' }[]; note: string; noteTone: 'grey' | 'red'; retry: boolean } | null;
-	reshipBox: { chip: Chip; rows: { k: string; v: string; tone: Tone | 'plain' }[]; note: string } | null;
+	/** failLines = 회수 접수 실패면 빨간 상자의 줄들(이때 rows · note 는 비어 있다) */
+	pickupBox: { chip: Chip; steps: { label: string; at: string; state: 'done' | 'now' | 'todo' }[]; rows: { k: string; v: string; tone: Tone | 'plain' }[]; note: string; failLines: string[]; retry: boolean; canConfirm: boolean } | null;
+	reshipBox: { chip: Chip; steps: { label: string; at: string; state: 'done' | 'now' | 'todo' }[]; rows: { k: string; v: string; tone: Tone | 'plain' }[]; note: string } | null;
 	notes: { tone: 'orange' | 'red'; text: string }[];
 	/** 단계별 버튼 — 회수 확인 · 송장 직접 입력(재발송 예외) · 환불 다시 · 승인/반려 */
 	action: 'pickup' | 'resend' | 'refund' | 'decide' | null;
@@ -136,9 +140,9 @@ const STAGE_CHIP: Record<ClaimStage, Chip> = {
 	rejected: { label: '반려', tone: 'grey' }
 };
 const CLAIM_EMPTY: Record<ClaimTab, string> = {
-	pickup: '회수 확인을 기다리는 환불 요청이 없어요',
-	resend: '재발송 요청이 없어요',
 	collect: '회수 확인이 필요한 요청이 없어요',
+	refunds: '진행 중인 환불이 없어요',
+	exchanges: '진행 중인 교환이 없어요',
 	refund: '환불을 다시 해야 하는 요청이 없어요',
 	pending: '처리를 기다리는 요청이 없어요',
 	done: '완료한 요청이 없어요',
@@ -204,7 +208,7 @@ const seedClaims = (): ClaimRaw[] => [
 		text: '생각보다 양이 많아서 뜯지 않은 채로 돌려보낼게요.',
 		photos: 2,
 		msg: '회수 후 왕복 배송비를 빼고 환불해 드릴게요.',
-		pickup: { state: 'assigned', at: '11월 13일 오전 9:30', code: 'RP2611130042', carrier: 'CJ대한통운', tracking: '6011-2045-7731' },
+		pickup: { state: 'assigned', at: '11월 13일 오전 9:30', code: 'RP2611130042', carrier: 'CJ대한통운', tracking: '6011-2045-7731', assignedAt: '11월 14일 오전 10:00' },
 		tl: [L('11월 12일 오후 1:05', '고객이 환불을 요청했어요', '고객'), L('11월 13일 오전 9:30', '하루가 승인했어요 · 이벗 회수 신청', '크리에이터'), L('11월 14일 오전 10:00', '회수 운송장 · CJ대한통운 6011-2045-7731', '자동')]
 	}),
 	K('R-0311', 'MYR1506', 'c2', 'p6', 1, '교환', '오배송', 'pickup', '11월 15일', '오*진', {
@@ -224,8 +228,8 @@ const seedClaims = (): ClaimRaw[] => [
 		res: 'partial',
 		text: '피부에 맞지 않아서 개봉 전 상태로 돌려보낼게요.',
 		msg: '회수 후 환불해 드릴게요.',
-		pickup: { state: 'failed', at: '11월 16일 오전 10:05', fail: '이벗 회수 신청 실패 · 송장 번호를 찾을 수 없어요' },
-		tl: [L('11월 14일 오후 2:30', '고객이 환불을 요청했어요', '고객'), L('11월 16일 오전 10:05', '소이가 승인했어요', '크리에이터'), L('11월 16일 오전 10:05', '이벗 회수 신청 실패 · 송장 번호를 찾을 수 없어요', '자동')]
+		pickup: { state: 'failed', at: '11월 16일 오전 10:05', fail: '이벗 회수 접수 실패 · 송장 번호를 찾을 수 없어요' },
+		tl: [L('11월 14일 오후 2:30', '고객이 환불을 요청했어요', '고객'), L('11월 16일 오전 10:05', '소이가 승인했어요', '크리에이터'), L('11월 16일 오전 10:05', '이벗 회수 접수 실패 · 송장 번호를 찾을 수 없어요', '자동')]
 	}),
 	K('R-0307', 'MYR1495', 'c3', 'p7', 1, '교환', '오배송', 'resend', '11월 11일', '고*민', {
 		opts: [op('reship_collect', '재발송 + 회수', '잘못 간 제품을 회수해 확인한 뒤 새 제품 출고', true, false), op('refund', '환불로 전환', '₩39,000 환불 · 회수 확인 뒤 환불', true, true, 39000)],
@@ -247,11 +251,12 @@ const seedClaims = (): ClaimRaw[] => [
 		text: '스틱 한 포가 터져서 왔어요.',
 		photos: 1,
 		msg: '새 상품으로 바로 보내 드릴게요.',
-		reship: { state: 'ordered', at: '11월 16일(월) 오전 11시', line: 'MYR1493-X1' },
+		reship: { state: 'shipped', at: '11월 16일(월) 오전 11시', line: 'MYR1493-X1', carrier: 'CJ대한통운', tracking: '5612-3455-2081', shippedAt: '11월 16일 오후 6:00' },
 		tl: [
 			L('11월 11일 오후 7:15', '고객이 교환을 요청했어요', '고객'),
 			L('11월 13일 오후 3:40', '민지가 승인했어요 · 새 제품 재발송 · 재발송 예약', '크리에이터'),
-			L('11월 16일 오전 11:00', '이벗 교환 주문 등록 · 배송준비중', '자동')
+			L('11월 16일 오전 11:00', '이벗 교환 주문 등록 · 배송준비중', '자동'),
+			L('11월 16일 오후 6:00', '재발송 운송장 · CJ대한통운 5612-3455-2081 · 고객에게 알림', '자동')
 		]
 	}),
 	K('R-0303', 'MYR1486', 'c3', 'p7', 1, '교환', '오배송', 'done', '11월 8일', '권*린', {
@@ -269,7 +274,8 @@ const seedClaims = (): ClaimRaw[] => [
 			L('11월 9일 오전 10:00', '회수 운송장 · 롯데택배 2391-8701-3355', '자동'),
 			L('11월 11일 오후 2:00', '회수 확인 · 재발송 예약', '운영 박서연'),
 			L('11월 12일 오전 11:00', '이벗 교환 주문 등록 · 배송준비중', '자동'),
-			L('11월 12일 오후 6:00', '교환 발송 송장 · CJ대한통운 5612-3402-1187 · 고객에게 알림', '자동')
+			L('11월 12일 오후 6:00', '재발송 운송장 · CJ대한통운 5612-3402-1187 · 고객에게 알림', '자동'),
+			L('11월 14일 오후 6:00', '배송 완료 · 택배사 연동 · 교환 완료', '자동')
 		]
 	}),
 	K('R-0305', 'MYR1490', 'c4', 'p9', 2, '환불', '파손 · 누액', 'refund', '11월 10일', '임*정', {
@@ -329,7 +335,30 @@ const seedClaims = (): ClaimRaw[] => [
 		photos: 1,
 		tl: [L('11월 15일 오전 11:30', '고객이 환불을 요청했어요', '고객')]
 	}),
-	// 회수 확인 필요 · 회수 후 환불: 교환 요청을 "환불로 전환"(첫 칩은 환불)
+	// 회수 접수 실패 — 이벗 연결 오류(응답 시간 초과) · [회수 다시 신청]
+	K('R-0315', 'MYR1532', 'c12', 'p26', 1, '환불', '단순 변심', 'pickup', '11월 14일', '임*은', {
+		res: 'partial',
+		opts: [op('partial', '부분 환불 (왕복 배송비 차감)', '₩16,000 환불 · 회수 확인 뒤 환불 · 왕복 배송비 ₩6,000 차감', true, true, 16000), op('refund', '전액 환불', '₩22,000 환불 · 회수 확인 뒤 환불', true, true, 22000)],
+		okAt: '11월 17일',
+		by: '지유',
+		text: '선물 받은 것과 겹쳐서 뜯지 않은 채로 돌려보낼게요.',
+		msg: '회수 후 왕복 배송비를 빼고 환불해 드릴게요.',
+		pickup: { state: 'failed', at: '11월 17일 오전 9:12', fail: '이벗 연결 실패 · 응답 시간 초과(30초)' },
+		tl: [L('11월 14일 오후 10:05', '고객이 환불을 요청했어요', '고객'), L('11월 17일 오전 9:12', '지유가 승인했어요 · 부분 환불', '크리에이터'), L('11월 17일 오전 9:12', '이벗 회수 접수 실패 · 응답 시간 초과', '자동')]
+	}),
+	// 회수 접수 실패 · 교환 탭: 오배송 교환(재발송 + 회수) — 이벗이 회수를 접수하지 못함 → [회수 다시 신청]
+	K('R-0320', 'MYR1535', 'c6', 'p14', 1, '교환', '오배송', 'pickup', '11월 16일', '노*린', {
+		res: 'reship_collect',
+		opts: [op('reship_collect', '재발송 + 회수', '잘못 간 제품을 회수해 확인한 뒤 새 제품 출고', true, false), op('refund', '환불로 전환', '₩29,000 환불 · 회수 확인 뒤 환불', true, true, 29000)],
+		okAt: '11월 17일',
+		by: '리나',
+		text: '마그네슘 젤리를 시켰는데 무드 허브티가 왔어요.',
+		photos: 2,
+		msg: '회수 후 마그네슘 젤리로 다시 보내 드릴게요.',
+		pickup: { state: 'failed', at: '11월 17일 오전 8:30', fail: '이벗 회수 접수 실패 · 이벗 일시 오류(잠시 후 다시 시도)' },
+		tl: [L('11월 16일 오후 7:50', '고객이 교환을 요청했어요', '고객'), L('11월 17일 오전 8:30', '리나가 승인했어요 · 재발송 + 회수', '크리에이터'), L('11월 17일 오전 8:30', '이벗 회수 접수 실패 · 이벗 일시 오류', '자동')]
+	}),
+	// 회수 운송장 나옴(회수 확인 필요) · 환불 탭: 교환 요청을 "환불로 전환"(첫 칩은 회수 후 환불)
 	K('R-0313', 'MYR1530', 'c1', 'p3', 1, '교환', '오배송', 'pickup', '11월 13일', '배*진', {
 		res: 'refund',
 		opts: [op('reship_collect', '재발송 + 회수', '잘못 간 제품을 회수해 확인한 뒤 새 제품 출고', true, false), op('refund', '환불로 전환', '₩34,000 환불 · 회수 확인 뒤 환불', true, true, 34000)],
@@ -338,10 +367,10 @@ const seedClaims = (): ClaimRaw[] => [
 		text: '히알루론 젤리 대신 포도 젤리가 왔어요.',
 		photos: 1,
 		msg: '재고가 없어 환불로 처리해 드릴게요. 회수 후 바로 환불돼요.',
-		pickup: { state: 'assigned', at: '11월 14일 오전 10:10', code: 'RP2611140051', carrier: 'CJ대한통운', tracking: '6011-2101-5584' },
+		pickup: { state: 'assigned', at: '11월 14일 오전 10:10', code: 'RP2611140051', carrier: 'CJ대한통운', tracking: '6011-2101-5584', assignedAt: '11월 15일 오전 10:00' },
 		tl: [L('11월 13일 오후 6:40', '고객이 교환을 요청했어요', '고객'), L('11월 14일 오전 10:10', '민지가 승인했어요 · 환불로 전환 · 이벗 회수 신청', '크리에이터'), L('11월 15일 오전 10:00', '회수 운송장 · CJ대한통운 6011-2101-5584', '자동')]
 	}),
-	// 회수 확인 필요 · 재발송 탭: 환불 요청을 "교환으로 전환" + 이벗 회수 신청 실패
+	// 회수 운송장 나옴(회수 확인 필요) · 교환 탭: 환불 요청을 "교환으로 전환"
 	K('R-0308', 'MYR1501', 'c8', 'p17', 1, '환불', '오배송', 'pickup', '11월 13일', '문*아', {
 		res: 'reship_collect',
 		opts: [op('refund', '전액 환불', '₩29,000 환불 · 회수 확인 뒤 환불', true, true, 29000), op('reship_collect', '교환으로 전환', '잘못 간 제품을 회수해 확인한 뒤 새 제품 출고', true, false)],
@@ -350,8 +379,8 @@ const seedClaims = (): ClaimRaw[] => [
 		text: '토마토 스틱을 시켰는데 흑마늘 젤리가 왔어요.',
 		photos: 2,
 		msg: '토마토 스틱으로 다시 보내 드릴게요.',
-		pickup: { state: 'failed', at: '11월 16일 오후 2:30', fail: '이벗 회수 신청 실패 · 이미 회수 접수된 송장이에요' },
-		tl: [L('11월 13일 오후 1:15', '고객이 환불을 요청했어요', '고객'), L('11월 16일 오후 2:30', '다온이 승인했어요 · 교환으로 전환', '크리에이터'), L('11월 16일 오후 2:30', '이벗 회수 신청 실패 · 이미 회수 접수된 송장이에요', '자동')]
+		pickup: { state: 'assigned', at: '11월 13일 오후 4:00', code: 'RP2611130088', carrier: '롯데택배', tracking: '2391-8920-4471', assignedAt: '11월 14일 오전 10:00' },
+		tl: [L('11월 13일 오후 1:15', '고객이 환불을 요청했어요', '고객'), L('11월 13일 오후 4:00', '다온이 승인했어요 · 교환으로 전환 · 이벗 회수 신청', '크리에이터'), L('11월 14일 오전 10:00', '회수 운송장 · 롯데택배 2391-8920-4471', '자동')]
 	}),
 	// 재발송 · 자동 발송: 환불 요청을 "교환으로 전환"(파손 · 누액 · 회수 없음) — 승인 때 바로 들어옴
 	K('R-0304', 'MYR1489', 'c5', 'p13', 1, '환불', '파손 · 누액', 'resend', '11월 15일', '김*호', {
@@ -362,7 +391,7 @@ const seedClaims = (): ClaimRaw[] => [
 		text: '스틱 몇 개가 눌려서 가루가 새어 나왔어요.',
 		photos: 2,
 		msg: '새 제품으로 바로 보내 드릴게요.',
-		reship: { state: 'queued', at: '11월 18일(수) 오전 11시', line: 'MYR1489-X1' },
+		reship: { state: 'ordered', at: '11월 17일(화) 오전 11시', line: 'MYR1489-X1' },
 		tl: [L('11월 15일 오후 4:20', '고객이 환불을 요청했어요', '고객'), L('11월 17일 오전 9:05', '온유가 승인했어요 · 교환으로 전환 · 재발송 예약', '크리에이터')]
 	}),
 	// 환불할 차례: 부분 환불이 회수 확인 뒤 실패
@@ -408,7 +437,8 @@ const seedClaims = (): ClaimRaw[] => [
 			L('11월 7일 오후 8:30', '고객이 교환을 요청했어요', '고객'),
 			L('11월 8일 오전 9:20', '민지가 승인했어요 · 새 제품 재발송 · 재발송 예약', '크리에이터'),
 			L('11월 9일 오전 11:00', '이벗 교환 주문 등록 · 배송준비중', '자동'),
-			L('11월 9일 오후 6:00', '교환 발송 송장 · CJ대한통운 5612-3377-0941 · 고객에게 알림', '자동')
+			L('11월 9일 오후 6:00', '재발송 운송장 · CJ대한통운 5612-3377-0941 · 고객에게 알림', '자동'),
+			L('11월 11일 오후 6:00', '배송 완료 · 택배사 연동 · 교환 완료', '자동')
 		]
 	}),
 	// 완료: 송장 직접 입력(예외 — 이벗이 아닌 곳에서 보냄)
@@ -521,12 +551,10 @@ export interface CsCounts {
 	inqOpen: number;
 	inqLate: number;
 	inqLateOldest: string | null;
-	/** 운영이 처리할 교환 · 환불 — 회수 확인 필요(그중 이벗 회수 신청 실패) · 재발송 예약(이벗이 자동 발송 — 기다리기만) · 환불 다시 필요(가장 오래된 실패 시각) */
+	/** 운영이 처리할 교환 · 환불 — 회수 확인 필요(그중 이벗 회수 접수 실패) · 재발송 예약(이벗이 자동 발송 — 기다리기만) · 환불 다시 필요(가장 오래된 실패 시각) */
 	pickup: number;
 	pickupFail: number;
 	/** 회수 확인 필요 중 회수 뒤 환불 · 회수 뒤 재발송 */
-	pickupRefund: number;
-	pickupReship: number;
 	resend: number;
 	refundRetry: number;
 	refundOldest: string | null;
@@ -558,8 +586,6 @@ class CsServer {
 			inqLateOldest: late.length ? ago(Math.max(...late.map((q) => q.mins))) : null,
 			pickup: st('pickup').length,
 			pickupFail: st('pickup').filter((k) => k.pickup?.state === 'failed').length,
-			pickupRefund: st('pickup').filter((k) => !!this.chosen(k)?.refunds).length,
-			pickupReship: st('pickup').filter((k) => !this.chosen(k)?.refunds).length,
 			resend: st('resend').length,
 			refundRetry: refund.length,
 			refundOldest: refund[0]?.fail?.split(' · ')[1]?.replace(/ \(.*\)$/, '') ?? null,
@@ -591,33 +617,39 @@ class CsServer {
 	// ── 교환 · 환불
 	claimSummary(): string {
 		const c = this.counts;
-		return `회수 확인 필요 ${c.pickup}건(환불 ${c.pickupRefund} · 재발송 ${c.pickupReship}) · 환불할 차례 ${c.refundRetry}건 · 크리에이터 답변 기한 넘김 ${c.creatorLate}건`;
+		return `회수 확인 필요 ${c.pickup}건 · 환불할 차례 ${c.refundRetry}건 · 크리에이터 답변 기한 넘김 ${c.creatorLate}건`;
 	}
 
-	/** 탭에 들어가는가 — 회수 후 환불 = 회수 확인 필요 중 환불 · 재발송 = 회수 확인 필요 중 재발송 + 자동 발송 · 회수 확인 필요(collect) = 둘 다 */
+	/** 탭에 들어가는가 — 회수 확인 필요 = 단계 pickup 전부 · 환불 = 진행 중 환불(pickup 중 환불 · 환불할 차례) · 교환 = 진행 중 교환(pickup 중 재발송 · 자동 발송) */
 	private inTab(k: ClaimRaw, tab: ClaimTab) {
-		if (tab === 'all') return true;
-		if (tab === 'collect') return k.stage === 'pickup';
-		if (tab === 'pickup') return k.stage === 'pickup' && !!this.chosen(k)?.refunds;
-		if (tab === 'resend') return k.stage === 'resend' || (k.stage === 'pickup' && !this.chosen(k)?.refunds);
-		return k.stage === tab;
+		const refunds = !!this.chosen(k)?.refunds;
+		switch (tab) {
+			case 'all':
+				return true;
+			case 'collect':
+				return k.stage === 'pickup';
+			case 'refunds':
+				return (k.stage === 'pickup' && refunds) || k.stage === 'refund';
+			case 'exchanges':
+				return (k.stage === 'pickup' && !refunds) || k.stage === 'resend';
+			default:
+				return k.stage === tab;
+		}
 	}
-	/** 요청이 속한 탭(상세 뒤로가기) */
+	/** 요청이 속한 탭(상세 뒤로가기) — 운영 할 일이면 그 탭, 자동 발송이면 교환 */
 	private tabOf(k: ClaimRaw): ClaimTab {
-		return k.stage === 'pickup' ? (this.chosen(k)?.refunds ? 'pickup' : 'resend') : k.stage;
-	}
-	/** 목록 위 띠 — 회수 확인 필요 전부(collect)를 볼 때만 */
-	claimBand(tab: ClaimTab): string | null {
-		const c = this.counts;
-		return tab === 'collect' ? `회수 확인이 필요한 요청이에요 — 회수 후 환불 ${c.pickupRefund}건 · 회수 후 재발송 ${c.pickupReship}건 · 물건이 도착하면 상세에서 [회수 확인]을 눌러 주세요` : null;
+		if (k.stage === 'pickup') return 'collect';
+		if (k.stage === 'resend') return 'exchanges';
+		return k.stage;
 	}
 
 	claimTabs(): { id: ClaimTab; name: string; count: number; hot?: boolean }[] {
 		const n = (s: ClaimStage) => this.claimsRaw.filter((k) => k.stage === s).length;
 		const t = (tab: ClaimTab) => this.claimsRaw.filter((k) => this.inTab(k, tab)).length;
 		return [
-			{ id: 'pickup', name: '회수 후 환불', count: t('pickup') },
-			{ id: 'resend', name: '재발송', count: t('resend') },
+			{ id: 'exchanges', name: '교환', count: t('exchanges') },
+			{ id: 'refunds', name: '환불', count: t('refunds') },
+			{ id: 'collect', name: '회수 확인 필요', count: t('collect') },
 			{ id: 'refund', name: '환불할 차례', count: n('refund'), hot: true },
 			{ id: 'pending', name: '처리 대기', count: n('pending') },
 			{ id: 'done', name: '완료', count: n('done') },
@@ -644,7 +676,7 @@ class CsServer {
 					title: `${p.name} × ${k.qty}`,
 					sub: `${x.name} · ${k.why}${k.by ? ` · ${k.okAt} ${k.by} ${k.stage === 'rejected' ? '반려' : '승인'}` : ''}`,
 					right: won(p.price * k.qty),
-					rightSub: k.stage === 'pending' ? (k.late ? `답변 기한 ${k.late}일 지남` : `${k.due}까지 답변`) : k.stage === 'pickup' ? this.pickupShort(k) : k.stage === 'resend' && k.reship ? (k.reship.state === 'ordered' ? '이벗 발주됨 · 송장 대기' : `${k.reship.at} 교환 발송`) : '',
+					rightSub: k.stage === 'pending' ? (k.late ? `답변 기한 ${k.late}일 지남` : `${k.due}까지 답변`) : k.stage === 'pickup' ? this.pickupShort(k) : k.stage === 'resend' && k.reship ? (k.reship.state === 'shipped' ? `배송 중 · ${k.reship.carrier}` : k.reship.state === 'ordered' ? '이벗 발주됨 · 재발송 운송장 대기' : `${k.reship.at} 발주 예정`) : '',
 					rightSubTone: k.late || k.pickup?.state === 'failed' ? 'red' : 'grey',
 					txt: `${k.id} ${k.ord} ${p.name} ${x.name} ${k.why}`.toLowerCase()
 				};
@@ -666,17 +698,18 @@ class CsServer {
 	private chosen(k: ClaimRaw) {
 		return k.opts.find((o) => o.id === k.res) ?? null;
 	}
-	/** 목록 첫 칩 — 승인 전 · 반려는 고객이 요청한 종류, 승인 뒤는 실제로 일어날 일(처리 방법의 환불 값으로) 환불 / 재발송. 둘째 칩(단계)이 회수 확인 필요(주황 · 운영 할 일) · 자동 발송(회색) */
+	/** 목록 첫 칩(경로) — 승인 전 · 반려는 고객이 요청한 종류, 승인 뒤는 실제로 일어날 일(처리 방법의 회수 · 환불 값으로):
+	 *  회수 후 환불 / 바로 환불 / 회수 후 재발송 / 바로 재발송. 둘째 칩(지금 상태)이 회수 확인 필요(주황 · 운영 할 일) · 자동 발송(회색) · 환불 다시 필요 … */
 	private pathChip(k: ClaimRaw): Chip {
 		const ch = this.chosen(k);
 		if (!ch || k.stage === 'pending' || k.stage === 'rejected') return { label: k.kind, tone: 'plain' };
-		return { label: ch.refunds ? '환불' : '재발송', tone: 'plain' };
+		return { label: `${ch.collects ? '회수 후' : '바로'} ${ch.refunds ? '환불' : '재발송'}`, tone: 'plain' };
 	}
 	/** 목록 오른쪽 한 줄 — 회수 상태 */
 	private pickupShort(k: ClaimRaw) {
 		const pk = k.pickup;
 		if (!pk) return '';
-		return pk.state === 'failed' ? '회수 신청 실패' : pk.state === 'assigned' ? `회수 중 · ${pk.carrier}` : '회수 운송장 대기';
+		return pk.state === 'failed' ? '회수 접수 실패' : pk.state === 'assigned' ? `회수 운송장 · ${pk.carrier}` : '회수 운송장 대기';
 	}
 	/** 회수 칸 — 승인 때 이벗에 회수를 자동 신청(E4) · 회수 운송장은 매일 오전 10시에 받아온다(바인허브 AssignPickupReturnNumber) · 도착은 운영이 [회수 확인] */
 	private pickupBox(k: ClaimRaw): ClaimView['pickupBox'] {
@@ -684,38 +717,60 @@ class CsServer {
 		if (k.stage !== 'pickup' || !pk) return null;
 		if (pk.state === 'failed')
 			return {
-				chip: { label: '회수 신청 실패', tone: 'red' },
-				rows: [{ k: '신청 시각', v: pk.at, tone: 'plain' }],
-				note: `${pk.fail ?? '이벗 회수 신청이 실패했어요'} · 송장과 이벗 주문을 확인한 뒤 [회수 다시 신청]을 눌러 주세요`,
-				noteTone: 'red',
-				retry: true
+				chip: { label: '회수 접수 실패', tone: 'red' },
+				steps: [],
+				rows: [],
+				note: '',
+				failLines: [`이벗 회수 접수가 실패했어요(${pk.at})`, '[회수 다시 신청]을 눌러 다시 신청해 주세요'],
+				retry: true,
+				canConfirm: false
 			};
+		const ready = pk.state === 'assigned';
+		const st = (done: boolean, now: boolean) => (done ? 'done' : now ? 'now' : 'todo') as 'done' | 'now' | 'todo';
 		return {
-			chip: pk.state === 'assigned' ? { label: '회수 중', tone: 'mint' } : { label: '회수 운송장 대기', tone: 'grey' },
-			rows: [
-				{ k: '이벗 회수 접수', v: `${pk.at}${pk.code ? ` · ${pk.code}` : ''}`, tone: 'plain' },
-				{ k: '회수 운송장', v: pk.state === 'assigned' ? `${pk.carrier} ${pk.tracking}` : '매일 오전 10시에 받아와요', tone: pk.state === 'assigned' ? 'plain' : 'grey' }
+			chip: ready ? { label: '운송장 확인 필요', tone: 'orange' } : { label: '회수 운송장 대기', tone: 'grey' },
+			steps: [
+				{ label: '회수 접수', at: pk.at, state: st(true, false) },
+				{ label: '회수 운송장(매일 오전 10시 자동)', at: pk.assignedAt ?? '', state: st(ready, !ready) },
+				{ label: '회수 완료(운영 확인)', at: '', state: st(false, ready) }
 			],
-			note: '승인하면 이벗에 회수가 자동으로 신청돼요 · 물건이 도착하면 상태를 확인하고 [회수 확인]을 눌러 주세요',
-			noteTone: 'grey',
-			retry: false
+			rows: [
+				{ k: '이벗 회수 접수', v: pk.code ?? '—', tone: 'plain' },
+				{ k: '회수 운송장', v: pk.tracking ? `${pk.carrier} ${pk.tracking}` : '매일 오전 10시에 받아와요', tone: pk.tracking ? 'plain' : 'grey' }
+			],
+			note: ready
+				? '회수 운송장으로 택배 조회를 해서 회수가 끝났는지 확인한 뒤 [회수 완료(운영 확인)]를 눌러 주세요'
+				: '이벗이 회수를 접수했어요 · 회수 운송장이 나오면 택배 조회로 회수가 끝났는지 확인할 수 있어요(운영이 할 일은 아직 없어요)',
+			failLines: [],
+			retry: false,
+			canConfirm: ready
 		};
 	}
-	/** 교환 발송 칸 — 회수 확인 때 결제 없는 교환 주문 줄 → 다음 영업일 11시 이벗 교환 주문(ordGbn=2)으로 자동 발주 · 송장은 18시 수집 · 송장이 붙으면 교환 완료 */
+
+	/** 이벗 처리 · 교환 발송 칸 — 교환 접수(결제 없는 교환 주문) → 교환 발주(다음 영업일 11시 이벗 교환 주문 ordGbn=2 · 배송준비중) → 재발송 운송장(18시 자동 수집) → 배송 완료(택배사 '91' 또는 발송 10일 · 자동) — 배송 완료되면 교환 완료 */
 	private reshipBox(k: ClaimRaw): ClaimView['reshipBox'] {
 		if (k.stage !== 'resend' || !k.reship) return null;
 		const r = k.reship;
+		const shipped = r.state === 'shipped';
 		const ordered = r.state === 'ordered';
+		const st = (done: boolean, now: boolean) => (done ? 'done' : now ? 'now' : 'todo') as 'done' | 'now' | 'todo';
 		return {
-			chip: ordered ? { label: '이벗 발주됨', tone: 'mint' } : { label: '발송 예약', tone: 'grey' },
+			chip: shipped ? { label: '배송 중', tone: 'mint' } : ordered ? { label: '이벗 발주됨', tone: 'mint' } : { label: '발송 예약', tone: 'grey' },
+			steps: [
+				{ label: '교환 접수', at: '', state: st(true, false) },
+				{ label: '교환 발주(이벗 · 배송준비중)', at: ordered || shipped ? r.at : `${r.at} 예정`, state: st(ordered || shipped, !ordered && !shipped) },
+				{ label: '재발송 운송장', at: shipped ? r.shippedAt ?? '' : ordered ? '오후 6시 자동' : '', state: st(shipped, ordered) },
+				{ label: '배송 완료(택배사 91 · 10일 자동)', at: '', state: st(false, shipped) }
+			],
 			rows: [
 				{ k: '교환 주문', v: `${r.line} · ₩0 · 결제 없음`, tone: 'plain' },
-				{ k: '이벗 발주', v: ordered ? `${r.at} · 배송준비중` : `${r.at} 예정`, tone: 'plain' },
-				{ k: '송장', v: '오후 6시에 자동으로 받아와요', tone: 'grey' }
+				{ k: '재발송 운송장', v: shipped ? `${r.carrier} ${r.tracking}` : '오후 6시에 자동으로 받아와요', tone: shipped ? 'plain' : 'grey' }
 			],
-			note: '교환은 결제 없이 다음 영업일 오전 11시에 이벗 교환 주문으로 발송돼요 · 송장은 오후 6시에 자동으로 붙고 고객에게 "교환 상품이 출발했어요" 메일이 가요 · 송장이 붙으면 교환이 완료돼요 · 이벗이 아닌 곳에서 보낼 때만 송장을 직접 입력해 주세요'
+			note: '이벗이 알아서 보내요 · 재발송 운송장이 붙으면 고객에게 알리고, 택배사 배송 완료(또는 발송 10일)가 찍히면 교환이 완료돼요 · 이벗이 아닌 곳에서 보낼 때만 송장을 직접 입력해 주세요'
 		};
 	}
+
+
 
 	claim(id: string): ClaimView | null {
 		const k = this.rawClaim(id);
@@ -749,9 +804,9 @@ class CsServer {
 		if (k.stage === 'pickup') {
 			action = 'pickup';
 			armed = {
-				label: '회수 확인',
-				sure: '정말 회수 확인하기',
-				note: ch?.refunds ? `회수를 확인하면 바로 환불돼요 · ${won(ch.quote ?? 0)}` : '회수를 확인하면 다음 영업일 오전 11시에 이벗으로 교환 상품이 발송돼요'
+				label: '회수 완료(운영 확인)',
+				sure: '정말 회수 완료로 처리하기',
+				note: ch?.refunds ? `회수가 끝난 걸 확인했나요? 회수 완료로 처리하면 바로 환불돼요 · ${won(ch.quote ?? 0)}` : '회수가 끝난 걸 확인했나요? 회수 완료로 처리하면 다음 영업일 오전 11시에 이벗으로 교환 상품이 발송돼요'
 			};
 		} else if (k.stage === 'resend') action = 'resend';
 		else if (k.stage === 'refund') {
@@ -784,7 +839,7 @@ class CsServer {
 			})),
 			photosTitle: `고객 사진 ${k.photos}장`,
 			message: k.msg ? { title: `${k.by ?? x.name} 메시지`, text: k.msg } : null,
-			order: [{ k: '주문번호', v: k.ord }, { k: '상품', v: `${p.name} × ${k.qty}` }, { k: '환불 대상 금액', v: amount }, ...(k.pickup?.tracking ? [{ k: '회수 운송장', v: `${k.pickup.carrier} ${k.pickup.tracking}` }] : []), ...(k.resent ? [{ k: '교환 발송 송장', v: k.resent }] : [])],
+			order: [{ k: '주문번호', v: k.ord }, { k: '상품', v: `${p.name} × ${k.qty}` }, { k: '환불 대상 금액', v: amount }, ...(k.pickup?.tracking ? [{ k: '회수 운송장', v: `${k.pickup.carrier} ${k.pickup.tracking}` }] : []), ...(k.resent ? [{ k: '재발송 운송장', v: k.resent }] : [])],
 			timeline: k.tl,
 			stageChip: STAGE_CHIP[k.stage],
 			side,
@@ -805,7 +860,7 @@ class CsServer {
 			return {
 				title: '송장 직접 입력',
 				desc,
-				info: '이벗이 아닌 곳에서 새 제품을 보냈을 때만 써요 · 저장하면 이벗 재발송 예약이 취소되고 교환이 완료되며 고객에게 운송장을 알려요',
+				info: '이벗이 아닌 곳에서 새 제품을 보냈을 때만 써요 · 저장하면 이벗 재발송 예약이 취소되고 고객에게 운송장을 알려요 · 배송 완료되면 교환이 완료돼요',
 				ok: '송장 저장',
 				options: { label: '택배사', items: CARRIERS.map((c) => ({ id: c, title: c })), value: CARRIERS[0] },
 				tracking: { label: '운송장', ph: '숫자와 - 만 입력' }
@@ -848,26 +903,27 @@ class CsServer {
 		this.claimsRaw = this.claimsRaw.map((k) => (k.id === id ? { ...k, ...fn(k) } : k));
 	}
 
-	/** [회수 확인] — 환불이면 바로 환불 · 교환이면 재발송 예약로 */
+	/** [회수 완료(운영 확인)](운영 — 회수 운송장 택배 조회로 회수가 끝난 걸 확인한 뒤) — 환불이면 바로 환불 · 교환이면 재발송 예약으로 */
 	confirmPickup(id: string): Result {
 		const k = this.rawClaim(id);
 		if (!k || k.stage !== 'pickup') return noR('회수를 기다리는 요청이 아니에요');
 		const ch = this.chosen(k);
 		const amount = won(ch?.quote ?? 0);
 		const refund = !!ch?.refunds;
-		if (k.pickup?.state === 'failed') return noR('이벗 회수 신청이 실패한 요청이에요 — 먼저 [회수 다시 신청]을 눌러 주세요');
+		if (k.pickup?.state === 'failed') return noR('이벗 회수 접수가 실패한 요청이에요 — 먼저 [회수 다시 신청]을 눌러 주세요');
+		if (k.pickup?.state !== 'assigned') return noR('회수 운송장이 아직 나오지 않았어요 — 운송장이 나오면 택배 조회로 회수가 끝났는지 확인해 주세요');
 		this.patchClaim(id, (o) => ({
 			stage: refund ? 'done' : 'resend',
 			reship: refund ? null : { state: 'queued', at: '11월 18일(수) 오전 11시', line: `${o.ord}-X1` },
-			tl: [...o.tl, L(stamp(), refund ? `회수 확인 · 환불 완료 ${amount}` : '회수 확인 · 재발송 예약', me())]
+			tl: [...o.tl, L(stamp(), refund ? `회수 완료(운영 확인) · 환불 완료 ${amount}` : '회수 완료(운영 확인) · 재발송 예약', me())]
 		}));
-		return okR(refund ? `회수 확인 · ${amount} 환불했어요` : '회수를 확인했어요 · 11월 18일(수) 오전 11시에 이벗으로 교환 상품이 발송돼요');
+		return okR(refund ? `회수 완료로 처리했어요 · ${amount} 환불했어요` : '회수 완료로 처리했어요 · 11월 18일(수) 오전 11시에 이벗으로 교환 상품이 발송돼요');
 	}
 
-	/** [회수 다시 신청] — 이벗 회수 신청이 실패한 요청을 다시 신청(UI 단계 — 목에서 신청됨으로) */
+	/** [회수 다시 신청] — 이벗 회수 접수가 실패한 요청을 다시 신청(UI 단계 — 목에서 신청됨으로) */
 	retryPickup(id: string): Result {
 		const k = this.rawClaim(id);
-		if (!k || k.stage !== 'pickup' || k.pickup?.state !== 'failed') return noR('회수 신청이 실패한 요청이 아니에요');
+		if (!k || k.stage !== 'pickup' || k.pickup?.state !== 'failed') return noR('회수 접수가 실패한 요청이 아니에요');
 		this.patchClaim(id, (o) => ({
 			pickup: { state: 'requested', at: stamp(), code: 'RP2611170201' },
 			tl: [...o.tl, L(stamp(), '이벗 회수 다시 신청', me())]
@@ -884,12 +940,11 @@ class CsServer {
 		if (!/^[\d-]{8,}$/.test(tr)) return noR('운송장 번호를 확인해 주세요 — 숫자 8자리 이상');
 		const r = `${carrier} ${tr}`;
 		this.patchClaim(id, (o) => ({
-			stage: 'done',
 			resent: r,
-			reship: null,
+			reship: o.reship ? { ...o.reship, state: 'shipped', carrier, tracking: tr, shippedAt: stamp() } : { state: 'shipped', at: stamp(), line: `${o.ord}-X1`, carrier, tracking: tr, shippedAt: stamp() },
 			tl: [...o.tl, L(stamp(), `송장 직접 입력 · ${r} (이벗 교환 발송 취소)`, me())]
 		}));
-		return okR('송장을 저장했어요 · 교환을 완료했어요');
+		return okR('송장을 저장했어요 · 배송 완료되면 교환이 완료돼요');
 	}
 
 	/** [환불 다시] — 결제 수단으로 다시 환불 */

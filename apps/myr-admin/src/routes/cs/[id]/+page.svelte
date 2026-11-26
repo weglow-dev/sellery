@@ -15,7 +15,7 @@
 	import Timeline from '$lib/components/Timeline.svelte';
 
 	/** 교환 · 환불 요청 상세 — docs/myr-admin-screens.md §8-2. 왼쪽 본문(고객 요청 · 사진 · 크리에이터 메시지 · 주문 · 배송 · 타임라인) + 오른쪽 고정 패널(단계 · 안내 · 단계별 버튼).
-	 *  처리 대기 → [승인](처리 방법 = 서버 선택지 · 사유별 — 회수가 필요하면 이벗 회수 신청 / 회수 없는 재발송은 바로 재발송 / 회수 없는 환불은 바로 환불) · 회수 확인 필요 → 회수 칸(이벗 회수 접수 · 회수 운송장 · 실패면 [회수 다시 신청]) + [회수 확인](한 번 더 확인) · 재발송 → 교환 발송 칸(다음 영업일 11시 이벗 자동 발송) + 예외 [송장 직접 입력](모달) · 환불할 차례 → [환불 다시](한 번 더 확인) · 처리 대기 → [반려] [승인](모달 · 운영 대행).
+	 *  처리 대기 → [승인](처리 방법 = 서버 선택지 · 사유별 — 회수가 필요하면 이벗 회수 신청 / 회수 없는 재발송은 바로 재발송 / 회수 없는 환불은 바로 환불) · 회수 확인 필요 → 회수 칸(이벗 회수 접수 · 회수 운송장 · 실패면 [회수 다시 신청]) + [회수 완료(운영 확인)](회수 운송장이 나온 뒤 · 한 번 더 확인) · 재발송 → 교환 발송 칸(다음 영업일 11시 이벗 자동 발송) + 예외 [송장 직접 입력](모달) · 환불할 차례 → [환불 다시](한 번 더 확인) · 처리 대기 → [반려] [승인](모달 · 운영 대행).
 	 *  칩 · 안내 · 버튼 · 모달 문구 · 결과 문구는 전부 서버(목) 값. 모바일은 오른쪽 패널이 본문 아래로 쌓인다 */
 	const id = $derived(page.params.id ?? '');
 	const v = $derived(cs.claim(id));
@@ -95,18 +95,44 @@
 				{#if v.pickupBox}
 					{@const b = v.pickupBox}
 					<div class="border-t border-white/8 pt-5">
-						<DetailCard plain title="회수" chips={[b.chip]}>
-							{#each b.rows as r (r.k)}
-								<InfoRow k={r.k} tone={r.tone}><span class="truncate">{r.v}</span></InfoRow>
-							{/each}
-							<p class="mt-2 text-[13px] leading-[1.5] {b.noteTone === 'red' ? 'font-semibold text-danger-fg' : 'text-white/55'}">{b.note}</p>
+						<DetailCard plain title="이벗 처리" sub="회수" chips={[b.chip]}>
+							{#if b.failLines.length}
+								<div class="rounded-[14px] bg-danger/10 px-4 py-3">
+									{#each b.failLines as l (l)}
+										<p class="flex gap-2 py-0.5 text-[13.5px] leading-[1.6] font-semibold text-danger-fg"><span class="shrink-0" aria-hidden="true">•</span><span>{l}</span></p>
+									{/each}
+								</div>
+							{:else}
+								<ol class="mb-3 flex flex-col gap-2">
+									{#each b.steps as st (st.label)}
+										<li class="flex items-center gap-2.5 text-[13.5px]">
+											<span class="h-2.5 w-2.5 shrink-0 rounded-full {st.state === 'done' ? 'bg-white/45' : st.state === 'now' ? 'bg-accent' : 'border border-white/25'}" aria-hidden="true"></span>
+											<span class="min-w-0 flex-1 {st.state === 'todo' ? 'text-white/40' : st.state === 'now' ? 'font-bold text-fg' : 'text-white/75'}">{st.label}</span>
+											<span class="shrink-0 text-[12px] text-white/45 tabular-nums">{st.at}</span>
+										</li>
+									{/each}
+								</ol>
+								{#each b.rows as r (r.k)}
+									<InfoRow k={r.k} tone={r.tone}><span class="truncate">{r.v}</span></InfoRow>
+								{/each}
+								<p class="mt-2 text-[13px] leading-[1.5] text-white/55">{b.note}</p>
+							{/if}
 						</DetailCard>
 					</div>
 				{/if}
 				{#if v.reshipBox}
 					{@const b = v.reshipBox}
 					<div class="border-t border-white/8 pt-5">
-						<DetailCard plain title="교환 발송" chips={[b.chip]}>
+						<DetailCard plain title="이벗 처리" sub="교환 발송" chips={[b.chip]}>
+							<ol class="mb-3 flex flex-col gap-2">
+								{#each b.steps as st (st.label)}
+									<li class="flex items-center gap-2.5 text-[13.5px]">
+										<span class="h-2.5 w-2.5 shrink-0 rounded-full {st.state === 'done' ? 'bg-white/45' : st.state === 'now' ? 'bg-accent' : 'border border-white/25'}" aria-hidden="true"></span>
+										<span class="min-w-0 flex-1 {st.state === 'todo' ? 'text-white/40' : st.state === 'now' ? 'font-bold text-fg' : 'text-white/75'}">{st.label}</span>
+										<span class="shrink-0 text-[12px] text-white/45 tabular-nums">{st.at}</span>
+									</li>
+								{/each}
+							</ol>
 							{#each b.rows as r (r.k)}
 								<InfoRow k={r.k} tone={r.tone}><span class="truncate">{r.v}</span></InfoRow>
 							{/each}
@@ -122,7 +148,7 @@
 				{#if v.action === 'pickup' && v.armed}
 					{#if v.pickupBox?.retry}
 						<Btn kind="primary" full onclick={() => toast(cs.retryPickup(id))}>회수 다시 신청</Btn>
-					{:else}
+					{:else if v.pickupBox?.canConfirm}
 						<div class="flex"><ArmedButton label={v.armed.label} sure={v.armed.sure} note={v.armed.note} onconfirm={() => toast(cs.confirmPickup(id))} /></div>
 					{/if}
 				{:else if v.action === 'resend'}

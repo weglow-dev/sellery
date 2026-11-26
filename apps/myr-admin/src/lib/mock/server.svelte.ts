@@ -580,9 +580,9 @@ class MockServer {
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
 				chip('환불 다시 필요', cs.counts.refundRetry, 'red', '/cs?tab=refund'),
-				chip('회수 신청 실패', cs.counts.pickupFail, 'red', '/cs?tab=collect'),
+				chip('회수 접수 실패', cs.counts.pickupFail, 'red', '/cs?tab=collect'),
 				chip('회수 확인 필요', cs.counts.pickup - cs.counts.pickupFail, 'orange', '/cs?tab=collect'),
-				chip('재발송', cs.counts.resend, 'grey', '/cs?tab=resend')
+				chip('자동 발송', cs.counts.resend, 'grey', '/cs?tab=exchanges')
 			]),
 			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', talk.counts.waiting, 'orange', '/talk?tab=wait')]),
 			row('creators', '크리에이터', 'm_creators', '/creators', [
