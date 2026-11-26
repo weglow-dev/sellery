@@ -23,7 +23,7 @@
 	import Field from './Field.svelte';
 	import Modal from './Modal.svelte';
 
-	/** 주문 동작 모달(§6-2 · §6-4) — 송장 입력/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일) · 예외 환불(사유 필수 · 한 번 더 확인).
+	/** 주문 동작 모달(§6-2 · §6-4) — 송장 입력/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일 · 자동으로 끝나지 않는 주문만) · 예외 환불(사유 필수 · 한 번 더 확인).
 	 *  거절 문구 · 결과 문구는 서버(목) 값 — 거절이면 Modal 안에 보여 주고 닫지 않는다 */
 	const m = $derived(orderModal.open);
 	const v = $derived(m ? orders.view(m.id) : undefined);
@@ -72,6 +72,7 @@
 		<Field label="실제 배송일" hint="택배 조회에서 확인한 날짜를 적어 주세요">
 			<input type="date" bind:value={date} max={TODAY} class={INPUT} />
 		</Field>
+		<p class="rounded-xl border border-white/10 bg-white/4 px-3.5 py-3 text-[13px] leading-[1.5] text-white/70">택배사가 배송 완료를 알려 주거나 발송 10일이 지나면 자동으로 배송 완료돼요 · 운영이 직접 입력한 송장처럼 자동으로 끝나지 않는 주문만 택배 조회로 도착을 확인한 뒤 기록해 주세요</p>
 	</Modal>
 {:else if m?.kind === 'refund' && v}
 	<Modal title="예외 환불" desc="{v.id} · {won(v.amount)}" ok="환불" sure="정말 환불하기" danger info="정말 환불할까요? 결제 수단으로 {won(v.amount)}이 바로 환불돼요" infoTone="orange" disabled={!why.trim()} onclose={close} onok={() => done(orders.refundException(v.id, why))}>

@@ -577,7 +577,7 @@ class MockServer {
 			]),
 			row('orders', '주문 · 배송', 'm_orders', '/orders', [
 				chip('이벗 발주 실패', orders.counts.ebutFail, 'red', '/orders?tab=ebutFail'),
-				chip('배송 완료 기록 없음', orders.counts.noDelivered, 'orange', '/orders/overdue')
+				chip('배송 완료 예외', orders.counts.noDelivered, 'orange', '/orders?tab=shipping&ship=overdue')
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
 				chip('환불 다시 필요', cs.counts.refundRetry, 'red', '/cs?tab=refund'),
