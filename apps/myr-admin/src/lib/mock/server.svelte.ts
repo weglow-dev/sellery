@@ -531,7 +531,7 @@ class MockServer {
 		return {
 			products: { n: products.counts.newReview + products.counts.revReview, hot: false },
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
-			orders: { n: orders.counts.ebutFail + orders.counts.noDelivered, hot: orders.counts.ebutFail > 0 },
+			orders: { n: orders.counts.ebutFail, hot: orders.counts.ebutFail > 0 },
 			cs: { n: cs.counts.inqOpen + cs.counts.refundRetry + cs.counts.pickup + cs.counts.resend, hot: cs.counts.inqLate + cs.counts.refundRetry + cs.counts.creatorLate > 0 },
 			talk: { n: talk.counts.waiting, hot: false },
 			settle: { n: products.counts.noLedger + settle.counts.heldLines, hot: false },
@@ -543,7 +543,7 @@ class MockServer {
 	/** 홈(시안 "MYR Admin" · "MYR Admin PC" 홈 · 2026-11-24) — 화면은 이 값만 그린다.
 	 *  ① 히어로: 10월분 아직 지급하지 않은 금액 · 지급 합계 · 지급 완료 · 운영 확인 필요 · 토스 지급 가능 잔액(다음 실행에 보낼 금액보다 적으면 "₩○ 모자라요") · 들어올 예정
 	 *  ② 세금계산서 확인 대기(확인하면 다음 자동 이체에 지급) · 심사 대기 상품
-	 *  ③ 오늘 처리할 일 — 메뉴 8줄 고정 순서 · 빨강 칩 수 = 급한 일
+	 *  ③ 처리할 일 — 메뉴 8줄 고정 순서 · 빨강 칩 수 = 급한 일
 	 *  ④ 정산 일정 — 회차 둘(10월분 지급 흐름 · 11월분 확정 전) × 4단계 · 단계 상태 끝남 · 진행 중 · 아직 */
 	get home() {
 		const c = this.counts;
@@ -572,12 +572,11 @@ class MockServer {
 		const rows: HomeRow[] = [
 			row('products', '상품', 'm_products', '/products', [
 				chip('신규 심사', pc.newReview, 'orange', '/products?tab=review'),
-				chip('수정 심사', pc.revReview, 'orange', '/products?tab=review'),
-				chip('재고 0 · 판매 중', pc.soldOutLive, 'orange', '/products?tab=live')
+				chip('수정 심사', pc.revReview, 'orange', '/products?tab=review')
 			]),
 			row('orders', '주문 · 배송', 'm_orders', '/orders', [
-				chip('이벗 발주 실패', orders.counts.ebutFail, 'red', '/orders?tab=ebutFail'),
-				chip('배송 완료 예외', orders.counts.noDelivered, 'orange', '/orders?tab=shipping&ship=overdue')
+				chip('이벗 발주 실패', orders.counts.ebutFail, 'red', '/orders?tab=paid'),
+				chip('배송 완료 예외', orders.counts.noDelivered, 'orange', '/orders?tab=shipping')
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
 				chip('환불 다시 필요', cs.counts.refundRetry, 'red', '/cs?tab=refund'),

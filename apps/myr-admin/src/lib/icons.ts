@@ -29,7 +29,7 @@ export const UI_ICONS: Record<string, string> = {
 	pause: `<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>`,
 	bolt: `<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>`,
 	info: `<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/>`,
-	// 홈 "오늘 처리할 일" 메뉴 타일(시안 MYR Admin · m_*) — stroke 1.8 로 그린다
+	// 홈 "처리할 일" 메뉴 타일(시안 MYR Admin · m_*) — stroke 1.8 로 그린다
 	m_products: `<path d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5L12 12l8.5-4.5M12 12v9"/>`,
 	m_creators: `<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/>`,
 	m_orders: `<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9.5 8h5M9.5 12h5"/>`,

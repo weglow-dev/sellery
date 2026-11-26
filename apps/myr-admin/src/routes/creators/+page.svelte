@@ -31,14 +31,12 @@
 </script>
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-16">
-	<PageHead title="크리에이터">
-		{#snippet actions()}
-			<Btn kind="ghost" onclick={() => (inviting = true)}><Icon id="send" size={16} />초대 보내기</Btn>
-		{/snippet}
-	</PageHead>
+	<PageHead title="크리에이터" />
 
-	<div class="mt-4 lg:mt-5">
-		<FilterTabs {tabs} value={tab} label="크리에이터 상태" onpick={(id) => setParams(page.url, { tab: id === 'all' ? null : id })} />
+	<!-- 탭(왼쪽) · [초대 보내기](오른쪽) — 큰 제목 없음(2026-11-26) -->
+	<div class="flex items-center justify-between gap-3">
+		<div class="min-w-0"><FilterTabs {tabs} value={tab} label="크리에이터 상태" onpick={(id) => setParams(page.url, { tab: id === 'all' ? null : id })} /></div>
+		<div class="shrink-0"><Btn kind="ghost" onclick={() => (inviting = true)}><Icon id="send" size={16} />초대 보내기</Btn></div>
 	</div>
 
 	<!-- PC 표 -->

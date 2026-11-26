@@ -6,7 +6,7 @@
 
 	/** 홈 — 시안 "MYR Admin"(모바일) · "MYR Admin PC" 홈과 같게(2026-11-24 · docs/myr-admin-screens.md §3).
 	 *  ① 히어로(10월분 아직 지급하지 않은 금액 · 토스 지급 가능 잔액) ② 세금계산서 확인 대기 · 심사 대기 상품
-	 *  ③ 오늘 처리할 일(메뉴 8줄 고정 순서) ④ 정산 일정(10월분 · 11월분 고르기 · 4단계 — 끝남 ✓ · 진행 중 · 아직).
+	 *  ③ 처리할 일(메뉴 8줄 고정 순서) ④ 정산 일정(10월분 · 11월분 고르기 · 4단계 — 끝남 ✓ · 진행 중 · 아직).
 	 *  숫자 · 문구 · 색 구분은 전부 서버(목) 값 server.home — 화면은 색 이름을 클래스로만 바꾼다 */
 	const h = $derived(server.home);
 
@@ -108,10 +108,10 @@
 	</div>
 
 	<div class="mt-[26px] lg:mt-7 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-stretch lg:gap-8">
-		<!-- ③ 오늘 처리할 일 — 메뉴 8줄 · 빨강 칩 = 급한 일 -->
+		<!-- ③ 처리할 일 — 메뉴 8줄 · 빨강 칩 = 급한 일 -->
 		<section class="flex flex-col" aria-labelledby="todo-h">
 			<div class="flex items-baseline justify-between">
-				<h2 id="todo-h" class="text-[19px] font-extrabold tracking-[-0.02em] lg:text-[20px]">오늘 처리할 일</h2>
+				<h2 id="todo-h" class="text-[19px] font-extrabold tracking-[-0.02em] lg:text-[20px]">처리할 일</h2>
 				<span class="text-[13px] font-bold lg:text-[14px] {h.hot ? 'text-danger-fg' : 'text-white/50'}">{h.hotText}</span>
 			</div>
 			<div class="mt-3 flex flex-1 flex-col overflow-hidden rounded-[20px] border border-white/8 bg-white/3 lg:mt-3.5 lg:rounded-3xl">
