@@ -76,8 +76,8 @@
 	</Modal>
 {:else if m?.kind === 'refund' && v}
 	<Modal title="예외 환불" desc="{v.id} · {won(v.amount)}" ok="환불" sure="정말 환불하기" danger info="정말 환불할까요? 결제 수단으로 {won(v.amount)}이 바로 환불돼요" infoTone="orange" disabled={!why.trim()} onclose={close} onok={() => done(orders.refundException(v.id, why))}>
-		<Field label="사유(필수)" count="{why.length}/200">
-			<textarea bind:value={why} maxlength="200" rows="3" class={TEXTAREA} placeholder="왜 예외로 환불하는지 적어 주세요"></textarea>
+		<Field label="사유(필수)" count="{why.length}/200" hint="고객 환불 메일과 크리에이터 환불 메일에도 이 사유가 그대로 보여요">
+			<textarea bind:value={why} maxlength="200" rows="3" class={TEXTAREA} placeholder="고객에게 보여도 되는 말로 적어 주세요"></textarea>
 		</Field>
 		<p class="rounded-xl border border-danger/28 bg-danger/10 px-3.5 py-3 text-[13px] leading-[1.45] font-semibold text-danger-fg">교환 · 환불 요청 없이 운영이 바로 환불해요</p>
 	</Modal>
