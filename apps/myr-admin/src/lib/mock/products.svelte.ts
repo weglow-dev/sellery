@@ -281,7 +281,6 @@ class ProductsServer {
 		return {
 			newReview: v.filter((p) => p.status === 'review').length,
 			revReview: v.filter(this.openRev).length,
-			soldOutLive: v.filter((p) => p.status === 'live' && soldOut(p)).length,
 			live: v.filter((p) => p.status === 'live').length,
 			/** 제조 원장이 없는 판매 중 · 일시중지 상품 — 이대로면 다음 정산에서 보류(§10-1) */
 			noLedger: v.filter((p) => approved(p.status) && !p.ledger).length

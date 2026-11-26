@@ -24,14 +24,12 @@
 </script>
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-16">
-	<PageHead title="상품">
-		{#snippet sum()}
-			심사 대기 <b class="font-bold text-accent">{summary.reviewN}건</b> · 판매 중 {summary.liveN}개
-		{/snippet}
-	</PageHead>
+	<PageHead title="상품" />
 
-	<div class="mt-4 lg:mt-5">
+	<!-- 탭(왼쪽) · 요약(오른쪽) — 큰 제목 없음(2026-11-26) -->
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
 		<FilterTabs {tabs} value={tab} label="상품 상태" onpick={(id) => setParams(page.url, { tab: id })} />
+		<p class="text-[13px] text-white/60 tabular-nums lg:text-[14px]">심사 대기 <b class="font-bold text-accent">{summary.reviewN}건</b> · 판매 중 {summary.liveN}개</p>
 	</div>
 
 	<!-- PC 표 -->

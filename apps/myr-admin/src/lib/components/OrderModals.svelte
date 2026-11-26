@@ -23,7 +23,7 @@
 	import Field from './Field.svelte';
 	import Modal from './Modal.svelte';
 
-	/** 주문 동작 모달(§6-2 · §6-4) — 송장 입력/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일 · 자동으로 끝나지 않는 주문만) · 예외 환불(사유 필수 · 한 번 더 확인).
+	/** 주문 동작 모달(§6-2 · §6-4 · 시안 2026-11-26) — 송장 입력/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일 · 자동으로 끝나지 않는 주문만) · 예외 환불(사유 필수 · 한 번 더 확인).
 	 *  거절 문구 · 결과 문구는 서버(목) 값 — 거절이면 Modal 안에 보여 주고 닫지 않는다 */
 	const m = $derived(orderModal.open);
 	const v = $derived(m ? orders.view(m.id) : undefined);
@@ -53,7 +53,7 @@
 </script>
 
 {#if m?.kind === 'ship' && v}
-	<Modal title={fix ? '송장 정정' : '송장 입력'} desc="{v.id} · {v.recipient[0].masked}" ok={fix ? '정정' : '저장'} info={fix ? '정정하면 고객에게 바뀐 운송장으로 다시 알려요' : '이벗이 보내 주는 송장을 기다리지 않고 운영이 직접 등록하는 송장이에요 · 저장하면 주문이 배송 중으로 바뀌고 고객에게 배송 시작 알림이 가요'} onclose={close} onok={() => done(orders.ship(v.id, carrier, tracking))}>
+	<Modal title={fix ? '송장 정정' : '송장 입력'} desc="{v.id} · {v.recipient[0].masked}" ok={fix ? '정정' : '송장 저장'} info={fix ? '정정하면 고객에게 바뀐 운송장으로 다시 알려요' : '운영이 직접 등록하는 송장이에요 · 저장하면 주문이 배송 중으로 바뀌어요'} onclose={close} onok={() => done(orders.ship(v.id, carrier, tracking))}>
 		<div class="flex flex-col gap-1.5">
 			<span class="text-[13px] font-semibold text-white/80">택배사</span>
 			<div class="flex flex-wrap gap-1.5" role="group" aria-label="택배사">
@@ -72,7 +72,10 @@
 		<Field label="실제 배송일" hint="택배 조회에서 확인한 날짜를 적어 주세요">
 			<input type="date" bind:value={date} max={TODAY} class={INPUT} />
 		</Field>
-		<p class="rounded-xl border border-white/10 bg-white/4 px-3.5 py-3 text-[13px] leading-[1.5] text-white/70">택배사가 배송 완료를 알려 주거나 발송 10일이 지나면 자동으로 배송 완료돼요 · 운영이 직접 입력한 송장처럼 자동으로 끝나지 않는 주문만 택배 조회로 도착을 확인한 뒤 기록해 주세요</p>
+		<ul class="flex flex-col gap-1 text-[13px] leading-[1.5] text-white/60">
+			<li class="flex gap-2"><span class="shrink-0 text-white/40" aria-hidden="true">•</span>택배사가 배송 완료를 알려 주거나 발송 10일이 지나면 자동으로 배송 완료돼요</li>
+			<li class="flex gap-2"><span class="shrink-0 text-white/40" aria-hidden="true">•</span>배송 완료 예외처럼 자동으로 끝나지 않는 주문만 택배 조회 후 기록해 주세요</li>
+		</ul>
 	</Modal>
 {:else if m?.kind === 'refund' && v}
 	<Modal title="예외 환불" desc="{v.id} · {won(v.amount)}" ok="환불" sure="정말 환불하기" danger info="정말 환불할까요? 결제 수단으로 {won(v.amount)}이 바로 환불돼요" infoTone="orange" disabled={!why.trim()} onclose={close} onok={() => done(orders.refundException(v.id, why))}>

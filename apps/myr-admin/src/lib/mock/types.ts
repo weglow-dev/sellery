@@ -198,7 +198,7 @@ export interface NavBadge {
 	hot: boolean;
 }
 
-/** 홈 "오늘 처리할 일" 칩 — 빨강(급함 · 급한 일 수에 들어감) · 주황 숫자(처리할 일) · 회색(기다리기만 하면 됨) */
+/** 홈 "처리할 일" 칩 — 빨강(급함 · 급한 일 수에 들어감) · 주황 숫자(처리할 일) · 회색(기다리기만 하면 됨) */
 export interface HomeChip {
 	label: string;
 	n: number;
@@ -206,7 +206,7 @@ export interface HomeChip {
 	href: string;
 }
 
-/** 홈 "오늘 처리할 일" 한 줄 = 메뉴 하나(시안 순서 고정 · 정렬하지 않는다) — 타일 색은 칩 중 가장 급한 색 */
+/** 홈 "처리할 일" 한 줄 = 메뉴 하나(시안 순서 고정 · 정렬하지 않는다) — 타일 색은 칩 중 가장 급한 색 */
 export interface HomeRow {
 	key: string;
 	name: string;
