@@ -15,7 +15,7 @@
 	import Timeline from '$lib/components/Timeline.svelte';
 
 	/** 교환 · 환불 요청 상세 — docs/myr-admin-screens.md §8-2. 왼쪽 본문(고객 요청 · 사진 · 크리에이터 메시지 · 주문 · 배송 · 타임라인) + 오른쪽 고정 패널(단계 · 안내 · 단계별 버튼).
-	 *  회수 대기 → [회수 확인](한 번 더 확인) · 재발송 대기 → [재발송 송장 입력](모달) · 환불할 차례 → [환불 다시](한 번 더 확인) · 처리 대기 → [반려] [승인](모달 · 운영 대행).
+	 *  처리 대기 → [승인](처리 방법 = 서버 선택지 · 사유별 — 회수가 필요하면 이벗 회수 신청 / 회수 없는 재발송은 바로 재발송 / 회수 없는 환불은 바로 환불) · 회수 확인 필요 → 회수 칸(이벗 회수 접수 · 회수 운송장 · 실패면 [회수 다시 신청]) + [회수 확인](한 번 더 확인) · 재발송 → 교환 발송 칸(다음 영업일 11시 이벗 자동 발송) + 예외 [송장 직접 입력](모달) · 환불할 차례 → [환불 다시](한 번 더 확인) · 처리 대기 → [반려] [승인](모달 · 운영 대행).
 	 *  칩 · 안내 · 버튼 · 모달 문구 · 결과 문구는 전부 서버(목) 값. 모바일은 오른쪽 패널이 본문 아래로 쌓인다 */
 	const id = $derived(page.params.id ?? '');
 	const v = $derived(cs.claim(id));
@@ -92,14 +92,41 @@
 					{/each}
 				</DetailCard>
 
+				{#if v.pickupBox}
+					{@const b = v.pickupBox}
+					<div class="border-t border-white/8 pt-5">
+						<DetailCard plain title="회수" chips={[b.chip]}>
+							{#each b.rows as r (r.k)}
+								<InfoRow k={r.k} tone={r.tone}><span class="truncate">{r.v}</span></InfoRow>
+							{/each}
+							<p class="mt-2 text-[13px] leading-[1.5] {b.noteTone === 'red' ? 'font-semibold text-danger-fg' : 'text-white/55'}">{b.note}</p>
+						</DetailCard>
+					</div>
+				{/if}
+				{#if v.reshipBox}
+					{@const b = v.reshipBox}
+					<div class="border-t border-white/8 pt-5">
+						<DetailCard plain title="교환 발송" chips={[b.chip]}>
+							{#each b.rows as r (r.k)}
+								<InfoRow k={r.k} tone={r.tone}><span class="truncate">{r.v}</span></InfoRow>
+							{/each}
+							<p class="mt-2 text-[13px] leading-[1.5] text-white/55">{b.note}</p>
+						</DetailCard>
+					</div>
+				{/if}
+
 				{#each v.notes as n (n.text)}
 					<Note tone={n.tone} text={n.text} />
 				{/each}
 
 				{#if v.action === 'pickup' && v.armed}
-					<div class="flex"><ArmedButton label={v.armed.label} sure={v.armed.sure} note={v.armed.note} onconfirm={() => toast(cs.confirmPickup(id))} /></div>
+					{#if v.pickupBox?.retry}
+						<Btn kind="primary" full onclick={() => toast(cs.retryPickup(id))}>회수 다시 신청</Btn>
+					{:else}
+						<div class="flex"><ArmedButton label={v.armed.label} sure={v.armed.sure} note={v.armed.note} onconfirm={() => toast(cs.confirmPickup(id))} /></div>
+					{/if}
 				{:else if v.action === 'resend'}
-					<Btn kind="primary" full onclick={() => openModal('resend')}>재발송 송장 입력</Btn>
+					<Btn kind="ghost" full onclick={() => openModal('resend')}>송장 직접 입력</Btn>
 				{:else if v.action === 'refund' && v.armed}
 					<div class="flex"><ArmedButton label={v.armed.label} sure={v.armed.sure} note={v.armed.note} onconfirm={() => toast(cs.refundAgain(id))} /></div>
 				{:else if v.action === 'decide'}
@@ -123,10 +150,11 @@
 			<div class="flex flex-col gap-[7px]">
 				<span class="text-[13px] font-semibold text-white/80" id="cs-opts-label">{opts.label}</span>
 				<div class="flex flex-wrap gap-1.5" role="group" aria-labelledby="cs-opts-label">
-					{#each opts.items as it (it)}
-						<button type="button" aria-pressed={pick === it} onclick={() => (pick = it)} class={pillCls(pick === it)}>{it}</button>
+					{#each opts.items as it (it.id)}
+						<button type="button" aria-pressed={pick === it.id} onclick={() => (pick = it.id)} class={pillCls(pick === it.id)}>{it.title}</button>
 					{/each}
 				</div>
+				{#if opts.items.find((it) => it.id === pick)?.desc}<p class="text-[12.5px] leading-[1.45] text-white/55">{opts.items.find((it) => it.id === pick)?.desc}</p>{/if}
 			</div>
 		{/if}
 		{#if def.tracking}
