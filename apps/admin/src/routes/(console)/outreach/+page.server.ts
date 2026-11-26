@@ -1,8 +1,11 @@
 import { fail, redirect } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import type { Actions, PageServerLoad } from './$types';
+import { META_STATE_COOKIE, META_STATE_MAX_AGE } from '@sellery/db/admin/meta-connect';
 import { OUTREACH_STATUSES, OUTREACH_STATUS_LABEL, isOutreachStatus, outreachFit, parseCsvRows, parseHandleList, type OutreachStatus } from '@sellery/db/admin/outreach-rules';
 import { adminPath, requireAdmin } from '$lib/server/admin';
-import { collectOutreachCandidates, countOutreachByStatus, listOutreach, outreachCollectStatus, setOutreachStatus, upsertOutreachCreators } from '$lib/server/outreach';
+import { beginMetaConnect, collectOutreachCandidates, countOutreachByStatus, disconnectMeta, listOutreach, outreachCollectStatus, setOutreachStatus, upsertOutreachCreators } from '$lib/server/outreach';
+import { OUTREACH_MSG } from './messages';
 
 /**
  * `/outreach` — 크리에이터 아웃리치 큐 (대표 요청 2026-10-22 · docs/admin-console-plan.md "아웃리치").
@@ -10,18 +13,12 @@ import { collectOutreachCandidates, countOutreachByStatus, listOutreach, outreac
  *   ?/add     핸들 목록(줄·쉼표) → 후보 추가 (지표 없음 · 초안 생성)
  *   ?/import  CSV/TSV 붙여넣기(헤더 포함) → upsert (지표 → 적합 점수)
  *   ?/status  행 상태 변경 (select)
- *   ?/collect 제공사(Modash) 검색 1페이지 → 대표 조건으로 걸러진 후보 upsert (MODASH_API_KEY 없으면 안내)
+ *   ?/collect 제공사(메타 공식 · Modash) 검색 1페이지 → 대표 조건으로 걸러진 후보 upsert (설정 없으면 안내)
+ *   ?/metaConnect    [Instagram 연결] — state 쿠키를 심고 Facebook 로그인 창으로 보낸다 → `./meta/callback` 이 받아 저장(0128)
+ *   ?/metaDisconnect 연결 해제(환경변수 토큰이 있으면 그쪽으로 돌아간다)
  * DM 은 자동 발송하지 않는다 — 운영자가 초안을 복사해 @makeyour.recipe 에서 보낸 뒤 "DM 보냄" 으로 바꾼다.
  */
-const MSG: Record<string, string> = {
-  added: '후보를 추가했어요',
-  imported: '가져오기 완료',
-  status: '상태를 바꿨어요',
-  collected: '조건으로 수집 완료',
-  not_configured: '수집 설정이 없어요 — Vercel sellery-admin 에 META_PAGE_ACCESS_TOKEN + META_IG_USER_ID(메타 공식) 또는 MODASH_API_KEY 를 넣으면 버튼이 켜져요',
-  provider_error: '제공사 응답 오류',
-  err: '처리하지 못했어요 — 입력을 확인해주세요'
-};
+const MSG = OUTREACH_MSG;
 
 function self(url: URL, msg?: string, extra?: string): string {
   const p = new URLSearchParams();
@@ -42,8 +39,7 @@ export const load: PageServerLoad = async (event) => {
   const sRaw = event.url.searchParams.get('status') ?? '';
   const status: OutreachStatus | null = isOutreachStatus(sRaw) ? sRaw : null;
   const q = (event.url.searchParams.get('q') ?? '').trim();
-  const [rows, counts] = await Promise.all([listOutreach({ status, q: q || null }), countOutreachByStatus()]);
-  const collect = outreachCollectStatus();
+  const [rows, counts, collect] = await Promise.all([listOutreach({ status, q: q || null }), countOutreachByStatus(), outreachCollectStatus()]);
   const cpage = Math.max(0, Number(event.url.searchParams.get('cpage') ?? '0') || 0);
   const cafter = event.url.searchParams.get('cafter') ?? '';
   const base = adminPath('/outreach');
@@ -51,18 +47,22 @@ export const load: PageServerLoad = async (event) => {
   const key = event.url.searchParams.get('msg') ?? '';
   const detail = event.url.searchParams.get('detail');
   const msg = key ? `${MSG[key] ?? ''}${detail ? ` — ${detail}` : ''}` : null;
+  // 메타 연결 실패 안내만 경고색 — 나머지 안내는 예전 그대로
+  const msgTone: 'ok' | 'danger' = /^meta_(?!connected$|disconnected$)/.test(key) ? 'danger' : 'ok';
 
   return {
     status,
     q,
     msg,
+    msgTone,
     self: base,
     chips: [
       { key: '', label: '전체', n: total, href: q ? `${base}?q=${encodeURIComponent(q)}` : base },
       ...OUTREACH_STATUSES.map((k) => ({ key: k, label: OUTREACH_STATUS_LABEL[k].label, n: counts[k] ?? 0, href: `${base}?status=${k}${q ? `&q=${encodeURIComponent(q)}` : ''}` }))
     ],
     statuses: OUTREACH_STATUSES.map((k) => ({ value: k, label: OUTREACH_STATUS_LABEL[k].label })),
-    collect: { ...collect, nextPage: cpage, nextAfter: cafter },
+    collect: { provider: collect.provider, configured: collect.configured, nextPage: cpage, nextAfter: cafter },
+    meta: collect.meta,
     rows: rows.map((r) => ({ ...r, fit: outreachFit(r), href: `${base}/${r.id}` }))
   };
 };
@@ -103,6 +103,21 @@ export const actions: Actions = {
     if (r.after) url.searchParams.set('cafter', r.after);
     else url.searchParams.delete('cafter');
     redirect(303, url.pathname + url.search);
+  },
+  metaConnect: async (event) => {
+    const gate = await requireAdmin(event);
+    if (!gate.ok) redirect(303, gate.location);
+    const begin = beginMetaConnect();
+    if (!begin.ok) redirect(303, self(event.url, 'meta_not_configured'));
+    // state 는 HttpOnly 쿠키에만 둔다 — 콜백이 쿼리의 state 와 대조한다(CSRF). SameSite=Lax 라 facebook.com 에서 돌아오는 최상위 이동에 실린다
+    event.cookies.set(META_STATE_COOKIE, begin.state, { path: adminPath('/'), httpOnly: true, sameSite: 'lax', secure: !dev, maxAge: META_STATE_MAX_AGE });
+    redirect(303, begin.url);
+  },
+  metaDisconnect: async (event) => {
+    const gate = await requireAdmin(event);
+    if (!gate.ok) redirect(303, gate.location);
+    const ok = await disconnectMeta(gate.ctx.user.email ?? null);
+    redirect(303, self(event.url, ok ? 'meta_disconnected' : 'err'));
   },
   status: async (event) => {
     const gate = await requireAdmin(event);
