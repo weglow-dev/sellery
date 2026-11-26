@@ -1,5 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { langToggle } from '$lib/lang';
+import { loginText } from '$lib/login-text';
 import { adminNextOf, getAdminContext } from '$lib/server/admin';
 import { SITE_URL } from '$lib/server/db';
 
@@ -12,22 +14,22 @@ import { SITE_URL } from '$lib/server/db';
  * 가입 화면이 없다 — 관리자 계정은 `profiles.role` 수동 승격으로만 만든다(docs/deploy.md §5.6).
  * 비밀번호 재설정(`/password`)도 아직 없다 — 잊으면 대시보드에서 재설정하거나 `dev-user.mjs` 로 다시 만든다.
  */
-const ERROR_TEXT: Record<string, string> = {
-	auth: '로그인에 실패했어요. 잠시 후 다시 시도해주세요.'
-};
-
 export const load: PageServerLoad = async (event) => {
 	const next = adminNextOf(event.url.searchParams.get('next'));
 	const ctx = await getAdminContext(event);
 	if (ctx.state === 'ok') redirect(303, next);
 
 	const err = event.url.searchParams.get('error');
+	const lang = event.locals.lang;
 	return {
 		next,
+		lang,
+		langToggle: langToggle(lang, event.url.searchParams),
 		foreign: ctx.state === 'foreign',
 		foreignRole: ctx.state === 'foreign' ? ctx.role : null,
 		foreignEmail: ctx.state === 'foreign' ? (ctx.user.email ?? null) : null,
-		initialError: err ? (ERROR_TEXT[err] ?? ERROR_TEXT.auth) : null,
+		// `?error=` 는 어떤 값이든 같은 안내 한 줄(문구는 `$lib/login-text`)
+		initialError: err ? loginText(lang).err.generic : null,
 		siteUrl: SITE_URL
 	};
 };

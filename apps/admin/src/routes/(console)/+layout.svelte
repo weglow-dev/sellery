@@ -16,6 +16,6 @@
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 </script>
 
-<PartnerShell role="admin" me={data.me} pathname={page.url.pathname}>
+<PartnerShell role="admin" me={data.me} pathname={page.url.pathname} lang={data.lang}>
 	{@render children()}
 </PartnerShell>

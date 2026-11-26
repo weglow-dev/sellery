@@ -19,6 +19,13 @@
 		brand: '브랜드 콘솔',
 		admin: '관리자 콘솔'
 	};
+	/** 영어 표시(`lang="en"`) — 관리자 콘솔이 메타 앱 검수자에게 보여 줄 때 쓴다. 탭 이름은 `TABS` 의 `en` 칸 */
+	export const ROLE_LABEL_EN: Record<ConsoleRole, string> = {
+		seller: 'Creator console',
+		brand: 'Brand console',
+		admin: 'Admin console'
+	};
+	export type ShellLang = 'ko' | 'en';
 
 	/* 탭 href 는 접두 없는 콘솔 경로 — 셸이 consolePath 로 접두를 붙인다. */
 	export const TABS: Record<ConsoleRole, ConsoleTab[]> = {
@@ -53,15 +60,15 @@
 		// 소유: 인플루언서·브랜드·상품 = 파트너 관리 담당 / 정산 = 정산·돈 담당. **탭을 활성화할 때만 이 표를 고친다.**
 		admin: [
 			// 캠페인 상세는 홈 대시보드의 전체 캠페인 표 · 최근 활동에서 들어온다(탭이 따로 없다)
-			{ href: '/home', label: '홈', icon: 'home', match: ['/campaigns'] },
+			{ href: '/home', label: '홈', en: 'Home', icon: 'home', match: ['/campaigns'] },
 			// 매칭·자동 제안은 "어느 인플루언서에게 제안하나" 를 보는 화면이라 인플루언서 탭에 묶는다
-			{ href: '/sellers', label: '인플루언서', icon: 'user', match: ['/match'] },
-			{ href: '/brands', label: '브랜드', icon: 'flag' },
-			{ href: '/products', label: '상품', icon: 'box' },
+			{ href: '/sellers', label: '인플루언서', en: 'Creators', icon: 'user', match: ['/match'] },
+			{ href: '/brands', label: '브랜드', en: 'Brands', icon: 'flag' },
+			{ href: '/products', label: '상품', en: 'Products', icon: 'box' },
 			// 정산 탭 안의 화면 칩(`apps/admin/src/lib/money-nav.ts`)이 가는 곳 — 그 화면에서도 탭이 켜져야 한다
-			{ href: '/settle', label: '정산', icon: 'chart', match: ['/orders', '/payments', '/revenue', '/cs'] },
+			{ href: '/settle', label: '정산', en: 'Settlement', icon: 'chart', match: ['/orders', '/payments', '/revenue', '/cs'] },
 			// 크리에이터 아웃리치(0055) — MYR 제조의뢰 제안 후보 큐 (2026-10-22)
-			{ href: '/outreach', label: '아웃리치', icon: 'send' }
+			{ href: '/outreach', label: '아웃리치', en: 'Outreach', icon: 'send' }
 		]
 	};
 </script>
@@ -77,20 +84,22 @@
 		role = 'seller',
 		me = null,
 		pathname = '/',
+		lang = 'ko',
 		children
-	}: { role?: ConsoleRole; me?: ShellMe | null; pathname?: string; children: Snippet } = $props();
+	}: { role?: ConsoleRole; me?: ShellMe | null; pathname?: string; lang?: ShellLang; children: Snippet } = $props();
 
+	const en = $derived(lang === 'en');
 	const tabs = $derived(
-		TABS[role].map((t) => ({ ...t, href: consolePath(role, t.href), match: t.match?.map((m) => consolePath(role, m)) }))
+		TABS[role].map((t) => ({ ...t, label: en && t.en ? t.en : t.label, href: consolePath(role, t.href), match: t.match?.map((m) => consolePath(role, m)) }))
 	);
 	const homeHref = $derived(consolePath(role, '/home'));
 	const signoutAction = $derived(`${consolePath(role, '/auth/signout')}?next=${encodeURIComponent(consolePath(role, '/login'))}`);
 </script>
 
-<a href="#main" class="skip">본문으로 건너뛰기</a>
+<a href="#main" class="skip">{en ? 'Skip to content' : '본문으로 건너뛰기'}</a>
 <header class="console-bar">
 	<Wordmark href={homeHref} />
-	<span class="console-label">{ROLE_LABEL[role]}</span>
+	<span class="console-label">{en ? ROLE_LABEL_EN[role] : ROLE_LABEL[role]}</span>
 	<div class="console-bar-right">
 		{#if me}
 			<div class="console-me">
@@ -100,7 +109,7 @@
 					<span class="cel" title="셀러리 포인트 잔액">🥬 {me.balance}</span>
 				{/if}
 				<form method="post" action={signoutAction}>
-					<button type="submit" class="ghost sm" aria-label="로그아웃">로그아웃</button>
+					<button type="submit" class="ghost sm" aria-label={en ? 'Sign out' : '로그아웃'}>{en ? 'Sign out' : '로그아웃'}</button>
 				</form>
 			</div>
 		{/if}

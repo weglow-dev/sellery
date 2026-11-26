@@ -10,8 +10,9 @@
 	 * `match` — 이 탭에 속하지만 href 아래가 아닌 경로(접두 없는 콘솔 경로). 탭 하나가 여러 화면을 묶을 때 쓴다.
 	 * 예: 관리자 "정산" 탭의 화면 칩은 `/orders` `/payments` `/revenue` `/cs` 로도 간다 — 그 화면에서도 탭이 켜져야 한다.
 	 * 비워 두면 href 아래만 활성이다(기존 동작).
+	 * `en` — 영어 표시 이름(선택). 셸이 `lang="en"` 일 때 `label` 대신 쓴다 — 지금은 관리자 콘솔 탭만 갖고 있다(메타 앱 검수자용).
 	 */
-	export type ConsoleTab = { href: string; label: string; icon: ConsoleTabIcon; disabled?: boolean; title?: string; match?: readonly string[] };
+	export type ConsoleTab = { href: string; label: string; icon: ConsoleTabIcon; disabled?: boolean; title?: string; match?: readonly string[]; en?: string };
 </script>
 
 <script lang="ts">
