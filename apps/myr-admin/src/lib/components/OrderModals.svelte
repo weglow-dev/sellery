@@ -1,6 +1,6 @@
 <script module lang="ts">
 	/** 주문 동작 모달을 여는 곳 — 주문 서랍 · 배송 완료 예외 줄 어디서든 같은 모달(화면마다 <OrderModals /> 하나).
-	 *  ship = 송장 저장 · 정정(송장이 있으면 정정) · delivered = 배송 완료 기록 · refund = 예외 환불 */
+	 *  ship = 송장 입력(운영이 직접) · 정정(송장이 있으면 정정) · delivered = 배송 완료 기록 · refund = 예외 환불 */
 	export type OrderModalKind = 'ship' | 'delivered' | 'refund';
 	class OrderModal {
 		open = $state<{ kind: OrderModalKind; id: string } | null>(null);
@@ -23,7 +23,7 @@
 	import Field from './Field.svelte';
 	import Modal from './Modal.svelte';
 
-	/** 주문 동작 모달(§6-2 · §6-4) — 송장 저장/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일) · 예외 환불(사유 필수 · 한 번 더 확인).
+	/** 주문 동작 모달(§6-2 · §6-4) — 송장 입력/정정(택배사 고르기 + 운송장) · 배송 완료(실제 배송일) · 예외 환불(사유 필수 · 한 번 더 확인).
 	 *  거절 문구 · 결과 문구는 서버(목) 값 — 거절이면 Modal 안에 보여 주고 닫지 않는다 */
 	const m = $derived(orderModal.open);
 	const v = $derived(m ? orders.view(m.id) : undefined);
@@ -53,7 +53,7 @@
 </script>
 
 {#if m?.kind === 'ship' && v}
-	<Modal title={fix ? '송장 정정' : '송장 저장'} desc="{v.id} · {v.recipient[0].masked}" ok={fix ? '정정' : '송장 저장'} info={fix ? '정정하면 고객에게 바뀐 운송장으로 다시 알려요' : '저장하면 배송 중으로 바뀌고 고객에게 알림이 가요'} onclose={close} onok={() => done(orders.ship(v.id, carrier, tracking))}>
+	<Modal title={fix ? '송장 정정' : '송장 입력'} desc="{v.id} · {v.recipient[0].masked}" ok={fix ? '정정' : '저장'} info={fix ? '정정하면 고객에게 바뀐 운송장으로 다시 알려요' : '이벗이 보내 주는 송장을 기다리지 않고 운영이 직접 등록하는 송장이에요 · 저장하면 주문이 배송 중으로 바뀌고 고객에게 배송 시작 알림이 가요'} onclose={close} onok={() => done(orders.ship(v.id, carrier, tracking))}>
 		<div class="flex flex-col gap-1.5">
 			<span class="text-[13px] font-semibold text-white/80">택배사</span>
 			<div class="flex flex-wrap gap-1.5" role="group" aria-label="택배사">

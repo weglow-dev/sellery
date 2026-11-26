@@ -27,7 +27,7 @@
 | 10 | **정산은 1차 범위 밖.** 주문에 `seller_margin_rate` 스냅샷만 남기고, 실적 화면은 매출·환불·순매출·예상 정산액을 보여준다 | 요율·주기·지급 방식이 미정. 셀러리 0053 수식(3%+3%+5%) 을 가져오지 않는다. 지급대행(`payouts.server.ts` · 0042) 은 나중에 재사용 가능. **→ 2026-11-09 정책 결정: §9-6** |
 | 11 | **셀러리 코드와의 경계** — MYR 공용 코드는 **`packages/myr-core`(`@sellery/myr-core` · 2026-11-04)** 한 곳. 셀러리 패키지(`@sellery/db` · `@sellery/payments` · `@sellery/core` · `@sellery/ui`)는 MYR 앱·패키지에서 import 하지 않고 필요한 코드는 복사한다 — `scripts/check-boundaries.mjs` 규칙 (f)(g) 가 CI 에서 막는다(패키지의 SvelteKit 별칭 `$env`·`$app`·`$lib` 도 금지 · 설정은 `configureMyrCore` 주입). (처음 계획한 `packages/db/src/server/myr/` · `packages/payments/src/server/myr/` 복사본 위치는 쓰지 않았다 — 셀러리 패키지 안에 두면 셀러리를 걷어낼 때 같이 지워진다) | 셀러리 폐기 시 `apps/{shop,influencer,brand,admin}` 과 셀러리 패키지만 지우면 되게. |
 | 12 | **단일 함수 원칙** — 같은 동작(환불 · 운송장 · 문의 답변 · 상품 상태 변경)은 **패키지 함수 하나 + SQL 함수 하나**로 두고 `actor`('customer' · 'seller' · 'admin') 매개변수로 권한만 가른다. 앱 라우트는 세션에서 actor 를 정해 그 함수를 부르는 얇은 껍데기. 외부가 부르는 HTTP 엔드포인트(토스 웹훅 · 크론) 는 `myr-shop` 에만 둔다(§3.1) | 셀러리는 고객 `/api/payments/cancel` · 브랜드 `refundOrderAsBrand` · 관리자 `admin-refund` 로 같은 토스 취소가 세 벌이다. MYR 은 앱이 넷이라 그대로 가면 네 벌이 된다. 앱끼리 HTTP 로 부르지 않는다 — 같은 Supabase 를 service role 로 직접 쓰므로 CORS·인증 전달이 필요 없다. |
-| 13 | **물류 = 이벗 API 자동화(2026-11-03 · 바인허브와 같은 방식)** — ① 평일 11시: 11시 전 결제(가상계좌는 입금) 된 줄을 이벗 주문 등록(`ordercreatem` · 주문번호 = 줄 id · 상품 = 이벗 상품코드) → 줄 상태 "배송준비중" · 실패 3회 재시도 ② 매일 18시: 이벗 상태 조회(`orderstatus`) → 줄마다 송장 → "배송중" · 택배사 배송완료(또는 10일 경과) → "배송완료" · 배송 시작 메일 ③ 반품 회수(`exprtakeback` · 취소 · 상태 조회) ④ 이벗 상품코드는 **운영팀이 상품 검수 때 입력**(인플루언서는 입력·열람하지 않음) ⑤ 재고는 창고(이벗) 기준 — 인플루언서 재고 입력 없음. 크론·이벗 클라이언트는 `myr-shop`(외부 호출 한 곳 · 결정 12) | 물류사가 바인허브와 같은 이벗을 쓰기로 함(2026-11-03). 바인허브 구현(`backend/shop/app/Services/EbutOrderService.php` · `Jobs/OrderStatusToPreparing.php` · `Jobs/OrderStatusToDeliveringOrDelivered.php` · `routes/console.php`) 을 기준으로 삼는다. 이벗 계정 · 상품 등록 절차 · 박스 발송인은 미정(§9-14). |
+| 13 | **물류 = 이벗 API 자동화(2026-11-03 · 바인허브와 같은 방식)** — ① 평일 11시: 11시 전 결제(가상계좌는 입금) 된 줄을 이벗 주문 등록(`ordercreatem` · 주문번호 = 줄 id · 상품 = 이벗 상품코드) → 줄 상태 "배송준비중" · 실패 3회 재시도 ② 매일 18시: 이벗 상태 조회(`orderstatus`) → 줄마다 송장 → "배송중" · 택배사 배송완료(또는 10일 경과) → "배송완료" · 배송 시작 메일 ③ 반품 회수(`exprtakeback` · 취소 · 상태 조회) ④ 이벗 상품코드는 **운영팀이 상품 검수 때 입력**(인플루언서는 입력·열람하지 않음) ⑤ 재고는 창고(이벗) 기준 — 인플루언서 재고 입력 없음. 크론·이벗 클라이언트는 `myr-shop`(외부 호출 한 곳 · 결정 12) **2026-11-25 이벗 확인 · 개정**: 주문 등록 상품은 **우리 상품코드**(`code`) 그대로 · 이벗 상품코드(`ebut_goods_code`)는 **재고 조회 전용**(0077 `coalesce(ebut_goods_code, code)` 를 `code` 로 바꿀 마이그레이션 필요) · 운영은 승인 때 이벗 상품코드 **또는** 처음 재고를 넣는다 · 판매 가능 재고 = 이벗 재고(5분 캐시) − (결제 완료 + 배송준비중 수량 · DB 에서 바로) — docs/myr-admin-plan.md 열린 결정 16 | 물류사가 바인허브와 같은 이벗을 쓰기로 함(2026-11-03). 바인허브 구현(`backend/shop/app/Services/EbutOrderService.php` · `Jobs/OrderStatusToPreparing.php` · `Jobs/OrderStatusToDeliveringOrDelivered.php` · `routes/console.php`) 을 기준으로 삼는다. 이벗 계정 · 상품 등록 절차 · 박스 발송인은 미정(§9-14). |
 | 14 | **크리에이터 가입은 초대 링크로만(2026-11-04).** 공개 `/signup` 없음 — 운영팀이 이메일로 초대하면 **메일 + 복사 링크** 두 가지로 받는다(`/invite/<토큰>`). 링크는 사람마다 다르고 30일(2026-11-04 · 처음 7일에서 늘림) · 1회용, 다시 초대하면 이전 링크는 무효. 가입 폼 = 이메일(초대 주소로 고정) · 비밀번호 · 활동명 · 핸들 · 대표 채널 · 휴대폰 · 약관 동의(§4.2.1 2-1 · 10번) | MYR 은 제조의뢰 미팅을 거친 크리에이터만 상품을 올린다. 초대 링크를 연 것이 이메일 확인이라 인증 메일 단계가 없다. |
 
 ---
@@ -124,6 +124,7 @@ myr_cs_messages         ← 0005 cs_messages, sender('customer'|'seller'|'admin'
 
 ```
 E1-a  myr_products            + ebut_goods_code text (옵션이 있으면 options[i].ebut_code 또는 별도 표 — 이벗 등록 방식 확인 뒤)
+                              → 2026-11-25: 재고 조회 전용 · 주문 등록은 code(docs/myr-admin-plan.md 열린 결정 16)
                               운영팀이 검수 때 입력 · 공개 RPC 에는 싣지 않는다
 E1-b  myr_order_items         + ship_status('PAID'|'PREPARING'|'SHIPPING'|'DELIVERED') · courier · tracking_no
                                 · ebut_registered_at · shipped_at · delivered_at · is_delayed
@@ -343,7 +344,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 관리자 계정 로그인(셀러리와 같은 `profiles.role='admin'` · `requireAdmin()` 복사) · 관리자가 아니면 거부
     - noindex(`app.html` 메타 + `X-Robots-Tag` 헤더 · robots.txt 는 수집 허용 — 인플루언서 콘솔과 같은 방식) · 운영자 외 세션은 404 가 아니라 `/login` 으로
 - **우선 1 · 홈** `/`
-    - 검수 대기 수 · 발송 대기 수(이벗 연동 뒤 = 오늘 발주 결과 성공·실패) · 배송 지연 수 · 처리 안 된 교환·환불 수 · 재고 부족 수(이벗 재고 연동 뒤)
+    - 검수 대기 수 · 발송 대기 수(이벗 연동 뒤 = 오늘 발주 결과 성공·실패 — 2026-11-26 UI: 홈 할 일 칩 "이벗 발주 실패"(빨강) → 주문 목록 "이벗 발주 실패" 탭 · 실패 기록은 서버에 아직 없음) · 배송 지연 수 · 처리 안 된 교환·환불 수 · 재고 부족 수(이벗 재고 연동 뒤)
     - 숫자를 누르면 해당 화면으로
 > **운영 콘솔 정본(2026-11-12 나눔)** — 화면 구성(무엇이 보이고 무엇을 누르는지 · Claude Design 요청서)은 [docs/myr-admin-screens.md](myr-admin-screens.md), 만들 때 필요한 것(이미 있는 RPC · 새로 만들 것 · 대체되는 스크립트 · 열린 결정 · 운영 전 체크)은 [docs/myr-admin-plan.md](myr-admin-plan.md). 아래는 처음 계획.
 
@@ -353,7 +354,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 승인 · 반려(사유 필수) · 판매중지 · 재개(`myr_app_admin_review_product` 0056)
     - **(0074 추가)** 수정 심사 큐(판매 중 상품의 수정본 · 지금 내용과 바뀐 섹션 비교 · `myr_app_admin_review_revision`) · 반려는 **섹션별 의견**(`p_items` — 크리에이터 "심사 결과" · "수정 필요" 칩으로 이어진다)
     - **이벗 상품코드 입력·수정**(옵션이 있으면 옵션별 · E1-a) — 이벗 확정 전에는 선택, 확정 뒤 승인 필수
-    - 재고 입력(이벗 재고 연동 전까지 운영팀 값)
+    - 재고 입력(이벗 재고 연동 전까지 운영팀 값) — 2026-11-25: 승인 때 이벗 상품코드(선택) 또는 처음 재고 · 이벗 상품코드가 있으면 재고 수정은 잠근다(UI · docs/myr-admin-plan.md 열린 결정 16)
     - 이 화면이 생기면 `myr-products.mjs review` 삭제
 - **우선 2 · 주문** `/orders` · `/orders/[code]`
     - 전체 주문 · 상태·기간·인플루언서 필터 · 수취인 정보 전체(열람 기록 `sensitive_access_log`)
@@ -369,7 +370,7 @@ PII: 발송을 물류센터가 하므로(결정 8) 인플루언서 응답에는 
     - 인플루언서가 승인한 요청 중 회수가 필요한 건
     - 회수 접수 · 취소 · 상태 확인(이벗 `exprtakeback` 등) — E4 전에는 "회수 완료" 수동 처리
     - 회수 확인 뒤 환불 실행 · 교환 재발송 등록(E4 전에는 재발송 송장 수동 입력)
-- **우선 4 · 재고** `/stock` — 이벗 재고와 판매 가능 수량 비교 · 재고 부족 기준 · 알림(바인허브 `EbutStockService` · `SendWarehouseLowStockNotification` 참고)
+- **우선 4 · 재고** `/stock` — 이벗 재고와 판매 가능 수량 비교 · 재고 부족 기준 · 알림(바인허브 `EbutStockService` · `SendWarehouseLowStockNotification` 참고) — 2026-11-25: 재고 부족 알림은 두지 않고 재고 0 이하 자동 품절 + 운영 수동 품절만(공식 · 캐시 · 어긋나는 경우는 docs/myr-admin-plan.md 열린 결정 16 "재고 연동 방식")
 - **우선 1 · 크리에이터 초대** `/sellers/invite`(2026-11-04 추가 · 인플루언서 10번과 짝) — 이메일 입력 → 초대 링크 발급 + 메일 발송 · 링크 복사 버튼 · 보낸 초대 목록(대기 · 가입 완료 · 만료 · 취소) · 재발송(이전 링크 무효) · 취소 · "새 초대 요청" 받은 것
 - **우선 4 · 인플루언서** `/sellers` — 목록 · 상품 수 · 계정 연결 여부 · 정지·복구 · 박스에 인플루언서 이름을 찍기로 하면 인플루언서별 이벗 쇼핑몰 코드·보내는 사람(바인허브는 한의원별 `ebut_shop_code`)
 - **우선 4 · 설정** `/settings` — 이벗 공통 설정(쇼핑몰 코드 · 보내는 사람) · 발주 마감 시각 · 배송비 · 무료배송 기준 · 공휴일(선택 · 바인허브에도 없음)

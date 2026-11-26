@@ -36,10 +36,11 @@
 	let ph = $state(0);
 	/** 한 번 더 확인 중인 버튼 — 일시중지 · 판매 종료(첫 클릭에 [취소] [정말 ○○하기] + 아래 안내) */
 	let armed = $state<'pause' | 'end' | null>(null);
-	let modal = $state<'approve' | 'stock' | 'ledger' | null>(null);
+	let modal = $state<'approve' | 'stock' | 'ledger' | 'ebut' | null>(null);
 	let stockIn = $state('');
 	let amountIn = $state('');
 	let memoIn = $state('');
+	let ebutIn = $state('');
 	$effect(() => {
 		void id;
 		ph = 0;
@@ -54,8 +55,9 @@
 		panel?.focusSel();
 		mobile?.openSheet();
 	};
-	const open = (m: 'approve' | 'stock' | 'ledger') => {
+	const open = (m: 'approve' | 'stock' | 'ledger' | 'ebut') => {
 		stockIn = m === 'stock' && v?.stock != null ? String(v.stock) : '';
+		ebutIn = m === 'ebut' ? (v?.ebut?.code ?? '') : '';
 		amountIn = '';
 		memoIn = '';
 		modal = m;
@@ -86,7 +88,7 @@
 		},
 		onapprove: () => open('approve')
 	});
-	const approveHints = $derived(products.approveHints(stockIn, amountIn));
+	const approveHints = $derived(products.approveHints(stockIn, amountIn, ebutIn));
 	const stockHint = $derived(products.stockHint(stockIn));
 </script>
 
@@ -157,11 +159,16 @@
 			sureKind="primary"
 			info="승인하면 제조금액 원장이 함께 만들어져요 · 다음 정산부터 정산금에서 상계해요"
 			onclose={() => (modal = null)}
-			onok={() => done(products.approve(id, stockIn, amountIn), '/products?tab=review')}
+			onok={() => done(products.approve(id, stockIn, amountIn, ebutIn), '/products?tab=review')}
 		>
-			<Field label="처음 재고" hint={approveHints.stock} hintRed={approveHints.stockRed}>
-				<input bind:value={stockIn} inputmode="numeric" placeholder="예: 300" class={INPUT} />
+			<Field label="이벗 상품코드 (선택)" hint={approveHints.ebut}>
+				<input bind:value={ebutIn} maxlength="40" autocomplete="off" placeholder="예: EB2048101" class={INPUT} />
 			</Field>
+			{#if approveHints.needStock}
+				<Field label="처음 재고" hint={approveHints.stock} hintRed={approveHints.stockRed}>
+					<input bind:value={stockIn} inputmode="numeric" placeholder="예: 300" class={INPUT} />
+				</Field>
+			{/if}
 			<Field label="제조금액" hint={approveHints.amount}>
 				<input bind:value={amountIn} inputmode="numeric" placeholder="예: 400,000" class={INPUT} />
 			</Field>
@@ -176,12 +183,12 @@
 					<PanelBtn {sm} onclick={() => (armed = null)}>취소</PanelBtn>
 					<PanelBtn {sm} tone="primary" onclick={pause}>정말 일시중지하기</PanelBtn>
 				{:else}
-					{#if v.can.stock}<PanelBtn {sm} onclick={() => open('stock')}>재고 수정</PanelBtn>{/if}
+					{#if v.can.stock}<PanelBtn {sm} disabled={!!v.stockLock} onclick={() => open('stock')}>재고 수정</PanelBtn>{/if}
 					{#if v.can.pause}<PanelBtn {sm} onclick={() => (armed = 'pause')}>일시중지</PanelBtn>{/if}
 					{#if v.can.resume}<PanelBtn {sm} tone="primary" onclick={() => app.showToast(products.resume(id))}>다시 판매</PanelBtn>{/if}
 				{/if}
 			</div>
-			{#if armed === 'pause'}<p class="text-[12.5px] leading-[1.45] font-semibold text-[#ff9a66]">{v.pauseNote}</p>{/if}
+			{#if armed === 'pause'}<p class="text-[12.5px] leading-[1.45] font-semibold text-[#ff9a66]">{v.pauseNote}</p>{:else if v.can.stock && v.stockLock}<p class="text-[12.5px] leading-[1.45] text-white/50">{v.stockLock}</p>{/if}
 			{#if v.can.end}
 				<div class="flex gap-2">
 					{#if armed === 'end'}
@@ -219,6 +226,16 @@
 							<span class="text-right font-semibold tabular-nums {r.red ? 'text-danger-fg' : ''}">{r.v}</span>
 						</div>
 					{/each}
+					<!-- 이벗 상품코드 — 재고 조회용(주문 등록은 위 상품코드로 나간다) -->
+					{#if v.ebut}
+						<div class="flex min-h-9 items-center justify-between gap-4 text-[14.5px] lg:min-h-[38px] lg:text-[15px]">
+							<span class="text-white/60">이벗 상품코드</span>
+							<span class="flex items-center gap-2 text-right font-semibold tabular-nums">
+								{#if v.ebut.code}{v.ebut.code}{:else}<span class="text-[#ff9a66]">미입력</span>{/if}
+								{#if v.ebut.canEdit}<button type="button" onclick={() => open('ebut')} class="h-6 rounded-[7px] border border-white/16 px-2 text-[11.5px] font-bold text-white/72 hover:border-white/40 hover:text-fg">{v.ebut.code ? '수정' : '입력'}</button>{/if}
+							</span>
+						</div>
+					{/if}
 				</section>
 
 				{#if v.revNote}
@@ -302,6 +319,20 @@
 		<Modal title="재고 수정" desc="{v.name} · 지금 {v.stock ?? 0}개" ok="저장" onclose={() => (modal = null)} onok={() => done(products.setStock(id, stockIn))}>
 			<Field label="재고" hint={stockHint.text} hintRed={stockHint.red}>
 				<input bind:value={stockIn} inputmode="numeric" class={INPUT} />
+			</Field>
+		</Modal>
+	{:else if modal === 'ebut' && v.ebut}
+		<Modal
+			title="이벗 상품코드"
+			desc={v.name}
+			ok="저장"
+			info={v.ebut.info}
+			disabled={!ebutIn.trim()}
+			onclose={() => (modal = null)}
+			onok={() => done(products.setEbutCode(id, ebutIn))}
+		>
+			<Field label="이벗 상품코드" hint="영문 · 숫자 · - · _ 로 40자까지">
+				<input bind:value={ebutIn} maxlength="40" autocomplete="off" placeholder="예: EB2048101" class={INPUT} />
 			</Field>
 		</Modal>
 	{:else if modal === 'ledger'}

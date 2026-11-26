@@ -13,7 +13,7 @@
 	import Section from './Section.svelte';
 	import Timeline from './Timeline.svelte';
 
-	/** 주문 상세(오른쪽 서랍 · §6-2) — 머리(주문번호 · 결제일 · 주문자 · 상태 · 금액) · 주문 줄 표 · 수취인 · 결제(가린 값 + 보기) · 송장 · 처리 이력.
+	/** 주문 상세(오른쪽 서랍 · §6-2) — 머리(주문번호 · 결제일 · 주문자 · 상태 · 금액) · 주문 줄 표 · 수취인 · 결제(가린 값 + 보기) · 송장(이벗 발주 실패면 확인 안내) · 처리 이력.
 	 *  열림은 주소(?id=)가 가진다 — 주문 목록 · 송장 일괄 입력 · 배송 완료 예외 어디서든 같은 서랍. 아래 버튼은 서버 값 actions 순서 그대로 */
 	let { id, onclose }: { id: string; onclose: () => void } = $props();
 	const v = $derived(orders.view(id));
@@ -69,6 +69,16 @@
 		</Section>
 
 		<Section title="송장">
+			{#if v.ebutFail}
+				<div class="mb-2.5 rounded-2xl bg-danger/10 px-4 py-3">
+					<p class="text-[13px] leading-[1.55] font-semibold text-danger-fg">{v.ebutFail.text}</p>
+					<ul class="mt-2 flex flex-col gap-1.5">
+						{#each v.ebutFail.codes as c (c.code)}
+							<li class="flex items-center justify-between gap-3 text-[13px]"><span class="min-w-0 truncate text-white/80">{c.name}</span><span class="inline-flex shrink-0 items-center gap-2 font-bold tabular-nums">{c.code}<CopyButton text={c.code} what="상품코드" /></span></li>
+						{/each}
+					</ul>
+				</div>
+			{/if}
 			<div class="rounded-2xl border border-white/8 px-4 py-1">
 				{#if v.ship}
 					<KV k="택배사">{v.ship.carrier}</KV>
@@ -88,7 +98,7 @@
 		{#snippet footer()}
 			{#if v.actions.length}
 				{#if has('ship')}
-					<div class="flex w-full gap-2"><Btn kind="primary" full onclick={() => orderModal.show('ship', v.id)}>송장 저장</Btn></div>
+					<div class="flex w-full gap-2"><Btn kind="primary" full onclick={() => orderModal.show('ship', v.id)}>송장 입력</Btn></div>
 				{/if}
 				{#if has('fixShip') || has('delivered')}
 					<div class="flex w-full gap-2">

@@ -261,6 +261,8 @@ export interface ProductRaw {
 	/** 사진 자리 — 타일 그라데이션 키 · 그림 키(UI 단계) */
 	tile: string;
 	icon: string;
+	/** 이벗 상품코드 — 이벗이 정한 코드 · 재고 조회에만 쓴다(주문 등록은 우리 상품코드 · 2026-11-25 이벗 확인). 없으면 null */
+	ebutCode?: string | null;
 	/** 사진이 여러 장일 때 [타일, 그림] — 첫 장이 대표 사진(없으면 tile · icon 한 장) */
 	photos?: [string, string][];
 	status: ProductStatus;

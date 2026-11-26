@@ -531,7 +531,7 @@ class MockServer {
 		return {
 			products: { n: products.counts.newReview + products.counts.revReview, hot: false },
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
-			orders: { n: orders.counts.toShip, hot: false },
+			orders: { n: orders.counts.ebutFail + orders.counts.noDelivered, hot: orders.counts.ebutFail > 0 },
 			cs: { n: cs.counts.inqOpen + cs.counts.refundRetry + cs.counts.pickup + cs.counts.resend, hot: cs.counts.inqLate + cs.counts.refundRetry + cs.counts.creatorLate > 0 },
 			talk: { n: talk.counts.waiting, hot: false },
 			settle: { n: products.counts.noLedger + settle.counts.heldLines, hot: false },
@@ -576,7 +576,7 @@ class MockServer {
 				chip('재고 0 · 판매 중', pc.soldOutLive, 'orange', '/products?tab=live')
 			]),
 			row('orders', '주문 · 배송', 'm_orders', '/orders', [
-				chip('발송 대기', orders.counts.toShip, 'orange', '/orders?tab=paid'),
+				chip('이벗 발주 실패', orders.counts.ebutFail, 'red', '/orders?tab=ebutFail'),
 				chip('배송 완료 기록 없음', orders.counts.noDelivered, 'orange', '/orders/overdue')
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
