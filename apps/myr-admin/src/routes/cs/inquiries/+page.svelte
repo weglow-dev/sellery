@@ -8,7 +8,7 @@
 	import SearchBox from '$lib/components/SearchBox.svelte';
 	import SubNav from '$lib/components/SubNav.svelte';
 
-	/** CS 관리 · 고객 문의 목록 — docs/myr-admin-screens.md §7-1. SubNav(교환 · 환불 | 고객 문의) → 요약 → 탭(답변 대기 · 24시간 넘은 미답변 · 답변 완료 · 종료) → 검색 → 줄 → 문의 상세(/cs/inquiries/[id]).
+	/** CS 관리 · 고객 문의 목록 — docs/myr-admin-screens.md §7-1. SubNav(교환 · 환불 | 고객 문의) → 요약 → 탭(시안 2026-11-27 — 문의 · 교환 · 환불(처리 대기 요청) · 48시간 넘은 미답변 · 답변 완료(+ 반려 요청)) → 검색 → 줄 → 문의 상세(/cs/inquiries/[id]).
 	 *  칩(지난 시간 · 24시간 넘음) · 건수 · 빈 상태 문구는 서버(목) 값 — 화면은 탭 · 검색어만 넘긴다 */
 	const subs = $derived(cs.subs());
 	const tabs = $derived(cs.inquiryTabs());
@@ -26,12 +26,12 @@
 
 	<div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
 		<FilterTabs {tabs} value={tab} label="문의 상태" onpick={(id) => setParams(page.url, { tab: id })} />
-		<SearchBox bind:value={q} placeholder="문의번호 · 고객 · 상품 · 질문" label="문의 검색" />
+		<SearchBox bind:value={q} placeholder="검색" label="문의 검색" />
 	</div>
 
 	<ListBox n={list.rows.length} empty={list.empty}>
 		{#each list.rows as r (r.id)}
-			<ListRow href="/cs/inquiries/{r.id}" thumb={r.thumb} chips={r.chips} meta={r.meta} title={r.title} sub={r.sub} />
+			<ListRow href={r.href} thumb={r.thumb} chips={r.chips} meta={r.meta} title={r.title} sub={r.sub} right={r.right} rightSub={r.rightSub || undefined} rightSubTone={r.rightSubTone} />
 		{/each}
 	</ListBox>
 </div>
