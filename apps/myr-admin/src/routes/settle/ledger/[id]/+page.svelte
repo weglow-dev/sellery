@@ -1,21 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { won } from '$lib/format';
 	import { products } from '$lib/mock/products.svelte';
 	import { app } from '$lib/state.svelte';
-	import { INPUT, TEXTAREA } from '$lib/ui';
-	import Btn from '$lib/components/Btn.svelte';
+	import { INPUT } from '$lib/ui';
 	import Chip from '$lib/components/Chip.svelte';
 	import Field from '$lib/components/Field.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import PanelBtn from '$lib/components/PanelBtn.svelte';
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
 
-	/** 제조금액 원장 상세 — docs/myr-admin-screens.md §10-1 · 시안 "MYR Admin PC" 원장(상품 관리 [원장 열기] · 정산 › 제조금액 원장 줄에서 연다).
-	 *  머리(뒤로 · 사진 · 상품명 · "크리에이터 · 제조금액 원장") · 왼쪽 요약 4칸 + 상계 막대 · 제조 차수 표 · 상계 이력(최근 회차부터)
-	 *  · 오른쪽 원장 정보(상환 · 보증금 칩 · 상품 · 크리에이터 · 판매 상태) · 안내 · 버튼 두 개 [제조 차수 추가] · [금액 정정].
-	 *  금액 정정 창에서 차수를 고른다(무효된 차수는 빠지고 보증금을 돌려준 차수는 고를 수 없음 · 사유 필수).
-	 *  무효 · 보증금 입금 확인은 화면에 두지 않는다(2026-11-25 · 운영 스크립트 mfg-void · mfg-deposit).
+	/** 제조금액 원장 상세 — docs/myr-admin-screens.md §10-1(시안 "MYR Admin PC" · "MYR Admin" detail 'ledger' · 2026-11-27). 상품 관리 [원장 열기] · 정산 › 제조금액 원장 줄에서 연다.
+	 *  머리(뒤로 · 사진 · "정산 · 제조금액 원장" · 상품명 · "제조금액 원장") · 왼쪽 요약 4칸 + 상계 막대 · 제조 차수 표(입력일 · 환급 · 메모) · 상계 이력(최근 회차부터)
+	 *  · 오른쪽 상환 · 보증금 칩 · 크리에이터 · 판매 상태 · 안내 · [제조 차수 추가] · [정정].
+	 *  보증금은 제조금액을 입력할 때 운영이 따로 받아 둔다(입금 확인 단계 없음). 모바일은 상태 칩이 제목 아래 · 정보 카드 · 안내 · 버튼이 맨 아래.
 	 *  UI 단계 — 버튼 · 정정 창은 자리만(저장은 다음 단계). 숫자 · 칩 · 버튼 표시 조건은 서버(목) 값 */
 	const id = $derived(page.params.id ?? '');
 	const v = $derived(products.ledger(id));
@@ -24,24 +24,64 @@
 	const soon = (what: string) => app.showToast(`${what}는 다음 단계에서 붙어요`);
 
 	const REFUND_CLS = { dim: 'text-white/40', plain: 'text-fg', grey: 'text-white/60' } as const;
-	// 표 열(시안) — 차수 · 입금 확인일 · 환급 · 메모 · 입력자 · 제조금액 · 보증금
+	// 표 열(시안) — 차수 · 입력일 · 환급 · 메모 · 제조금액 · 보증금
 	const ROUND_COLS = 'grid-cols-[44px_92px_72px_minmax(0,1fr)_100px_100px]';
+	const OFFSET_COLS = 'grid-cols-[90px_minmax(0,1fr)_120px_130px]';
 
-	// 금액 정정 창 — 차수 고르기(서버 fix: 무효면 빠짐 · 보증금 환급이면 못 고름) · 올바른 금액 · 사유
+	// [정정] 창(시안 ledFix) — 차수(살아 있는 차수 · 마지막이 기본) · 제조금액 · 메모(고른 차수 값으로 채움) · 한 번 더 확인
 	let fixOpen = $state(false);
 	let fixN = $state('');
 	let amountIn = $state('');
-	let reason = $state('');
-	const fixable = $derived(v ? v.rounds.filter((r) => r.fix) : []);
-	const chosen = $derived(fixable.find((r) => r.n === fixN && r.fix?.ok) ?? null);
+	let memoIn = $state('');
+	const fixable = $derived(v ? v.rounds.filter((r) => r.fix?.ok) : []);
+	const chosen = $derived(fixable.find((r) => r.n === fixN) ?? null);
+	const fmt = (s: string) => {
+		const n = s.replace(/\D/g, '');
+		return n ? Number(n).toLocaleString('ko-KR') : '';
+	};
+	const amountN = $derived(Number(amountIn.replace(/\D/g, '')) || 0);
+	const pick = (n: string) => {
+		const r = fixable.find((x) => x.n === n);
+		if (!r) return;
+		fixN = r.n;
+		amountIn = r.amount.toLocaleString('ko-KR');
+		memoIn = r.memoRaw ?? '';
+	};
 	const openFix = () => {
-		fixN = fixable.find((r) => r.fix?.ok)?.n ?? '';
-		amountIn = '';
-		reason = '';
+		pick(fixable[fixable.length - 1]?.n ?? '');
 		fixOpen = true;
 	};
-	const OFFSET_COLS = 'grid-cols-[90px_minmax(0,1fr)_120px_130px]';
+	/** 바뀐 내용 한 줄 — "1차 · 제조금액 ₩600,000 → ₩650,000 · 메모 변경" */
+	const changes = $derived.by(() => {
+		if (!chosen) return [];
+		const out: string[] = [];
+		if (amountN && amountN !== chosen.amount) out.push(`제조금액 ${won(chosen.amount)} → ${won(amountN)}`);
+		if (memoIn.trim() !== (chosen.memoRaw ?? '')) out.push('메모 변경');
+		return out;
+	});
 </script>
+
+{#snippet infoCard()}
+	{#if v}
+		<dl>
+			<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><dt class="shrink-0 text-white/60">크리에이터</dt><dd class="min-w-0 truncate text-right font-semibold">{v.creator.name} {v.creator.handle}</dd></div>
+			<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><dt class="shrink-0 text-white/60">판매 상태</dt><dd><Chip label={v.statusChip.label} tone={v.statusChip.tone} /></dd></div>
+		</dl>
+	{/if}
+{/snippet}
+
+{#snippet note()}
+	{#if v}<p class="rounded-[14px] border border-white/8 bg-white/4 px-4 py-[13px] text-[13.5px] leading-normal font-semibold text-white/60">{v.note}</p>{/if}
+{/snippet}
+
+{#snippet buttons()}
+	{#if v}
+		<div class="flex flex-col gap-2">
+			<div class="flex gap-2"><PanelBtn tone="primary" onclick={() => soon('제조 차수 추가')}>제조 차수 추가</PanelBtn></div>
+			<div class="flex gap-2"><PanelBtn disabled={!v.can.fix} onclick={openFix}>정정</PanelBtn></div>
+		</div>
+	{/if}
+{/snippet}
 
 {#if !v}
 	<div class="px-5 py-20 text-center lg:pt-24">
@@ -61,12 +101,13 @@
 			</div>
 			<span class="hidden flex-1 lg:block"></span>
 			<div class="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:shrink-0">
-				{#each v.chips as c (c.label)}<Chip label={c.label} tone={c.tone} lg />{/each}
-				<span class="ml-1 text-[13px] text-white/50 lg:text-[14px]">{v.creator.name} · 제조금액 원장</span>
+				<!-- 모바일만 상태 칩을 제목 아래에(PC 는 오른쪽 패널 머리) -->
+				{#each v.chips as c (c.label)}<span class="lg:hidden"><Chip label={c.label} tone={c.tone} lg /></span>{/each}
+				<span class="ml-1 text-[13px] text-white/50 lg:ml-0 lg:text-[14px]">제조금액 원장</span>
 			</div>
 		</div>
 
-		<div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
+		<div class="mt-5 grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-8">
 			<div class="flex min-w-0 flex-col gap-3.5">
 				<!-- 요약 4칸 + 상계 막대 -->
 				<section class="rounded-3xl border border-white/8 bg-white/3 p-5 lg:p-6" aria-label="원장 요약">
@@ -90,14 +131,14 @@
 					<div class="no-bar -mx-5 overflow-x-auto px-5 lg:mx-0 lg:px-0">
 						<div class="min-w-[560px]" role="table" aria-label="제조 차수">
 							<div role="row" class="grid {ROUND_COLS} items-end gap-x-4 border-b border-white/8 pb-2.5 text-[12.5px] leading-[1.3] font-semibold text-white/50">
-								<span role="columnheader">차수</span><span role="columnheader">입금 확인일</span><span role="columnheader">환급</span><span role="columnheader">메모 · 입력자</span><span role="columnheader" class="text-right">제조금액</span><span role="columnheader" class="text-right">보증금 (25%)</span>
+								<span role="columnheader">차수</span><span role="columnheader">입력일</span><span role="columnheader">환급</span><span role="columnheader">메모</span><span role="columnheader" class="text-right">제조금액</span><span role="columnheader" class="text-right">보증금 (25%)</span>
 							</div>
 							{#each v.rounds as r (r.n)}
 								<div role="row" class="grid {ROUND_COLS} min-h-14 items-center gap-x-4 border-b border-white/5 py-1.5 text-[14.5px] tabular-nums {r.void ? 'line-through opacity-45' : ''}">
 									<span role="cell">{r.n}</span>
-									<span role="cell" class={r.deposit.wait ? 'font-semibold text-danger-fg' : ''}>{r.deposit.label}</span>
+									<span role="cell">{r.entered}</span>
 									<span role="cell" class={REFUND_CLS[r.refund.tone]}>{r.refund.label}</span>
-									<span role="cell" class="truncate text-white/60">{r.memo}</span>
+									<span role="cell" class="truncate text-white/75">{r.memo}</span>
 									<span role="cell" class="text-right font-bold">{r.amountText}</span>
 									<span role="cell" class="text-right">{r.depositText}</span>
 								</div>
@@ -126,26 +167,23 @@
 					</div>
 					{#if !v.offsets.length}<p class="pt-[22px] pb-2 text-center text-[13.5px] leading-normal text-white/55">{v.offsetsEmpty}</p>{/if}
 				</section>
+
+				<!-- 모바일 — 정보 카드 · 안내 · 버튼은 맨 아래(시안) -->
+				<div class="flex flex-col gap-3.5 lg:hidden">
+					<section class="rounded-3xl border border-white/8 bg-white/3 p-5">{@render infoCard()}</section>
+					{@render note()}
+					{@render buttons()}
+				</div>
 			</div>
 
-			<!-- 오른쪽 패널 — 원장 정보 · 안내 · 버튼 -->
-			<aside class="flex flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-5 lg:sticky lg:top-7 lg:p-6">
+			<!-- 오른쪽 패널(PC) — 상환 · 보증금 칩 · 크리에이터 · 판매 상태 · 안내 · 버튼 -->
+			<aside class="hidden flex-col gap-5 rounded-3xl border border-white/8 bg-white/3 p-6 lg:sticky lg:top-7 lg:flex">
 				<div>
-					<div class="mb-3.5 flex flex-wrap items-center gap-2">
-						<h2 class="text-[17px] font-extrabold tracking-[-0.01em]">원장</h2>
-						{#each v.chips as c (c.label)}<Chip label={c.label} tone={c.tone} />{/each}
-					</div>
-					<dl>
-						<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><dt class="shrink-0 text-white/60">상품</dt><dd class="min-w-0 truncate text-right font-semibold">{v.name}</dd></div>
-						<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><dt class="shrink-0 text-white/60">크리에이터</dt><dd class="min-w-0 truncate text-right font-semibold">{v.creator.name} {v.creator.handle}</dd></div>
-						<div class="flex min-h-[38px] items-center justify-between gap-4 text-[15px]"><dt class="shrink-0 text-white/60">판매 상태</dt><dd><Chip label={v.statusChip.label} tone={v.statusChip.tone} /></dd></div>
-					</dl>
+					<div class="mb-3.5 flex flex-wrap items-center gap-2">{#each v.chips as c (c.label)}<Chip label={c.label} tone={c.tone} />{/each}</div>
+					{@render infoCard()}
 				</div>
-				<p class="rounded-[14px] border border-white/8 bg-white/4 px-4 py-[13px] text-[13.5px] leading-normal font-semibold text-white/60">{v.note}</p>
-				<div class="flex flex-col gap-2">
-					<Btn kind="primary" full onclick={() => soon('제조 차수 추가')}>제조 차수 추가</Btn>
-					<Btn kind="ghost" full disabled={!v.can.fix} onclick={openFix}>금액 정정</Btn>
-				</div>
+				{@render note()}
+				{@render buttons()}
 			</aside>
 		</div>
 	</div>
@@ -153,32 +191,37 @@
 
 {#if v && fixOpen}
 	<Modal
-		title="금액 정정"
-		desc={chosen ? `${v.name} · ${chosen.n} · 지금 ${chosen.amountText}` : v.name}
+		title="정정"
+		desc="{v.name} · {v.creator.name}"
 		ok="정정"
-		info="올바른 금액으로 새 차수를 만들고 고른 차수는 무효로 남겨요 · 이미 상계한 금액은 그대로예요{chosen && !chosen.deposit.wait ? ' · 보증금 입금 확인일도 새 차수로 옮겨요' : ''}"
-		disabled={!chosen || !amountIn.trim() || !reason.trim()}
+		sure="정말 정정하기"
+		sureKind="primary"
+		sureInfo={chosen && changes.length ? `${chosen.n} · ${changes.join(' · ')}` : undefined}
+		info="금액을 정정하면 보증금과 남은 제조금액을 다시 계산해요"
+		infoTone="grey"
+		disabled={!chosen || !amountN || !changes.length}
 		onclose={() => (fixOpen = false)}
 		onok={() => {
 			fixOpen = false;
-			soon('금액 정정 저장');
+			soon('정정 저장');
 		}}
 	>
-		<Field label="고칠 차수">
-			<span class="relative block">
-				<select bind:value={fixN} class="{INPUT} appearance-none pr-10">
-					{#each fixable as r (r.n)}
-						<option value={r.n} disabled={!r.fix?.ok}>{r.n} · {r.amountText} · {r.memo}{r.fix?.ok ? '' : ` — ${r.fix?.why}`}</option>
-					{/each}
-				</select>
-				<span class="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-white/55"><Icon id="down" size={14} sw={2.2} /></span>
-			</span>
+		<div class="flex flex-col gap-1.5">
+			<p class="text-[13px] font-semibold text-white/80">차수</p>
+			<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="차수">
+				{#each fixable as r (r.n)}
+					<button type="button" role="radio" aria-checked={fixN === r.n} onclick={() => pick(r.n)} class="h-[42px] rounded-xl border px-[15px] text-[13.5px] font-semibold transition-colors {fixN === r.n ? 'border-accent bg-accent/12 text-accent' : 'border-white/12 text-white/70 hover:border-white/30'}">{r.n}</button>
+				{/each}
+			</div>
+		</div>
+		<Field label="제조금액" hint={chosen ? products.fixHint(chosen.amount, amountIn) : undefined}>
+			<div class="relative">
+				<span class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-[15px] font-bold text-white/55">₩</span>
+				<input value={amountIn} oninput={(e) => (amountIn = fmt(e.currentTarget.value))} inputmode="numeric" class="{INPUT} pl-9 font-bold tabular-nums" />
+			</div>
 		</Field>
-		<Field label="올바른 제조금액">
-			<input bind:value={amountIn} inputmode="numeric" placeholder="예: 800,000" class={INPUT} />
-		</Field>
-		<Field label="정정 사유" count="{reason.length}/200">
-			<textarea bind:value={reason} rows="3" maxlength="200" placeholder="무엇을 잘못 넣었는지 적어 주세요" class={TEXTAREA}></textarea>
+		<Field label="메모">
+			<input bind:value={memoIn} maxlength="40" placeholder="예: 초도 2,000포" class={INPUT} />
 		</Field>
 	</Modal>
 {/if}

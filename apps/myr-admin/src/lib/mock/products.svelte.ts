@@ -104,17 +104,16 @@ function ledSum(l: LedgerRaw) {
 	const total = alive.reduce((a, r) => a + r.amount, 0);
 	const repaid = Math.min(total, l.offsets.reduce((a, o) => a + o.amount, 0));
 	const remain = total - repaid;
-	const depWait = alive.some((r) => !r.depositAt);
-	const depKeep = alive.some((r) => r.depositAt && !r.refunded);
+	// 보증금은 제조금액을 입력할 때 운영이 따로 받아 둔다 — 입력하면 바로 보관 중 · 다 갚으면 환급 완료(시안 2026-11-27 · 입금 확인 단계 없음)
+	const depKeep = alive.some((r) => !r.refunded);
 	return {
 		total,
 		repaid,
 		remain,
 		deposit: depositOf(total),
 		pct: total ? Math.round((repaid / total) * 100) : 0,
-		depWait,
 		stateChip: (remain ? { label: '상환 중', tone: 'orange' } : { label: '상환 완료', tone: 'grey' }) as Chip,
-		depChip: (depWait ? { label: '보증금 입금 확인 전', tone: 'red' } : depKeep ? { label: '보증금 보관 중', tone: 'orange' } : { label: '보증금 환급 완료', tone: 'grey' }) as Chip
+		depChip: (depKeep ? { label: '보증금 보관 중', tone: 'orange' } : { label: '보증금 환급 완료', tone: 'grey' }) as Chip
 	};
 }
 
@@ -612,10 +611,13 @@ class ProductsServer {
 			barText: `${l.pct}% 상계 · ${l.remain ? '상환 중' : '상환 완료'}`,
 			rounds: p.ledger.rounds.map((r) => ({
 				n: `${r.n}차`,
-				// 입금 확인일 — 무효 차수는 기다리지 않으니 "—", 아직이면 "확인 전"(빨강)
-				deposit: r.depositAt ? { label: r.depositAt, wait: false } : r.void ? { label: '—', wait: false } : { label: '확인 전', wait: true },
-				refund: (r.void ? { label: '무효', tone: 'dim' } : !r.depositAt ? { label: '—', tone: 'dim' } : r.refunded ? { label: '환급 완료', tone: 'plain' } : { label: '보관 중', tone: 'grey' }) as { label: string; tone: 'dim' | 'plain' | 'grey' },
-				memo: `${r.memo || '메모 없음'} · ${r.by.replace('운영 ', '')}`,
+				// 입력일(시안) — 없으면 "—"
+				entered: r.depositAt ?? '—',
+				refund: (r.void ? { label: '무효', tone: 'dim' } : r.refunded ? { label: '환급 완료', tone: 'plain' } : { label: '보관 중', tone: 'grey' }) as { label: string; tone: 'dim' | 'plain' | 'grey' },
+				memo: r.memo || '메모 없음',
+				/** [정정] 창 — 고른 차수의 지금 금액 · 메모를 채워 둔다 */
+				amount: r.amount,
+				memoRaw: r.memo,
 				amountText: won(r.amount),
 				depositText: won(depositOf(r.amount)),
 				void: r.void,
@@ -624,8 +626,8 @@ class ProductsServer {
 			})),
 			offsets: offsets.reverse(),
 			offsetsEmpty: '아직 상계한 금액이 없어요 · 첫 정산에서 상계가 시작돼요',
-			note: '제조금액은 매달 정산금에서 상계해요 · 다 갚으면 보증금을 그 정산에서 돌려줘요',
-			// 오른쪽 패널 버튼 — [제조 차수 추가] · [금액 정정](고칠 수 있는 차수가 하나라도 있을 때)
+			note: '제조금액은 매달 정산금에서 상계해요, 다 갚으면 보증금을 그 정산에서 돌려줘요',
+			// 오른쪽 패널 버튼 — [제조 차수 추가] · [정정](고칠 수 있는 차수가 하나라도 있을 때)
 			can: { fix: p.ledger.rounds.some((r) => !r.void && !r.refunded) }
 		};
 	}
@@ -653,7 +655,7 @@ class ProductsServer {
 	/** 제조금액 칸 안내 — 적으면 보증금(25%)을 보여 준다 */
 	private amountHint(input: string) {
 		const a = this.amountOf(input);
-		return a.ok ? `보증금 (25%) ${won(depositOf(a.n))} · 크리에이터에게 입금 안내가 가요` : '보증금은 제조금액의 25%로 자동 계산해요';
+		return a.ok ? `보증금 (25%) ${won(depositOf(a.n))} · 입력하면 바로 보관 중으로 기록돼요` : '보증금은 제조금액의 25%로 자동 계산해요';
 	}
 
 	/** 승인 모달 안내 — 처음 재고 · 제조금액(§4-2 · 승인하면 원장이 함께 만들어진다) */
@@ -689,7 +691,7 @@ class ProductsServer {
 		const a = this.amountOf(amountIn);
 		if (!a.ok) return { ok: false, msg: a.msg! };
 		this.clearOps(id);
-		const ledger = { rounds: [rd(1, a.n, null, false, '', me())], offsets: [] };
+		const ledger = { rounds: [rd(1, a.n, TODAY_LABEL, false, '', me())], offsets: [] };
 		if (e.code) {
 			// 재고는 이벗에서 가져온다(목은 이벗 재고가 없어 비워 둔다 · 기능 단계에서 판매 가능 재고 함수)
 			this.patch(id, () => ({ status: 'live', ebutCode: e.code, stock: null, days: 0, submittedAt: null, ledger }), `승인 · 이벗 상품코드 ${e.code} · 제조금액 ${won(a.n)}`);
@@ -697,6 +699,12 @@ class ProductsServer {
 		}
 		this.patch(id, () => ({ status: 'live', stock: s.n, days: 0, submittedAt: null, ledger }), `승인 · 재고 ${s.n}개 · 제조금액 ${won(a.n)}`);
 		return { ok: true, msg: '승인했어요 · 샵에 올라갔고 제조금액 원장을 만들었어요' };
+	}
+
+	/** [정정] 창 제조금액 칸 안내 — 금액을 바꾸면 보증금 변화(시안 "보증금 (25%) ₩… → ₩…") */
+	fixHint(before: number, amountIn: string) {
+		const a = this.amountOf(amountIn);
+		return a.ok && a.n !== before ? `보증금 (25%) ${won(depositOf(before))} → ${won(depositOf(a.n))}` : undefined;
 	}
 
 	/** 제조금액 입력(원장이 없는 판매 중 상품 · §10-1) — 1차를 만든다 */
@@ -709,8 +717,8 @@ class ProductsServer {
 		if (p.ledger) return { ok: false, msg: '이미 원장이 있어요 · 원장에서 제조 차수를 추가해 주세요' };
 		const a = this.amountOf(amountIn);
 		if (!a.ok) return { ok: false, msg: a.msg! };
-		this.patch(id, () => ({ ledger: { rounds: [rd(1, a.n, null, false, memo.trim(), me())], offsets: [] } }), `제조금액 입력 · 1차 ${won(a.n)}`);
-		return { ok: true, msg: `1차 제조금액 ${won(a.n)}을 더했어요 · 보증금 ${won(depositOf(a.n))} 입금을 기다려요` };
+		this.patch(id, () => ({ ledger: { rounds: [rd(1, a.n, TODAY_LABEL, false, memo.trim(), me())], offsets: [] } }), `제조금액 입력 · 1차 ${won(a.n)}`);
+		return { ok: true, msg: `1차 제조금액 ${won(a.n)}을 더했어요 · 보증금 ${won(depositOf(a.n))} 보관 중` };
 	}
 
 	reject(id: string): { ok: boolean; msg: string } {

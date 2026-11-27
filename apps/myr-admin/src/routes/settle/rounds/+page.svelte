@@ -18,7 +18,7 @@
 	let month = $state(run.months[0]);
 
 	const SUBS = [
-		{ key: 'ledger', label: '제조 원장', href: '/settle' },
+		{ key: 'ledger', label: '제조금액 원장', href: '/settle' },
 		{ key: 'rounds', label: '월 정산', href: '/settle/rounds' }
 	];
 </script>
@@ -47,7 +47,8 @@
 </div>
 
 {#if runOpen}
-	<Modal title={run.title} desc={run.desc} ok={run.ok} sure={run.sure} info={run.info} infoTone="grey" onclose={() => (runOpen = false)} onok={() => settle.runRound().msg}>
+	<!-- 시안 runRound — 정산월 칩 · 회색 안내 상자 · 빨간 안내(아직 안 끝난 달) · [닫기] [실행](잠김) -->
+	<Modal title={run.title} desc={run.desc} ok={run.ok} info={run.info} disabled={!run.canRun} onclose={() => (runOpen = false)} onok={() => settle.runRound().msg}>
 		<div class="flex flex-col gap-1.5">
 			<p class="text-[13px] font-semibold text-white/80">정산월</p>
 			<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="정산월">
@@ -56,5 +57,6 @@
 				{/each}
 			</div>
 		</div>
+		{#if run.warn}<p class="rounded-xl bg-danger/10 px-3.5 py-3 text-[13px] leading-[1.55] font-semibold text-danger-fg">{run.warn}</p>{/if}
 	</Modal>
 {/if}

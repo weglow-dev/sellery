@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { won } from '$lib/format';
 	import { FAIL_META, server } from '$lib/mock/server.svelte';
@@ -6,7 +8,7 @@
 	import { payModal } from '$lib/pay-modal.svelte';
 	import { app } from '$lib/state.svelte';
 	import { NOTE_CLS } from '$lib/tone';
-	import { closeDrawer, setParams } from '$lib/url';
+	import { setParams } from '$lib/url';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import Btn from '$lib/components/Btn.svelte';
 	import Chip from '$lib/components/Chip.svelte';
@@ -14,11 +16,10 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import PageHead from '$lib/components/PageHead.svelte';
 	import PayoutButtons from '$lib/components/PayoutButtons.svelte';
-	import PayoutDrawer from '$lib/components/PayoutDrawer.svelte';
 	import SubFilter from '$lib/components/SubFilter.svelte';
 
 	/** 지급 — docs/myr-admin-screens.md §11. 자동 이체(영업일 오후 1시) 기준이라 이 화면의 일은 "보내기"가 아니라 막힌 것 · 예외 처리.
-	 *  머리(요약 · 다음 자동 이체 · 토스 잔액 · 마지막 실행) → 탭(실패가 있으면 기본 · 종류별 하위 필터) → 표(PC) / 카드(모바일) → 서랍(?id=).
+	 *  머리(요약 · 다음 자동 이체 · 토스 잔액 · 마지막 실행) → 탭(실패가 있으면 기본 · 종류별 하위 필터) → 표(PC) / 카드(모바일) → 줄을 누르면 지급 건 상세 페이지(/payouts/<id> · 2026-11-27 서랍 대신).
 	 *  상태 칩 · 안내 · 버튼 · 건수는 서버(목) 값 — 화면은 탭 소속(tabs) · 실패 종류(failKind) · 보류 이유(holdKinds)로 거르기만 한다 */
 	const meta = $derived(server.payoutTabs());
 	const all = $derived(server.payouts);
@@ -28,8 +29,6 @@
 
 	const tab = $derived(page.url.searchParams.get('tab') ?? meta.defaultTab);
 	const sub = $derived(page.url.searchParams.get('sub') ?? '');
-	const openId = $derived(page.url.searchParams.get('id'));
-	const open = $derived(openId ? all.find((p) => p.id === openId) : undefined);
 
 	const rows = $derived(
 		all.filter((p) => {
@@ -63,7 +62,13 @@
 	const allOn = $derived(rows.length > 0 && rows.every((r) => picked.includes(r.id)));
 
 	let moreOpen = $state(false);
-	const openRow = (id: string) => setParams(page.url, { id }, true);
+	const openRow = (id: string) => goto(`/payouts/${id}`);
+
+	// 예전 서랍 주소(?id=) — 상세 페이지로 넘긴다
+	onMount(() => {
+		const id = page.url.searchParams.get('id');
+		if (id) goto(`/payouts/${encodeURIComponent(id)}`, { replaceState: true });
+	});
 </script>
 
 <svelte:window onclick={() => (moreOpen = false)} />
@@ -153,7 +158,7 @@
 			</thead>
 			<tbody>
 				{#each rows as p (p.id)}
-					<tr onclick={() => openRow(p.id)} class="h-[60px] cursor-pointer border-b border-white/6 transition-colors last:border-b-0 hover:bg-white/4 {openId === p.id ? 'bg-white/5' : ''}">
+					<tr onclick={() => openRow(p.id)} class="h-[60px] cursor-pointer border-b border-white/6 transition-colors last:border-b-0 hover:bg-white/4">
 						<td class="pl-5" onclick={(e) => e.stopPropagation()}><input type="checkbox" checked={picked.includes(p.id)} onchange={() => toggle(p.id)} aria-label="{p.name} 선택" class="h-4 w-4 accent-[#ff7a3d]" /></td>
 						<td>
 							<span class="flex items-center gap-2.5">
@@ -215,6 +220,3 @@
 	</div>
 {/if}
 
-{#if open}
-	<PayoutDrawer p={open} onclose={() => closeDrawer(page.url)} />
-{/if}

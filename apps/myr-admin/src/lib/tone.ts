@@ -7,7 +7,9 @@ export const CHIP_CLS: Record<Tone, string> = {
 	orange: 'bg-accent/16 text-accent',
 	grey: 'bg-white/8 text-white/70',
 	lilac: 'bg-lilac/16 text-lilac',
-	plain: 'bg-white/6 text-white/70'
+	plain: 'bg-white/6 text-white/70',
+	/** 흰 글자 칩(시안 white — 정산 회차 상세 "지급 ₩…") */
+	white: 'bg-white/12 text-fg'
 };
 
 /** 안내 한 줄 글자색 */
@@ -17,7 +19,8 @@ export const NOTE_CLS: Record<Tone, string> = {
 	orange: 'text-accent',
 	grey: 'text-white/55',
 	lilac: 'text-lilac',
-	plain: 'text-white/60'
+	plain: 'text-white/60',
+	white: 'text-fg'
 };
 
 /** 점(상태 표시) */
@@ -27,5 +30,6 @@ export const DOT_CLS: Record<Tone, string> = {
 	orange: 'bg-accent',
 	grey: 'bg-white/40',
 	lilac: 'bg-lilac',
-	plain: 'bg-white/30'
+	plain: 'bg-white/30',
+	white: 'bg-white'
 };
