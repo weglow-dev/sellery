@@ -8,11 +8,11 @@
 	import SearchBox from '$lib/components/SearchBox.svelte';
 	import SubNav from '$lib/components/SubNav.svelte';
 
-	/** CS 관리 · 교환 · 환불 요청 목록 — docs/myr-admin-screens.md §8-1. SubNav(교환 · 환불 | 고객 문의) → 요약 → 탭(교환 · 환불 · 회수 확인 필요(기본 · 운영 할 일) · 환불할 차례(운영 할 일) · 처리 대기 · 완료 · 반려 · 전체 — 한 요청이 두 탭에 보일 수 있다) → 검색 → 줄 → 요청 상세(/cs/[id]).
+	/** CS 관리 · 교환 · 환불 요청 목록 — docs/myr-admin-screens.md §8-1. SubNav(교환 · 환불 | 고객 문의) → 요약 → 탭(시안 2026-11-27 — 교환(기본) · 환불 · 회수 확인 필요 · 완료 · 전체 · 처리 대기 · 반려 요청은 고객 문의에서 — 한 요청이 두 탭에 보일 수 있다) → 검색 → 줄 → 요청 상세(/cs/[id]).
 	 *  칩 · 기한 문구 · 건수 · 빈 상태 문구는 서버(목) 값 — 화면은 탭(?tab=) · 검색어만 넘긴다. 크리에이터 답변 기한 넘김은 빨간 글자(표시만 · 운영 처리 조건이 아니다) */
 	const subs = $derived(cs.subs());
 	const tabs = $derived(cs.claimTabs());
-	const tab = $derived((page.url.searchParams.get('tab') ?? 'collect') as ClaimTab);
+	const tab = $derived((page.url.searchParams.get('tab') ?? 'exchanges') as ClaimTab);
 	let q = $state('');
 	const list = $derived(cs.claims({ tab, q }));
 </script>
@@ -26,12 +26,12 @@
 
 	<div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
 		<FilterTabs {tabs} value={tab} label="요청 단계" onpick={(id) => setParams(page.url, { tab: id })} />
-		<SearchBox bind:value={q} placeholder="요청번호 · 주문번호 · 상품 · 크리에이터" label="요청 검색" />
+		<SearchBox bind:value={q} placeholder="검색" label="요청 검색(요청번호 · 주문번호 · 상품 · 크리에이터)" />
 	</div>
 
 	<ListBox n={list.rows.length} empty={list.empty}>
 		{#each list.rows as r (r.id)}
-			<ListRow href="/cs/{r.id}" thumb={r.thumb} chips={r.chips} meta={r.meta} title={r.title} sub={r.sub} right={r.right} rightSub={r.rightSub || undefined} rightSubTone={r.rightSubTone} />
+			<ListRow href={r.href} thumb={r.thumb} chips={r.chips} meta={r.meta} title={r.title} sub={r.sub} right={r.right} rightSub={r.rightSub || undefined} rightSubTone={r.rightSubTone} />
 		{/each}
 	</ListBox>
 </div>

@@ -532,7 +532,7 @@ class MockServer {
 			products: { n: products.counts.newReview + products.counts.revReview, hot: false },
 			creators: { n: c.settleWait + o.creators.inviteAsk, hot: false },
 			orders: { n: orders.counts.ebutFail, hot: orders.counts.ebutFail > 0 },
-			cs: { n: cs.counts.inqOpen + cs.counts.refundRetry + cs.counts.pickup, hot: cs.counts.inqLate + cs.counts.refundRetry + cs.counts.pickupFail + cs.counts.creatorLate > 0 },
+			cs: { n: cs.counts.inqOpen + cs.counts.pending + cs.counts.refundRetry + cs.counts.pickupWay + cs.counts.pickupFail, hot: cs.counts.inqLate + cs.counts.creatorLate + cs.counts.refundRetry + cs.counts.pickupFail > 0 },
 			talk: { n: talk.counts.waiting, hot: false },
 			settle: { n: products.counts.noLedger + settle.counts.heldLines, hot: false },
 			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
@@ -579,10 +579,9 @@ class MockServer {
 				chip('배송 완료 예외', orders.counts.noDelivered, 'orange', '/orders?tab=shipping')
 			]),
 			row('cs', 'CS', 'm_claims', '/cs', [
-				chip('환불 다시 필요', cs.counts.refundRetry, 'red', '/cs?tab=refund'),
-				chip('회수 접수 실패', cs.counts.pickupFail, 'red', '/cs?tab=collect'),
-				chip('회수 확인 필요', cs.counts.pickup - cs.counts.pickupFail, 'orange', '/cs?tab=collect'),
-				chip('자동 발송', cs.counts.resend, 'grey', '/cs?tab=exchanges')
+				chip('환불 실패', cs.counts.refundRetry, 'red', '/cs?tab=refunds'),
+				chip('회수 신청 실패', cs.counts.pickupFail, 'red', '/cs?tab=all'),
+				chip('회수 확인 필요', cs.counts.pickupWay, 'orange', '/cs?tab=collect')
 			]),
 			row('talk', '파트너팀 톡', 'm_talk', '/talk', [chip('답할 차례', talk.counts.waiting, 'orange', '/talk?tab=wait')]),
 			row('creators', '크리에이터', 'm_creators', '/creators', [
