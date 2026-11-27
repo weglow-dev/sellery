@@ -5,7 +5,7 @@
 	import Btn from './Btn.svelte';
 
 	/** 지급 건 버튼 — 어떤 버튼이 보일지는 서버 값 actions(§11-1 상태별 버튼). max = 표 줄에서 보일 개수.
-	 *  지급 완료 기록은 서버가 맨 앞에 둔 경우(결과 확인 필요)만 버튼 — 그 밖에는 서랍 아래 글자 링크 */
+	 *  지급 완료 기록은 서버가 맨 앞에 둔 경우(결과 확인 필요)만 버튼 — 그 밖에는 지급 건 상세 아래 글자 링크 */
 	let { p, sm = false, max = 9, full = false }: { p: PayoutView; sm?: boolean; max?: number; full?: boolean } = $props();
 
 	const LABEL: Record<PayoutAction, string> = {

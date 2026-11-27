@@ -490,7 +490,7 @@ class MockServer {
 					}
 				: null,
 			products: ps.rows,
-			payouts: pays.map((p) => ({ id: p.id, month: p.month, reason: p.holdText ?? '—', reasonRed: !!p.holdText, chip: p.chips[0], amountText: won(p.amount), href: `/payouts?tab=all&id=${p.id}` })),
+			payouts: pays.map((p) => ({ id: p.id, month: p.month, reason: p.holdText ?? '—', reasonRed: !!p.holdText, chip: p.chips[0], amountText: won(p.amount), href: `/payouts/${p.id}` })),
 			activity: [
 				{ at: this.crJoined(c), text: '초대 링크로 가입했어요', who: '' },
 				...(c.biz ? [{ at: c.biz.submittedAt, text: '사업자 · 정산 정보를 제출했어요', who: '' }] : []),
@@ -534,7 +534,7 @@ class MockServer {
 			orders: { n: orders.counts.ebutFail, hot: orders.counts.ebutFail > 0 },
 			cs: { n: cs.counts.inqOpen + cs.counts.pending + cs.counts.refundRetry + cs.counts.pickupWay + cs.counts.pickupFail, hot: cs.counts.inqLate + cs.counts.creatorLate + cs.counts.refundRetry + cs.counts.pickupFail > 0 },
 			talk: { n: talk.counts.waiting, hot: false },
-			settle: { n: products.counts.noLedger + settle.counts.heldLines, hot: false },
+			settle: { n: settle.counts.noMfg, hot: false },
 			payouts: { n: c.check.length + c.ops.length + c.account.length, hot: c.check.length + c.ops.length + c.account.length > 0 },
 			tax: { n: c.taxChk.length + c.taxOverdue, hot: c.taxOverdue > 0 }
 		};
@@ -589,8 +589,7 @@ class MockServer {
 				chip('토스 인증 대기', this.creators.filter((x) => x.tabs.includes('toss')).length, 'grey', '/creators?tab=wait')
 			]),
 			row('settle', '정산', 'm_settle', '/settle', [
-				chip('제조금액 미입력', pc.noLedger, 'orange', '/settle?tab=none'),
-				chip('보류된 정산', settle.counts.heldLines, 'orange', '/settle')
+				chip('제조금액 미입력', settle.counts.noMfg, 'red', '/settle?tab=none')
 			]),
 			row('payouts', '지급', 'm_payouts', '/payouts', [
 				chip('운영 확인 필요', opsN, 'red', '/payouts?tab=fail'),

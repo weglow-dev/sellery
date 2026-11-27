@@ -8,7 +8,7 @@ import { ME } from './seed';
 import { server } from './server.svelte';
 import type { Chip, Tone } from './types';
 
-const won = (n: number) => `₩${n.toLocaleString('ko-KR')}`;
+const won = (n: number) => `${n < 0 ? '−₩' : '₩'}${Math.abs(n).toLocaleString('ko-KR')}`;
 /** 목의 오늘(seed.ts NOW · 11월 17일) — 보증금 입금 확인일 거절 */
 const TODAY = '2026-11-17';
 const NEXT_AT = '12월 1일(화) 오후 1시';
@@ -26,7 +26,7 @@ const chip = (label: string, tone: Tone): Chip => ({ label, tone });
 export interface LedgerRound {
 	n: number;
 	amount: number;
-	/** 보증금 입금 확인일 — 없으면 확인 전 */
+	/** 입력일(시안 "입력일") — 보증금은 제조금액을 입력할 때 운영이 따로 받아 둔다(입금 확인 단계 없음 · 2026-11-27) */
 	depositAt: string;
 	refunded: boolean;
 	memo: string;
@@ -94,17 +94,11 @@ export interface LedgerRow {
 	title: string;
 	sub: string;
 	bar?: { pct: number; text: string };
-	right: string;
+	right?: string;
 	rightTone: 'plain' | 'grey';
-	rightSub: string;
-	/** 원장이 있으면 상세 주소 · 없으면 제조금액 입력 모달 */
+	rightSub?: string;
+	/** 원장이 있으면 상세 주소 · 없으면 제조금액 입력 모달(+ 줄의 [제조금액 입력]) */
 	href: string | null;
-}
-export interface AlertGroup {
-	key: 'held' | 'noLedger';
-	title: string;
-	sub: string;
-	items: { id: string; thumb: { tile: string; icon: string }; title: string; sub: string }[];
 }
 export interface LedgerDetail {
 	id: string;
@@ -117,7 +111,7 @@ export interface LedgerDetail {
 	tables: SettleTable[];
 	side: { product: string; creator: string; status: Chip };
 	note: string;
-	can: { deposit: boolean; fix: boolean; void: boolean };
+	can: { fix: boolean; void: boolean };
 }
 export interface RoundRow {
 	month: string;
@@ -135,7 +129,8 @@ export interface RoundDetail {
 	month: string;
 	title: string;
 	sub: string;
-	stats: { k: string; v: string; tone?: Tone | 'plain' }[];
+	/** op — 값 앞 연산 기호(− + =) · note — 값 아래 작은 글씨(지급 합계 "(환불 차감 −₩…)" · 지난 회차 정산 뒤 환불) */
+	stats: { k: string; v: string; tone?: Tone | 'plain'; op?: string; note?: string }[];
 	bar: { pct: number; text: string };
 	groups: { creatorId: string; name: string; handle: string; chips: Chip[]; payoutHref: string; table: SettleTable }[];
 }
@@ -253,8 +248,8 @@ class SettleServer {
 		const live = l.rounds.filter((r) => !r.void);
 		const total = live.reduce((a, r) => a + r.amount, 0);
 		const remain = Math.max(0, total - l.offset);
-		const wait = live.some((r) => !r.depositAt);
-		const keep = live.some((r) => r.depositAt && !r.refunded);
+		// 보증금은 제조금액을 입력할 때 운영이 따로 받아 둔다 — 입력하면 바로 보관 중 · 다 갚으면 환급 완료(시안 · 입금 확인 단계 없음)
+		const keep = live.some((r) => !r.refunded);
 		return {
 			raw: l,
 			rounds: l.rounds,
@@ -265,13 +260,12 @@ class SettleServer {
 			dep: live.reduce((a, r) => a + r.amount * 0.25, 0),
 			st: (remain ? 'repay' : 'done') as 'repay' | 'done',
 			stChip: remain ? chip('상환 중', 'orange') : chip('상환 완료', 'grey'),
-			depChip: wait ? chip('보증금 입금 확인 전', 'red') : keep ? chip('보증금 보관 중', 'orange') : chip('보증금 환급 완료', 'grey'),
-			waitDep: wait
+			depChip: keep ? chip('보증금 보관 중', 'orange') : chip('보증금 환급 완료', 'grey')
 		};
 	}
-	/** 원장 화면이 다루는 상품 — 판매 중 · 일시중지 · 판매 종료 */
+	/** 원장 화면이 다루는 상품 — 판매 중 · 일시중지 · (원장이 있는) 판매 종료 */
 	private get scope() {
-		return PRODUCTS.filter((p) => p.status === 'live' || p.status === 'paused' || p.status === 'ended');
+		return PRODUCTS.filter((p) => p.status === 'live' || p.status === 'paused' || (p.status === 'ended' && !!this.ledgerOf(p.id)));
 	}
 	/** 판매 중인데 원장이 없는 상품(보류된 줄이 있는 상품은 보류 묶음에서) */
 	private get noLedger() {
@@ -285,7 +279,7 @@ class SettleServer {
 	// ───────── 홈 · 메뉴 숫자 ─────────
 
 	get counts() {
-		return { noLedger: this.noLedger.length, heldLines: this.heldOpen.length, nextAt: NEXT_AT, dday: DDAY };
+		return { noLedger: this.noLedger.length, heldLines: this.heldOpen.length, noMfg: this.scope.filter((p) => !this.led(p.id)).length, nextAt: NEXT_AT, dday: DDAY };
 	}
 
 	// ───────── 제조 원장 목록 ─────────
@@ -298,10 +292,10 @@ class SettleServer {
 		const all = this.scope.map((p) => this.led(p.id));
 		const n = (f: (x: ReturnType<SettleServer['led']>) => boolean) => all.filter(f).length;
 		return [
-			{ id: 'all', name: '전체', count: all.length },
 			{ id: 'repay', name: '상환 중', count: n((x) => x?.st === 'repay') },
 			{ id: 'done', name: '상환 완료', count: n((x) => x?.st === 'done') },
-			{ id: 'none', name: '원장 없음', count: n((x) => !x), hot: true }
+			{ id: 'none', name: '제조금액 없음', count: n((x) => !x), hot: true },
+			{ id: 'all', name: '전체', count: all.length }
 		];
 	}
 
@@ -330,38 +324,16 @@ class SettleServer {
 							thumb: this.thumb(p),
 							chips: [chip('제조금액 확인 중', 'red')],
 							title: p.name,
-							sub: `${c.name} · 원장이 없어요 · 정산이 보류돼요`,
-							right: '—',
+							sub: ((h) => (h ? `${c.name} · 제조금액이 없어요 · 10월분 정산금 ${won(h.settle)} 보류 중` : `${c.name} · 제조금액이 없어요 · 정산이 보류돼요`))(this.heldOpen.find((x) => x.productId === p.id)),
 							rightTone: 'grey',
-							rightSub: '남은 제조금액',
 							href: null
 						}
 			);
 	}
 
-	/** 맨 위 빨간 카드 두 묶음(§10-1) — 보류된 정산 · 판매 중인데 원장이 없는 상품 */
-	alerts(): AlertGroup[] {
-		const held = this.heldOpen;
-		const out: AlertGroup[] = [];
-		if (held.length)
-			out.push({
-				key: 'held',
-				title: '보류된 정산',
-				sub: '제조금액을 입력하면 다음 정산에서 지급돼요',
-				items: held.map((l) => {
-					const p = productOf(l.productId);
-					return { id: p.id, thumb: this.thumb(p), title: p.name, sub: `${creatorOf(l.creatorId).name} · 10월분 보류 · 정산금 ${won(l.settle)}` };
-				})
-			});
-		const none = this.noLedger;
-		if (none.length)
-			out.push({
-				key: 'noLedger',
-				title: '판매 중인데 원장이 없는 상품',
-				sub: '정산일 전에 입력하지 않으면 정산이 보류돼요',
-				items: none.map((p) => ({ id: p.id, thumb: this.thumb(p), title: p.name, sub: `${creatorOf(p.creatorId).name} · ${p.days}일 전 승인 · 아직 정산 전` }))
-			});
-		return out;
+	/** 제조금액 없음 탭 위 주황 띠(시안 — 위쪽 알림 카드는 없앴다 · 제조금액이 없는 상품은 이 탭에서 한 번만) */
+	ledgerBand(tab: LedgerTab): string | null {
+		return tab === 'none' && this.scope.some((p) => !this.led(p.id)) ? '제조금액이 입력되지 않으면 정산이 보류돼요 · 정산일 전에 입력하면 다음 정산에서 지급돼요' : null;
 	}
 
 	// ───────── 제조 원장 상세 ─────────
@@ -408,7 +380,7 @@ class SettleServer {
 			tables: [rounds, offsets],
 			side: { product: p.name, creator: `${c.name} ${c.handle}`, status: STATUS_CHIP[p.status] },
 			note: '제조금액은 매달 정산금에서 상계해요 · 다 갚으면 보증금을 그 정산에서 돌려줘요',
-			can: { deposit: l.waitDep, fix: hasLive, void: hasLive }
+			can: { fix: hasLive, void: hasLive }
 		};
 	}
 
@@ -424,7 +396,7 @@ class SettleServer {
 		return {
 			title: isNew ? '제조금액 입력' : '제조 차수 추가',
 			desc: `${p.name} · ${creatorOf(p.creatorId).name} · ${nth}차`,
-			hint: amount ? `보증금 (25%) ${won(amount * 0.25)} · 크리에이터에게 입금 안내가 가요` : '보증금은 제조금액의 25%로 자동 계산해요',
+			hint: amount ? `보증금 (25%) ${won(amount * 0.25)} · 입력하면 바로 보관 중으로 기록돼요` : '보증금은 제조금액의 25%로 자동 계산해요',
 			info: held ? `보류된 10월분 정산금 ${won(held.settle)}은 다음 정산(${NEXT_DAY})에서 지급돼요` : isNew ? '다음 정산부터 정산금에서 상계가 시작돼요' : '남은 제조금액에 더해져요 · 다음 정산부터 상계해요',
 			ok: held ? '보류 확정' : isNew ? '원장 만들기' : '차수 추가'
 		};
@@ -445,7 +417,8 @@ class SettleServer {
 			: { title: '무효', desc: `${p.name} · ${r.n}차 ${won(r.amount)}`, placeholder: '', why: '왜 무효로 하는지 적어 주세요', info: null, warn: '무효로 한 차수는 줄을 그어 남기고 계산에서 빠져요', ok: '무효', sure: '정말 무효로 하기' };
 	}
 	get runModal() {
-		return { title: '회차 수동 실행', desc: '자동 계산이 실패했을 때만 써요', months: ['11월분'], info: '회차는 매월 1일 오후 1시에 자동으로 계산하고 확정해요', ok: '실행', sure: '정말 실행하기' };
+		// 시안 — 고를 수 있는 달이 아직 안 끝났으면 빨간 안내를 먼저 보여 주고 [실행]은 잠근다
+		return { title: '회차 수동 실행', desc: '자동 계산이 실패했을 때만 써요', months: ['11월분'], info: '회차는 매월 1일 오후 1시에 자동으로 계산하고 확정해요', warn: '11월분은 아직 끝나지 않았어요 — 12월 1일 오후 1시부터 실행할 수 있어요', ok: '실행', canRun: false };
 	}
 
 	// ───────── 월 정산 회차 ─────────
@@ -456,7 +429,7 @@ class SettleServer {
 	}
 	private get octTotals() {
 		const live = this.lines.filter((l) => !l.hold);
-		const tot = (k: 'settle' | 'offset' | 'dep' | 'pay') => live.reduce((a, l) => a + l[k], 0);
+		const tot = (k: 'settle' | 'refund' | 'offset' | 'dep' | 'pay') => live.reduce((a, l) => a + l[k], 0);
 		const pays = this.payouts.filter((p) => p.amount);
 		const paid = pays.filter((p) => p.paid);
 		return { tot, pays, paid, paidSum: paid.reduce((a, p) => a + p.amount, 0), pct: pays.length ? Math.round((paid.length / pays.length) * 100) : 0 };
@@ -468,7 +441,7 @@ class SettleServer {
 	/** 보류가 안 풀린 줄이 있으면 빨간 띠 */
 	get roundsBand(): string | null {
 		const n = this.heldOpen.length;
-		return n ? `10월분에 보류된 정산이 ${n}건 있어요 · 제조 원장에서 제조금액을 입력해 주세요` : null;
+		return n ? `10월분에 보류된 정산이 ${n}건 있어요 · 제조금액 원장에서 제조금액을 입력해 주세요` : null;
 	}
 
 	rounds(): RoundRow[] {
@@ -512,14 +485,14 @@ class SettleServer {
 		const groups = [...byCreator.entries()].map(([creatorId, ls]) => {
 			const c = creatorOf(creatorId);
 			const pay = this.payouts.find((x) => x.creatorId === creatorId);
-			const chips: Chip[] = [chip(`지급 건 ${won(pay?.amount ?? 0)}`, 'plain'), ...(pay?.chips ?? [])];
+			const chips: Chip[] = [chip(`지급 ${won(pay?.amount ?? 0)}`, 'white'), ...(pay?.chips ?? [])];
 			if (pay?.paid) chips.push(chip(`${pay.paid.at.split(' 오')[0]} ${pay.paid.manual ? '지급 완료 기록' : '자동 이체'}`, 'grey'));
 			return {
 				creatorId,
 				name: c.name,
 				handle: c.handle,
 				chips,
-				payoutHref: `/payouts?tab=all&id=pay-${creatorId}`,
+				payoutHref: `/payouts/pay-${creatorId}`,
 				table: {
 					title: c.name,
 					cols: ROUND_COLS,
@@ -552,9 +525,9 @@ class SettleServer {
 			sub: '11월 1일 오후 1:00 자동 계산 · 확정',
 			stats: [
 				{ k: '정산금 합', v: won(tot('settle')) },
-				{ k: '상계 합', v: won(tot('offset')) },
-				{ k: '보증금 환급 합', v: won(tot('dep')) },
-				{ k: '지급 합계', v: won(tot('pay')), tone: 'orange' },
+				{ k: '상계 합', v: won(tot('offset')), op: '−' },
+				{ k: '보증금 환급 합', v: won(tot('dep')), op: '+' },
+				{ k: '지급 합계', v: won(tot('pay')), tone: 'orange', op: '=', note: tot('refund') ? `(환불 차감 ${won(-tot('refund'))})` : undefined },
 				{ k: '지급 진행', v: `${paid.length}/${pays.length}건` }
 			],
 			bar: { pct, text: `지급 완료 ${won(paidSum)} / ${won(tot('pay'))}` },
@@ -573,12 +546,12 @@ class SettleServer {
 		if (amount < 10000) return { ok: false, msg: '제조금액이 너무 작아요 — ₩10,000 이상으로 적어 주세요' };
 		const l = this.ledgerOf(productId);
 		const nth = l ? l.rounds.length + 1 : 1;
-		const r: LedgerRound = { n: nth, amount, depositAt: '', refunded: false, memo: memo.trim(), by: me(), void: false };
+		const r: LedgerRound = { n: nth, amount, depositAt: fd(TODAY), refunded: false, memo: memo.trim(), by: me(), void: false };
 		if (l) l.rounds.push(r);
 		else this.ledgersRaw.push({ productId, rounds: [r], offset: 0 });
 		const held = this.heldOpen.find((x) => x.productId === productId);
 		for (const x of this.linesRaw) if (x.productId === productId && x.hold) x.fixed = true;
-		return { ok: true, msg: held ? `보류를 확정했어요 · ${NEXT_DAY} 정산에서 지급돼요` : `${nth}차 제조금액 ${won(amount)}을 더했어요 · 보증금 ${won(amount * 0.25)} 입금을 기다려요` };
+		return { ok: true, msg: held ? `보류를 확정했어요 · ${NEXT_DAY} 정산에서 지급돼요` : `${nth}차 제조금액 ${won(amount)}을 더했어요 · 보증금 ${won(amount * 0.25)} 보관 중` };
 	}
 	confirmDeposit(productId: string, isoDate: string): Result {
 		if (!isoDate) return { ok: false, msg: '입금 확인일을 골라 주세요' };

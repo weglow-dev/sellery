@@ -3,7 +3,7 @@
 
 /** 칩 색 — docs/myr-admin-screens.md §1-2 (민트 = 대기 · 진행 · 빨강 = 보류 · 막힘 · 주황 = 주의 · 회색 = 끝남) */
 /** plain = 색 없음(보조 글자) — 안내 한 줄 · 할 일 칸에만 */
-export type Tone = 'mint' | 'red' | 'orange' | 'grey' | 'lilac' | 'plain';
+export type Tone = 'mint' | 'red' | 'orange' | 'grey' | 'lilac' | 'plain' | 'white';
 export interface Chip {
 	label: string;
 	tone: Tone;
