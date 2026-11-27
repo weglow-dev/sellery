@@ -16,13 +16,10 @@
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-7 lg:pb-14">
 	{#if d}
-		<!-- 머리(시안) — 뒤로 · "정산 · 월 정산" · 제목 · 오른쪽 계산 시각 -->
+		<!-- 머리 — 뒤로 · 제목 · 오른쪽 계산 시각(위 보조 글씨 "정산 · 월 정산"은 없앰 · 2026-11-27) -->
 		<div class="flex flex-wrap items-center gap-x-3.5 gap-y-2 lg:min-h-[52px] lg:flex-nowrap">
 			<a href="/settle/rounds" aria-label="월 정산 목록으로" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 hover:bg-white/6"><Icon id="back" size={18} sw={2.2} /></a>
-			<div class="min-w-0 flex-1 lg:flex-none">
-				<p class="text-[12.5px] font-semibold text-white/50">정산 · 월 정산</p>
-				<h1 class="truncate text-[22px] font-extrabold tracking-[-0.03em] lg:text-[28px]">{d.title}</h1>
-			</div>
+			<h1 class="min-w-0 flex-1 truncate text-[22px] font-extrabold tracking-[-0.03em] lg:flex-none lg:text-[28px]">{d.title}</h1>
 			<span class="hidden flex-1 lg:block"></span>
 			<span class="w-full text-[13px] text-white/50 tabular-nums lg:w-auto lg:text-[14px]">{d.sub}</span>
 		</div>
