@@ -1,6 +1,7 @@
 /** 상품(§4) 서버 흉내 — 목록 · 신규 심사 · 수정 심사 · 상품 관리의 판정 · 문구 · 동작(메모리 · 새로고침하면 시드로).
  *  기능 단계에서 RPC 로 바뀐다(0071~0074 상품 상태 · 수정본 · 반려 의견 — docs/myr-admin-plan.md). 화면은 여기서 받은 칩 · 안내 · 버튼 · 건수만 그린다. */
 import { won } from '../format';
+import { groupbuys } from './groupbuys.svelte';
 import { ME, NOW, seedCreators } from './seed';
 import type { Chip, LedgerRaw, LedgerRound, LogEntry, ProductOpinion, ProductRaw, ProductStatus, SecItem, SecNo } from './types';
 
@@ -292,6 +293,14 @@ class ProductsServer {
 		return { reviewN: c.newReview + c.revReview, liveN: c.live };
 	}
 
+	/** 상품 메뉴 안 화면 고르기(상품 | 공구 링크 · 2026-11-27 — 공구 링크 메뉴를 상품으로 합침) · 상품 배지 = 심사 대기(메뉴 배지와 같은 값) */
+	subs(): { key: string; label: string; href: string; n?: number }[] {
+		return [
+			{ key: 'products', label: '상품', href: '/products', n: this.summary.reviewN },
+			{ key: 'groupbuys', label: '공구 링크', href: '/products/groupbuys' }
+		];
+	}
+
 	tabs() {
 		const v = this.raw;
 		return [
@@ -319,6 +328,9 @@ class ProductsServer {
 			const c = this.creator(p.creatorId);
 			const kind: Kind = tab !== 'review' ? 'etc' : p.status === 'review' ? 'new' : this.openRev(p) ? 'rev' : 'etc';
 			const chips: Chip[] = [kind === 'new' ? { label: '신규 심사', tone: 'orange' } : kind === 'rev' ? { label: '수정 심사', tone: 'orange' } : STATUS_CHIP[p.status]];
+			/** 공구 칩(시안) — 판매 중 상품에 진행 중인 공구가 있으면 상태 칩 바로 뒤 "공구 중 15%"(공구 서버 값) */
+			const gb = p.status === 'live' && kind === 'etc' ? groupbuys.chipOf(p.id) : null;
+			if (gb) chips.push(gb);
 			if (this.openRev(p) && kind !== 'rev') chips.push({ label: '수정 심사 중', tone: 'orange' });
 			if (p.status === 'live' && soldOut(p)) chips.push({ label: '품절', tone: 'red' });
 			const meta =
@@ -414,6 +426,7 @@ class ProductsServer {
 			noLedgerNote: '제조금액 원장이 없어요 · 정산일 전에 제조금액을 입력하지 않으면 정산이 보류돼요',
 			sent: rejected(p.status) ? (p.sent ?? []).map(([k, t]) => ({ h: k ? `${k} ${SEC_NAME[k]}` : '전체', t })) : [],
 			log: p.log,
+			/** 공구 링크 칸(지금 공구 · 링크 주소 · 지난 공구) — 공구를 만든 적 없으면 null */
 			creator: c,
 			sideNote: p.status === 'ended' ? '판매 종료한 상품은 읽기 전용이에요' : rejected(p.status) ? '크리에이터가 고쳐서 다시 요청하면 신규 심사에 올라와요' : p.status === 'draft' ? '크리에이터가 아직 심사를 요청하지 않은 임시저장이에요' : null,
 			/** 오른쪽 패널 버튼(§4-4) — 서버가 정한다 */

@@ -5,12 +5,13 @@
 	import Chip from '$lib/components/Chip.svelte';
 	import FilterTabs from '$lib/components/FilterTabs.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import PageHead from '$lib/components/PageHead.svelte';
 	import ProductThumb from '$lib/components/ProductThumb.svelte';
+	import SubNav from '$lib/components/SubNav.svelte';
 
-	/** 상품 목록 — docs/myr-admin-screens.md §4-1 (시안 "MYR Admin PC" 상품 · 2026-11-25).
+	/** 상품 목록 — docs/myr-admin-screens.md §4-1 (시안 "MYR Admin PC" 상품 · 2026-11-25). SubNav(상품 | 공구 링크 — 2026-11-27 공구 링크 메뉴를 합침) → 요약 → 탭.
 	 *  탭 3개(심사 · 판매 중 · 판매 종료) · 표(상품코드 · 상품 · 카테고리 · 용량 · 가격 · 재고 · 상태 — 모바일은 같은 칸을 좁게 두고 옆으로 밀어서 본다).
 	 *  줄을 누르면 신규 심사 · 수정 심사 · 상품 관리. 칩 · 처리 시점 · 재고 색 · 정렬은 서버(목) 값 */
+	const subs = $derived(products.subs());
 	const tabs = $derived(products.tabs());
 	const summary = $derived(products.summary);
 	const t0 = $derived(page.url.searchParams.get('tab'));
@@ -24,12 +25,14 @@
 </script>
 
 <div class="animate-up-in px-5 pb-10 lg:mx-auto lg:max-w-[1240px] lg:px-10 lg:pt-8 lg:pb-16">
-	<PageHead title="상품" />
-
-	<!-- 탭(왼쪽) · 요약(오른쪽) — 큰 제목 없음(2026-11-26) -->
-	<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-		<FilterTabs {tabs} value={tab} label="상품 상태" onpick={(id) => setParams(page.url, { tab: id })} />
+	<h1 class="sr-only">상품</h1>
+	<!-- 하위 화면(왼쪽) · 요약(오른쪽) → 탭 — 큰 제목 없음(2026-11-26) -->
+	<div class="flex flex-col gap-3 lg:min-h-[52px] lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+		<SubNav items={subs} value="products" label="상품 화면" />
 		<p class="text-[13px] text-white/60 tabular-nums lg:text-[14px]">심사 대기 <b class="font-bold text-accent">{summary.reviewN}건</b> · 판매 중 {summary.liveN}개</p>
+	</div>
+	<div class="mt-5">
+		<FilterTabs {tabs} value={tab} label="상품 상태" onpick={(id) => setParams(page.url, { tab: id })} />
 	</div>
 
 	<!-- PC 표 -->
