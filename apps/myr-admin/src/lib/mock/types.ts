@@ -118,6 +118,8 @@ export type PayoutTab = 'fail' | 'hold' | 'ready' | 'sending' | 'paid' | 'none';
 export type PayoutAction = 'resend' | 'openCreator' | 'openTax' | 'hold' | 'release' | 'cancelPaid' | 'record';
 
 export interface PayoutView extends PayoutRaw {
+	/** 토스 요청 번호(서버 myr_payouts.transfer_ref · 0127) — 토스에 한 번이라도 보낸 건만 · 상점관리자 조회 · 문의용 */
+	tossRef: string | null;
 	name: string;
 	handle: string;
 	initial: string;

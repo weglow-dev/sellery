@@ -7,6 +7,7 @@
 	import { NOTE_CLS } from '$lib/tone';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import Chip from '$lib/components/Chip.svelte';
+	import CopyButton from '$lib/components/CopyButton.svelte';
 	import DetailCard from '$lib/components/DetailCard.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import KV from '$lib/components/KV.svelte';
@@ -94,6 +95,7 @@
 					{:else if p.nextTry}
 						<KV k="다음 시도"><span class="text-accent">{p.nextTry}</span></KV>
 					{/if}
+					{#if p.tossRef}<KV k="토스 요청 번호"><span class="inline-flex items-center gap-2 tabular-nums">{p.tossRef}<CopyButton text={p.tossRef} what="토스 요청 번호" /></span></KV>{/if}
 					{#if p.fail?.check}<KV k="보낸 시각">{p.fail.check.sentAt}</KV>{/if}
 					{#if p.opsHold}<KV k="운영 보류 메모"><span class="text-danger-fg">{p.opsHold.memo}</span><span class="mt-0.5 block text-[12px] font-medium text-white/55">{p.opsHold.by}</span></KV>{/if}
 					{#if p.memo}<KV k="운영 메모">{p.memo}</KV>{/if}

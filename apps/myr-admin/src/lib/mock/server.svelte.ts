@@ -220,7 +220,9 @@ class MockServer {
 			actions,
 			releaseLeft: holds.includes('ops') && left.length ? `해제해도 ${left.map((h) => HOLD_LABEL[h]).join(' · ')}이라 계속 보류돼요` : null,
 			taxId: this.taxOf(p.creatorId)?.id ?? null,
-			linesText: `${p.lines.length}줄${p.lines.some((l) => l.month.includes('보류 해제')) ? ' · 지난 달 보류분 포함' : ''}`
+			linesText: `${p.lines.length}줄${p.lines.some((l) => l.month.includes('보류 해제')) ? ' · 지난 달 보류분 포함' : ''}`,
+			// 토스 요청 번호(목 — 시안 payRef 형식) · 시도가 없으면 없음
+			tossRef: p.tries ? `MYR-2610-${p.creatorId.toUpperCase()}-${p.tries}` : null
 		};
 	};
 
